@@ -13,6 +13,7 @@ import Data.Text (Text)
 
 
 newtype Name = Name { unName :: Text }
+  deriving (Eq, Ord, Show)
 
 
 data Type ann =
@@ -27,6 +28,7 @@ data Type ann =
   | Maybe ann (Type ann)
   | List ann (Type ann)
   | Map ann (Type ann) (Type ann)
+  deriving Show
 
 
 data Term ann =

@@ -16,6 +16,8 @@ library
     OSL.Types.ErrorMessage
     OSL.Types.OSL
     OSL.Types.Sigma11
+    OSL.ValidContext
+    OSL.ValidateContext
 
   build-depends:
     base >= 4.9 && < 5,
