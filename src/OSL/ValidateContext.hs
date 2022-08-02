@@ -8,6 +8,7 @@ import Control.Monad (foldM)
 import qualified Data.Map as Map
 import Data.Text (pack)
 
+import OSL.Term (termAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..))
 import OSL.ValidContext (getDeclaration)
@@ -142,3 +143,17 @@ checkTerm c t x =
     AddZ ann -> checkTypeEquality c ann t (F ann (Z ann) (F ann (Z ann) (Z ann)))
     MulZ ann -> checkTypeEquality c ann t (F ann (Z ann) (F ann (Z ann) (Z ann)))
     ConstZ ann n -> checkTypeEquality c ann t (Z ann)
+    Cast ann ->
+      case t of
+        F _ a b -> checkTypeIsNumeric c a >> checkTypeIsNumeric c b
+        t -> Left . ErrorMessage ann $ "expected a " <> pack (show t) <> " but got cast"
+
+
+checkTypeIsNumeric :: ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
+checkTypeIsNumeric c t =
+  case t of
+    N _ -> return ()
+    Z _ -> return ()
+    Fin _ n -> return ()
+    NamedType ann name -> getNamedType c ann name >>= checkTypeIsNumeric c
+    t -> Left . ErrorMessage (termAnnotation t) $ "expected a numeric type but got " <> show t
