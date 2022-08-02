@@ -11,6 +11,9 @@ data-files: examples/*.s
 library
   exposed-modules:
     OSL.EntryPoint
+    OSL.Types.Arity
+    OSL.Types.DeBruijnIndex
+    OSL.Types.Sigma11
 
   build-depends:
     base >= 4.9 && < 5,
