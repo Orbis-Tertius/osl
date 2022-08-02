@@ -13,6 +13,7 @@ library
     OSL.EntryPoint
     OSL.Types.Arity
     OSL.Types.DeBruijnIndex
+    OSL.Types.OSL
     OSL.Types.Sigma11
 
   build-depends:

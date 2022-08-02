@@ -1,17 +1,22 @@
+{-# LANGUAGE DeriveGeneric #-}
+
+
 module OSL.Types.Sigma11
-  ( Name (..)
+  ( Name (Name)
   , Term (..)
   , Formula (..)
   ) where
 
 
 import Data.List.NonEmpty (NonEmpty)
+import GHC.Generics (Generic)
 
 import OSL.Types.Arity (Arity)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex)
 
 
-data Name = Name Arity DeBruijnIndex
+data Name = Name { arity :: Arity, deBruijnIndex :: DeBruijnIndex }
+  deriving Generic
 
 
 data Term =
