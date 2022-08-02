@@ -30,7 +30,7 @@ termAnnotation t =
     Let ann _ _ _ _ -> ann
     Just' ann -> ann
     Nothing' ann -> ann
-    Maybe' ann -> ann
+    Maybe' ann _ -> ann
     Exists ann -> ann
     Length ann -> ann
     Nth ann -> ann

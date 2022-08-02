@@ -55,7 +55,7 @@ data Term ann =
   | Let ann Name (Type ann) (Term ann) (Term ann)
   | Just' ann
   | Nothing' ann
-  | Maybe' ann
+  | Maybe' ann (Term ann)
   | Exists ann
   | Length ann
   | Nth ann
@@ -76,6 +76,7 @@ data Term ann =
   | MapFrom ann Name
   | SumMapLength ann
   | SumListLookup ann (Term ann)
+  deriving Show
 
 
 data Declaration ann =
