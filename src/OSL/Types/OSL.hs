@@ -18,7 +18,7 @@ newtype Name = Name { unName :: Text }
 
 data Type ann =
     Prop ann
-  | Function ann (Type ann) (Type ann)
+  | F ann (Type ann) (Type ann) -- functions
   | N ann -- natural numbers
   | Z ann -- integers
   | Fin ann Integer

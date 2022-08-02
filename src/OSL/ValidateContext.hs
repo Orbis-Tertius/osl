@@ -33,7 +33,7 @@ checkType :: ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
 checkType c t =
   case t of
     Prop _ -> return ()
-    Function _ a b -> checkType c a >> checkType c b
+    F _ a b -> checkType c a >> checkType c b
     N _ -> return ()
     Z _ -> return ()
     (Fin ann n) -> checkFinType ann n
@@ -68,7 +68,7 @@ checkQuantifiableType :: ValidContext ann -> Type ann -> Either (ErrorMessage an
 checkQuantifiableType c t =
   case t of
     Prop ann -> Left (ErrorMessage ann "expected a quantifiable type but got Prop")
-    Function _ a b -> checkFiniteDimType c a >> checkQuantifiableType c b
+    F _ a b -> checkFiniteDimType c a >> checkQuantifiableType c b
     N _ -> return ()
     Z _ -> return ()
     Fin ann n -> checkFinType ann n
@@ -84,7 +84,7 @@ checkFiniteDimType :: ValidContext ann -> Type ann -> Either (ErrorMessage ann) 
 checkFiniteDimType c t =
   case t of
     Prop ann -> Left (ErrorMessage ann "expected a finite-dimensional type but got Prop")
-    Function _ a b -> checkFiniteDimType c a >> checkFiniteDimType c b
+    F _ a b -> checkFiniteDimType c a >> checkFiniteDimType c b
     N _ -> return ()
     Z _ -> return ()
     Fin ann n -> checkFinType ann n
@@ -98,7 +98,7 @@ checkFiniteDimType c t =
 
 checkTypeEquality :: Show ann => ValidContext ann -> ann -> Type ann -> Type ann -> Either (ErrorMessage ann) ()
 checkTypeEquality _ _ (Prop _) (Prop _) = return ()
-checkTypeEquality c ann (Function _ a b) (Function _ a' b') =
+checkTypeEquality c ann (F _ a b) (F _ a' b') =
   checkTypeEquality c ann a a' >> checkTypeEquality c ann b b'
 checkTypeEquality _ _ (N _) (N _) = return ()
 checkTypeEquality _ _ (Z _) (Z _) = return ()
@@ -130,3 +130,15 @@ checkTerm c t x =
     NamedTerm ann name ->
       case getDeclaration c name of
         Just (Defined t' def) -> checkTypeEquality c ann t t'
+        Just (FreeVariable t') -> checkTypeEquality c ann t t'
+        Just (Data _) -> Left (ErrorMessage ann "expected a value but got a type")
+    AddN ann -> checkTypeEquality c ann t (F ann (N ann) (F ann (N ann) (N ann)))
+    MulN ann -> checkTypeEquality c ann t (F ann (N ann) (F ann (N ann) (N ann)))
+    ConstN ann n -> do
+      checkTypeEquality c ann t (N ann)
+      if n >= 0
+        then return ()
+        else Left (ErrorMessage ann "expected a natural number but got a negative integer")
+    AddZ ann -> checkTypeEquality c ann t (F ann (Z ann) (F ann (Z ann) (Z ann)))
+    MulZ ann -> checkTypeEquality c ann t (F ann (Z ann) (F ann (Z ann) (Z ann)))
+    ConstZ ann n -> checkTypeEquality c ann t (Z ann)
