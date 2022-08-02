@@ -4,6 +4,7 @@ module OSL.Types.OSL
   , Term (..)
   , Declaration (..)
   , Context (..)
+  , ValidContext (..)
   ) where
 
 
@@ -81,4 +82,7 @@ data Declaration =
   | Defined Type Term
 
 
-newtype Context = Context { unContext :: Map Name Declaration }
+newtype Context = Context { unContext :: [Declaration] }
+
+
+newtype ValidContext = ValidContext { unValidContext :: Map Name Declaration }
