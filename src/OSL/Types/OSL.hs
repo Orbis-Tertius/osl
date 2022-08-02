@@ -7,6 +7,7 @@ module OSL.Types.OSL
   ) where
 
 
+import Data.Map (Map)
 import Data.Text (Text)
 
 
@@ -75,9 +76,9 @@ data Term =
 
 
 data Declaration =
-    FreeVariable Name Type
-  | Data Name Type
-  | Def Name Type Term
+    FreeVariable Type
+  | Data Type
+  | Defined Type Term
 
 
-newtype Context = Context { unContext :: [Declaration] }
+newtype Context = Context { unContext :: Map Name Declaration }
