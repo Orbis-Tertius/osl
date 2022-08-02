@@ -10,8 +10,9 @@ data-files: examples/*.s
 
 library
   exposed-modules:
-    OSL.Term
     OSL.EntryPoint
+    OSL.Term
+    OSL.Type
     OSL.Types.Arity
     OSL.Types.DeBruijnIndex
     OSL.Types.ErrorMessage

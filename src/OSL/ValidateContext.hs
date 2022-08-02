@@ -8,7 +8,7 @@ import Control.Monad (foldM)
 import qualified Data.Map as Map
 import Data.Text (pack)
 
-import OSL.Term (termAnnotation)
+import OSL.Type (typeAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..))
 import OSL.ValidContext (getDeclaration)
@@ -147,13 +147,41 @@ checkTerm c t x =
       case t of
         F _ a b -> checkTypeIsNumeric c a >> checkTypeIsNumeric c b
         t -> Left . ErrorMessage ann $ "expected a " <> pack (show t) <> " but got cast"
+    ConstFin ann n ->
+      case t of
+        Fin _ m ->
+          if n < 0
+          then Left . ErrorMessage ann $ "expected an element of a finite type but got a negative number"
+          else if n >= m
+          then Left . ErrorMessage ann $ "expected an element of Fin(" <> pack (show m) <> ") but got " <> pack (show n)
+          else return ()
+        _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t) <> " but got a constant of a finite type"
+    Pair ann0 ->
+      case t of
+        F ann1 a (F ann2 b (Product _ a' b')) -> do
+          checkTypeEquality c ann1 a a'
+          checkTypeEquality c ann2 b b'
+        _ -> Left . ErrorMessage ann0 $ "expected a " <> pack (show t) <> " but got the pairing function"
+    Pi1 ann0 ->
+      case t of
+        F ann1 (Product _ a b) a' -> checkTypeEquality c ann1 a a'
+        _ -> Left . ErrorMessage ann0 $ "expected a " <> pack (show t) <> " but got pi1"
+    Pi2 ann0 ->
+      case t of
+        F ann1 (Product _ a b) b' -> checkTypeEquality c ann1 b b'
+        _ -> Left . ErrorMessage ann0 $ "expected a " <> pack (show t) <> " but got pi2"
+    Iota1 ann0 ->
+      case t of
+        F ann1 a (Coproduct _ a' b) -> checkTypeEquality c ann1 a a'
+        _ -> Left . ErrorMessage ann0 $ "expected a " <> pack (show t) <> " but got iota1"
 
 
-checkTypeIsNumeric :: ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
+
+checkTypeIsNumeric :: Show ann => ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
 checkTypeIsNumeric c t =
   case t of
     N _ -> return ()
     Z _ -> return ()
     Fin _ n -> return ()
     NamedType ann name -> getNamedType c ann name >>= checkTypeIsNumeric c
-    t -> Left . ErrorMessage (termAnnotation t) $ "expected a numeric type but got " <> show t
+    t -> Left . ErrorMessage (typeAnnotation t) $ "expected a numeric type but got " <> pack (show t)
