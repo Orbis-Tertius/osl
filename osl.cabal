@@ -1,0 +1,105 @@
+cabal-version:      2.4
+name:               osl
+version:            0.1.0.0
+license: NONE
+license-files: LICENSE
+author:        Orbis Labs
+maintainer:    morgan.thomas@platonic.systems
+
+data-files: examples/*.s
+
+library
+  exposed-modules:
+    OSL.EntryPoint
+
+  build-depends:
+    base >= 4.9 && < 5,
+    aeson,
+    bytestring,
+    containers,
+    either,
+    extra,
+    generic-lens,
+    genvalidity,
+    genvalidity-bytestring,
+    genvalidity-sydtest,
+    genvalidity-sydtest-aeson,
+    ghc-prim,
+    hedgehog -any,
+    lens,
+    mtl,
+    optparse-applicative,
+    process,
+    QuickCheck,
+    random,
+    sydtest,
+    sydtest-discover,
+    text -any,
+    transformers,
+    validity
+
+  hs-source-dirs: src
+  default-language: Haskell2010
+  ghc-options:
+          -Wall -Werror -Wcompat -fwarn-redundant-constraints -fwarn-incomplete-uni-patterns
+          -fwarn-tabs -fwarn-incomplete-record-updates -fwarn-identities -Wmissing-export-lists
+          -threaded -rtsopts -with-rtsopts=-N
+
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+
+  other-modules:
+
+  build-tools:
+    sydtest-discover
+
+  build-depends:
+    base >= 4.9 && < 5,
+    aeson,
+    bytestring,
+    containers,
+    either,
+    extra,
+    generic-lens,
+    genvalidity,
+    genvalidity-bytestring,
+    genvalidity-sydtest,
+    genvalidity-sydtest-aeson,
+    ghc-prim,
+    hedgehog -any,
+    lens,
+    mtl,
+    optparse-applicative,
+    process,
+    QuickCheck,
+    random,
+    sydtest,
+    text -any,
+    transformers,
+    validity,
+
+    osl
+
+  hs-source-dirs: test
+  default-language: Haskell2010
+  ghc-options:
+          -Wall -Werror -Wcompat -fwarn-redundant-constraints -fwarn-incomplete-uni-patterns
+          -fwarn-tabs -fwarn-incomplete-record-updates -fwarn-identities -Wmissing-export-lists
+          -threaded -rtsopts -with-rtsopts=-N
+
+
+executable osl
+  main-is:
+    Main.hs
+
+  build-depends:
+    osl
+
+  hs-source-dirs: app
+  default-language: Haskell2010
+  ghc-options:
+          -Wall -Werror -Wcompat -fwarn-redundant-constraints -fwarn-incomplete-uni-patterns
+          -fwarn-tabs -fwarn-incomplete-record-updates -fwarn-identities -Wmissing-export-lists
+
