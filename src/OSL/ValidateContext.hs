@@ -213,6 +213,17 @@ checkTerm c t x =
       checkTypeIsNumeric c t
       a <- inferType c y
       checkTypeIsNumeric c a
+    Apply ann f x -> do
+      a <- inferType c f
+      case a of
+        F _ b d -> do
+          checkTerm c b x
+    To ann name -> do
+      a <- getNamedType c ann name
+      checkTypeEquality c ann t (F ann a (NamedType ann name))
+    From ann name -> do
+      a <- getNamedType c ann name
+      checkTypeEquality c ann t (F ann (NamedType ann name) a)
   where
     genericErrorMessage = Left . ErrorMessage (termAnnotation x)
       $ "expected a " <> pack (show t) <> " but got " <> pack (show x)
@@ -225,10 +236,31 @@ inferType c t =
     ConstN ann _ -> return (N ann)
     ConstZ ann _ -> return (Z ann)
     ConstFin ann _ -> Left (ErrorMessage ann "cannot infer cardinality of type of finite constant")
-    NamedTerm ann name -> getNamedTermType c ann name
     AddN ann -> return (F ann (N ann) (F ann (N ann) (N ann)))
     MulN ann -> return (F ann (N ann) (F ann (N ann) (N ann)))
     Cast ann -> Left (ErrorMessage ann "cannot infer the type of cast from context")
+    To ann name -> do
+      a <- getNamedType c ann name
+      return (F ann a (NamedType ann name))
+    From ann name -> do
+      a <- getNamedType c ann name
+      return (F ann (NamedType ann name) a)
+    FunctionProduct ann f g -> do
+      a <- inferType c f
+      b <- inferType c g
+      case (a, b) of
+        (F _ d e, F _ d' e') -> do
+          checkTypeEquality c ann d d'
+          return (F ann d (Product ann e e'))
+        _ -> Left (ErrorMessage ann "ill-typed function product; one of the arguments is not a function")
+    FunctionCoproduct ann f g -> do
+      a <- inferType c f
+      b <- inferType c g
+      case (a, b) of
+        (F _ d e, F _ d' e') -> do
+          checkTypeEquality c ann e e'
+          return (F ann (Coproduct ann d d') e)
+        _ -> Left (ErrorMessage ann "ill-typed function coproduct; one of the arguments is not a function")
     Maybe' ann f -> do
       a <- inferType c f
       case a of
@@ -309,6 +341,7 @@ inferType c t =
       codomain <- inferType c def
       return (F ann domain codomain)
     Let ann varName varType def body -> todo
+    _ -> Left (ErrorMessage (termAnnotation t) "could not infer type of term from context")
 
 
 todo :: a
