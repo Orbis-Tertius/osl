@@ -224,6 +224,42 @@ checkTerm c t x =
     From ann name -> do
       a <- getNamedType c ann name
       checkTypeEquality c ann t (F ann (NamedType ann name) a)
+    Let ann varName varType varDef body -> do
+      checkType c varType
+      c' <- addToContext c (varName, Defined varType varDef)
+      checkTerm c' t body
+    Just' ann ->
+      case t of
+        F _ a (Maybe _ a') -> checkTypeEquality c ann a a'
+        _ -> genericErrorMessage
+    Nothing' ann ->
+      case t of
+        Maybe _ _ -> return ()
+        _ -> genericErrorMessage
+    Maybe' ann f ->
+      case t of
+        F _ b (F _ (Maybe _ _) b') -> checkTypeEquality c ann b b'
+        _ -> genericErrorMessage
+    Exists ann ->
+      case t of
+        F _ (Maybe _ a) a' -> checkTypeEquality c ann a a'
+        _ -> genericErrorMessage
+    Length ann ->
+      case t of
+        F _ (List _ _) (N _) -> return ()
+        _ -> genericErrorMessage
+    Nth ann ->
+      case t of
+        F _ (List _ a) (F _ (N _) a') -> checkTypeEquality c ann a a'
+        _ -> genericErrorMessage
+    ListPi1 ann ->
+      case t of
+        F _ (List _ (Product _ a _)) (List _ a') -> checkTypeEquality c ann a a'
+        _ -> genericErrorMessage
+    ListPi2 ann ->
+      case t of
+        F _ (List _ (Product _ _ b)) (List _ b') -> checkTypeEquality c ann b b'
+        _ -> genericErrorMessage
   where
     genericErrorMessage = Left . ErrorMessage (termAnnotation x)
       $ "expected a " <> pack (show t) <> " but got " <> pack (show x)
