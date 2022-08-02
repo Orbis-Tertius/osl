@@ -15,74 +15,75 @@ import Data.Text (Text)
 newtype Name = Name { unName :: Text }
 
 
-data Type =
-    Prop
-  | Function Type Type
-  | N -- natural numbers
-  | Z -- integers
-  | Fin Integer
-  | Product Type Type
-  | Coproduct Type Type
-  | NamedType Name
-  | Maybe Type
-  | List Type
-  | Map Type Type
+data Type ann =
+    Prop ann
+  | Function ann (Type ann) (Type ann)
+  | N ann -- natural numbers
+  | Z ann -- integers
+  | Fin ann Integer
+  | Product ann (Type ann) (Type ann)
+  | Coproduct ann (Type ann) (Type ann)
+  | NamedType ann Name
+  | Maybe ann (Type ann)
+  | List ann (Type ann)
+  | Map ann (Type ann) (Type ann)
 
 
-data Term =
-    NamedTerm Name
-  | AddN
-  | MulN
-  | ConstN Integer
-  | AddZ
-  | MulZ
-  | ConstZ Integer
-  | Cast
-  | ConstFin Integer
-  | Cons Term Term
-  | Pi1 Term -- Product projections
-  | Pi2 Term
-  | Iota1 Term -- Coproduct injections
-  | Iota2 Term
-  | FunctionProduct Term Term
-  | FunctionCoproduct Term Term
-  | Lambda Name Type Term
-  | Apply Term Term
-  | To Name
-  | From Name
-  | Let Name Type Term Term
-  | Just'
-  | Nothing'
-  | Maybe'
-  | Exists
-  | Length
-  | Nth
-  | ListPi1
-  | ListPi2
-  | ListTo Name
-  | ListFrom Name
-  | ListLength
-  | ListMaybePi1
-  | ListMaybePi2
-  | ListMaybeLength
-  | Sum
-  | Lookup
-  | Keys
-  | MapPi1
-  | MapPi2
-  | MapTo Name
-  | MapFrom Name
-  | SumMapLength
-  | SumListLookup Term
+data Term ann =
+    NamedTerm ann Name
+  | AddN ann
+  | MulN ann
+  | ConstN ann Integer
+  | AddZ ann
+  | MulZ ann
+  | ConstZ ann Integer
+  | Cast ann
+  | ConstFin ann Integer
+  | Pair ann
+  | Pi1 ann -- Product projections
+  | Pi2 ann
+  | Iota1 ann -- Coproduct injections
+  | Iota2 ann
+  | FunctionProduct ann (Term ann) (Term ann)
+  | FunctionCoproduct ann (Term ann) (Term ann)
+  | Lambda ann Name (Type ann) (Term ann)
+  | Apply ann (Term ann) (Term ann)
+  | To ann Name
+  | From ann Name
+  | Let ann Name (Type ann) (Term ann) (Term ann)
+  | Just' ann
+  | Nothing' ann
+  | Maybe' ann
+  | Exists ann
+  | Length ann
+  | Nth ann
+  | ListPi1 ann
+  | ListPi2 ann
+  | ListTo ann Name
+  | ListFrom ann Name
+  | ListLength ann
+  | ListMaybePi1 ann
+  | ListMaybePi2 ann
+  | ListMaybeLength ann
+  | Sum ann
+  | Lookup ann
+  | Keys ann
+  | MapPi1 ann
+  | MapPi2 ann
+  | MapTo ann Name
+  | MapFrom ann Name
+  | SumMapLength ann
+  | SumListLookup ann (Term ann)
 
 
-data Declaration =
-    FreeVariable Type
-  | Data Type
-  | Defined Type Term
+data Declaration ann =
+    FreeVariable (Type ann)
+  | Data (Type ann)
+  | Defined (Type ann) (Term ann)
 
 
-newtype Context = Context { unContext :: [Declaration] }
+newtype Context ann = Context { unContext :: [(Name, Declaration ann)] }
 
 
-newtype ValidContext = ValidContext { unValidContext :: Map Name Declaration }
+newtype ValidContext ann =
+  ValidContext { unValidContext :: Map Name (Declaration ann) }
