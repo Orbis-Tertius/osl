@@ -466,7 +466,25 @@ inferType c t =
       case a of
         List _ (Maybe _ (List _ _)) -> return (List ann (Maybe ann (N ann)))
         _ -> Left (ErrorMessage ann "List(Maybe(length)) applied to a non-List-of-Maybe-Lists")
-    Apply _ (Sum _) xs -> todo xs
+    Apply ann (Sum _) xs -> do
+      a <- inferType c xs
+      case a of
+        List _ (Maybe _ b) -> do
+          checkTypeIsNumeric c b
+          return b
+        List _ (List _ (Maybe _ b)) -> do
+          checkTypeIsNumeric c b
+          return b
+        List _ (List _ b) -> do
+          checkTypeIsNumeric c b
+          return b
+        List _ b -> do
+          checkTypeIsNumeric c b
+          return b
+        Map _ _ b -> do
+          checkTypeIsNumeric c b
+          return b
+        _ -> Left (ErrorMessage ann "sum applied to a non-summable term")
     Apply _ (Apply _ (Lookup _) _) xs -> todo xs
     Apply _ (Keys _) xs -> todo xs
     Apply _ (MapPi1 _) xs -> todo xs
