@@ -485,7 +485,14 @@ inferType c t =
           checkTypeIsNumeric c b
           return b
         _ -> Left (ErrorMessage ann "sum applied to a non-summable term")
-    Apply _ (Apply _ (Lookup _) _) xs -> todo xs
+    Apply ann (Apply _ (Lookup _) k) xs -> do
+      a <- inferType c k
+      b <- inferType c xs
+      case b of
+        Map _ a' d -> do
+          checkTypeEquality c ann a a'
+          return (Maybe ann d)
+        _ -> Left (ErrorMessage ann "lookup applied to a non-Map")
     Apply _ (Keys _) xs -> todo xs
     Apply _ (MapPi1 _) xs -> todo xs
     Apply _ (MapPi2 _) xs -> todo xs
