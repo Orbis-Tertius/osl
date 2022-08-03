@@ -498,8 +498,16 @@ inferType c t =
       case a of
         Map _ b _ -> return (List ann b)
         _ -> Left (ErrorMessage ann "keys applied to a non-Map")
-    Apply _ (MapPi1 _) xs -> todo xs
-    Apply _ (MapPi2 _) xs -> todo xs
+    Apply ann (MapPi1 _) xs -> do
+      a <- inferType c xs
+      case a of
+        Map _ b (Product _ d _) -> return (Map ann b d)
+        _ -> Left (ErrorMessage ann "Map(pi1) applied to a non-Map or a Map whose value type is not a Cartesian product")
+    Apply ann (MapPi2 _) xs -> do
+      a <- inferType c xs
+      case a of
+        Map _ b (Product _ _ d) -> return (Map ann b d)
+        _ -> Left (ErrorMessage ann "Map(pi2) applied to a non-Map or a Map whose value type is not a Cartesian product")
     Apply _ (SumMapLength _) xs -> todo xs
     Apply _ (SumListLookup _ _) xs -> todo xs
     -- generic application inference for those cases not covered above
