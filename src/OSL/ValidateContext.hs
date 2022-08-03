@@ -214,15 +214,15 @@ checkTerm c t x =
       a <- inferType c y
       checkTypeIsNumeric c a
     Apply ann f y -> do
-      a <- inferType c x
-      checkTypeEquality c ann a t
+      a <- inferType c y
+      checkTerm c (F ann a t) f
     To ann name -> do
       a <- getNamedType c ann name
       checkTypeEquality c ann t (F ann a (NamedType ann name))
     From ann name -> do
       a <- getNamedType c ann name
       checkTypeEquality c ann t (F ann (NamedType ann name) a)
-    Let ann varName varType varDef body -> do
+    Let _ varName varType varDef body -> do
       checkType c varType
       c' <- addToContext c (varName, Defined varType varDef)
       checkTerm c' t body
@@ -230,19 +230,21 @@ checkTerm c t x =
       case t of
         F _ a (Maybe _ a') -> checkTypeEquality c ann a a'
         _ -> genericErrorMessage
-    Nothing' ann ->
+    Nothing' _ ->
       case t of
         Maybe _ _ -> return ()
         _ -> genericErrorMessage
     Maybe' ann f ->
       case t of
-        F _ b (F _ (Maybe _ _) b') -> checkTypeEquality c ann b b'
+        F _ b (F _ (Maybe _ a) b') -> do
+          checkTypeEquality c ann b b'
+          checkTerm c (F ann a b) f
         _ -> genericErrorMessage
     Exists ann ->
       case t of
         F _ (Maybe _ a) a' -> checkTypeEquality c ann a a'
         _ -> genericErrorMessage
-    Length ann ->
+    Length _ ->
       case t of
         F _ (List _ _) (N _) -> return ()
         _ -> genericErrorMessage
@@ -275,9 +277,10 @@ checkTerm c t x =
           if name == name'
             then return ()
             else genericErrorMessage
+        _ -> genericErrorMessage
     ListLength _ ->
       case t of
-        F _ (List _ (List _ a)) (List _ (N _)) -> return ()
+        F _ (List _ (List _ _)) (List _ (N _)) -> return ()
         _ -> genericErrorMessage
     ListMaybePi1 ann ->
       case t of
@@ -307,7 +310,7 @@ checkTerm c t x =
         F _ (List _ a) a' -> do
          checkTypeEquality c ann a a'
          checkTypeIsNumeric c a
-        F _ (Map _ a b) b' -> do
+        F _ (Map _ _ b) b' -> do
           checkTypeEquality c ann b b'
           checkTypeIsNumeric c b
         _ -> genericErrorMessage
@@ -343,6 +346,7 @@ checkTerm c t x =
           if name' == name
             then return ()
             else genericErrorMessage
+        _ -> genericErrorMessage
     MapFrom ann name -> do
       a <- getNamedType c ann name
       case t of
@@ -352,6 +356,19 @@ checkTerm c t x =
           if name' == name
             then return ()
             else genericErrorMessage
+        _ -> genericErrorMessage
+    SumMapLength ann ->
+      case t of
+        F _ (Map _ a (List _ _)) (Map _ a' (N _)) ->
+          checkTypeEquality c ann a a'
+        _ -> genericErrorMessage
+    SumListLookup _ann0 k ->
+      case t of
+        F _ (List _ (Map ann1 a b)) b' -> do
+          checkTypeEquality c ann1 b b'
+          checkTypeIsNumeric c b
+          checkTerm c a k
+        _ -> genericErrorMessage
   where
     genericErrorMessage = Left . ErrorMessage (termAnnotation x)
       $ "expected a " <> pack (show t) <> " but got " <> pack (show x)
@@ -394,10 +411,10 @@ inferType c t =
       case a of
         F _ b d -> return (F ann d (F ann (Maybe ann b) d))
         _ -> Left . ErrorMessage ann $ "expected a function as the first argument to maybe but got a " <> pack (show a)
-    Apply ann0 (Apply ann1 (Pair _) x) y -> do
+    Apply ann (Apply _ (Pair _) x) y -> do
       a <- inferType c x
       b <- inferType c y
-      return (Product ann0 a b)
+      return (Product ann a b)
     Apply ann (Pi1 _) x -> do
       a <- inferType c x
       case a of
@@ -422,7 +439,7 @@ inferType c t =
     Apply ann (ListPi1 _) xs -> do
       a <- inferType c xs
       case a of
-        List _ (Product _ a _) -> return (List ann a)
+        List _ (Product _ b _) -> return (List ann b)
         _ -> Left (ErrorMessage ann "List(pi1) applied to a non-List or a List of non-tuples")
     Apply ann (ListPi2 _) xs -> do
       a <- inferType c xs
@@ -432,7 +449,7 @@ inferType c t =
     Apply ann (ListLength _) xs -> do
       a <- inferType c xs
       case a of
-        List _ (List _ b) -> return (List ann (N ann))
+        List _ (List _ _) -> return (List ann (N ann))
         _ -> Left (ErrorMessage ann "List(length) applied to a non-List-of-Lists")
     Apply ann (ListMaybePi1 _) xs -> do
       a <- inferType c xs
@@ -447,15 +464,15 @@ inferType c t =
     Apply ann (ListMaybeLength _) xs -> do
       a <- inferType c xs
       case a of
-        List _ (Maybe _ (List _ b)) -> return (List ann (Maybe ann (N ann)))
+        List _ (Maybe _ (List _ _)) -> return (List ann (Maybe ann (N ann)))
         _ -> Left (ErrorMessage ann "List(Maybe(length)) applied to a non-List-of-Maybe-Lists")
-    Apply ann (Sum _) xs -> todo
-    Apply ann (Apply _ (Lookup _) k) xs -> todo
-    Apply ann (Keys _) xs -> todo
-    Apply ann (MapPi1 _) xs -> todo
-    Apply ann (MapPi2 _) xs -> todo
-    Apply ann (SumMapLength _) xs -> todo
-    Apply ann (SumListLookup _ k) xs -> todo
+    Apply _ (Sum _) xs -> todo xs
+    Apply _ (Apply _ (Lookup _) _) xs -> todo xs
+    Apply _ (Keys _) xs -> todo xs
+    Apply _ (MapPi1 _) xs -> todo xs
+    Apply _ (MapPi2 _) xs -> todo xs
+    Apply _ (SumMapLength _) xs -> todo xs
+    Apply _ (SumListLookup _ _) xs -> todo xs
     -- generic application inference for those cases not covered above
     Apply ann f x -> do
       a <- inferType c f
@@ -463,12 +480,13 @@ inferType c t =
         F _ b d -> do
           checkTerm c b x
           return d
+        _ -> Left (ErrorMessage ann "function application head does not contain a function")
     Lambda ann varName domain def -> do
       checkType c domain
       c' <- addToContext c (varName, FreeVariable domain)
-      codomain <- inferType c def
+      codomain <- inferType c' def
       return (F ann domain codomain)
-    Let ann varName varType def body -> todo
+    Let ann varName varType def body -> todo ann varName varType def body
     _ -> Left (ErrorMessage (termAnnotation t) "could not infer type of term from context")
 
 
@@ -481,6 +499,6 @@ checkTypeIsNumeric c t =
   case t of
     N _ -> return ()
     Z _ -> return ()
-    Fin _ n -> return ()
+    Fin _ _ -> return ()
     NamedType ann name -> getNamedType c ann name >>= checkTypeIsNumeric c
-    t -> Left . ErrorMessage (typeAnnotation t) $ "expected a numeric type but got " <> pack (show t)
+    _ -> Left . ErrorMessage (typeAnnotation t) $ "expected a numeric type but got " <> pack (show t)
