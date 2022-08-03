@@ -3,7 +3,7 @@ module OSL.Tokenize (tokenize) where
 
 import Control.Monad (void)
 import Data.Either.Combinators (mapLeft)
-import Data.Text (Text, pack)
+import Data.Text (Text, pack, cons)
 import Text.Parsec (SourceName, SourcePos, getPosition, eof, oneOf, (<|>), try, string, noneOf, anyChar, choice)
 import Text.Parsec.Prim (parse, many)
 import Text.Parsec.Text (Parser)
@@ -70,7 +70,10 @@ keyword = todo
 
 
 name :: Parser Name
-name = todo
+name = do
+  begin <- oneOf (['a'..'z'] <> ['A'..'Z'] <> "_")
+  rest  <- many (oneOf (['a'..'z'] <> ['A'..'Z'] <> ['0'..'9'] <> "_"))
+  return (Name (cons begin (pack rest)))
 
 
 todo :: a
