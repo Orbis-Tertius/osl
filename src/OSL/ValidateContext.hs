@@ -508,7 +508,11 @@ inferType c t =
       case a of
         Map _ b (Product _ _ d) -> return (Map ann b d)
         _ -> Left (ErrorMessage ann "Map(pi2) applied to a non-Map or a Map whose value type is not a Cartesian product")
-    Apply _ (SumMapLength _) xs -> todo xs
+    Apply ann (SumMapLength _) xs -> do
+      a <- inferType c xs
+      case a of
+        Map _ _ (List _ _) -> return (N ann)
+        _ -> Left (ErrorMessage ann "sum.Map(length) applied to a non-Map-of-Lists")
     Apply _ (SumListLookup _ _) xs -> todo xs
     -- generic application inference for those cases not covered above
     Apply ann f x -> do
