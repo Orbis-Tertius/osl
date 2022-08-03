@@ -12,6 +12,7 @@ library
   exposed-modules:
     OSL.EntryPoint
     OSL.Term
+    OSL.Tokenize
     OSL.Type
     OSL.Types.Arity
     OSL.Types.DeBruijnIndex
