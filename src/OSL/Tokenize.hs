@@ -4,16 +4,19 @@ module OSL.Tokenize (tokenize) where
 import Control.Monad (void)
 import Data.Either.Combinators (mapLeft)
 import Data.Text (Text, pack)
-import Text.Parsec (SourceName, SourcePos, getPosition, eof, oneOf, (<|>), try, string, noneOf, anyChar)
+import Text.Parsec (SourceName, SourcePos, getPosition, eof, oneOf, (<|>), try, string, noneOf, anyChar, choice)
 import Text.Parsec.Prim (parse, many)
 import Text.Parsec.Text (Parser)
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
+import OSL.Types.OSL (Name (..))
+import OSL.Types.Keyword (Keyword)
 import OSL.Types.Token (Token)
+import qualified OSL.Types.Token as T
 
 
 tokenize :: SourceName -> Text -> Either (ErrorMessage ()) [(Token, SourcePos)]
-tokenize name = mapLeft (ErrorMessage () . pack . show) . parse tokens name
+tokenize sourceName = mapLeft (ErrorMessage () . pack . show) . parse tokens sourceName
 
 
 tokens :: Parser [(Token, SourcePos)]
@@ -45,14 +48,29 @@ multiLineComment :: Parser ()
 multiLineComment = do
   void $ string "{-"
   rest
-
   where
     rest :: Parser ()
     rest = void (try (string "-}")) <|> (void anyChar >> rest)
 
 
 token :: Parser Token
-token = todo
+token =
+  choice
+  $
+  try
+  <$>
+  [ T.Keyword <$> keyword
+  -- Var must come last in order to deal with ambiguity
+  , T.Var <$> name
+  ]
+
+
+keyword :: Parser Keyword
+keyword = todo
+
+
+name :: Parser Name
+name = todo
 
 
 todo :: a
