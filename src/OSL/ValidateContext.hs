@@ -258,6 +258,100 @@ checkTerm c t x =
       case t of
         F _ (List _ (Product _ _ b)) (List _ b') -> checkTypeEquality c ann b b'
         _ -> genericErrorMessage
+    ListTo ann name -> do
+      a <- getNamedType c ann name
+      case t of
+        F _ (List _ a') (List _ (NamedType _ name')) -> do
+          checkTypeEquality c ann a a'
+          if name == name'
+            then return ()
+            else genericErrorMessage
+        _ -> genericErrorMessage
+    ListFrom ann name -> do
+      a <- getNamedType c ann name
+      case t of
+        F _ (List _ (NamedType _ name')) (List _ a') -> do
+          checkTypeEquality c ann a a'
+          if name == name'
+            then return ()
+            else genericErrorMessage
+    ListLength _ ->
+      case t of
+        F _ (List _ (List _ a)) (List _ (N _)) -> return ()
+        _ -> genericErrorMessage
+    ListMaybePi1 ann ->
+      case t of
+        F _ (List _ (Maybe _ (Product _ a _))) (List _ (Maybe _ a')) ->
+          checkTypeEquality c ann a a'
+        _ -> genericErrorMessage
+    ListMaybePi2 ann ->
+      case t of
+        F _ (List _ (Maybe _ (Product _ _ b))) (List _ (Maybe _ b')) ->
+          checkTypeEquality c ann b b'
+        _ -> genericErrorMessage
+    ListMaybeLength _ ->
+      case t of
+        F _ (List _ (Maybe _ (List _ _))) (List _ (Maybe _ (N _))) -> return ()
+        _ -> genericErrorMessage
+    Sum ann ->
+      case t of
+        F _ (List _ (Maybe _ a)) a' -> do
+          checkTypeEquality c ann a a'
+          checkTypeIsNumeric c a
+        F _ (List _ (List _ (Maybe _ a))) a' -> do
+          checkTypeEquality c ann a a'
+          checkTypeIsNumeric c a
+        F _ (List _ (List _ a)) a' -> do
+          checkTypeEquality c ann a a'
+          checkTypeIsNumeric c a
+        F _ (List _ a) a' -> do
+         checkTypeEquality c ann a a'
+         checkTypeIsNumeric c a
+        F _ (Map _ a b) b' -> do
+          checkTypeEquality c ann b b'
+          checkTypeIsNumeric c b
+        _ -> genericErrorMessage
+    Lookup ann ->
+      case t of
+        F _ a (F _ (Map _ a' b) (Maybe _ b')) -> do
+          checkTypeEquality c ann a a'
+          checkTypeEquality c ann b b'
+        _ -> genericErrorMessage
+    Keys ann ->
+      case t of
+        F _ (Map _ a _) (List _ a') ->
+          checkTypeEquality c ann a a'
+        _ -> genericErrorMessage
+    MapPi1 ann ->
+      case t of
+        F _ (Map _ a (Product _ b _)) (Map _ a' b') -> do
+          checkTypeEquality c ann a a'
+          checkTypeEquality c ann b b'
+        _ -> genericErrorMessage
+    MapPi2 ann ->
+      case t of
+        F _ (Map _ a (Product _ _ d)) (Map _ a' d') -> do
+          checkTypeEquality c ann a a'
+          checkTypeEquality c ann d d'
+        _ -> genericErrorMessage
+    MapTo ann name -> do
+      a <- getNamedType c ann name
+      case t of
+        F _ (Map _ a' b) (Map _ (NamedType _ name') b') -> do
+          checkTypeEquality c ann a a'
+          checkTypeEquality c ann b b'
+          if name' == name
+            then return ()
+            else genericErrorMessage
+    MapFrom ann name -> do
+      a <- getNamedType c ann name
+      case t of
+        F _ (Map _ (NamedType _ name') b) (Map _ a' b') -> do
+          checkTypeEquality c ann a a'
+          checkTypeEquality c ann b b'
+          if name' == name
+            then return ()
+            else genericErrorMessage
   where
     genericErrorMessage = Left . ErrorMessage (termAnnotation x)
       $ "expected a " <> pack (show t) <> " but got " <> pack (show x)
