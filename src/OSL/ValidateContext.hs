@@ -493,7 +493,11 @@ inferType c t =
           checkTypeEquality c ann a a'
           return (Maybe ann d)
         _ -> Left (ErrorMessage ann "lookup applied to a non-Map")
-    Apply _ (Keys _) xs -> todo xs
+    Apply ann (Keys _) xs -> do
+      a <- inferType c xs
+      case a of
+        Map _ b _ -> return (List ann b)
+        _ -> Left (ErrorMessage ann "keys applied to a non-Map")
     Apply _ (MapPi1 _) xs -> todo xs
     Apply _ (MapPi2 _) xs -> todo xs
     Apply _ (SumMapLength _) xs -> todo xs
