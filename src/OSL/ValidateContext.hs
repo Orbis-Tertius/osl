@@ -369,6 +369,36 @@ checkTerm c t x =
           checkTypeIsNumeric c b
           checkTerm c a k
         _ -> genericErrorMessage
+    And ann p q -> do
+      case t of
+        Prop _ -> do
+          checkTerm c (Prop ann) p
+          checkTerm c (Prop ann) q
+        _ -> genericErrorMessage
+    Or ann p q -> do
+      case t of
+        Prop _ -> do
+          checkTerm c (Prop ann) p
+          checkTerm c (Prop ann) q
+        _ -> genericErrorMessage
+    Not ann p -> do
+      case t of
+        Prop _ -> checkTerm c (Prop ann) p
+        _ -> genericErrorMessage
+    Implies ann p q -> do
+      case t of
+        Prop _ -> do
+          checkTerm c (Prop ann) p
+          checkTerm c (Prop ann) q
+        _ -> genericErrorMessage
+    ForAll ann varName varType p -> do
+      checkType c varType
+      c' <- addToContext c (varName, FreeVariable varType)
+      checkTerm c' (Prop ann) p
+    ForSome ann varName varType p -> do
+      checkType c varType
+      c' <- addToContext c (varName, FreeVariable varType)
+      checkTerm c' (Prop ann) p
   where
     genericErrorMessage = Left . ErrorMessage (termAnnotation x)
       $ "expected a " <> pack (show t) <> " but got " <> pack (show x)
@@ -539,6 +569,31 @@ inferType c t =
       checkType c varType
       c' <- addToContext c (varName, Defined varType def)
       inferType c' body
+    And ann p q -> do
+      checkTerm c (Prop ann) p
+      checkTerm c (Prop ann) q
+      return (Prop ann)
+    Or ann p q -> do
+      checkTerm c (Prop ann) p
+      checkTerm c (Prop ann) q
+      return (Prop ann)
+    Not ann p -> do
+      checkTerm c (Prop ann) p
+      return (Prop ann)
+    Implies ann p q -> do
+      checkTerm c (Prop ann) p
+      checkTerm c (Prop ann) q
+      return (Prop ann)
+    ForAll ann varName varType p -> do
+      checkType c varType
+      c' <- addToContext c (varName, FreeVariable varType)
+      checkTerm c' (Prop ann) p
+      return (Prop ann)
+    ForSome ann varName varType p -> do
+      checkType c varType
+      c' <- addToContext c (varName, FreeVariable varType)
+      checkTerm c' (Prop ann) p
+      return (Prop ann)
     _ -> Left (ErrorMessage (termAnnotation t) "could not infer type of term from context")
 
 

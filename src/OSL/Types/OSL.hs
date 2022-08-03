@@ -76,6 +76,12 @@ data Term ann =
   | MapFrom ann Name
   | SumMapLength ann
   | SumListLookup ann (Term ann)
+  | And ann (Term ann) (Term ann)
+  | Or ann (Term ann) (Term ann)
+  | Not ann (Term ann)
+  | Implies ann (Term ann) (Term ann)
+  | ForAll ann Name (Type ann) (Term ann)
+  | ForSome ann Name (Type ann) (Term ann)
   deriving Show
 
 
