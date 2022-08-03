@@ -521,7 +521,7 @@ inferType c t =
           checkTypeIsNumeric c d
           checkTypeEquality c ann a a'
           return d
-        _ -> Left (ErrorMessage ann "sum.List(lookup(k)) applied to a non-List-of-Maps")
+        _ -> Left (ErrorMessage ann "sum.List(lookup(_)) applied to a non-List-of-Maps")
     -- generic application inference for those cases not covered above
     Apply ann f x -> do
       a <- inferType c f
@@ -535,12 +535,11 @@ inferType c t =
       c' <- addToContext c (varName, FreeVariable domain)
       codomain <- inferType c' def
       return (F ann domain codomain)
-    Let ann varName varType def body -> todo ann varName varType def body
+    Let _ varName varType def body -> do
+      checkType c varType
+      c' <- addToContext c (varName, Defined varType def)
+      inferType c' body
     _ -> Left (ErrorMessage (termAnnotation t) "could not infer type of term from context")
-
-
-todo :: a
-todo = todo
 
 
 checkTypeIsNumeric :: Show ann => ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
