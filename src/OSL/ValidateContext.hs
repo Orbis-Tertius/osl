@@ -513,7 +513,15 @@ inferType c t =
       case a of
         Map _ _ (List _ _) -> return (N ann)
         _ -> Left (ErrorMessage ann "sum.Map(length) applied to a non-Map-of-Lists")
-    Apply _ (SumListLookup _ _) xs -> todo xs
+    Apply ann (SumListLookup _ k) xs -> do
+      a <- inferType c k
+      b <- inferType c xs
+      case b of
+        List _ (Map _ a' d) -> do
+          checkTypeIsNumeric c d
+          checkTypeEquality c ann a a'
+          return d
+        _ -> Left (ErrorMessage ann "sum.List(lookup(k)) applied to a non-List-of-Maps")
     -- generic application inference for those cases not covered above
     Apply ann f x -> do
       a <- inferType c f
