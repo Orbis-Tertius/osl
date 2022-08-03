@@ -213,11 +213,9 @@ checkTerm c t x =
       checkTypeIsNumeric c t
       a <- inferType c y
       checkTypeIsNumeric c a
-    Apply ann f x -> do
-      a <- inferType c f
-      case a of
-        F _ b d -> do
-          checkTerm c b x
+    Apply ann f y -> do
+      a <- inferType c x
+      checkTypeEquality c ann a t
     To ann name -> do
       a <- getNamedType c ann name
       checkTypeEquality c ann t (F ann a (NamedType ann name))
