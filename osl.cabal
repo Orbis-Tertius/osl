@@ -38,6 +38,7 @@ library
     lens,
     mtl,
     optparse-applicative,
+    parsec,
     process,
     QuickCheck,
     random,
