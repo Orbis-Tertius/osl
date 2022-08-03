@@ -16,8 +16,10 @@ library
     OSL.Types.Arity
     OSL.Types.DeBruijnIndex
     OSL.Types.ErrorMessage
+    OSL.Types.Keyword
     OSL.Types.OSL
     OSL.Types.Sigma11
+    OSL.Types.Token
     OSL.ValidContext
     OSL.ValidateContext
 
