@@ -60,6 +60,49 @@ token =
   try
   <$>
   [ T.Keyword <$> keyword
+  , T.ThinArrow <$ string "->"
+  , T.ThinArrow <$ string "→"
+  , T.Colon <$ string ":"
+  , T.OpenParen <$ string "("
+  , T.CloseParen <$ string ")"
+  , T.ConstN <$> constantNatural
+  , T.ConstZ <$> constantInteger
+  , T.ConstFin <$> constantFinite
+  , T.AddNOp <$ string "+N"
+  , T.AddNOp <$ string "+ℕ"
+  , T.MulNOp <$ string "×ℕ"
+  , T.AddZOp <$ string "+Z"
+  , T.AddZOp <$ string "+ℤ"
+  , T.MulZOp <$ string "*Z"
+  , T.MulZOp <$ string "×ℤ"
+  , T.ProductOp <$ string "*"
+  , T.ProductOp <$ string "×"
+  , T.Comma <$ string ","
+  , T.CoproductOp <$ string "+"
+  , T.CoproductOp <$ string "⊕"
+  , T.Equals <$ string "="
+  , T.LessOrEquals <$ string "<="
+  , T.LessOrEquals <$ string "≤"
+  , T.And <$ string "&"
+  , T.And <$ string "∧"
+  , T.Or <$ string "|"
+  , T.Or <$ string "∨"
+  , T.Not <$ string "!"
+  , T.Not <$ string "¬"
+  , T.ForAll <$ string "all"
+  , T.ForAll <$ string "∀"
+  , T.ForSome <$ string "some"
+  , T.ForSome <$ string "∃"
+  , T.Lambda <$ string "\\"
+  , T.Lambda <$ string "λ"
+  , T.ThickArrow <$ string "=>"
+  , T.ThickArrow <$ string "⇨"
+  , T.Congruent <$ string "~="
+  , T.Congruent <$ string "≅"
+  , T.DefEquals <$ string ":="
+  , T.DefEquals <$ string "≔"
+  , T.Semicolon <$ string ";"
+  , T.Period <$ string "."
   -- Var must come last in order to deal with ambiguity
   , T.Var <$> name
   ]
@@ -74,6 +117,18 @@ name = do
   begin <- oneOf (['a'..'z'] <> ['A'..'Z'] <> "_")
   rest  <- many (oneOf (['a'..'z'] <> ['A'..'Z'] <> ['0'..'9'] <> "_"))
   return (Name (cons begin (pack rest)))
+
+
+constantNatural :: Parser Integer
+constantNatural = todo
+
+
+constantInteger :: Parser Integer
+constantInteger = todo
+
+
+constantFinite :: Parser Integer
+constantFinite = todo
 
 
 todo :: a
