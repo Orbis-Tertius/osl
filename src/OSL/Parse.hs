@@ -250,7 +250,34 @@ lambda = do
 
 
 term1 :: Parser (Term SourcePos)
-term1 = todo
+term1 =
+  choice
+  $
+  try
+  <$>
+  [ binaryOp term2 T.And And
+  , binaryOp term2 T.Or Or
+  , binaryOp term2 T.ThinArrow Implies
+  ]
+
+
+binaryOp :: Parser (Term SourcePos)
+  -> Token
+  -> (SourcePos
+      -> Term SourcePos
+      -> Term SourcePos
+      -> Term SourcePos)
+  -> Parser (Term SourcePos)
+binaryOp subexpr opTok opCtor = do
+  p <- getPosition
+  x <- subexpr
+  consumeExact_ opTok
+  y <- subexpr
+  return (opCtor p x y)
+
+
+term2 :: Parser (Term SourcePos)
+term2 = todo
 
 
 todo :: a
