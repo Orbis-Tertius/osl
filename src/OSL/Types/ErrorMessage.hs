@@ -13,4 +13,4 @@ data ErrorMessage ann =
   { annotation :: ann
   , message :: Text
   }
-  deriving Generic
+  deriving (Generic, Show)

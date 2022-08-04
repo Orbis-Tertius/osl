@@ -6,8 +6,6 @@ license-files: LICENSE
 author:        Orbis Labs
 maintainer:    morgan.thomas@platonic.systems
 
-data-files: examples/*.s
-
 library
   exposed-modules:
     OSL.EntryPoint

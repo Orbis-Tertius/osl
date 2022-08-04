@@ -68,7 +68,6 @@
                     ./ci/lint.sh
                     cabal test
                     nix-build
-                    ./ci/examples.sh
                   )
                   '';
               };
