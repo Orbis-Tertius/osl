@@ -278,8 +278,8 @@ term1 =
   [ binaryOpAssocLeft term2 T.And And
   , binaryOpAssocLeft term2 T.Or Or
   , binaryOp term2 T.ThinArrow Implies
-  , binaryOp term3 T.Equal Equal
-  , binaryOp term3 T.LessOrEqual LessOrEqual
+  , binaryOp term2 T.Equal Equal
+  , binaryOp term2 T.LessOrEqual LessOrEqual
   , binaryOpAssocLeft term2 T.AddNOp (applyBinaryOp AddN)
   , binaryOpAssocLeft term2 T.MulNOp (applyBinaryOp MulN)
   , binaryOpAssocLeft term2 T.AddZOp (applyBinaryOp AddZ)
@@ -308,8 +308,8 @@ functionApplication = do
   p <- getPosition
   f <- term3
   consumeExact_ T.OpenParen
-  arg <- term3
-  args <- many (consumeExact_ T.Comma >> term3)
+  arg <- term1
+  args <- many (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
   return (foldl (Apply p) f (arg:args))
 
@@ -508,8 +508,8 @@ tuple :: Parser (Term SourcePos)
 tuple = do
   p <- getPosition
   consumeExact_ T.OpenParen
-  x <- term3
-  xs <- many1 (consumeExact_ T.Comma >> term3)
+  x <- term1
+  xs <- many1 (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
   return
     (foldl
