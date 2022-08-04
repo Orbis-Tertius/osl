@@ -217,6 +217,8 @@ term0 :: Parser (Term SourcePos)
 term0 =
   choice
   $
+  try
+  <$>
   [ quantifier T.ForAll ForAll
   , quantifier T.ForSome ForSome
   , lambda
@@ -328,8 +330,8 @@ functionApplication = do
   p <- getPosition
   f <- term5
   consumeExact_ T.OpenParen
-  arg <- term0
-  args <- many (consumeExact_ T.Comma >> term0)
+  arg <- term3
+  args <- many (consumeExact_ T.Comma >> term3)
   consumeExact_ T.CloseParen
   return (foldl (Apply p) f (arg:args))
 
@@ -346,6 +348,8 @@ term5 :: Parser (Term SourcePos)
 term5 =
   choice
   $
+  try
+  <$>
   [ namedTerm
   , constant
   , parenthesizedTerm
@@ -382,7 +386,7 @@ constant =
       (T.ConstN i, p) -> return (ConstN p i)
       (T.ConstZ i, p) -> return (ConstZ p i)
       (T.ConstFin i, p) -> return (ConstFin p i)
-      _ -> mzero
+      _ -> Nothing
 
 
 builtin :: K.Keyword
