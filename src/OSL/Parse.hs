@@ -295,10 +295,10 @@ term3 =
   $
   try
   <$>
-  [ binaryOp term4 T.AddNOp (applyOp AddN)
-  , binaryOp term4 T.MulNOp (applyOp MulN)
-  , binaryOp term4 T.AddZOp (applyOp AddZ)
-  , binaryOp term4 T.MulZOp (applyOp MulZ)
+  [ binaryOp term4 T.AddNOp (applyBinaryOp AddN)
+  , binaryOp term4 T.MulNOp (applyBinaryOp MulN)
+  , binaryOp term4 T.AddZOp (applyBinaryOp AddZ)
+  , binaryOp term4 T.MulZOp (applyBinaryOp MulZ)
   , binaryOp term4 T.ProductOp FunctionProduct
   , binaryOp term4 T.CoproductOp FunctionCoproduct
   , term4
@@ -311,16 +311,36 @@ term4 =
   $
   [ tuple
   , unaryOp T.Not Not
+  , constant
+  , unaryOp (T.Keyword K.Cast) (applyUnaryOp Cast)
   , todo
   ]
 
 
-applyOp :: (SourcePos -> Term SourcePos)
+constant :: Parser (Term SourcePos)
+constant =
+  consume $
+    \case
+      (T.ConstN i, p) -> return (ConstN p i)
+      (T.ConstZ i, p) -> return (ConstZ p i)
+      (T.ConstFin i, p) -> return (ConstFin p i)
+      _ -> mzero
+
+
+applyUnaryOp :: (SourcePos -> Term SourcePos)
+  -> SourcePos
+  -> Term SourcePos
+  -> Term SourcePos
+applyUnaryOp op p = Apply p (op p)
+
+
+applyBinaryOp :: (SourcePos -> Term SourcePos)
   -> SourcePos
   -> Term SourcePos
   -> Term SourcePos
   -> Term SourcePos
-applyOp op p x y = (Apply p (Apply p (op p) x) y)
+applyBinaryOp op p x y =
+  (Apply p (Apply p (op p) x) y)
 
 
 binaryOp :: Parser (Term SourcePos)
