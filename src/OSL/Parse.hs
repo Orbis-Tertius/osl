@@ -258,6 +258,7 @@ term1 =
   [ binaryOp term2 T.And And
   , binaryOp term2 T.Or Or
   , binaryOp term2 T.ThinArrow Implies
+  , term2
   ]
 
 
@@ -277,7 +278,18 @@ binaryOp subexpr opTok opCtor = do
 
 
 term2 :: Parser (Term SourcePos)
-term2 = todo
+term2 =
+  choice
+  $
+  try
+  <$>
+  [ binaryOp term3 T.Equal Equal
+  , binaryOp term3 T.LessOrEqual LessOrEqual
+  ]
+
+
+term3 :: Parser (Term SourcePos)
+term3 = todo
 
 
 todo :: a
