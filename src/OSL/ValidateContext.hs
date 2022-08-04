@@ -214,8 +214,14 @@ checkTerm c t x =
       a <- inferType c y
       checkTypeIsNumeric c a
     Apply ann f y -> do
-      a <- inferType c y
-      checkTerm c (F ann a t) f
+      case inferType c f of
+        Left _ -> do
+          a <- inferType c y
+          checkTerm c (F ann a t) f
+        Right (F _ a b) -> do
+          checkTerm c a y
+          checkTypeEquality c ann t b
+        Right _ -> Left (ErrorMessage ann "function application head is not a function")
     To ann name -> do
       a <- getNamedType c ann name
       checkTypeEquality c ann t (F ann a (NamedType ann name))

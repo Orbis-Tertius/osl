@@ -532,11 +532,11 @@ tuple :: Parser (Term SourcePos)
 tuple = do
   p <- getPosition
   consumeExact_ T.OpenParen
-  x <- term0
-  xs <- many1 (consumeExact_ T.Comma >> term0)
+  x <- term3
+  xs <- many1 (consumeExact_ T.Comma >> term3)
   consumeExact_ T.CloseParen
   return
-    (foldr
+    (foldl
       (\y z -> Apply p (Apply p (Pair p) y) z)
       x
       xs)

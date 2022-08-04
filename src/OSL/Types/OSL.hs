@@ -9,7 +9,7 @@ module OSL.Types.OSL
 
 
 import Data.Map (Map)
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 
 
 newtype Name = Name { unName :: Text }
@@ -28,7 +28,20 @@ data Type ann =
   | Maybe ann (Type ann)
   | List ann (Type ann)
   | Map ann (Type ann) (Type ann)
-  deriving Show
+
+
+instance Show (Type ann) where
+  show (Prop _) = "Prop"
+  show (F _ a b) = "(" <> show a <> " -> " <> show b <> ")"
+  show (N _) = "N"
+  show (Z _) = "Z"
+  show (Fin _ n) = "Fin(" <> show n <> ")"
+  show (Product _ a b) = "(" <> show a <> " * " <> show b <> ")"
+  show (Coproduct _ a b) = "(" <> show a <> " + " <> show b <> ")"
+  show (NamedType _ a) = unpack (unName a)
+  show (Maybe _ a) = "Maybe(" <> show a <> ")"
+  show (List _ a) = "List(" <> show a <> ")"
+  show (Map _ a b) = "Map(" <> show a <> ", " <> show b <> ")"
 
 
 data Term ann =
