@@ -355,6 +355,11 @@ term5 =
   , builtin K.Exists Exists
   , builtin K.Length Length
   , builtin K.Nth Nth
+  , functorApplication
+  , builtin K.Lookup Lookup
+  , builtin K.Keys Keys
+  , builtin K.SumMapLength SumMapLength
+  , unaryOp term0 (T.Keyword K.SumListLookup) SumListLookup
   , todo
   ]
 
@@ -376,6 +381,10 @@ builtin k op = do
   p <- getPosition
   consumeExact_ (T.Keyword k)
   return (op p)
+
+
+functorApplication :: Parser (Term SourcePos)
+functorApplication = todo
 
 
 applyBinaryOp :: (SourcePos -> Term SourcePos)
