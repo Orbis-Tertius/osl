@@ -7,7 +7,7 @@ module OSL.Parse (parseContext) where
 import Control.Monad (guard, mzero)
 import Data.Either.Combinators (mapLeft)
 import Data.Text (Text, pack, unpack)
-import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>))
+import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try, choice)
 import qualified Text.Parsec.Prim as Prim
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
@@ -96,7 +96,13 @@ name =
 
 
 type' :: Parser (Type SourcePos)
-type' = todo
+type' =
+  choice
+  $
+  try
+  <$>
+  [ consumeExact (T.Keyword K.Prop) Prop
+  ]
 
 
 term :: Parser (Term SourcePos)
