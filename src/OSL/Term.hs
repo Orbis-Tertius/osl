@@ -51,6 +51,8 @@ termAnnotation t =
     MapFrom ann _ -> ann
     SumMapLength ann -> ann
     SumListLookup ann _ -> ann
+    Equal ann _ _ -> ann
+    LessOrEqual ann _ _ -> ann
     And ann _ _ -> ann
     Or ann _ _ -> ann
     Not ann _ -> ann

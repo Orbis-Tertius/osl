@@ -76,6 +76,8 @@ data Term ann =
   | MapFrom ann Name
   | SumMapLength ann
   | SumListLookup ann (Term ann)
+  | Equal ann (Term ann) (Term ann)
+  | LessOrEqual ann (Term ann) (Term ann)
   | And ann (Term ann) (Term ann)
   | Or ann (Term ann) (Term ann)
   | Not ann (Term ann)

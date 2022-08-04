@@ -369,6 +369,22 @@ checkTerm c t x =
           checkTypeIsNumeric c b
           checkTerm c a k
         _ -> genericErrorMessage
+    Equal ann y z -> do
+      case t of
+        Prop _ -> do
+          a <- inferType c y
+          a' <- inferType c z
+          checkTypeEquality c ann a a'
+          checkFiniteDimType c a
+        _ -> genericErrorMessage
+    LessOrEqual ann y z -> do
+      case t of
+        Prop _ -> do
+          a <- inferType c y
+          a' <- inferType c z
+          checkTypeEquality c ann a a'
+          checkTypeIsNumeric c a
+        _ -> genericErrorMessage
     And ann p q -> do
       case t of
         Prop _ -> do
@@ -569,6 +585,18 @@ inferType c t =
       checkType c varType
       c' <- addToContext c (varName, Defined varType def)
       inferType c' body
+    Equal ann y z -> do
+      a <- inferType c y
+      a' <- inferType c z
+      checkTypeEquality c ann a a'
+      checkFiniteDimType c a
+      return (Prop ann)
+    LessOrEqual ann y z -> do
+      a <- inferType c y
+      a' <- inferType c z
+      checkTypeEquality c ann a a'
+      checkTypeIsNumeric c a
+      return (Prop ann)
     And ann p q -> do
       checkTerm c (Prop ann) p
       checkTerm c (Prop ann) q
