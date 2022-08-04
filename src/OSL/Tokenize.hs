@@ -76,6 +76,7 @@ token =
   , T.Const <$> nonNegativeIntegerLiteral
   , T.AddNOp <$ string "+N"
   , T.AddNOp <$ string "+ℕ"
+  , T.MulNOp <$ string "*N"
   , T.MulNOp <$ string "×ℕ"
   , T.AddZOp <$ string "+Z"
   , T.AddZOp <$ string "+ℤ"

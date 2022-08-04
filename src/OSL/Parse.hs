@@ -277,8 +277,8 @@ term1 =
   $
   try
   <$>
-  [ binaryOp term2 T.And And
-  , binaryOp term2 T.Or Or
+  [ binaryOpAssocLeft term2 T.And And
+  , binaryOpAssocLeft term2 T.Or Or
   , binaryOp term2 T.ThinArrow Implies
   , term2
   ]
@@ -302,12 +302,12 @@ term3 =
   $
   try
   <$>
-  [ binaryOp term4 T.AddNOp (applyBinaryOp AddN)
-  , binaryOp term4 T.MulNOp (applyBinaryOp MulN)
-  , binaryOp term4 T.AddZOp (applyBinaryOp AddZ)
-  , binaryOp term4 T.MulZOp (applyBinaryOp MulZ)
-  , binaryOp term4 T.ProductOp FunctionProduct
-  , binaryOp term4 T.CoproductOp FunctionCoproduct
+  [ binaryOpAssocLeft term4 T.AddNOp (applyBinaryOp AddN)
+  , binaryOpAssocLeft term4 T.MulNOp (applyBinaryOp MulN)
+  , binaryOpAssocLeft term4 T.AddZOp (applyBinaryOp AddZ)
+  , binaryOpAssocLeft term4 T.MulZOp (applyBinaryOp MulZ)
+  , binaryOpAssocLeft term4 T.ProductOp FunctionProduct
+  , binaryOpAssocLeft term4 T.CoproductOp FunctionCoproduct
   , term4
   ]
 
@@ -361,6 +361,7 @@ term5 =
   , unaryOp name (T.Keyword K.To) To
   , unaryOp name (T.Keyword K.From) From
   , builtin K.Nothing' Nothing'
+  , builtin K.Just' Just'
   , unaryOp term0 (T.Keyword K.Maybe') Maybe'
   , builtin K.Exists Exists
   , builtin K.Length Length
@@ -482,8 +483,7 @@ applyBinaryOp :: (SourcePos -> Term SourcePos)
   -> Term SourcePos
   -> Term SourcePos
   -> Term SourcePos
-applyBinaryOp op p x y =
-  (Apply p (Apply p (op p) x) y)
+applyBinaryOp op p x y = Apply p (Apply p (op p) x) y
 
 
 binaryOp :: Parser (Term SourcePos)
@@ -499,6 +499,20 @@ binaryOp subexpr opTok opCtor = do
   consumeExact_ opTok
   y <- subexpr
   return (opCtor p x y)
+
+
+binaryOpAssocLeft :: Parser (Term SourcePos)
+  -> Token
+  -> (SourcePos
+       -> Term SourcePos
+       -> Term SourcePos
+       -> Term SourcePos)
+  -> Parser (Term SourcePos)
+binaryOpAssocLeft subexpr opTok opCtor = do
+  p <- getPosition
+  x <- subexpr
+  xs <- many1 (consumeExact_ opTok >> subexpr)
+  return (foldl (opCtor p) x xs)
 
 
 unaryOp :: Parser a

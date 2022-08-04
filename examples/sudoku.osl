@@ -30,5 +30,5 @@ def solutionMatchesProblem : Problem -> Solution -> Prop
      all c : Cell, f(c) = nothing | f(c) = just(g(c)).
 
 def problemIsSolvable : Problem -> Prop
-  := \p : Problem => exists s : Solution,
+  := \p : Problem => some s : Solution,
      solutionMatchesProblem(p, s) & solutionIsWellFormed(s).
