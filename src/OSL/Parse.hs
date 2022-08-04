@@ -217,8 +217,6 @@ term0 :: Parser (Term SourcePos)
 term0 =
   choice
   $
-  try
-  <$>
   [ quantifier T.ForAll ForAll
   , quantifier T.ForSome ForSome
   , lambda
@@ -280,6 +278,14 @@ term1 =
   [ binaryOpAssocLeft term2 T.And And
   , binaryOpAssocLeft term2 T.Or Or
   , binaryOp term2 T.ThinArrow Implies
+  , binaryOp term3 T.Equal Equal
+  , binaryOp term3 T.LessOrEqual LessOrEqual
+  , binaryOpAssocLeft term2 T.AddNOp (applyBinaryOp AddN)
+  , binaryOpAssocLeft term2 T.MulNOp (applyBinaryOp MulN)
+  , binaryOpAssocLeft term2 T.AddZOp (applyBinaryOp AddZ)
+  , binaryOpAssocLeft term2 T.MulZOp (applyBinaryOp MulZ)
+  , binaryOpAssocLeft term2 T.ProductOp FunctionProduct
+  , binaryOpAssocLeft term2 T.CoproductOp FunctionCoproduct
   , term2
   ]
 
@@ -290,45 +296,17 @@ term2 =
   $
   try
   <$>
-  [ binaryOp term3 T.Equal Equal
-  , binaryOp term3 T.LessOrEqual LessOrEqual
-  , term3
-  ]
-
-
-term3 :: Parser (Term SourcePos)
-term3 =
-  choice
-  $
-  try
-  <$>
-  [ binaryOpAssocLeft term4 T.AddNOp (applyBinaryOp AddN)
-  , binaryOpAssocLeft term4 T.MulNOp (applyBinaryOp MulN)
-  , binaryOpAssocLeft term4 T.AddZOp (applyBinaryOp AddZ)
-  , binaryOpAssocLeft term4 T.MulZOp (applyBinaryOp MulZ)
-  , binaryOpAssocLeft term4 T.ProductOp FunctionProduct
-  , binaryOpAssocLeft term4 T.CoproductOp FunctionCoproduct
-  , term4
-  ]
-
-
-term4 :: Parser (Term SourcePos)
-term4 =
-  choice
-  $
-  try
-  <$>
   [ tuple
   , unaryOp term0 T.Not Not
   , functionApplication
-  , term5
+  , term3
   ]
 
 
 functionApplication :: Parser (Term SourcePos)
 functionApplication = do
   p <- getPosition
-  f <- term5
+  f <- term3
   consumeExact_ T.OpenParen
   arg <- term3
   args <- many (consumeExact_ T.Comma >> term3)
@@ -344,12 +322,10 @@ parenthesizedTerm = do
   return x
 
 
-term5 :: Parser (Term SourcePos)
-term5 =
+term3 :: Parser (Term SourcePos)
+term3 =
   choice
   $
-  try
-  <$>
   [ namedTerm
   , constant
   , parenthesizedTerm

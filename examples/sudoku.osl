@@ -27,7 +27,7 @@ def solutionMatchesProblem : Problem -> Solution -> Prop
   := \p : Problem => \s : Solution
   => let f : Cell -> Maybe(Value) := from(Problem)(p);
      let g : Cell -> Value := from(Solution)(s);
-     all c : Cell, f(c) = nothing | f(c) = just(g(c)).
+     all c : Cell, (f(c) = nothing) | (f(c) = just(g(c))).
 
 def problemIsSolvable : Problem -> Prop
   := \p : Problem => some s : Solution,
