@@ -10,3 +10,4 @@ data Token = Var Name | Keyword Keyword | ThinArrow | Colon
   | ProductOp | Comma | CoproductOp | AddNOp | MulNOp | AddZOp | MulZOp
   | Equals | LessOrEquals | And | Or | Not | ForAll | ForSome
   | Lambda | ThickArrow | Congruent | DefEquals | Semicolon | Period
+  deriving Show
