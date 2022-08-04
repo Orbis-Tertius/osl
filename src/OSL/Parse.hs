@@ -394,7 +394,6 @@ functorApplication = do
   (f, p) <- consume $
     \case
       (T.Keyword K.List, p) -> return (K.List, p)
-      (T.Keyword K.Maybe, p) -> return (K.Maybe, p)
       (T.Keyword K.Map, p) -> return (K.Map, p)
       _ -> Nothing
   case f of
@@ -441,8 +440,31 @@ functorApplication = do
         _ -> mzero
       consumeExact_ T.CloseParen
       return h
-    K.Maybe -> todo
-    K.Map -> todo
+    K.Map -> do
+      consumeExact_ T.OpenParen
+      g <- consume $
+        \case
+          (T.Keyword K.Pi1, _) -> return K.Pi1
+          (T.Keyword K.Pi2, _) -> return K.Pi2
+          (T.Keyword K.To, _) -> return K.To
+          (T.Keyword K.From, _) -> return K.From
+          _ -> Nothing
+      h <- case g of
+        K.Pi1 -> return (MapPi1 p)
+        K.Pi2 -> return (MapPi2 p)
+        K.To -> do
+          consumeExact_ T.OpenParen
+          a <- name
+          consumeExact_ T.CloseParen
+          return (MapTo p a)
+        K.From -> do
+          consumeExact_ T.OpenParen
+          a <- name
+          consumeExact_ T.CloseParen
+          return (MapFrom p a)
+        _ -> mzero
+      consumeExact_ T.CloseParen
+      return h
     _ -> mzero
 
 
@@ -493,7 +515,3 @@ tuple = do
       (\y z -> Apply p (Apply p (Pair p) y) z)
       x
       xs)
-
-
-todo :: a
-todo = todo
