@@ -13,8 +13,8 @@ def getCell : Square -> SquareCell -> Cell
   := \s : Square => \c : SquareCell
   => let s' : Fin(3) * Fin(3) := from(Square)(s);
      let c' : Fin(3) * Fin(3) := from(SquareCell)(c);
-     to(Cell)( to(Row)(cast(3N *N cast(pi1(s'))) +N cast(pi1(c'))))
-             , to(Col)(cast(3N *N cast(pi2(s'))) +N cast(pi2(c')))) ).
+     to(Cell)( to(Row)(cast(3N *N cast(pi1(s'))) +N cast(pi1(c')))
+             , to(Col)(cast(3N *N cast(pi2(s'))) +N cast(pi2(c'))) ).
 
 def solutionIsWellFormed : Solution -> Prop
   := \s : Solution
