@@ -5,7 +5,7 @@ data Row ~= Fin(9).
 data Col ~= Fin(9).
 data Cell ~= Row * Col.
 data Problem ~= Cell -> Maybe(Value).
-data Solution ~= Cell -> Maybe(Value).
+data Solution ~= Cell -> Value.
 data Square ~= Fin(3) * Fin(3).
 data SquareCell ~= Fin(3) * Fin(3).
 
