@@ -203,10 +203,10 @@ checkTerm c t x =
         _ -> genericErrorMessage
     Lambda ann varName varType def ->
       case t of
-        F _ a _ -> do
+        F _ a b -> do
           checkTypeEquality c ann a varType
           c' <- addToContext c (varName, FreeVariable varType)
-          checkTerm c' t def
+          checkTerm c' b def
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
               <> " but got a lambda"
     Apply _ (Cast _) y -> do
