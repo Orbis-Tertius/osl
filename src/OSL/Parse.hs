@@ -215,6 +215,7 @@ term0 =
   [ quantifier T.ForAll ForAll
   , quantifier T.ForSome ForSome
   , lambda
+  , letExpr
   , term1
   ]
 
@@ -249,6 +250,20 @@ lambda = do
   return (Lambda p varName varType y)
 
 
+letExpr :: Parser (Term SourcePos)
+letExpr = do
+  p <- getPosition
+  consumeExact_ (T.Keyword K.Let)
+  varName <- name
+  consumeExact_ T.Colon
+  varType <- type0
+  consumeExact_ T.DefEquals
+  def <- term0
+  consumeExact_ T.Semicolon
+  y <- term0
+  return (Let p varName varType def y)
+
+
 term1 :: Parser (Term SourcePos)
 term1 =
   choice
@@ -260,6 +275,22 @@ term1 =
   , binaryOp term2 T.ThinArrow Implies
   , term2
   ]
+
+
+term2 :: Parser (Term SourcePos)
+term2 =
+  choice
+  $
+  try
+  <$>
+  [ binaryOp term3 T.Equal Equal
+  , binaryOp term3 T.LessOrEqual LessOrEqual
+  , term3
+  ]
+
+
+term3 :: Parser (Term SourcePos)
+term3 = todo
 
 
 binaryOp :: Parser (Term SourcePos)
@@ -275,21 +306,6 @@ binaryOp subexpr opTok opCtor = do
   consumeExact_ opTok
   y <- subexpr
   return (opCtor p x y)
-
-
-term2 :: Parser (Term SourcePos)
-term2 =
-  choice
-  $
-  try
-  <$>
-  [ binaryOp term3 T.Equal Equal
-  , binaryOp term3 T.LessOrEqual LessOrEqual
-  ]
-
-
-term3 :: Parser (Term SourcePos)
-term3 = todo
 
 
 todo :: a
