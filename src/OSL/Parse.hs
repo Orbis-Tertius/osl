@@ -7,13 +7,13 @@ module OSL.Parse (parseContext) where
 import Control.Monad (guard, mzero)
 import Data.Either.Combinators (mapLeft)
 import Data.Text (Text, pack, unpack)
-import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try, choice)
+import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try, choice, getPosition, option)
 import qualified Text.Parsec.Prim as Prim
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.OSL (Context (..), Name, Declaration (..), Term (..), Type (..))
 import qualified OSL.Types.Keyword as K
-import OSL.Types.Token (Token (..))
+import OSL.Types.Token (Token)
 import qualified OSL.Types.Token as T
 
 
@@ -61,7 +61,7 @@ dataDeclaration = do
   consumeExact_ (T.Keyword K.Data)
   n <- name
   consumeExact_ T.Congruent
-  t <- type'
+  t <- type0
   consumeExact_ T.Period
   return (n, Data t)
 
@@ -71,7 +71,7 @@ defDeclaration = do
   consumeExact_ (T.Keyword K.Def)
   n <- name
   consumeExact_ T.Colon
-  ty <- type'
+  ty <- type0
   consumeExact_ T.DefEquals
   def <- term
   consumeExact_ T.Period
@@ -82,7 +82,7 @@ freeDeclaration :: Parser (Name, Declaration SourcePos)
 freeDeclaration = do
   n <- name
   consumeExact_ T.Colon
-  t <- type'
+  t <- type0
   consumeExact_ T.Period
   return (n, FreeVariable t)
 
@@ -95,14 +95,117 @@ name =
       _            -> mzero
 
 
-type' :: Parser (Type SourcePos)
-type' =
+type0 :: Parser (Type SourcePos)
+type0 = do
+  p <- getPosition
+  t <- type1
+  ts <- option Nothing (consumeExact_ T.ThinArrow >> (Just <$> type0))
+  case ts of
+    Nothing -> return t
+    Just t' -> return (F p t t')
+
+
+type1 :: Parser (Type SourcePos)
+type1 = do
+  p <- getPosition
+  t <- type1
+  ts <- option Nothing ((Just. Left <$> productTail) <|> (Just . Right <$> coproductTail))
+  case ts of
+    Nothing -> return t
+    Just (Left ts') -> return (Product p t ts')
+    Just (Right ts') -> return (Coproduct p t ts')
+
+
+productTail :: Parser (Type SourcePos)
+productTail = do
+  p <- getPosition
+  consumeExact_ T.ProductOp
+  t <- type2
+  ts <- option Nothing (Just <$> productTail)
+  case ts of
+    Nothing -> return t
+    Just ts' -> return (Product p t ts')
+
+
+coproductTail :: Parser (Type SourcePos)
+coproductTail = do
+  p <- getPosition
+  consumeExact_ T.CoproductOp
+  t <- type2
+  ts <- option Nothing (Just <$> coproductTail)
+  case ts of
+    Nothing -> return t
+    Just ts' -> return (Coproduct p t ts')
+
+
+type2 :: Parser (Type SourcePos)
+type2 =
   choice
   $
   try
   <$>
   [ consumeExact (T.Keyword K.Prop) Prop
+  , consumeExact (T.Keyword K.N) N
+  , consumeExact (T.Keyword K.Z) Z
+  , NamedType <$> getPosition <*> name
+  , parenthesizedType
+  , finiteType
+  , maybeType
+  , listType
+  , mapType
   ]
+
+
+parenthesizedType :: Parser (Type SourcePos)
+parenthesizedType = do
+  consumeExact_ T.OpenParen
+  t <- type0
+  consumeExact_ T.CloseParen
+  return t
+
+
+finiteType :: Parser (Type SourcePos)
+finiteType = do
+  consumeExact_ (T.Keyword K.Fin)
+  consumeExact_ T.OpenParen
+  t <- consume $
+    \case
+      (T.Const i, p) -> return (Fin p i)
+      _ -> mzero
+  consumeExact_ T.CloseParen
+  return t
+
+
+maybeType :: Parser (Type SourcePos)
+maybeType = do
+  p <- getPosition
+  consumeExact_ (T.Keyword K.Maybe)
+  consumeExact_ T.OpenParen
+  t <- type0
+  consumeExact_ T.CloseParen
+  return (Maybe p t)
+
+
+listType :: Parser (Type SourcePos)
+listType = do
+  p <- getPosition
+  consumeExact_ (T.Keyword K.List)
+  consumeExact_ T.OpenParen
+  t <- type0
+  consumeExact_ T.CloseParen
+  return (List p t)
+
+
+mapType :: Parser (Type SourcePos)
+mapType = do
+  p <- getPosition
+  consumeExact_ (T.Keyword K.Map)
+  consumeExact_ T.OpenParen
+  t0 <- type0
+  consumeExact_ T.Comma
+  t1 <- type0
+  consumeExact_ T.CloseParen
+  return (Map p t0 t1)
 
 
 term :: Parser (Term SourcePos)

@@ -72,6 +72,9 @@ token =
   , constantNatural
   , constantInteger
   , constantFinite
+  -- the T.Const case must come after the other constant
+  -- cases to deal with ambiguity
+  , T.Const <$> nonNegativeIntegerLiteral
   , T.AddNOp <$ string "+N"
   , T.AddNOp <$ string "+ℕ"
   , T.MulNOp <$ string "×ℕ"
