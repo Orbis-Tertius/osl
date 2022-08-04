@@ -309,10 +309,52 @@ term4 :: Parser (Term SourcePos)
 term4 =
   choice
   $
+  try
+  <$>
   [ tuple
-  , unaryOp T.Not Not
-  , constant
-  , unaryOp (T.Keyword K.Cast) (applyUnaryOp Cast)
+  , unaryOp term0 T.Not Not
+  , functionApplication
+  , parenthesizedTerm
+  , term5
+  ]
+
+
+functionApplication :: Parser (Term SourcePos)
+functionApplication = do
+  p <- getPosition
+  f <- term5
+  consumeExact_ T.OpenParen
+  arg <- term0
+  args <- many (consumeExact_ T.Comma >> term0)
+  consumeExact_ T.CloseParen
+  return (foldl (Apply p) f (arg:args))
+
+
+parenthesizedTerm :: Parser (Term SourcePos)
+parenthesizedTerm = do
+  consumeExact_ T.OpenParen
+  x <- term0
+  consumeExact_ T.CloseParen
+  return x
+
+
+term5 :: Parser (Term SourcePos)
+term5 =
+  choice
+  $
+  [ constant
+  , builtin K.Cast Cast
+  , builtin K.Pi1 Pi1
+  , builtin K.Pi2 Pi2
+  , builtin K.Iota1 Iota1
+  , builtin K.Iota2 Iota2
+  , unaryOp name (T.Keyword K.To) To
+  , unaryOp name (T.Keyword K.From) From
+  , builtin K.Nothing' Nothing'
+  , unaryOp term0 (T.Keyword K.Maybe') Maybe'
+  , builtin K.Exists Exists
+  , builtin K.Length Length
+  , builtin K.Nth Nth
   , todo
   ]
 
@@ -327,11 +369,13 @@ constant =
       _ -> mzero
 
 
-applyUnaryOp :: (SourcePos -> Term SourcePos)
-  -> SourcePos
-  -> Term SourcePos
-  -> Term SourcePos
-applyUnaryOp op p = Apply p (op p)
+builtin :: K.Keyword
+  -> (SourcePos -> Term SourcePos)
+  -> Parser (Term SourcePos)
+builtin k op = do
+  p <- getPosition
+  consumeExact_ (T.Keyword k)
+  return (op p)
 
 
 applyBinaryOp :: (SourcePos -> Term SourcePos)
@@ -358,14 +402,15 @@ binaryOp subexpr opTok opCtor = do
   return (opCtor p x y)
 
 
-unaryOp :: Token
-  -> (SourcePos -> Term SourcePos -> Term SourcePos)
+unaryOp :: Parser a
+  -> Token
+  -> (SourcePos -> a -> Term SourcePos)
   -> Parser (Term SourcePos)
-unaryOp opTok opCtor = do
+unaryOp subexpr opTok opCtor = do
   p <- getPosition
   consumeExact_ opTok
   consumeExact_ T.OpenParen
-  x <- term0
+  x <- subexpr
   consumeExact_ T.CloseParen
   return (opCtor p x)
 
@@ -375,7 +420,11 @@ tuple = do
   p <- getPosition
   x <- term0
   xs <- many1 term0
-  return (foldr (Apply p) (Pair p) (x:xs))
+  return
+    (foldr
+      (\y z -> Apply p (Apply p (Pair p) y) z)
+      x
+      xs)
 
 
 todo :: a
