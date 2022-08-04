@@ -73,7 +73,7 @@ defDeclaration = do
   consumeExact_ T.Colon
   ty <- type0
   consumeExact_ T.DefEquals
-  def <- term
+  def <- term0
   consumeExact_ T.Period
   return (n, Defined ty def)
 
@@ -208,8 +208,49 @@ mapType = do
   return (Map p t0 t1)
 
 
-term :: Parser (Term SourcePos)
-term = todo
+term0 :: Parser (Term SourcePos)
+term0 =
+  choice
+  $
+  [ quantifier T.ForAll ForAll
+  , quantifier T.ForSome ForSome
+  , lambda
+  , term1
+  ]
+
+
+quantifier :: Token
+  -> (SourcePos
+      -> Name
+      -> Type (SourcePos)
+      -> Term (SourcePos)
+      -> Term SourcePos)
+  -> Parser (Term SourcePos)
+quantifier tok ctor = do
+  p <- getPosition
+  consumeExact_ tok
+  varName <- name
+  consumeExact_ T.Colon
+  varType <- type0
+  consumeExact_ T.Comma
+  q <- term0
+  return (ctor p varName varType q)
+
+
+lambda :: Parser (Term SourcePos)
+lambda = do
+  p <- getPosition
+  consumeExact_ T.Lambda
+  varName <- name
+  consumeExact_ T.Colon
+  varType <- type0
+  consumeExact_ T.ThickArrow
+  y <- term0
+  return (Lambda p varName varType y)
+
+
+term1 :: Parser (Term SourcePos)
+term1 = todo
 
 
 todo :: a
