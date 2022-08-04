@@ -290,7 +290,31 @@ term2 =
 
 
 term3 :: Parser (Term SourcePos)
-term3 = todo
+term3 =
+  choice
+  $
+  try
+  <$>
+  [ binaryOp term4 T.AddNOp (applyOp AddN)
+  , binaryOp term4 T.MulNOp (applyOp MulN)
+  , binaryOp term4 T.AddZOp (applyOp AddZ)
+  , binaryOp term4 T.MulZOp (applyOp MulZ)
+  , binaryOp term4 T.ProductOp FunctionProduct
+  , binaryOp term4 T.CoproductOp FunctionCoproduct
+  , term4
+  ]
+
+
+term4 :: Parser (Term SourcePos)
+term4 = todo
+
+
+applyOp :: (SourcePos -> Term SourcePos)
+  -> SourcePos
+  -> Term SourcePos
+  -> Term SourcePos
+  -> Term SourcePos
+applyOp op p x y = (Apply p (Apply p (op p) x) y)
 
 
 binaryOp :: Parser (Term SourcePos)
