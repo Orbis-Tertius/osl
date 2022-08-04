@@ -7,7 +7,7 @@ module OSL.Parse (parseContext) where
 import Control.Monad (guard, mzero)
 import Data.Either.Combinators (mapLeft)
 import Data.Text (Text, pack, unpack)
-import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try, choice, getPosition, option)
+import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try, choice, getPosition, option, many1)
 import qualified Text.Parsec.Prim as Prim
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
@@ -306,7 +306,13 @@ term3 =
 
 
 term4 :: Parser (Term SourcePos)
-term4 = todo
+term4 =
+  choice
+  $
+  [ tuple
+  , unaryOp T.Not Not
+  , todo
+  ]
 
 
 applyOp :: (SourcePos -> Term SourcePos)
@@ -330,6 +336,26 @@ binaryOp subexpr opTok opCtor = do
   consumeExact_ opTok
   y <- subexpr
   return (opCtor p x y)
+
+
+unaryOp :: Token
+  -> (SourcePos -> Term SourcePos -> Term SourcePos)
+  -> Parser (Term SourcePos)
+unaryOp opTok opCtor = do
+  p <- getPosition
+  consumeExact_ opTok
+  consumeExact_ T.OpenParen
+  x <- term0
+  consumeExact_ T.CloseParen
+  return (opCtor p x)
+
+
+tuple :: Parser (Term SourcePos)
+tuple = do
+  p <- getPosition
+  x <- term0
+  xs <- many1 term0
+  return (foldr (Apply p) (Pair p) (x:xs))
 
 
 todo :: a
