@@ -66,7 +66,6 @@ token =
   [ T.Keyword <$> keyword
   , T.ThinArrow <$ string "->"
   , T.ThinArrow <$ string "→"
-  , T.Colon <$ string ":"
   , T.OpenParen <$ string "("
   , T.CloseParen <$ string ")"
   , constantNatural
@@ -82,12 +81,9 @@ token =
   , T.AddZOp <$ string "+ℤ"
   , T.MulZOp <$ string "*Z"
   , T.MulZOp <$ string "×ℤ"
-  , T.ProductOp <$ string "*"
   , T.ProductOp <$ string "×"
   , T.Comma <$ string ","
-  , T.CoproductOp <$ string "+"
   , T.CoproductOp <$ string "⊕"
-  , T.Equal <$ string "="
   , T.LessOrEqual <$ string "<="
   , T.LessOrEqual <$ string "≤"
   , T.And <$ string "&"
@@ -110,6 +106,12 @@ token =
   , T.DefEquals <$ string "≔"
   , T.Semicolon <$ string ";"
   , T.Period <$ string "."
+  , T.Keyword K.Let <$ string "let"
+  -- the following must come after some others in order to deal with ambiguity
+  , T.ProductOp <$ string "*"
+  , T.CoproductOp <$ string "+"
+  , T.Colon <$ string ":"
+  , T.Equal <$ string "="
   -- Var must come last in order to deal with ambiguity
   , T.Var <$> name
   ]
@@ -162,7 +164,7 @@ keyword =
 name :: Parser Name
 name = do
   begin <- oneOf (['a'..'z'] <> ['A'..'Z'] <> "_")
-  rest  <- many (oneOf (['a'..'z'] <> ['A'..'Z'] <> ['0'..'9'] <> "_"))
+  rest  <- many (oneOf (['a'..'z'] <> ['A'..'Z'] <> ['0'..'9'] <> "_\'"))
   return (Name (cons begin (pack rest)))
 
 

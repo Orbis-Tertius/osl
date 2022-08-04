@@ -53,7 +53,12 @@ context = do
 
 
 declaration :: Parser (Name, Declaration SourcePos)
-declaration = dataDeclaration <|> defDeclaration <|> freeDeclaration
+declaration =
+  choice
+  [ dataDeclaration
+  , defDeclaration
+  , freeDeclaration
+  ]
 
 
 dataDeclaration :: Parser (Name, Declaration SourcePos)
@@ -108,7 +113,7 @@ type0 = do
 type1 :: Parser (Type SourcePos)
 type1 = do
   p <- getPosition
-  t <- type1
+  t <- type2
   ts <- option Nothing ((Just. Left <$> productTail) <|> (Just . Right <$> coproductTail))
   case ts of
     Nothing -> return t
@@ -314,7 +319,6 @@ term4 =
   [ tuple
   , unaryOp term0 T.Not Not
   , functionApplication
-  , parenthesizedTerm
   , term5
   ]
 
@@ -344,6 +348,7 @@ term5 =
   $
   [ namedTerm
   , constant
+  , parenthesizedTerm
   , builtin K.Cast Cast
   , builtin K.Pi1 Pi1
   , builtin K.Pi2 Pi2
@@ -508,8 +513,10 @@ unaryOp subexpr opTok opCtor = do
 tuple :: Parser (Term SourcePos)
 tuple = do
   p <- getPosition
+  consumeExact_ T.OpenParen
   x <- term0
-  xs <- many1 term0
+  xs <- many1 (consumeExact_ T.Comma >> term0)
+  consumeExact_ T.CloseParen
   return
     (foldr
       (\y z -> Apply p (Apply p (Pair p) y) z)

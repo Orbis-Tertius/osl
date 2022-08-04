@@ -18,10 +18,12 @@ main = do
       source <- readFile fileName
       case tokenize fileName source of
         Left err -> putStrLn $ "Tokenizing error: " <> show err
-        Right toks ->
+        Right toks -> do
+          putStrLn "tokenized successfully"
           case parseContext fileName toks of
             Left err -> putStrLn $ "Parse error: " <> show err
-            Right rawCtx ->
+            Right rawCtx -> do
+              putStrLn "parsed successfully"
               case validateContext rawCtx of
                 Left err -> putStrLn $ "Type checking error: " <> show err
                 Right _ -> putStrLn "Validated OSL"

@@ -13,22 +13,22 @@ def getCell : Square -> SquareCell -> Cell
   := \s : Square => \c : SquareCell
   => let s' : Fin(3) * Fin(3) := from(Square)(s);
      let c' : Fin(3) * Fin(3) := from(SquareCell)(c);
-     to(Cell)( to(Row)(cast(3N *N cast(pi1(s') +N cast(pi1(c')))))
-             , to(Col)(cast(3N *N cast(pi2(s')) +N cast(pi2(c')))) ).
+     to(Cell)( to(Row)(cast(3N *N cast(pi1(s'))) +N cast(pi1(c'))))
+             , to(Col)(cast(3N *N cast(pi2(s'))) +N cast(pi2(c')))) ).
 
-def solutionIsWellFormed : Solution -> Prop
-  := \s : Solution
-  => let f : Cell -> Value := from(Solution)(s);
-     (all r : Row, all v : Value, some c : Col, f(to(Cell)((r,c))) = v)
-   & (all c : Col, all v : Value, some r : Row, f(to(Cell)((r,c))) = v)
-   & (all r : Square, all v : Value, some c : SquareCell, f(getCell(r,c)) = v).
-
-def solutionMatchesProblem : Problem -> Solution -> Prop
-  := \p : Problem => \s : Solution
-  => let f : Cell -> Maybe(Value) := from(Problem)(p);
-     let g : Cell -> Value := from(Solution)(s);
-     all c : Cell, f(c) = nothing | f(c) = just(g(c)).
-
-def problemIsSolvable : Problem -> Prop
-  := \p : Problem => exists s : Solution,
-     solutionMatchesProblem(p, s) & solutionIsWellFormed(s).
+-- def solutionIsWellFormed : Solution -> Prop
+--   := \s : Solution
+--   => let f : Cell -> Value := from(Solution)(s);
+--      (all r : Row, all v : Value, some c : Col, f(to(Cell)((r,c))) = v)
+--    & (all c : Col, all v : Value, some r : Row, f(to(Cell)((r,c))) = v)
+--    & (all r : Square, all v : Value, some c : SquareCell, f(getCell(r,c)) = v).
+-- 
+-- def solutionMatchesProblem : Problem -> Solution -> Prop
+--   := \p : Problem => \s : Solution
+--   => let f : Cell -> Maybe(Value) := from(Problem)(p);
+--      let g : Cell -> Value := from(Solution)(s);
+--      all c : Cell, f(c) = nothing | f(c) = just(g(c)).
+-- 
+-- def problemIsSolvable : Problem -> Prop
+--   := \p : Problem => exists s : Solution,
+--      solutionMatchesProblem(p, s) & solutionIsWellFormed(s).
