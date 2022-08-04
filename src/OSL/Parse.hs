@@ -342,7 +342,8 @@ term5 :: Parser (Term SourcePos)
 term5 =
   choice
   $
-  [ constant
+  [ namedTerm
+  , constant
   , builtin K.Cast Cast
   , builtin K.Pi1 Pi1
   , builtin K.Pi2 Pi2
@@ -362,6 +363,12 @@ term5 =
   , unaryOp term0 (T.Keyword K.SumListLookup) SumListLookup
   , todo
   ]
+
+
+namedTerm :: Parser (Term SourcePos)
+namedTerm = do
+  p <- getPosition
+  NamedTerm p <$> name
 
 
 constant :: Parser (Term SourcePos)
