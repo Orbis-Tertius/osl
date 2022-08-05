@@ -217,8 +217,6 @@ term0 :: Parser (Term SourcePos)
 term0 =
   choice
   $
-  try
-  <$>
   [ quantifier T.ForAll ForAll
   , quantifier T.ForSome ForSome
   , lambda
@@ -272,16 +270,66 @@ letExpr = do
 
 
 term1 :: Parser (Term SourcePos)
-term1 =
-  choice
-  $
-  try
-  <$>
-  [ binaryOpAssocLeft term2 T.And And
-  , binaryOpAssocLeft term2 T.Or Or
-  , binaryOp term2 T.ThinArrow Implies
-  , term2
-  ]
+term1 = do
+  x <- term2
+  try (operatorOn x) <|> return x
+
+
+operatorOn :: Term SourcePos -> Parser (Term SourcePos)
+operatorOn x = do
+  p <- getPosition
+  op <- consume $
+    \case
+      (T.And, _) -> return T.And
+      (T.Or, _) -> return T.Or
+      (T.AddNOp, _) -> return T.AddNOp
+      (T.MulNOp, _) -> return T.MulNOp
+      (T.AddZOp, _) -> return T.AddZOp
+      (T.MulZOp, _) -> return T.MulZOp
+      (T.ProductOp, _) -> return T.ProductOp
+      (T.CoproductOp, _) -> return T.CoproductOp
+      (T.ThinArrow, _) -> return T.ThinArrow
+      (T.Equal, _) -> return T.Equal
+      (T.LessOrEqual, _) -> return T.LessOrEqual
+      _ -> Nothing
+  xs <-
+    if isAssociative op
+    then do
+      y <- term2
+      ys <- many (consumeExact_ op >> term2)
+      return (y:ys)
+    else (:[]) <$> term2
+  return (foldl (opCtor op p) x xs)
+  where
+    opCtor =
+      \case
+        T.And -> And
+        T.Or -> Or
+        T.AddNOp -> applyBinaryOp AddN
+        T.MulNOp -> applyBinaryOp MulN
+        T.AddZOp -> applyBinaryOp AddZ
+        T.MulZOp -> applyBinaryOp MulZ
+        T.ProductOp -> FunctionProduct
+        T.CoproductOp -> FunctionCoproduct
+        T.ThinArrow -> Implies
+        T.Equal -> Equal
+        T.LessOrEqual -> LessOrEqual
+        _ -> error "opCtor called outside defined domain"
+
+    isAssociative =
+      \case
+        T.And -> True
+        T.Or -> True
+        T.AddNOp -> True
+        T.MulNOp -> True
+        T.AddZOp -> True
+        T.MulZOp -> True
+        T.ProductOp -> True
+        T.CoproductOp -> True
+        T.ThinArrow -> False
+        T.Equal -> False
+        T.LessOrEqual -> False
+        _ -> error "isAssociative called outside defined domain"
 
 
 term2 :: Parser (Term SourcePos)
@@ -290,48 +338,20 @@ term2 =
   $
   try
   <$>
-  [ binaryOp term3 T.Equal Equal
-  , binaryOp term3 T.LessOrEqual LessOrEqual
-  , term3
-  ]
-
-
-term3 :: Parser (Term SourcePos)
-term3 =
-  choice
-  $
-  try
-  <$>
-  [ binaryOpAssocLeft term4 T.AddNOp (applyBinaryOp AddN)
-  , binaryOpAssocLeft term4 T.MulNOp (applyBinaryOp MulN)
-  , binaryOpAssocLeft term4 T.AddZOp (applyBinaryOp AddZ)
-  , binaryOpAssocLeft term4 T.MulZOp (applyBinaryOp MulZ)
-  , binaryOpAssocLeft term4 T.ProductOp FunctionProduct
-  , binaryOpAssocLeft term4 T.CoproductOp FunctionCoproduct
-  , term4
-  ]
-
-
-term4 :: Parser (Term SourcePos)
-term4 =
-  choice
-  $
-  try
-  <$>
   [ tuple
   , unaryOp term0 T.Not Not
   , functionApplication
-  , term5
+  , term3
   ]
 
 
 functionApplication :: Parser (Term SourcePos)
 functionApplication = do
   p <- getPosition
-  f <- term5
+  f <- term3
   consumeExact_ T.OpenParen
-  arg <- term3
-  args <- many (consumeExact_ T.Comma >> term3)
+  arg <- term1
+  args <- many (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
   return (foldl (Apply p) f (arg:args))
 
@@ -344,12 +364,10 @@ parenthesizedTerm = do
   return x
 
 
-term5 :: Parser (Term SourcePos)
-term5 =
+term3 :: Parser (Term SourcePos)
+term3 =
   choice
   $
-  try
-  <$>
   [ namedTerm
   , constant
   , parenthesizedTerm
@@ -486,35 +504,6 @@ applyBinaryOp :: (SourcePos -> Term SourcePos)
 applyBinaryOp op p x y = Apply p (Apply p (op p) x) y
 
 
-binaryOp :: Parser (Term SourcePos)
-  -> Token
-  -> (SourcePos
-      -> Term SourcePos
-      -> Term SourcePos
-      -> Term SourcePos)
-  -> Parser (Term SourcePos)
-binaryOp subexpr opTok opCtor = do
-  p <- getPosition
-  x <- subexpr
-  consumeExact_ opTok
-  y <- subexpr
-  return (opCtor p x y)
-
-
-binaryOpAssocLeft :: Parser (Term SourcePos)
-  -> Token
-  -> (SourcePos
-       -> Term SourcePos
-       -> Term SourcePos
-       -> Term SourcePos)
-  -> Parser (Term SourcePos)
-binaryOpAssocLeft subexpr opTok opCtor = do
-  p <- getPosition
-  x <- subexpr
-  xs <- many1 (consumeExact_ opTok >> subexpr)
-  return (foldl (opCtor p) x xs)
-
-
 unaryOp :: Parser a
   -> Token
   -> (SourcePos -> a -> Term SourcePos)
@@ -532,8 +521,8 @@ tuple :: Parser (Term SourcePos)
 tuple = do
   p <- getPosition
   consumeExact_ T.OpenParen
-  x <- term3
-  xs <- many1 (consumeExact_ T.Comma >> term3)
+  x <- term1
+  xs <- many1 (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
   return
     (foldl
