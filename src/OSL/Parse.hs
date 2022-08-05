@@ -270,24 +270,66 @@ letExpr = do
 
 
 term1 :: Parser (Term SourcePos)
-term1 =
-  choice
-  $
-  try
-  <$>
-  [ binaryOpAssocLeft term2 T.And And
-  , binaryOpAssocLeft term2 T.Or Or
-  , binaryOp term2 T.ThinArrow Implies
-  , binaryOp term2 T.Equal Equal
-  , binaryOp term2 T.LessOrEqual LessOrEqual
-  , binaryOpAssocLeft term2 T.AddNOp (applyBinaryOp AddN)
-  , binaryOpAssocLeft term2 T.MulNOp (applyBinaryOp MulN)
-  , binaryOpAssocLeft term2 T.AddZOp (applyBinaryOp AddZ)
-  , binaryOpAssocLeft term2 T.MulZOp (applyBinaryOp MulZ)
-  , binaryOpAssocLeft term2 T.ProductOp FunctionProduct
-  , binaryOpAssocLeft term2 T.CoproductOp FunctionCoproduct
-  , term2
-  ]
+term1 = do
+  x <- term2
+  try (operatorOn x) <|> return x
+
+
+operatorOn :: Term SourcePos -> Parser (Term SourcePos)
+operatorOn x = do
+  p <- getPosition
+  op <- consume $
+    \case
+      (T.And, _) -> return T.And
+      (T.Or, _) -> return T.Or
+      (T.AddNOp, _) -> return T.AddNOp
+      (T.MulNOp, _) -> return T.MulNOp
+      (T.AddZOp, _) -> return T.AddZOp
+      (T.MulZOp, _) -> return T.MulZOp
+      (T.ProductOp, _) -> return T.ProductOp
+      (T.CoproductOp, _) -> return T.CoproductOp
+      (T.ThinArrow, _) -> return T.ThinArrow
+      (T.Equal, _) -> return T.Equal
+      (T.LessOrEqual, _) -> return T.LessOrEqual
+      _ -> Nothing
+  xs <-
+    if isAssociative op
+    then do
+      y <- term2
+      ys <- many (consumeExact_ op >> term2)
+      return (y:ys)
+    else (:[]) <$> term2
+  return (foldl (opCtor op p) x xs)
+  where
+    opCtor =
+      \case
+        T.And -> And
+        T.Or -> Or
+        T.AddNOp -> applyBinaryOp AddN
+        T.MulNOp -> applyBinaryOp MulN
+        T.AddZOp -> applyBinaryOp AddZ
+        T.MulZOp -> applyBinaryOp MulZ
+        T.ProductOp -> FunctionProduct
+        T.CoproductOp -> FunctionCoproduct
+        T.ThinArrow -> Implies
+        T.Equal -> Equal
+        T.LessOrEqual -> LessOrEqual
+        _ -> error "opCtor called outside defined domain"
+
+    isAssociative =
+      \case
+        T.And -> True
+        T.Or -> True
+        T.AddNOp -> True
+        T.MulNOp -> True
+        T.AddZOp -> True
+        T.MulZOp -> True
+        T.ProductOp -> True
+        T.CoproductOp -> True
+        T.ThinArrow -> False
+        T.Equal -> False
+        T.LessOrEqual -> False
+        _ -> error "isAssociative called outside defined domain"
 
 
 term2 :: Parser (Term SourcePos)
@@ -460,35 +502,6 @@ applyBinaryOp :: (SourcePos -> Term SourcePos)
   -> Term SourcePos
   -> Term SourcePos
 applyBinaryOp op p x y = Apply p (Apply p (op p) x) y
-
-
-binaryOp :: Parser (Term SourcePos)
-  -> Token
-  -> (SourcePos
-      -> Term SourcePos
-      -> Term SourcePos
-      -> Term SourcePos)
-  -> Parser (Term SourcePos)
-binaryOp subexpr opTok opCtor = do
-  p <- getPosition
-  x <- subexpr
-  consumeExact_ opTok
-  y <- subexpr
-  return (opCtor p x y)
-
-
-binaryOpAssocLeft :: Parser (Term SourcePos)
-  -> Token
-  -> (SourcePos
-       -> Term SourcePos
-       -> Term SourcePos
-       -> Term SourcePos)
-  -> Parser (Term SourcePos)
-binaryOpAssocLeft subexpr opTok opCtor = do
-  p <- getPosition
-  x <- subexpr
-  xs <- many1 (consumeExact_ opTok >> subexpr)
-  return (foldl (opCtor p) x xs)
 
 
 unaryOp :: Parser a
