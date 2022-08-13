@@ -20,6 +20,7 @@ library
     OSL.Types.OSL
     OSL.Types.Sigma11
     OSL.Types.Token
+    OSL.Types.TranslationContext
     OSL.ValidContext
     OSL.ValidateContext
 
