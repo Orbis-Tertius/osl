@@ -6,6 +6,7 @@ module OSL.Translate
 import OSL.Types.OSL (ValidContext)
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
+import OSL.Types.TranslationContext (TranslationContext)
 
 
 translate
