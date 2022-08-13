@@ -8,10 +8,12 @@ maintainer:    morgan.thomas@platonic.systems
 
 library
   exposed-modules:
+    OSL.BuildTranslationContext
     OSL.EntryPoint
     OSL.Parse
     OSL.Term
     OSL.Tokenize
+    OSL.Translate
     OSL.Type
     OSL.Types.Arity
     OSL.Types.DeBruijnIndex
