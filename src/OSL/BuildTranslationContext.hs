@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 
@@ -7,20 +9,26 @@ module OSL.BuildTranslationContext
   ) where
 
 
+import Control.Lens ((^.))
 import Control.Monad (forM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT (..), runExceptT)
 import Control.Monad.Trans.State.Strict (StateT, execStateT)
 import Data.Functor.Identity (runIdentity)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 import OSL.Die (die)
 import OSL.Type (typeAnnotation)
+import OSL.Types.Arity (Arity)
+import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.OSL (Declaration (..), Type (..), ValidContext (..))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
-import OSL.Types.TranslationContext (TranslationContext (..))
+import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), LengthMapping (..), ValuesMapping (..), KeysMapping (..), KeyIndicatorMapping (..))
 import OSL.ValidContext (getExistingDeclaration)
 
 
@@ -66,8 +74,41 @@ getFreeVariables (ValidContext decls) =
     isFree _ = False
 
 
-getFreeS11Name :: TranslationContext -> S11.Name
-getFreeS11Name = todo
+getBoundS11NamesInContext :: Arity -> TranslationContext -> Set S11.Name
+getBoundS11NamesInContext arity (TranslationContext ctx) =
+  Map.foldl' Set.union Set.empty
+    $ getBoundS11NamesInMapping arity <$> ctx
+
+
+getBoundS11NamesInMapping :: Arity -> Mapping -> Set S11.Name
+getBoundS11NamesInMapping arity =
+  \case
+    ScalarMapping name -> f name
+    ProductMapping (LeftMapping a) (RightMapping b) ->
+      rec a `Set.union` rec b
+    CoproductMapping (ChoiceMapping a)
+        (LeftMapping b) (RightMapping c) ->
+      f a `Set.union` (rec b `Set.union` rec c)
+    ListMapping (LengthMapping a) (ValuesMapping b) ->
+      f a `Set.union` rec b
+    MapMapping (LengthMapping a) (KeysMapping b)
+        (KeyIndicatorMapping c) (ValuesMapping d) ->
+      f a `Set.union` (rec b `Set.union` (f c `Set.union` rec d))
+  where
+    f :: S11.Name -> Set S11.Name
+    f name =
+      if name ^. #arity == arity
+      then Set.singleton name
+      else Set.empty
+
+    rec = getBoundS11NamesInMapping arity
+
+
+getFreeS11Name :: Arity -> TranslationContext -> S11.Name
+getFreeS11Name arity ctx =
+  fromMaybe (S11.Name arity (DeBruijnIndex 0))
+    . fmap (S11.Name arity . (+1) . (^. #deBruijnIndex))
+    $ Set.lookupMax (getBoundS11NamesInContext arity ctx)
 
 
 todo :: a

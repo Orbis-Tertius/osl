@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveGeneric #-}
+
+
 module OSL.Types.OSL
   ( Name (..)
   , Type (..)
@@ -8,12 +11,14 @@ module OSL.Types.OSL
   ) where
 
 
+import Data.Generics.Labels ()
 import Data.Map (Map)
 import Data.Text (Text, unpack)
+import GHC.Generics (Generic)
 
 
 newtype Name = Name { unName :: Text }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 
 data Type ann =

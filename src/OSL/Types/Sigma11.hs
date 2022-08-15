@@ -9,6 +9,7 @@ module OSL.Types.Sigma11
 
 
 import Data.List.NonEmpty (NonEmpty)
+import Data.Generics.Labels ()
 import GHC.Generics (Generic)
 
 import OSL.Types.Arity (Arity)
@@ -16,7 +17,7 @@ import OSL.Types.DeBruijnIndex (DeBruijnIndex)
 
 
 data Name = Name { arity :: Arity, deBruijnIndex :: DeBruijnIndex }
-  deriving Generic
+  deriving (Eq, Ord, Generic)
 
 
 data Term =
