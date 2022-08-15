@@ -1,8 +1,13 @@
-module OSL.ValidContext (getDeclaration) where
+{-# LANGUAGE OverloadedStrings #-}
+
+
+module OSL.ValidContext
+  ( getDeclaration
+  , getExistingDeclaration
+  ) where
 
 
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
 
 import OSL.Die (die)
 import OSL.Types.OSL (ValidContext (..), Name, Declaration)
@@ -17,5 +22,5 @@ getExistingDeclaration
   -> Name
   -> Declaration ann
 getExistingDeclaration c =
-  h(die "logically impossible: could not find a declaration known to exist")
+  (die "logically impossible: could not find a declaration known to exist")
   . getDeclaration c

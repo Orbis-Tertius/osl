@@ -4,8 +4,6 @@ module OSL.Types.TranslationContext
   , LeftMapping (..)
   , RightMapping (..)
   , ChoiceMapping (..)
-  , LeftMapping (..)
-  , RightMapping (..)
   , LengthMapping (..)
   , ValuesMapping (..)
   , KeysMapping (..)
@@ -13,7 +11,8 @@ module OSL.Types.TranslationContext
   ) where
 
 
-import OSL.Types.OSL (Context)
+import Data.Map (Map)
+
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 

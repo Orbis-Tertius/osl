@@ -3,6 +3,7 @@ module OSL.Translate
   ) where
 
 
+import OSL.Types.ErrorMessage (ErrorMessage)
 import OSL.Types.OSL (ValidContext)
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
@@ -10,10 +11,10 @@ import OSL.Types.TranslationContext (TranslationContext)
 
 
 translate
-  :: ValidContext
+  :: ValidContext ann
   -> TranslationContext
   -> OSL.Name
-  -> Either ErrorMessage S11.Formula
+  -> Either (ErrorMessage ann) S11.Formula
 translate = todo
 
 
