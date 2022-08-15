@@ -5,6 +5,11 @@
 
 module OSL.BuildTranslationContext
   ( buildTranslationContext
+  , addFreeVariableMapping
+  , addToTranslationContext
+  , getFreeVariables
+  , getBoundS11NamesInContext
+  , getBoundS11NamesInMapping
   , getFreeS11Name
   ) where
 
@@ -13,7 +18,7 @@ import Control.Lens ((^.))
 import Control.Monad (forM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT (..), runExceptT)
-import Control.Monad.Trans.State.Strict (StateT, execStateT)
+import Control.Monad.Trans.State.Strict (StateT, execStateT, modify, get)
 import Data.Functor.Identity (runIdentity)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -22,7 +27,7 @@ import qualified Data.Set as Set
 
 import OSL.Die (die)
 import OSL.Type (typeAnnotation)
-import OSL.Types.Arity (Arity)
+import OSL.Types.Arity (Arity (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.OSL (Declaration (..), Type (..), ValidContext (..))
@@ -61,9 +66,23 @@ addFreeVariableMapping c freeVariable = do
         Prop _ -> lift . ExceptT . pure . Left
           $ ErrorMessage (typeAnnotation t)
             "free Prop variable"
-        N _ -> todo -- ScalarMapping <$> getFreeS11Name t
+        N _ -> addToTranslationContext
+               freeVariable
+               =<< (ScalarMapping <$> getFreeS11NameM (Arity 0))
         _ -> todo
     _ -> die "logically impossible: free variable is not a free variable"
+
+
+addToTranslationContext
+  :: Monad m
+  => OSL.Name
+  -> Mapping
+  -> StateT TranslationContext m ()
+addToTranslationContext name mapping =
+  modify
+    ( TranslationContext
+    . Map.insert name mapping
+    . unTranslationContext )
 
 
 getFreeVariables :: ValidContext ann -> [OSL.Name]
@@ -109,6 +128,14 @@ getFreeS11Name arity ctx =
   fromMaybe (S11.Name arity (DeBruijnIndex 0))
     . fmap (S11.Name arity . (+1) . (^. #deBruijnIndex))
     $ Set.lookupMax (getBoundS11NamesInContext arity ctx)
+
+
+getFreeS11NameM
+  :: Monad m
+  => Arity
+  -> StateT TranslationContext m S11.Name
+getFreeS11NameM arity =
+  getFreeS11Name arity <$> get
 
 
 todo :: a
