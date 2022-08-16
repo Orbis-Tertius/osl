@@ -34,7 +34,7 @@ import OSL.Type (typeAnnotation)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.OSL (Declaration (..), Type (..), ValidContext (..))
+import OSL.Types.OSL (Declaration (..), Type (..), ValidContext (..), Name (Sym, GenSym))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), LengthMapping (..), ValuesMapping (..), KeysMapping (..), KeyIndicatorMapping (..))
@@ -181,7 +181,11 @@ addGensym t = do
 getFreeOSLName
   :: TranslationContext ann
   -> OSL.Name
-getFreeOSLName = todo
+getFreeOSLName (TranslationContext (ValidContext c) _) =
+  case fst <$> Map.lookupMax c of
+    Nothing -> GenSym 0
+    Just (Sym _) -> GenSym 0
+    Just (GenSym i) -> GenSym (i+1)
 
 
 todo :: a
