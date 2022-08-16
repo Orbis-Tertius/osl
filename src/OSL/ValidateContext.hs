@@ -124,7 +124,7 @@ checkTypeEquality c ann (Coproduct _ a b) (Coproduct _ a' b') =
 checkTypeEquality _ ann (NamedType _ name) (NamedType _ name') =
   if name == name'
   then return ()
-  else Left (ErrorMessage ann ("type mismatch: " <> unName name <> " and " <> unName name'))
+  else Left (ErrorMessage ann ("type mismatch: " <> pack (show name) <> " and " <> pack (show name')))
 checkTypeEquality c ann (Maybe _ a) (Maybe _ b) =
   checkTypeEquality c ann a b
 checkTypeEquality c ann (List _ a) (List _ b) =

@@ -17,7 +17,9 @@ import Data.Text (Text, unpack)
 import GHC.Generics (Generic)
 
 
-newtype Name = Name { unName :: Text }
+data Name =
+    Sym Text
+  | GenSym Int
   deriving (Eq, Ord, Show, Generic)
 
 
@@ -43,7 +45,8 @@ instance Show (Type ann) where
   show (Fin _ n) = "Fin(" <> show n <> ")"
   show (Product _ a b) = "(" <> show a <> " * " <> show b <> ")"
   show (Coproduct _ a b) = "(" <> show a <> " + " <> show b <> ")"
-  show (NamedType _ a) = unpack (unName a)
+  show (NamedType _ (Sym a)) = unpack a
+  show (NamedType _ (GenSym a)) = "$gensym" <> show a
   show (Maybe _ a) = "Maybe(" <> show a <> ")"
   show (List _ a) = "List(" <> show a <> ")"
   show (Map _ a b) = "Map(" <> show a <> ", " <> show b <> ")"

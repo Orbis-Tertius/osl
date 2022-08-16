@@ -166,7 +166,7 @@ name :: Parser Name
 name = do
   begin <- oneOf (['a'..'z'] <> ['A'..'Z'] <> "_")
   rest  <- many (oneOf (['a'..'z'] <> ['A'..'Z'] <> ['0'..'9'] <> "_\'"))
-  return (Name (cons begin (pack rest)))
+  return (Sym (cons begin (pack rest)))
 
 
 constantNatural :: Parser Token
