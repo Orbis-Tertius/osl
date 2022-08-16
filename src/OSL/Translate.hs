@@ -76,7 +76,7 @@ translate ctx@(TranslationContext decls mappings) termType =
       case termType of
         OSL.Coproduct _ b c -> do
           aM <- translateToMapping ctx b a
-          bM <- getArbitraryMapping ctx c
+          bM <- getArbitraryMapping decls c
           return . Mapping
             $ CoproductMapping
               (ChoiceMapping (S11.Const 0))
@@ -85,10 +85,32 @@ translate ctx@(TranslationContext decls mappings) termType =
 
 
 getArbitraryMapping
-  :: TranslationContext ann
+  :: OSL.ValidContext
   -> OSL.Type ann
   -> Either (ErrorMessage ann) (Mapping S11.Term)
-getArbitraryMapping = todo
+getArbitraryMapping ctx =
+  \case
+    OSL.Prop ann -> Left (ErrorMessage ann "expected a finite-dimensional type; got a Prop")
+    OSL.F ann _ _ -> Left (ErrorMessage ann "expected a finite-dimensional type; got a function")
+    OSL.N _ -> return $ ScalarMapping (S11.Const 0)
+    OSL.Z _ -> return $ ScalarMapping (S11.Const 0)
+    OSL.Fin _ _ -> return $ ScalarMapping (S11.Const 0)
+    OSL.Product _ a b ->
+      ProductMapping
+      <$> (LeftMapping <$> rec a)
+      <*> (RightMapping <$> rec b)
+    OSL.Coproduct _ a b ->
+      CoproductMapping (ChoiceMapping (S11.Const 0))
+      <$> (LeftMapping <$> rec a)
+      <*> (RightMapping <$> rec b)
+    OSL.Maybe _ a ->
+      MaybeMapping (ChoiceMapping (S11.Const 0))
+      . ValuesMapping <$> rec a
+    OSL.NamedType _ a ->
+      case getDeclaration ctx a of
+        Just (Data b)
+  where
+    rec = getArbitraryMapping ctx      
 
 
 translateToMapping
