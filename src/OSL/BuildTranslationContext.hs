@@ -103,28 +103,47 @@ addFreeVariableMapping freeVariable = do
                   getFiniteDimMappingArity
                   (typeAnnotation a) 
                   aMap
-          return (mapAritiesInMapping (+ (Arity 1)) bMap)
+          return (mapAritiesInMapping (+aDim) bMap)
         NamedType ann aName -> do
           a <- getTypeDeclaration ann aName
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
+          addMapping freeVariable aMap
           return aMap
         Maybe _ a -> do
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
           i <- getFreeS11NameM (Arity 0)
-          return
-            (MaybeMapping
-              (ChoiceMapping i)
-              (ValuesMapping aMap))
-        List ann a -> do
+          let mapping = MaybeMapping
+                (ChoiceMapping i)
+                (ValuesMapping aMap)
+          addMapping freeVariable mapping
+          return mapping
+        List _ a -> do
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
           l <- getFreeS11NameM (Arity 0)
-          return
-            (ListMapping
-              (LengthMapping l)
-              (ValuesMapping (mapAritiesInMapping (+1) aMap)))
+          let mapping = ListMapping
+                (LengthMapping l)
+                (ValuesMapping (mapAritiesInMapping (+1) aMap))
+          addMapping freeVariable mapping 
+          return mapping
+        Map ann a b -> do
+          aSym <- addGensym a
+          aMap <- addFreeVariableMapping aSym
+          aDim <- lift . except
+            $ getFiniteDimMappingArity ann aMap
+          bSym <- addGensym b
+          bMap <- addFreeVariableMapping bSym
+          lVar <- getFreeS11NameM (Arity 0)
+          iVar <- getFreeS11NameM aDim
+          let mapping = MapMapping
+                (LengthMapping lVar)
+                (KeysMapping (mapAritiesInMapping (+1) aMap))
+                (KeyIndicatorMapping iVar)
+                (ValuesMapping (mapAritiesInMapping (+aDim) bMap))
+          addMapping freeVariable mapping
+          return mapping
     _ -> die "logically impossible: free variable is not a free variable"
   where
     mapScalar = do
@@ -177,6 +196,8 @@ getBoundS11NamesInMapping arity =
     CoproductMapping (ChoiceMapping a)
         (LeftMapping b) (RightMapping c) ->
       f a `Set.union` (rec b `Set.union` rec c)
+    MaybeMapping (ChoiceMapping a) (ValuesMapping b) ->
+      f a `Set.union` rec b
     ListMapping (LengthMapping a) (ValuesMapping b) ->
       f a `Set.union` rec b
     MapMapping (LengthMapping a) (KeysMapping b)
