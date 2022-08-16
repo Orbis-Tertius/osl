@@ -5,6 +5,7 @@ import Data.Text.IO (readFile)
 import Prelude hiding (readFile)
 import System.Environment (getArgs)
 
+import OSL.BuildTranslationContext (buildTranslationContext)
 import OSL.Parse (parseContext)
 import OSL.Tokenize (tokenize)
 import OSL.ValidateContext (validateContext)
@@ -24,5 +25,8 @@ main = do
             Right rawCtx -> do
               case validateContext rawCtx of
                 Left err -> putStrLn $ "Type checking error: " <> show err
-                Right _ -> putStrLn "Validated OSL"
+                Right validCtx ->
+                  case buildTranslationContext validCtx of
+                    Right _ -> putStrLn "Validated OSL"
+                    Left err -> putStrLn $ "Error building context: " <> show err
     _ -> putStrLn "Error: please provide a filename and nothing else"
