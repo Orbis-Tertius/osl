@@ -109,6 +109,14 @@ addFreeVariableMapping freeVariable = do
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
           return aMap
+        Maybe _ a -> do
+          i <- getFreeS11NameM (Arity 0)
+          aSym <- addGensym a
+          aMap <- addFreeVariableMapping aSym
+          return
+            (MaybeMapping
+              (ChoiceMapping i)
+              (ValuesMapping aMap))
     _ -> die "logically impossible: free variable is not a free variable"
   where
     mapScalar = do

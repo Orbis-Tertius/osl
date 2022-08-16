@@ -40,6 +40,9 @@ data Mapping =
     ChoiceMapping
     LeftMapping
     RightMapping
+  | MaybeMapping
+    ChoiceMapping
+    ValuesMapping
   | ListMapping
     LengthMapping
     ValuesMapping
