@@ -23,6 +23,7 @@ library
     OSL.Types.OSL
     OSL.Types.Sigma11
     OSL.Types.Token
+    OSL.Types.Translation
     OSL.Types.TranslationContext
     OSL.ValidContext
     OSL.ValidateContext

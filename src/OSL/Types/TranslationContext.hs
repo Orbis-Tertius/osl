@@ -2,7 +2,7 @@
 
 
 module OSL.Types.TranslationContext
-  ( TranslationContext (..)
+  ( TranslationContext (TranslationContext)
   , Mapping (..)
   , LeftMapping (..)
   , RightMapping (..)
