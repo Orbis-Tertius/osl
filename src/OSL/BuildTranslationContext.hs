@@ -21,7 +21,7 @@ module OSL.BuildTranslationContext
 import Control.Lens ((^.), (%~))
 import Control.Monad (forM_)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (ExceptT (..), runExceptT)
+import Control.Monad.Trans.Except (ExceptT (..), runExceptT, except)
 import Control.Monad.Trans.State.Strict (StateT, execStateT, modify, get)
 import Data.Functor.Identity (runIdentity)
 import qualified Data.Map as Map
@@ -94,6 +94,16 @@ addFreeVariableMapping freeVariable = do
                         (RightMapping bMap)
           addMapping freeVariable mapping
           return mapping
+        F _ a b -> do
+          aSym <- addGensym a
+          bSym <- addGensym b
+          aMap <- addFreeVariableMapping aSym
+          bMap <- addFreeVariableMapping bSym
+          aDim <- lift . except $
+                  getFiniteDimMappingArity
+                  (typeAnnotation a) 
+                  aMap
+          return (mapAritiesInMapping (+ (Arity 1)) bMap)
     _ -> die "logically impossible: free variable is not a free variable"
   where
     mapScalar = do
@@ -197,3 +207,30 @@ getFreeOSLName (TranslationContext (ValidContext c) _) =
     Nothing -> GenSym 0
     Just (Sym _) -> GenSym 0
     Just (GenSym i) -> GenSym (i+1)
+
+
+mapAritiesInMapping
+  :: (Arity -> Arity)
+  -> Mapping
+  -> Mapping
+mapAritiesInMapping = todo
+
+
+getFiniteDimMappingArity
+  :: ann
+  -> Mapping
+  -> Either (ErrorMessage ann) Arity
+getFiniteDimMappingArity ann =
+  \case
+    ScalarMapping _ -> return (Arity 1)
+    ProductMapping (LeftMapping a) (RightMapping b) ->
+      (+) <$> rec a <*> rec b
+    CoproductMapping _ (LeftMapping a) (RightMapping b) ->
+      (Arity 1 +) <$> ((+) <$> rec a <*> rec b)
+    _ -> Left (ErrorMessage ann "expected a finite-dimensional type")
+  where
+    rec = getFiniteDimMappingArity ann
+
+
+todo :: a
+todo = todo
