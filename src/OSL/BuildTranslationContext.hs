@@ -255,7 +255,38 @@ mapAritiesInMapping
   :: (Arity -> Arity)
   -> Mapping
   -> Mapping
-mapAritiesInMapping = todo
+mapAritiesInMapping f =
+  \case
+    ScalarMapping a ->
+      ScalarMapping (g a)
+    ProductMapping (LeftMapping a) (RightMapping b) ->
+      ProductMapping
+      (LeftMapping (rec a))
+      (RightMapping (rec b))
+    CoproductMapping (ChoiceMapping a)
+        (LeftMapping b) (RightMapping c) ->
+      CoproductMapping
+      (ChoiceMapping (g a))
+      (LeftMapping (rec b))
+      (RightMapping (rec c))
+    MaybeMapping (ChoiceMapping a) (ValuesMapping b) ->
+      MaybeMapping
+      (ChoiceMapping (g a))
+      (ValuesMapping (rec b))
+    ListMapping (LengthMapping a) (ValuesMapping b) ->
+      ListMapping
+      (LengthMapping (g a))
+      (ValuesMapping (rec b))
+    MapMapping (LengthMapping a) (KeysMapping b)
+        (KeyIndicatorMapping c) (ValuesMapping d) ->
+      MapMapping
+      (LengthMapping (g a))
+      (KeysMapping (rec b))
+      (KeyIndicatorMapping (g c))
+      (ValuesMapping (rec d))
+  where
+    g (S11.Name arity i) = S11.Name (f arity) i
+    rec = mapAritiesInMapping f
 
 
 getFiniteDimMappingArity
@@ -288,7 +319,3 @@ getTypeDeclaration ann name = do
     -- these errors should be logically impossible:
     Just _ -> lift . throwE $ ErrorMessage ann "expected the name of a type"
     Nothing -> lift . throwE $ ErrorMessage ann "undefined name"
-
-
-todo :: a
-todo = todo
