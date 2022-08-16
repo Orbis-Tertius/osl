@@ -12,7 +12,7 @@ import OSL.Types.TranslationContext (TranslationContext)
 
 translate
   :: ValidContext ann
-  -> TranslationContext
+  -> TranslationContext ann
   -> OSL.Name
   -> Either (ErrorMessage ann) S11.Formula
 translate = todo

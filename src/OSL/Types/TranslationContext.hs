@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveGeneric #-}
+
+
 module OSL.Types.TranslationContext
   ( TranslationContext (..)
   , Mapping (..)
@@ -11,16 +14,20 @@ module OSL.Types.TranslationContext
   ) where
 
 
+import Data.Generics.Labels ()
 import Data.Map (Map)
+import GHC.Generics (Generic)
 
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 
 
-newtype TranslationContext =
+data TranslationContext ann =
   TranslationContext
-  { unTranslationContext
-      :: Map OSL.Name Mapping }
+  { context :: OSL.ValidContext ann
+  , mappings :: Map OSL.Name Mapping
+  }
+  deriving Generic
 
 
 data Mapping =

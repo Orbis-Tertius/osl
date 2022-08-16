@@ -4,6 +4,7 @@
 module OSL.ValidContext
   ( getDeclaration
   , getExistingDeclaration
+  , addDeclaration
   ) where
 
 
@@ -24,3 +25,12 @@ getExistingDeclaration
 getExistingDeclaration c =
   (die "logically impossible: could not find a declaration known to exist")
   . getDeclaration c
+
+
+addDeclaration
+  :: Name
+  -> Declaration ann
+  -> ValidContext ann
+  -> ValidContext ann 
+addDeclaration name decl (ValidContext c) =
+  ValidContext (Map.insert name decl c)

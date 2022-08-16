@@ -6,15 +6,19 @@
 module OSL.BuildTranslationContext
   ( buildTranslationContext
   , addFreeVariableMapping
-  , addToTranslationContext
+  , addMapping
+  , addFreeVariableDeclaration
   , getFreeVariables
   , getBoundS11NamesInContext
   , getBoundS11NamesInMapping
   , getFreeS11Name
+  , getFreeS11NameM
+  , addGensym
+  , getFreeOSLName
   ) where
 
 
-import Control.Lens ((^.))
+import Control.Lens ((^.), (%~))
 import Control.Monad (forM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT (..), runExceptT)
@@ -34,31 +38,30 @@ import OSL.Types.OSL (Declaration (..), Type (..), ValidContext (..))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), LengthMapping (..), ValuesMapping (..), KeysMapping (..), KeyIndicatorMapping (..))
-import OSL.ValidContext (getExistingDeclaration)
+import OSL.ValidContext (getExistingDeclaration, addDeclaration)
 
 
 -- builds a translation context providing mappings
 -- for all of the free variables in the given context.
 buildTranslationContext
   :: ValidContext ann
-  -> Either (ErrorMessage ann) TranslationContext
+  -> Either (ErrorMessage ann) (TranslationContext ann)
 buildTranslationContext c =
   let freeVariables = getFreeVariables c
   in runIdentity $
      runExceptT
        (execStateT
-         (forM_
-           freeVariables
-           (addFreeVariableMapping c))
-         (TranslationContext mempty))
+         (forM_ freeVariables addFreeVariableMapping)
+         (TranslationContext c mempty))
 
 
 addFreeVariableMapping
   :: Monad m
-  => ValidContext ann
-  -> OSL.Name
-  -> StateT TranslationContext (ExceptT (ErrorMessage ann) m) ()
-addFreeVariableMapping c freeVariable = do
+  => OSL.Name
+  -> StateT (TranslationContext ann)
+       (ExceptT (ErrorMessage ann) m) Mapping
+addFreeVariableMapping freeVariable = do
+  TranslationContext c _ <- get
   let decl = getExistingDeclaration c freeVariable
   case decl of
     FreeVariable t ->
@@ -66,23 +69,44 @@ addFreeVariableMapping c freeVariable = do
         Prop _ -> lift . ExceptT . pure . Left
           $ ErrorMessage (typeAnnotation t)
             "free Prop variable"
-        N _ -> addToTranslationContext
-               freeVariable
-               =<< (ScalarMapping <$> getFreeS11NameM (Arity 0))
+        N _ -> mapScalar
+        Z _ -> mapScalar
+        Fin _ _ -> mapScalar
+        Product _ a b -> do
+          aSym <- addGensym a
+          bSym <- addGensym b
+          aMap <- addFreeVariableMapping aSym
+          bMap <- addFreeVariableMapping bSym
+          let mapping = ProductMapping
+                        (LeftMapping aMap)
+                        (RightMapping bMap)
+          addMapping freeVariable mapping
+          return mapping
         _ -> todo
     _ -> die "logically impossible: free variable is not a free variable"
+  where
+    mapScalar = do
+      mapping <- ScalarMapping <$> getFreeS11NameM (Arity 0)
+      addMapping freeVariable mapping
+      return mapping
 
 
-addToTranslationContext
+addMapping
   :: Monad m
   => OSL.Name
   -> Mapping
-  -> StateT TranslationContext m ()
-addToTranslationContext name mapping =
-  modify
-    ( TranslationContext
-    . Map.insert name mapping
-    . unTranslationContext )
+  -> StateT (TranslationContext ann) m ()
+addMapping name mapping =
+  modify ( #mappings %~ Map.insert name mapping )
+
+
+addFreeVariableDeclaration
+  :: Monad m
+  => OSL.Name
+  -> Type ann
+  -> StateT (TranslationContext ann) m ()
+addFreeVariableDeclaration name t =
+  modify ( #context %~ addDeclaration name (FreeVariable t) )
 
 
 getFreeVariables :: ValidContext ann -> [OSL.Name]
@@ -93,8 +117,11 @@ getFreeVariables (ValidContext decls) =
     isFree _ = False
 
 
-getBoundS11NamesInContext :: Arity -> TranslationContext -> Set S11.Name
-getBoundS11NamesInContext arity (TranslationContext ctx) =
+getBoundS11NamesInContext
+  :: Arity
+  -> TranslationContext ann
+  -> Set S11.Name
+getBoundS11NamesInContext arity (TranslationContext _ ctx) =
   Map.foldl' Set.union Set.empty
     $ getBoundS11NamesInMapping arity <$> ctx
 
@@ -123,7 +150,10 @@ getBoundS11NamesInMapping arity =
     rec = getBoundS11NamesInMapping arity
 
 
-getFreeS11Name :: Arity -> TranslationContext -> S11.Name
+getFreeS11Name
+  :: Arity
+  -> TranslationContext ann
+  -> S11.Name
 getFreeS11Name arity ctx =
   fromMaybe (S11.Name arity (DeBruijnIndex 0))
     . fmap (S11.Name arity . (+1) . (^. #deBruijnIndex))
@@ -133,9 +163,25 @@ getFreeS11Name arity ctx =
 getFreeS11NameM
   :: Monad m
   => Arity
-  -> StateT TranslationContext m S11.Name
+  -> StateT (TranslationContext ann) m S11.Name
 getFreeS11NameM arity =
   getFreeS11Name arity <$> get
+
+
+addGensym
+  :: Monad m
+  => Type ann
+  -> StateT (TranslationContext ann) m OSL.Name
+addGensym t = do
+  name <- getFreeOSLName <$> get
+  addFreeVariableDeclaration name t
+  return name
+
+
+getFreeOSLName
+  :: TranslationContext ann
+  -> OSL.Name
+getFreeOSLName = todo
 
 
 todo :: a
