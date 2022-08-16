@@ -82,7 +82,18 @@ addFreeVariableMapping freeVariable = do
                         (RightMapping bMap)
           addMapping freeVariable mapping
           return mapping
-        _ -> todo
+        Coproduct _ a b -> do
+          iSym <- getFreeS11NameM (Arity 0)
+          aSym <- addGensym a
+          bSym <- addGensym b
+          aMap <- addFreeVariableMapping aSym
+          bMap <- addFreeVariableMapping bSym
+          let mapping = CoproductMapping
+                        (ChoiceMapping iSym)
+                        (LeftMapping aMap)
+                        (RightMapping bMap)
+          addMapping freeVariable mapping
+          return mapping
     _ -> die "logically impossible: free variable is not a free variable"
   where
     mapScalar = do
@@ -186,7 +197,3 @@ getFreeOSLName (TranslationContext (ValidContext c) _) =
     Nothing -> GenSym 0
     Just (Sym _) -> GenSym 0
     Just (GenSym i) -> GenSym (i+1)
-
-
-todo :: a
-todo = todo
