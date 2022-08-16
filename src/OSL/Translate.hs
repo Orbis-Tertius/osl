@@ -50,6 +50,17 @@ translate ctx@(TranslationContext _ mappings) =
         (ProductMapping
           <$> (LeftMapping <$> translateToMapping ctx a)
           <*> (RightMapping <$> translateToMapping ctx b))
+    OSL.Apply _ (OSL.Pi1 _) a -> do
+      aM <- translateToMapping ctx a
+      case aM of
+        ProductMapping (LeftMapping m) _ ->
+          return (Mapping m)
+    OSL.Apply _ (OSL.Pi2 _) a -> do
+      aM <- translateToMapping ctx a
+      case aM of
+        ProductMapping _ (RightMapping m) ->
+          return (Mapping m)
+
 
 translateToMapping
   :: TranslationContext ann
@@ -68,6 +79,7 @@ translateToTerm
 translateToTerm c t =
   case translate c t of
     Right (Term t') -> return t'
+    Right (Mapping (ScalarMapping t')) -> return t'
     Right _ -> Left (ErrorMessage (termAnnotation t)
                  "expected a term denoting a scalar")
     Left err -> Left err
