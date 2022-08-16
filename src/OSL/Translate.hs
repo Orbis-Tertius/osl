@@ -16,16 +16,18 @@ import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.Translation (Translation (Formula, Term, Mapping))
 import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..))
+import OSL.ValidateContext (inferType)
 
 
 -- Provides a translation for the given term in
 -- the given context.
 translate
-  :: TranslationContext ann
+  :: Show ann
+  => TranslationContext ann
   -> OSL.Type ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) Translation
-translate ctx@(TranslationContext _ mappings) termType =
+translate ctx@(TranslationContext decls mappings) termType =
   \case
     OSL.NamedTerm ann name ->
       case Map.lookup name mappings of
@@ -57,13 +59,15 @@ translate ctx@(TranslationContext _ mappings) termType =
         _ -> Left (ErrorMessage ann $
           "expected a " <> pack (show termType))
     OSL.Apply ann (OSL.Pi1 _) a -> do
-      aM <- translateToMapping ctx todo a
+      aT <- inferType decls a
+      aM <- translateToMapping ctx aT a
       case aM of
         ProductMapping (LeftMapping m) _ ->
           return (Mapping m)
         _ -> Left (ErrorMessage ann "expected a pair")
     OSL.Apply ann (OSL.Pi2 _) a -> do
-      aM <- translateToMapping ctx todo a
+      aT <- inferType decls a
+      aM <- translateToMapping ctx aT a
       case aM of
         ProductMapping _ (RightMapping m) ->
           return (Mapping m)
@@ -88,7 +92,8 @@ getArbitraryMapping = todo
 
 
 translateToMapping
-  :: TranslationContext ann
+  :: Show ann
+  => TranslationContext ann
   -> OSL.Type ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) (Mapping S11.Term)
@@ -99,7 +104,8 @@ translateToMapping c tType t =
     
 
 translateToTerm
-  :: TranslationContext ann
+  :: Show ann
+  => TranslationContext ann
   -> OSL.Type ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Term

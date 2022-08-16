@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module OSL.ValidateContext (validateContext) where
+module OSL.ValidateContext
+  ( validateContext
+  , inferType
+  ) where
 
 
 import Control.Monad (foldM)
