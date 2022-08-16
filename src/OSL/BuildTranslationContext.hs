@@ -83,11 +83,11 @@ addFreeVariableMapping freeVariable = do
           addMapping freeVariable mapping
           return mapping
         Coproduct _ a b -> do
-          iSym <- getFreeS11NameM (Arity 0)
           aSym <- addGensym a
           bSym <- addGensym b
           aMap <- addFreeVariableMapping aSym
           bMap <- addFreeVariableMapping bSym
+          iSym <- getFreeS11NameM (Arity 0)
           let mapping = CoproductMapping
                         (ChoiceMapping iSym)
                         (LeftMapping aMap)
@@ -110,13 +110,21 @@ addFreeVariableMapping freeVariable = do
           aMap <- addFreeVariableMapping aSym
           return aMap
         Maybe _ a -> do
-          i <- getFreeS11NameM (Arity 0)
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
+          i <- getFreeS11NameM (Arity 0)
           return
             (MaybeMapping
               (ChoiceMapping i)
               (ValuesMapping aMap))
+        List ann a -> do
+          aSym <- addGensym a
+          aMap <- addFreeVariableMapping aSym
+          l <- getFreeS11NameM (Arity 0)
+          return
+            (ListMapping
+              (LengthMapping l)
+              (ValuesMapping (mapAritiesInMapping (+1) aMap)))
     _ -> die "logically impossible: free variable is not a free variable"
   where
     mapScalar = do
