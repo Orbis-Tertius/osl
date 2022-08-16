@@ -21,7 +21,7 @@ module OSL.BuildTranslationContext
 import Control.Lens ((^.), (%~))
 import Control.Monad (forM_)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (ExceptT (..), runExceptT, except)
+import Control.Monad.Trans.Except (ExceptT (..), runExceptT, except, throwE)
 import Control.Monad.Trans.State.Strict (StateT, execStateT, modify, get)
 import Data.Functor.Identity (runIdentity)
 import qualified Data.Map as Map
@@ -104,6 +104,11 @@ addFreeVariableMapping freeVariable = do
                   (typeAnnotation a) 
                   aMap
           return (mapAritiesInMapping (+ (Arity 1)) bMap)
+        NamedType ann aName -> do
+          a <- getTypeDeclaration ann aName
+          aSym <- addGensym a
+          aMap <- addFreeVariableMapping aSym
+          return aMap
     _ -> die "logically impossible: free variable is not a free variable"
   where
     mapScalar = do
@@ -230,6 +235,22 @@ getFiniteDimMappingArity ann =
     _ -> Left (ErrorMessage ann "expected a finite-dimensional type")
   where
     rec = getFiniteDimMappingArity ann
+
+
+getTypeDeclaration
+  :: Monad m
+  => ann
+  -> OSL.Name
+  -> StateT (TranslationContext ann)
+       (ExceptT (ErrorMessage ann) m)
+       (Type ann)
+getTypeDeclaration ann name = do
+  TranslationContext (ValidContext c) _ <- get
+  case Map.lookup name c of
+    Just (Data a) -> return a
+    -- these errors should be logically impossible:
+    Just _ -> lift . throwE $ ErrorMessage ann "expected the name of a type"
+    Nothing -> lift . throwE $ ErrorMessage ann "undefined name"
 
 
 todo :: a
