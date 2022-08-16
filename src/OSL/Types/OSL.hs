@@ -20,7 +20,13 @@ import GHC.Generics (Generic)
 data Name =
     Sym Text
   | GenSym Int
-  deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Show, Generic)
+
+instance Ord Name where
+  Sym a <= Sym b = a <= b
+  GenSym a <= GenSym b = a <= b
+  Sym _ <= GenSym _ = True
+  GenSym _ <= Sym _ = False
 
 
 data Type ann =
