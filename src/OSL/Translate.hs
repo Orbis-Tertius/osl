@@ -27,7 +27,7 @@ translate ctx@(TranslationContext _ mappings) =
     OSL.NamedTerm ann name ->
       case Map.lookup name mappings of
         Just (ScalarMapping n) -> return (Term (S11.Var n))
-        Just m -> return (Mapping m)
+        Just m -> return (Mapping (S11.Var <$> m))
         Nothing -> Left (ErrorMessage ann "un-mapped name")
     OSL.Apply _ (OSL.Apply _ (OSL.AddN _) a) b ->
       Term <$> (S11.Add <$> translateTerm ctx a
@@ -54,6 +54,7 @@ translateTerm c t =
   case translate c t of
     Right (Term t') -> return t'
     Left err -> Left err
+
 
 todo :: a
 todo = todo

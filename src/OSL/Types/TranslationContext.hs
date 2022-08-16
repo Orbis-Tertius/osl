@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 
 
 module OSL.Types.TranslationContext
@@ -25,50 +26,88 @@ import qualified OSL.Types.Sigma11 as S11
 data TranslationContext ann =
   TranslationContext
   { context :: OSL.ValidContext ann
-  , mappings :: Map OSL.Name Mapping
+  , mappings :: Map OSL.Name (Mapping S11.Name)
   }
   deriving Generic
 
 
-data Mapping =
-    ScalarMapping
-    S11.Name
+data Mapping a =
+    ScalarMapping a
   | ProductMapping
-    LeftMapping
-    RightMapping
+    (LeftMapping a)
+    (RightMapping a)
   | CoproductMapping
-    ChoiceMapping
-    LeftMapping
-    RightMapping
+    (ChoiceMapping a)
+    (LeftMapping a)
+    (RightMapping a)
   | MaybeMapping
-    ChoiceMapping
-    ValuesMapping
+    (ChoiceMapping a)
+    (ValuesMapping a)
   | ListMapping
-    LengthMapping
-    ValuesMapping
+    (LengthMapping a)
+    (ValuesMapping a)
   | MapMapping
-    LengthMapping
-    KeysMapping
-    KeyIndicatorMapping
-    ValuesMapping
+    (LengthMapping a)
+    (KeysMapping a)
+    (KeyIndicatorMapping a)
+    (ValuesMapping a)
 
 
-newtype LeftMapping = LeftMapping { unLeftMapping :: Mapping }
+instance Functor Mapping where
+  fmap f =
+    \case
+      ScalarMapping a -> ScalarMapping (f a)
+      ProductMapping (LeftMapping a) (RightMapping b) ->
+        ProductMapping
+        (LeftMapping (f <$> a))
+        (RightMapping (f <$> b))
+      CoproductMapping (ChoiceMapping a)
+          (LeftMapping b) (RightMapping c) ->
+        CoproductMapping
+        (ChoiceMapping (f a))
+        (LeftMapping (f <$> b))
+        (RightMapping (f <$> c))
+      MaybeMapping (ChoiceMapping a) (ValuesMapping b) ->
+        MaybeMapping
+        (ChoiceMapping (f a))
+        (ValuesMapping (f <$> b))
+      ListMapping (LengthMapping a) (ValuesMapping b) ->
+        ListMapping
+        (LengthMapping (f a))
+        (ValuesMapping (f <$> b))
+      MapMapping (LengthMapping a) (KeysMapping b)
+          (KeyIndicatorMapping c) (ValuesMapping d) ->
+        MapMapping
+        (LengthMapping (f a))
+        (KeysMapping (f <$> b))
+        (KeyIndicatorMapping (f c))
+        (ValuesMapping (f <$> d))
 
 
-newtype RightMapping = RightMapping { unRightMapping :: Mapping }
+newtype LeftMapping a
+  = LeftMapping { unLeftMapping :: Mapping a }
 
 
-newtype ChoiceMapping = ChoiceMapping { unChoiceMapping :: S11.Name }
+newtype RightMapping a =
+  RightMapping { unRightMapping :: Mapping a }
 
 
-newtype LengthMapping = LengthMapping { unLengthMapping :: S11.Name }
+newtype ChoiceMapping a
+  = ChoiceMapping { unChoiceMapping :: a }
 
 
-newtype ValuesMapping = ValuesMapping { unValuesMapping :: Mapping }
+newtype LengthMapping a =
+  LengthMapping { unLengthMapping :: a }
 
 
-newtype KeysMapping = KeysMapping { unKeysMapping :: Mapping }
+newtype ValuesMapping a
+  = ValuesMapping { unValuesMapping :: Mapping a }
 
 
-newtype KeyIndicatorMapping = KeyIndicatorMapping { unKeyIndicatorMapping :: S11.Name }
+newtype KeysMapping a
+  = KeysMapping { unKeysMapping :: Mapping a }
+
+
+newtype KeyIndicatorMapping a
+  = KeyIndicatorMapping
+    { unKeyIndicatorMapping :: a }

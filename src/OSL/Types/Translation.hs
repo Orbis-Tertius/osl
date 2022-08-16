@@ -8,4 +8,4 @@ import OSL.Types.TranslationContext (Mapping)
 data Translation =
     Formula Formula
   | Term Term
-  | Mapping Mapping
+  | Mapping (Mapping Term)
