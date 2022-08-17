@@ -103,6 +103,14 @@ translate ctx@(TranslationContext decls mappings) termType =
               (LeftMapping aM)
               (RightMapping bM)
         _ -> Left (ErrorMessage ann "expected a coproduct")
+    OSL.FunctionProduct ann f g ->
+      case termType of
+        OSL.F ann' a (OSL.Product _ b c) ->
+          Mapping
+          <$> (ProductMapping
+            <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' a b) f)
+            <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' a c) g))
+        _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
