@@ -59,7 +59,7 @@ addFreeVariableMapping
   :: Monad m
   => OSL.Name
   -> StateT (TranslationContext ann)
-       (ExceptT (ErrorMessage ann) m) Mapping
+       (ExceptT (ErrorMessage ann) m) (Mapping S11.Name)
 addFreeVariableMapping freeVariable = do
   TranslationContext c _ <- get
   let decl = getExistingDeclaration c freeVariable
@@ -155,7 +155,7 @@ addFreeVariableMapping freeVariable = do
 addMapping
   :: Monad m
   => OSL.Name
-  -> Mapping
+  -> Mapping S11.Name
   -> StateT (TranslationContext ann) m ()
 addMapping name mapping =
   modify ( #mappings %~ Map.insert name mapping )
@@ -187,7 +187,7 @@ getBoundS11NamesInContext arity (TranslationContext _ ctx) =
     $ getBoundS11NamesInMapping arity <$> ctx
 
 
-getBoundS11NamesInMapping :: Arity -> Mapping -> Set S11.Name
+getBoundS11NamesInMapping :: Arity -> Mapping S11.Name -> Set S11.Name
 getBoundS11NamesInMapping arity =
   \case
     ScalarMapping name -> f name
@@ -253,8 +253,8 @@ getFreeOSLName (TranslationContext (ValidContext c) _) =
 
 mapAritiesInMapping
   :: (Arity -> Arity)
-  -> Mapping
-  -> Mapping
+  -> Mapping S11.Name
+  -> Mapping S11.Name
 mapAritiesInMapping f =
   \case
     ScalarMapping a ->
@@ -291,7 +291,7 @@ mapAritiesInMapping f =
 
 getFiniteDimMappingArity
   :: ann
-  -> Mapping
+  -> Mapping S11.Name
   -> Either (ErrorMessage ann) Arity
 getFiniteDimMappingArity ann =
   \case

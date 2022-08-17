@@ -16,6 +16,7 @@ import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.Translation (Translation (Formula, Term, Mapping))
 import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..))
+import OSL.ValidContext (getDeclaration)
 import OSL.ValidateContext (inferType)
 
 
@@ -72,7 +73,7 @@ translate ctx@(TranslationContext decls mappings) termType =
         ProductMapping _ (RightMapping m) ->
           return (Mapping m)
         _ -> Left (ErrorMessage ann "expected a pair")
-    OSL.Apply _ (OSL.Iota1 _) a ->
+    OSL.Apply ann (OSL.Iota1 _) a ->
       case termType of
         OSL.Coproduct _ b c -> do
           aM <- translateToMapping ctx b a
@@ -82,10 +83,11 @@ translate ctx@(TranslationContext decls mappings) termType =
               (ChoiceMapping (S11.Const 0))
               (LeftMapping aM)
               (RightMapping bM)
+        _ -> Left (ErrorMessage ann "expected a coproduct")
 
 
 getArbitraryMapping
-  :: OSL.ValidContext
+  :: OSL.ValidContext ann
   -> OSL.Type ann
   -> Either (ErrorMessage ann) (Mapping S11.Term)
 getArbitraryMapping ctx =
@@ -106,9 +108,11 @@ getArbitraryMapping ctx =
     OSL.Maybe _ a ->
       MaybeMapping (ChoiceMapping (S11.Const 0))
       . ValuesMapping <$> rec a
-    OSL.NamedType _ a ->
+    OSL.NamedType ann a ->
       case getDeclaration ctx a of
-        Just (Data b)
+        Just (OSL.Data b) -> rec b
+        Just _ -> Left (ErrorMessage ann "expected the name of a type")
+        Nothing -> Left (ErrorMessage ann "undefined name")
   where
     rec = getArbitraryMapping ctx      
 
