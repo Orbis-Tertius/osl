@@ -84,6 +84,18 @@ translate ctx@(TranslationContext decls mappings) termType =
               (LeftMapping aM)
               (RightMapping bM)
         _ -> Left (ErrorMessage ann "expected a coproduct")
+    OSL.Apply ann (OSL.Iota2 _) a ->
+      case termType of
+        OSL.Coproduct _ b c -> do
+          aM <- getArbitraryMapping decls b
+          bM <- translateToMapping ctx c a
+          return . Mapping
+            $ CoproductMapping
+              (ChoiceMapping (S11.Const 0))
+              (LeftMapping aM)
+              (RightMapping bM)
+        _ -> Left (ErrorMessage ann "expected a coproduct")
+
 
 
 getArbitraryMapping
