@@ -103,7 +103,16 @@ translate ctx@(TranslationContext decls mappings) termType =
               (LeftMapping aM)
               (RightMapping bM)
         _ -> Left (ErrorMessage ann "expected a coproduct")
-
+    -- NOTICE: what follows is the last Apply case. It is generic and must
+    -- come last among all the Apply cases.
+    OSL.Apply ann f x -> do
+      fType <- inferType decls f
+      case fType of
+        OSL.F _ a _ -> do
+          fM <- translateToMapping ctx fType f
+          xM <- translateToMapping ctx a x
+          Mapping <$> applyMappings ann fM xM
+        _ -> Left (ErrorMessage ann "expected a function")
 
 
 getArbitraryMapping
