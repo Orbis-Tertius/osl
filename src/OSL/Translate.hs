@@ -111,6 +111,14 @@ translate ctx@(TranslationContext decls mappings) termType =
             <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' a b) f)
             <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' a c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
+    OSL.FunctionCoproduct ann f g ->
+      case termType of
+        OSL.F ann' a (OSL.Coproduct _ b c) ->
+          Mapping
+          <$> (FunctionCoproductMapping
+            <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' a b) f)
+            <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' a c) g))
+        _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
@@ -190,6 +198,15 @@ applyMappings ann f x =
   case (f, x) of
     (ScalarMapping f', ScalarMapping x') ->
       ScalarMapping <$> applyTerms ann f' x'
+    (ProductMapping (LeftMapping f) (RightMapping g), x) ->
+      ProductMapping
+      <$> (LeftMapping <$> applyMappings ann f x)
+      <*> (RightMapping <$> applyMappings ann g x)
+    (FunctionCoproductMapping (LeftMapping f) (RightMapping g),
+     CoproductMapping (ChoiceMapping a) (LeftMapping b) (RightMapping c)) ->
+      CoproductMapping (ChoiceMapping a)
+      <$> (LeftMapping <$> applyMappings ann f b)
+      <*> (RightMapping <$> applyMappings ann g c)
 
 
 applyTerms

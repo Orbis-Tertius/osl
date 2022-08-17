@@ -40,6 +40,9 @@ data Mapping a =
     (ChoiceMapping a)
     (LeftMapping a)
     (RightMapping a)
+  | FunctionCoproductMapping
+    (LeftMapping a)
+    (RightMapping a)
   | MaybeMapping
     (ChoiceMapping a)
     (ValuesMapping a)
@@ -67,6 +70,10 @@ instance Functor Mapping where
         (ChoiceMapping (f a))
         (LeftMapping (f <$> b))
         (RightMapping (f <$> c))
+      FunctionCoproductMapping (LeftMapping a) (RightMapping b) ->
+        FunctionCoproductMapping
+        (LeftMapping (f <$> a))
+        (RightMapping (f <$> b))
       MaybeMapping (ChoiceMapping a) (ValuesMapping b) ->
         MaybeMapping
         (ChoiceMapping (f a))
