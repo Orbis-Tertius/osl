@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 
@@ -55,7 +56,7 @@ translate ctx@(TranslationContext decls mappings) termType =
         Just (OSL.Defined fType@(OSL.F _ a b) f) -> do
           xM <- translateToMapping ctx a x
           fM <- translateToMapping ctx fType f
-          applyMappings fM xM
+          Mapping <$> applyMappings ann fM xM
         Just _ -> Left (ErrorMessage ann "expected the name of a defined function")
     OSL.Apply ann (OSL.Apply _ (OSL.Pair _) a) b ->
       case termType of
@@ -161,6 +162,29 @@ translateToTerm c tType t =
     Right _ -> Left (ErrorMessage (termAnnotation t)
                  "expected a term denoting a scalar")
     Left err -> Left err
+
+
+applyMappings
+  :: ann
+  -> Mapping S11.Term
+  -> Mapping S11.Term
+  -> Either (ErrorMessage ann) (Mapping S11.Term)
+applyMappings ann f x =
+  case (f, x) of
+    (ScalarMapping f', ScalarMapping x') ->
+      ScalarMapping <$> applyTerms ann f' x'
+
+
+applyTerms
+  :: ann
+  -> S11.Term
+  -> S11.Term
+  -> Either (ErrorMessage ann) S11.Term
+applyTerms ann f x =
+  case f of
+    S11.Var f' -> pure $ S11.App f' [x]
+    S11.App f' ys -> pure $ S11.App f' (ys <> [x])
+    _ -> Left $ ErrorMessage ann "expected a function term"
 
 
 todo :: a
