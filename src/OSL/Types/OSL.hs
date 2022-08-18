@@ -116,8 +116,8 @@ data Term ann =
   | Or ann (Term ann) (Term ann)
   | Not ann (Term ann)
   | Implies ann (Term ann) (Term ann)
-  | ForAll ann Name (Type ann) (Term ann)
-  | ForSome ann Name (Type ann) (Term ann)
+  | ForAll ann Name (Type ann) (Bound ann) (Term ann)
+  | ForSome ann Name (Type ann) (Bound ann) (Term ann)
   deriving Show
 
 
@@ -129,24 +129,31 @@ data Bound ann =
   | ListBound (ValuesBound ann)
   | MaybeBound (ValuesBound ann)
   | MapBound (KeysBound ann) (ValuesBound ann)
+  deriving Show
 
 
 newtype LeftBound ann = LeftBound { unLeftBound :: Bound ann }
+  deriving Show
 
 
 newtype RightBound ann = RightBound { unRightBound :: Bound ann }
+  deriving Show
 
 
 newtype DomainBound ann = DomainBound { unDomainBound :: Bound ann }
+  deriving Show
 
 
 newtype CodomainBound ann = CodomainBound { unCodomainBound :: Bound ann }
+  deriving Show
 
 
 newtype ValuesBound ann = ValuesBound { unValuesBound :: Bound ann }
+  deriving Show
 
 
 newtype KeysBound ann = KeysBound { unKeysBound :: Bound ann }
+  deriving Show
 
 
 data Declaration ann =

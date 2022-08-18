@@ -57,5 +57,5 @@ termAnnotation t =
     Or ann _ _ -> ann
     Not ann _ -> ann
     Implies ann _ _ -> ann
-    ForAll ann _ _ _ -> ann
-    ForSome ann _ _ _ -> ann
+    ForAll ann _ _ _ _ -> ann
+    ForSome ann _ _ _ _ -> ann
