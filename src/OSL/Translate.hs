@@ -15,6 +15,7 @@ import OSL.BuildTranslationContext (buildTranslationContext')
 import OSL.Sigma11 (incrementDeBruijnIndices)
 import OSL.Term (termAnnotation)
 import OSL.TranslationContext (mappingDimensions)
+import OSL.Types.Arity (Arity (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
@@ -197,11 +198,23 @@ translate ctx@(TranslationContext
           TranslationContext _ qCtx <-
             buildTranslationContext' decls' [varName]
           let ctx' = TranslationContext decls'
-                     (qCtx `Map.union` (incrementDeBruijnIndices n <$> mappings))
+                     (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
           Formula . foldl (.) id (replicate n (S11.ForAll todo))
             <$> translateToFormula ctx' p
         InfiniteDimensions ->
           Left (ErrorMessage ann "universal quantification over an infinite-dimensional type")
+    OSL.ForSome ann varName varType p -> do
+     let decls' = OSL.ValidContext
+          $ Map.insert varName (OSL.FreeVariable varType) declsMap
+     varDim <- getMappingDimensions decls varType
+     case varDim of
+       FiniteDimensions n -> do
+         TranslationContext _ qCtx <-
+           buildTranslationContext' decls' [varName]
+         let ctx' = TranslationContext decls'
+                    (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
+         Formula . foldl (.) id (replicate n (S11.ExistsFO todo))
+           <$> translateToFormula ctx' p
 
 
 getMappingDimensions
