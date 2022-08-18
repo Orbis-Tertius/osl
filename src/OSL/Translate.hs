@@ -175,6 +175,16 @@ translate ctx@(TranslationContext
       Formula <$>
         (S11.And <$> translateToFormula ctx p
                  <*> translateToFormula ctx q)
+    OSL.Or _ p q ->
+      Formula <$>
+        (S11.Or <$> translateToFormula ctx p
+                <*> translateToFormula ctx q)
+    OSL.Not _ p ->
+      Formula . S11.Not <$> translateToFormula ctx p
+    OSL.Implies _ p q ->
+      Formula <$>
+        (S11.Implies <$> translateToFormula ctx p
+                     <*> translateToFormula ctx q)
 
 
 getArbitraryMapping
