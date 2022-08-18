@@ -14,7 +14,7 @@ import Data.Text (pack)
 import OSL.Term (termAnnotation)
 import OSL.Type (typeAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..))
+import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..), Bound (..), LeftBound (..), RightBound (..), DomainBound (..), CodomainBound (..), ValuesBound (..), KeysBound (..))
 import OSL.ValidContext (getDeclaration)
 
 
@@ -426,17 +426,72 @@ checkTerm c t x =
           checkTerm c (Prop ann) p
           checkTerm c (Prop ann) q
         _ -> genericErrorMessage
-    ForAll ann varName varType p -> do
+    ForAll ann varName varType varBound p -> do
       checkType c varType
+      checkBound c ann varType varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
-    ForSome ann varName varType p -> do
+    ForSome ann varName varType varBound p -> do
       checkType c varType
+      checkBound c ann varType varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
   where
     genericErrorMessage = Left . ErrorMessage (termAnnotation x)
       $ "expected a " <> pack (show t) <> " but got " <> pack (show x)
+
+
+checkBound
+  :: Show ann
+  => ValidContext ann
+  -> ann
+  -> Type ann
+  -> Bound ann
+  -> Either (ErrorMessage ann) ()
+checkBound c ann t bound =
+  case t of
+    Prop _ -> Left (ErrorMessage ann "cannot quantify over Prop")
+    F _ a b ->
+      case bound of
+        FunctionBound (DomainBound aBound) (CodomainBound bBound) -> do
+          checkBound c ann a aBound
+          checkBound c ann b bBound
+        _ -> Left (ErrorMessage ann "expected a function bound")
+    N ann' ->
+      case bound of
+        ScalarBound boundTerm -> checkTerm c (N ann') boundTerm
+        _ -> Left (ErrorMessage ann "expected a natural number bound")
+    Z ann' ->
+      case bound of
+        ScalarBound boundTerm -> checkTerm c (Z ann') boundTerm
+        _ -> Left (ErrorMessage ann "expected an integer bound")
+    Fin ann' n ->
+      case bound of
+        ScalarBound boundTerm -> checkTerm c (Fin ann' n) boundTerm
+        _ -> Left . ErrorMessage ann $ "expected a Fin("
+               <> pack (show n) <> ") bound"
+    Product _ a b ->
+      case bound of
+        ProductBound (LeftBound aBound) (RightBound bBound) -> do
+          checkBound c ann a aBound
+          checkBound c ann b bBound
+        _ -> Left (ErrorMessage ann "expected a product bound")
+    Coproduct _ a b ->
+      case bound of
+        CoproductBound (LeftBound aBound) (RightBound bBound) -> do
+          checkBound c ann a aBound
+          checkBound c ann b bBound
+        _ -> Left (ErrorMessage ann "expected a coproduct bound")
+    NamedType ann' name ->
+      case getDeclaration c name of
+        Just (Data a) ->
+          case bound of
+            ToBound name' bound' ->
+              if name == name'
+              then checkBound c ann a bound'
+              else Left (ErrorMessage ann "mismatching named type and to bound")
+            _ -> Left (ErrorMessage ann "expected a to bound")
+        _ -> Left (ErrorMessage ann' "expected the name of a type")
 
 
 inferType :: Show ann => ValidContext ann -> Term ann -> Either (ErrorMessage ann) (Type ann)
@@ -641,13 +696,15 @@ inferType c t =
       checkTerm c (Prop ann) p
       checkTerm c (Prop ann) q
       return (Prop ann)
-    ForAll ann varName varType p -> do
+    ForAll ann varName varType varBound p -> do
       checkType c varType
+      checkBound c ann varType varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
       return (Prop ann)
-    ForSome ann varName varType p -> do
+    ForSome ann varName varType varBound p -> do
       checkType c varType
+      checkBound c ann varType varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
       return (Prop ann)

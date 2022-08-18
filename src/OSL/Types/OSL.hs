@@ -129,6 +129,7 @@ data Bound ann =
   | ListBound (ValuesBound ann)
   | MaybeBound (ValuesBound ann)
   | MapBound (KeysBound ann) (ValuesBound ann)
+  | ToBound Name (Bound ann)
   deriving Show
 
 
