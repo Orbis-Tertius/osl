@@ -171,6 +171,10 @@ translate ctx@(TranslationContext
         (S11.LessOrEqual
           <$> translateToTerm ctx xType x
           <*> translateToTerm ctx xType y)
+    OSL.And _ p q ->
+      Formula <$>
+        (S11.And <$> translateToFormula ctx p
+                 <*> translateToFormula ctx q)
 
 
 getArbitraryMapping
@@ -228,6 +232,19 @@ translateToTerm c tType t =
     Right (Mapping (ScalarMapping t')) -> return t'
     Right _ -> Left (ErrorMessage (termAnnotation t)
                  "expected a term denoting a scalar")
+    Left err -> Left err
+
+
+translateToFormula
+  :: Show ann
+  => TranslationContext ann
+  -> OSL.Term ann
+  -> Either (ErrorMessage ann) S11.Formula
+translateToFormula c t =
+  case translate c (OSL.Prop (termAnnotation t)) t of
+    Right (Formula f) -> return f
+    Right _ -> Left (ErrorMessage (termAnnotation t)
+                 "expected a term denoting a Prop")
     Left err -> Left err
 
 
