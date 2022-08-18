@@ -29,12 +29,14 @@ translate
   -> OSL.Type ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) Translation
-translate ctx@(TranslationContext decls mappings) termType =
+translate ctx@(TranslationContext
+          decls@(OSL.ValidContext declsMap) mappings)
+          termType =
   \case
     OSL.NamedTerm ann name ->
       case Map.lookup name mappings of
-        Just (ScalarMapping n) -> return (Term (S11.Var n))
-        Just m -> return (Mapping (S11.Var <$> m))
+        Just (ScalarMapping x) -> return (Term x)
+        Just m -> return (Mapping m)
         Nothing -> Left (ErrorMessage ann "un-mapped name")
     OSL.Apply ann (OSL.Apply _ (OSL.AddN _) a) b ->
       Term <$> (S11.Add <$> translateToTerm ctx (OSL.N ann) a
@@ -119,6 +121,13 @@ translate ctx@(TranslationContext decls mappings) termType =
             <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' a b) f)
             <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' a c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
+    OSL.Apply ann (OSL.Lambda _ varName varType body) x -> do
+      xM <- translateToMapping ctx varType x
+      let decls' = (OSL.ValidContext
+                     (Map.insert varName (OSL.Defined varType x) declsMap))
+          ctx' = TranslationContext decls' (Map.insert varName xM mappings)
+      bodyType <- inferType decls' body
+      Mapping <$> translateToMapping ctx' bodyType body
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do

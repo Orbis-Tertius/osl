@@ -26,7 +26,7 @@ import qualified OSL.Types.Sigma11 as S11
 data TranslationContext ann =
   TranslationContext
   { context :: OSL.ValidContext ann
-  , mappings :: Map OSL.Name (Mapping S11.Name)
+  , mappings :: Map OSL.Name (Mapping S11.Term)
   }
   deriving Generic
 
