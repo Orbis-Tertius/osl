@@ -31,6 +31,7 @@ data Term =
 
 data Formula =
     Equals Term Term
+  | LessOrEqual Term Term
   | Not Formula
   | And Formula Formula
   | Or Formula Formula

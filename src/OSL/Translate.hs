@@ -159,10 +159,16 @@ translate ctx@(TranslationContext
                      (Map.insert varName (OSL.Defined varType varDef) declsMap)
           ctx' = TranslationContext decls' (Map.insert varName varDefM mappings)
       Mapping <$> translateToMapping ctx' termType body
-    OSL.Equal ann x y -> do
+    OSL.Equal _ x y -> do
       xType <- inferType decls x
       Formula <$>
         (S11.Equals
+          <$> translateToTerm ctx xType x
+          <*> translateToTerm ctx xType y)
+    OSL.LessOrEqual _ x y -> do
+      xType <- inferType decls x
+      Formula <$>
+        (S11.LessOrEqual
           <$> translateToTerm ctx xType x
           <*> translateToTerm ctx xType y)
 
