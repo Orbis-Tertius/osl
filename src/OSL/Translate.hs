@@ -131,6 +131,12 @@ translate ctx@(TranslationContext
         Nothing -> Left (ErrorMessage ann "undefined name")
     OSL.Apply _ (OSL.From ann typeName) x ->
       translate ctx (OSL.NamedType ann typeName) x
+    OSL.Apply ann (OSL.Just' _) x ->
+      case termType of
+        OSL.Maybe _ xType ->
+          Mapping . MaybeMapping (ChoiceMapping (S11.Const 1))
+            . ValuesMapping <$> translateToMapping ctx xType x
+        _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
