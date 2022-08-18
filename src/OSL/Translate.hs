@@ -120,11 +120,10 @@ translate ctx@(TranslationContext
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     OSL.Apply ann (OSL.Lambda _ varName varType body) x -> do
       xM <- translateToMapping ctx varType x
-      let decls' = (OSL.ValidContext
-                     (Map.insert varName (OSL.Defined varType x) declsMap))
+      let decls' = OSL.ValidContext
+                     (Map.insert varName (OSL.Defined varType x) declsMap)
           ctx' = TranslationContext decls' (Map.insert varName xM mappings)
-      bodyType <- inferType decls' body
-      Mapping <$> translateToMapping ctx' bodyType body
+      Mapping <$> translateToMapping ctx' termType body
     OSL.Apply _ (OSL.To ann typeName) x ->
       case getDeclaration decls typeName of
         Just (OSL.Data typeDef) -> translate ctx typeDef x
@@ -142,6 +141,12 @@ translate ctx@(TranslationContext
           xM <- translateToMapping ctx a x
           Mapping <$> applyMappings ann fM xM
         _ -> Left (ErrorMessage ann "expected a function")
+    OSL.Let ann varName varType varDef body -> do
+      varDefM <- translateToMapping ctx varType varDef
+      let decls' = OSL.ValidContext
+                     (Map.insert varName (OSL.Defined varType varDef) declsMap)
+          ctx' = TranslationContext decls' (Map.insert varName varDefM mappings)
+      Mapping <$> translateToMapping ctx' termType body
 
 
 getArbitraryMapping
