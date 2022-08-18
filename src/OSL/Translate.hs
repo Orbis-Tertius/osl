@@ -130,6 +130,8 @@ translate ctx@(TranslationContext
         Just (OSL.Data typeDef) -> translate ctx typeDef x
         Just _ -> Left (ErrorMessage ann "expected the name of a type")
         Nothing -> Left (ErrorMessage ann "undefined name")
+    OSL.Apply _ (OSL.From ann typeName) x ->
+      translate ctx (OSL.NamedType ann typeName) x
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
