@@ -137,6 +137,12 @@ translate ctx@(TranslationContext
           Mapping . MaybeMapping (ChoiceMapping (S11.Const 1))
             . ValuesMapping <$> translateToMapping ctx xType x
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
+    OSL.Nothing' ann ->
+      case termType of
+        OSL.Maybe _ xType ->
+          Mapping . MaybeMapping (ChoiceMapping (S11.Const 0))
+            . ValuesMapping <$> getArbitraryMapping decls xType
+        _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
