@@ -12,9 +12,11 @@ library
     OSL.Die
     OSL.EntryPoint
     OSL.Parse
+    OSL.Sigma11
     OSL.Term
     OSL.Tokenize
     OSL.Translate
+    OSL.TranslationContext
     OSL.Type
     OSL.Types.Arity
     OSL.Types.DeBruijnIndex

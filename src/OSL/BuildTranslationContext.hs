@@ -5,6 +5,7 @@
 
 module OSL.BuildTranslationContext
   ( buildTranslationContext
+  , buildTranslationContext'
   , addFreeVariableMapping
   , addMapping
   , addFreeVariableDeclaration
@@ -42,18 +43,25 @@ import OSL.ValidContext (getExistingDeclaration, addDeclaration)
 
 
 -- builds a translation context providing mappings
+-- for the given free variables.
+buildTranslationContext'
+  :: ValidContext ann
+  -> [OSL.Name]
+  -> Either (ErrorMessage ann) (TranslationContext ann)
+buildTranslationContext' c freeVariables =
+  runIdentity $
+    runExceptT
+      (execStateT
+        (forM_ freeVariables addFreeVariableMapping)
+        (TranslationContext c mempty))
+
+
+-- builds a translation context providing mappings
 -- for all of the free variables in the given context.
 buildTranslationContext
   :: ValidContext ann
   -> Either (ErrorMessage ann) (TranslationContext ann)
-buildTranslationContext c =
-  let freeVariables = getFreeVariables c
-  in runIdentity $
-     runExceptT
-       (execStateT
-         (forM_ freeVariables addFreeVariableMapping)
-         (TranslationContext c mempty))
-
+buildTranslationContext c = buildTranslationContext' c (getFreeVariables c)
 
 addFreeVariableMapping
   :: Monad m
@@ -158,7 +166,7 @@ addMapping
   -> Mapping S11.Name
   -> StateT (TranslationContext ann) m ()
 addMapping name mapping =
-  modify ( #mappings %~ Map.insert name mapping )
+  modify ( #mappings %~ Map.insert name (S11.Var <$> mapping) )
 
 
 addFreeVariableDeclaration
@@ -187,7 +195,7 @@ getBoundS11NamesInContext arity (TranslationContext _ ctx) =
     $ getBoundS11NamesInMapping arity <$> ctx
 
 
-getBoundS11NamesInMapping :: Arity -> Mapping S11.Name -> Set S11.Name
+getBoundS11NamesInMapping :: Arity -> Mapping S11.Term -> Set S11.Name
 getBoundS11NamesInMapping arity =
   \case
     ScalarMapping name -> f name
@@ -196,6 +204,8 @@ getBoundS11NamesInMapping arity =
     CoproductMapping (ChoiceMapping a)
         (LeftMapping b) (RightMapping c) ->
       f a `Set.union` (rec b `Set.union` rec c)
+    FunctionCoproductMapping (LeftMapping a) (RightMapping b) ->
+      rec a `Set.union` rec b
     MaybeMapping (ChoiceMapping a) (ValuesMapping b) ->
       f a `Set.union` rec b
     ListMapping (LengthMapping a) (ValuesMapping b) ->
@@ -204,8 +214,16 @@ getBoundS11NamesInMapping arity =
         (KeyIndicatorMapping c) (ValuesMapping d) ->
       f a `Set.union` (rec b `Set.union` (f c `Set.union` rec d))
   where
-    f :: S11.Name -> Set S11.Name
-    f name =
+    f :: S11.Term -> Set S11.Name
+    f (S11.Var name) = g name
+    f (S11.App h xs) = g h `Set.union` (Set.unions (f <$> xs))
+    f (S11.Add x y) = f x `Set.union` f y
+    f (S11.Mul x y) = f x `Set.union` f y
+    f (S11.IndLess x y) = f x `Set.union` f y
+    f (S11.Const _) = Set.empty
+
+    g :: S11.Name -> Set S11.Name
+    g name =
       if name ^. #arity == arity
       then Set.singleton name
       else Set.empty
@@ -261,6 +279,10 @@ mapAritiesInMapping f =
       ScalarMapping (g a)
     ProductMapping (LeftMapping a) (RightMapping b) ->
       ProductMapping
+      (LeftMapping (rec a))
+      (RightMapping (rec b))
+    FunctionCoproductMapping (LeftMapping a) (RightMapping b) ->
+      FunctionCoproductMapping
       (LeftMapping (rec a))
       (RightMapping (rec b))
     CoproductMapping (ChoiceMapping a)

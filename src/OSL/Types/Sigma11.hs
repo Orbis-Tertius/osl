@@ -30,7 +30,7 @@ data Term =
 
 
 data Formula =
-    Equals Term Term
+    Equal Term Term
   | LessOrEqual Term Term
   | Not Formula
   | And Formula Formula

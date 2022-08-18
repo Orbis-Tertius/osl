@@ -11,12 +11,15 @@ module OSL.Translate
 import qualified Data.Map as Map
 import Data.Text (pack)
 
+import OSL.BuildTranslationContext (buildTranslationContext')
+import OSL.Sigma11 (incrementDeBruijnIndices)
 import OSL.Term (termAnnotation)
+import OSL.TranslationContext (mappingDimensions)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.Translation (Translation (Formula, Term, Mapping))
-import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..))
+import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..), MappingDimensions (..))
 import OSL.ValidContext (getDeclaration)
 import OSL.ValidateContext (inferType)
 
@@ -162,7 +165,7 @@ translate ctx@(TranslationContext
     OSL.Equal _ x y -> do
       xType <- inferType decls x
       Formula <$>
-        (S11.Equals
+        (S11.Equal
           <$> translateToTerm ctx xType x
           <*> translateToTerm ctx xType y)
     OSL.LessOrEqual _ x y -> do
@@ -185,6 +188,28 @@ translate ctx@(TranslationContext
       Formula <$>
         (S11.Implies <$> translateToFormula ctx p
                      <*> translateToFormula ctx q)
+    OSL.ForAll ann varName varType p -> do
+      varDim <- getMappingDimensions decls varType
+      case varDim of
+        FiniteDimensions n -> do
+          let decls' = OSL.ValidContext
+                $ Map.insert varName (OSL.FreeVariable varType) declsMap
+          TranslationContext _ qCtx <-
+            buildTranslationContext' decls' [varName]
+          let ctx' = TranslationContext decls'
+                     (qCtx `Map.union` (incrementDeBruijnIndices n <$> mappings))
+          Formula . foldl (.) id (replicate n (S11.ForAll todo))
+            <$> translateToFormula ctx' p
+        InfiniteDimensions ->
+          Left (ErrorMessage ann "universal quantification over an infinite-dimensional type")
+
+
+getMappingDimensions
+  :: OSL.ValidContext ann
+  -> OSL.Type ann
+  -> Either (ErrorMessage ann) MappingDimensions
+getMappingDimensions ctx t =
+  mappingDimensions <$> getArbitraryMapping ctx t
 
 
 getArbitraryMapping

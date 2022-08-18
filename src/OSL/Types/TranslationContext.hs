@@ -12,6 +12,7 @@ module OSL.Types.TranslationContext
   , ValuesMapping (..)
   , KeysMapping (..)
   , KeyIndicatorMapping (..)
+  , MappingDimensions (..)
   ) where
 
 
@@ -118,3 +119,16 @@ newtype KeysMapping a
 newtype KeyIndicatorMapping a
   = KeyIndicatorMapping
     { unKeyIndicatorMapping :: a }
+
+
+data MappingDimensions
+  = FiniteDimensions Int
+  | InfiniteDimensions
+
+instance Semigroup MappingDimensions where
+  (FiniteDimensions x) <> (FiniteDimensions y) = FiniteDimensions (x + y)
+  _ <> InfiniteDimensions = InfiniteDimensions
+  InfiniteDimensions <> _ = InfiniteDimensions
+
+instance Monoid MappingDimensions where
+  mempty = FiniteDimensions 0
