@@ -5,6 +5,13 @@ module OSL.Types.OSL
   ( Name (..)
   , Type (..)
   , Term (..)
+  , Bound (..)
+  , LeftBound (..)
+  , RightBound (..)
+  , DomainBound (..)
+  , CodomainBound (..)
+  , ValuesBound (..)
+  , KeysBound (..)
   , Declaration (..)
   , Context (..)
   , ValidContext (..)
@@ -112,6 +119,34 @@ data Term ann =
   | ForAll ann Name (Type ann) (Term ann)
   | ForSome ann Name (Type ann) (Term ann)
   deriving Show
+
+
+data Bound ann =
+    ScalarBound (Term ann)
+  | ProductBound (LeftBound ann) (RightBound ann)
+  | CoproductBound (LeftBound ann) (RightBound ann)
+  | FunctionBound (DomainBound ann) (CodomainBound ann)
+  | ListBound (ValuesBound ann)
+  | MaybeBound (ValuesBound ann)
+  | MapBound (KeysBound ann) (ValuesBound ann)
+
+
+newtype LeftBound ann = LeftBound { unLeftBound :: Bound ann }
+
+
+newtype RightBound ann = RightBound { unRightBound :: Bound ann }
+
+
+newtype DomainBound ann = DomainBound { unDomainBound :: Bound ann }
+
+
+newtype CodomainBound ann = CodomainBound { unCodomainBound :: Bound ann }
+
+
+newtype ValuesBound ann = ValuesBound { unValuesBound :: Bound ann }
+
+
+newtype KeysBound ann = KeysBound { unKeysBound :: Bound ann }
 
 
 data Declaration ann =
