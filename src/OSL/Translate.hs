@@ -55,10 +55,7 @@ translate ctx@(TranslationContext
     OSL.ConstFin _ x -> return (Term (S11.Const x))
     OSL.Apply ann (OSL.NamedTerm _ fName) x ->
       case getDeclaration decls fName of
-        Just (OSL.Defined fType@(OSL.F _ a b) f) -> do
-          xM <- translateToMapping ctx a x
-          fM <- translateToMapping ctx fType f
-          Mapping <$> applyMappings ann fM xM
+        Just (OSL.Defined _ f) -> translate ctx termType (OSL.Apply ann f x)
         Just _ -> Left (ErrorMessage ann "expected the name of a defined function")
     OSL.Apply ann (OSL.Apply _ (OSL.Pair _) a) b ->
       case termType of
