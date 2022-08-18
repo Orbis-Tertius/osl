@@ -125,6 +125,11 @@ translate ctx@(TranslationContext
           ctx' = TranslationContext decls' (Map.insert varName xM mappings)
       bodyType <- inferType decls' body
       Mapping <$> translateToMapping ctx' bodyType body
+    OSL.Apply _ (OSL.To ann typeName) x ->
+      case getDeclaration decls typeName of
+        Just (OSL.Data typeDef) -> translate ctx typeDef x
+        Just _ -> Left (ErrorMessage ann "expected the name of a type")
+        Nothing -> Left (ErrorMessage ann "undefined name")
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
