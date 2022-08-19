@@ -502,6 +502,18 @@ checkBound c t bound =
         MaybeBound _ (ValuesBound bound') -> checkBound c a bound'
         _ -> Left (ErrorMessage (boundAnnotation bound)
                      "expected a maybe bound")
+    List _ a ->
+      case bound of
+        ListBound _ (ValuesBound bound') -> checkBound c a bound'
+        _ -> Left (ErrorMessage (boundAnnotation bound)
+                     "expected a list bound")
+    Map _ a b ->
+      case bound of
+        MapBound _ (KeysBound aBound) (ValuesBound bBound) -> do
+          checkBound c a aBound
+          checkBound c b bBound
+        _ -> Left (ErrorMessage (boundAnnotation bound)
+                     "expected a map bound")
 
 
 inferType :: Show ann => ValidContext ann -> Term ann -> Either (ErrorMessage ann) (Type ann)
