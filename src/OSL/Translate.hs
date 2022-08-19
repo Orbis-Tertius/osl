@@ -365,6 +365,10 @@ translateBound ctx t =
                <*> translateBound ctx (OSL.F ann' (OSL.N ann') a)
                    (OSL.FunctionBound ann (OSL.DomainBound lBound)
                                           (OSL.CodomainBound vBound))
+    OSL.MaybeBound ann (OSL.ValuesBound vBound) ->
+      case t of
+        OSL.Maybe ann' a ->
+          ((S11.Const 2):) <$> translateBound ctx a vBound
 
 
 todo :: a
