@@ -190,6 +190,13 @@ translate ctx@(TranslationContext
         ListMapping lM (ValuesMapping (ProductMapping (LeftMapping aM) _)) ->
           pure . Mapping $ ListMapping lM (ValuesMapping aM)
         _ -> Left . ErrorMessage ann $ "expected a list of pairs"
+    OSL.Apply ann (OSL.ListPi2 _) xs -> do
+      xsType <- inferType decls xs
+      xsM <- translateToMapping ctx xsType xs
+      case xsM of
+        ListMapping lM (ValuesMapping (ProductMapping _ (RightMapping bM))) ->
+          pure . Mapping $ ListMapping lM (ValuesMapping bM)
+        _ -> Left . ErrorMessage ann $ "expected a list of pairs"
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
