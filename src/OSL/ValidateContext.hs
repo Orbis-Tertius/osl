@@ -492,6 +492,10 @@ checkBound c ann t bound =
               else Left (ErrorMessage ann "mismatching named type and to bound")
             _ -> Left (ErrorMessage ann "expected a to bound")
         _ -> Left (ErrorMessage ann' "expected the name of a type")
+    Maybe _ a ->
+      case bound of
+        MaybeBound (ValuesBound bound') -> checkBound c ann a bound'
+        _ -> Left (ErrorMessage ann "expected a maybe bound")
 
 
 inferType :: Show ann => ValidContext ann -> Term ann -> Either (ErrorMessage ann) (Type ann)
