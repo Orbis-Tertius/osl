@@ -509,9 +509,12 @@ checkBound c t bound =
           checkBound c a vBound
         _ -> Left (ErrorMessage (boundAnnotation bound)
                      "expected a list bound")
-    Map _ a b ->
+    Map ann a b ->
       case bound of
-        MapBound _ (KeysBound aBound) (ValuesBound bBound) -> do
+        MapBound _ (LengthBound lBound)
+                   (KeysBound aBound)
+                   (ValuesBound bBound) -> do
+          checkBound c (N ann) lBound
           checkBound c a aBound
           checkBound c b bBound
         _ -> Left (ErrorMessage (boundAnnotation bound)

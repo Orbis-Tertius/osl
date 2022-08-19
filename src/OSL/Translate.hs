@@ -369,6 +369,33 @@ translateBound ctx t =
       case t of
         OSL.Maybe ann' a ->
           ((S11.Const 2):) <$> translateBound ctx a vBound
+    OSL.MapBound ann
+        (OSL.LengthBound lBound)
+        (OSL.KeysBound kBound)
+        (OSL.ValuesBound vBound) ->
+      case t of
+        OSL.Map ann' k v ->
+          mconcatM
+          [ translateBound ctx (OSL.N ann') lBound
+          , translateBound ctx (OSL.F ann' (OSL.N ann') k)
+              (OSL.FunctionBound ann'
+                 (OSL.DomainBound lBound)
+                 (OSL.CodomainBound kBound))
+          , translateBound ctx (OSL.F ann' k (OSL.N ann'))
+              (OSL.FunctionBound ann' (OSL.DomainBound kBound)
+                (OSL.CodomainBound (OSL.ScalarBound ann' (OSL.ConstN ann' 2))))
+          , translateBound ctx (OSL.F ann' k v)
+              (OSL.FunctionBound ann'
+                (OSL.DomainBound kBound)
+                (OSL.CodomainBound vBound))
+          ]
+
+
+mconcatM :: Monad m => Monoid a => [m a] -> m a
+mconcatM [] = return mempty
+mconcatM (xM:xMs) = do
+  x <- xM
+  (x <>) <$> mconcatM xMs
 
 
 todo :: a

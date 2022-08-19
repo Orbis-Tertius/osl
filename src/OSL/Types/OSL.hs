@@ -129,7 +129,7 @@ data Bound ann =
   | FunctionBound ann (DomainBound ann) (CodomainBound ann)
   | ListBound ann (LengthBound ann) (ValuesBound ann)
   | MaybeBound ann (ValuesBound ann)
-  | MapBound ann (KeysBound ann) (ValuesBound ann)
+  | MapBound ann (LengthBound ann) (KeysBound ann) (ValuesBound ann)
   | ToBound ann Name (Bound ann)
   deriving Show
 
