@@ -20,7 +20,7 @@ import OSL.Types.ErrorMessage (ErrorMessage (..))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.Translation (Translation (Formula, Term, Mapping))
-import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..), MappingDimensions (..))
+import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..), MappingDimensions (..), LengthMapping (..))
 import OSL.ValidContext (getDeclaration)
 import OSL.ValidateContext (inferType)
 
@@ -173,6 +173,12 @@ translate ctx@(TranslationContext
       case mxM of
         MaybeMapping _ (ValuesMapping xM) -> pure (Mapping xM)
         _ -> Left . ErrorMessage ann $ "expected a maybe mapping"
+    OSL.Apply ann (OSL.Length _) xs -> do
+      xsType <- inferType decls xs
+      xsM <- translateToMapping ctx xsType xs
+      case xsM of
+        ListMapping (LengthMapping lT) _ -> pure (Term lT)
+        _ -> Left (ErrorMessage ann "expected a list")
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
