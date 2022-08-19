@@ -197,6 +197,12 @@ translate ctx@(TranslationContext
         ListMapping lM (ValuesMapping (ProductMapping _ (RightMapping bM))) ->
           pure . Mapping $ ListMapping lM (ValuesMapping bM)
         _ -> Left . ErrorMessage ann $ "expected a list of pairs"
+    OSL.Apply ann (OSL.ListTo ann' name) xs -> do
+      case getDeclaration decls name of
+        Just (OSL.Data a) -> do
+          Mapping <$> translateToMapping ctx (OSL.List ann' a) xs
+        Just _ -> Left (ErrorMessage ann' "expected the name of a type")
+        Nothing -> Left (ErrorMessage ann' "undefined name")
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
