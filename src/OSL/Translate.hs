@@ -168,6 +168,11 @@ translate ctx@(TranslationContext
                 _ -> Left . ErrorMessage ann $ "expected a scalar value"
             _ -> Left . ErrorMessage ann $ "expected a maybe value"
         _ -> Left . ErrorMessage ann' $ "expected a function"
+    OSL.Apply ann (OSL.Exists _) mx -> do
+      mxM <- translateToMapping ctx (OSL.Maybe ann termType) mx
+      case mxM of
+        MaybeMapping _ (ValuesMapping xM) -> pure (Mapping xM)
+        _ -> Left . ErrorMessage ann $ "expected a maybe mapping"
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
@@ -432,7 +437,3 @@ mconcatM [] = return mempty
 mconcatM (xM:xMs) = do
   x <- xM
   (x <>) <$> mconcatM xMs
-
-
-todo :: a
-todo = todo
