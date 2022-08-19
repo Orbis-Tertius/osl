@@ -1,12 +1,17 @@
-module OSL.Term (termAnnotation) where
+{-# LANGUAGE LambdaCase #-}
+
+module OSL.Term
+  ( termAnnotation
+  , boundAnnotation
+  ) where
 
 
-import OSL.Types.OSL (Term (..))
+import OSL.Types.OSL (Term (..), Bound (..))
 
 
 termAnnotation :: Term ann -> ann
-termAnnotation t =
-  case t of
+termAnnotation =
+  \case
     NamedTerm ann _ -> ann
     AddN ann -> ann
     MulN ann -> ann
@@ -59,3 +64,16 @@ termAnnotation t =
     Implies ann _ _ -> ann
     ForAll ann _ _ _ _ -> ann
     ForSome ann _ _ _ _ -> ann
+
+
+boundAnnotation :: Bound ann -> ann
+boundAnnotation =
+  \case
+    ScalarBound ann _ -> ann
+    ProductBound ann _ _ -> ann
+    CoproductBound ann _ _ -> ann
+    FunctionBound ann _ _ -> ann
+    ListBound ann _ -> ann
+    MaybeBound ann _ -> ann
+    MapBound ann _ _ -> ann
+    ToBound ann _ _ -> ann

@@ -11,7 +11,7 @@ import Control.Monad (foldM)
 import qualified Data.Map as Map
 import Data.Text (pack)
 
-import OSL.Term (termAnnotation)
+import OSL.Term (termAnnotation, boundAnnotation)
 import OSL.Type (typeAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..), Bound (..), LeftBound (..), RightBound (..), DomainBound (..), CodomainBound (..), ValuesBound (..), KeysBound (..))
@@ -428,12 +428,12 @@ checkTerm c t x =
         _ -> genericErrorMessage
     ForAll ann varName varType varBound p -> do
       checkType c varType
-      checkBound c ann varType varBound
+      checkBound c varType varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
     ForSome ann varName varType varBound p -> do
       checkType c varType
-      checkBound c ann varType varBound
+      checkBound c varType varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
   where
@@ -444,58 +444,64 @@ checkTerm c t x =
 checkBound
   :: Show ann
   => ValidContext ann
-  -> ann
   -> Type ann
   -> Bound ann
   -> Either (ErrorMessage ann) ()
-checkBound c ann t bound =
+checkBound c t bound =
   case t of
-    Prop _ -> Left (ErrorMessage ann "cannot quantify over Prop")
+    Prop ann -> Left (ErrorMessage ann "cannot quantify over Prop")
     F _ a b ->
       case bound of
-        FunctionBound (DomainBound aBound) (CodomainBound bBound) -> do
-          checkBound c ann a aBound
-          checkBound c ann b bBound
-        _ -> Left (ErrorMessage ann "expected a function bound")
+        FunctionBound _ (DomainBound aBound) (CodomainBound bBound) -> do
+          checkBound c a aBound
+          checkBound c b bBound
+        _ -> Left (ErrorMessage (boundAnnotation bound)
+                     "expected a function bound")
     N ann' ->
       case bound of
-        ScalarBound boundTerm -> checkTerm c (N ann') boundTerm
-        _ -> Left (ErrorMessage ann "expected a natural number bound")
+        ScalarBound _ boundTerm -> checkTerm c (N ann') boundTerm
+        _ -> Left (ErrorMessage (boundAnnotation bound)
+                     "expected a natural number bound")
     Z ann' ->
       case bound of
-        ScalarBound boundTerm -> checkTerm c (Z ann') boundTerm
-        _ -> Left (ErrorMessage ann "expected an integer bound")
+        ScalarBound _ boundTerm -> checkTerm c (Z ann') boundTerm
+        _ -> Left (ErrorMessage (boundAnnotation bound)
+                     "expected an integer bound")
     Fin ann' n ->
       case bound of
-        ScalarBound boundTerm -> checkTerm c (Fin ann' n) boundTerm
-        _ -> Left . ErrorMessage ann $ "expected a Fin("
-               <> pack (show n) <> ") bound"
+        ScalarBound _ boundTerm -> checkTerm c (Fin ann' n) boundTerm
+        _ -> Left . ErrorMessage (boundAnnotation bound)
+              $ "expected a Fin(" <> pack (show n) <> ") bound"
     Product _ a b ->
       case bound of
-        ProductBound (LeftBound aBound) (RightBound bBound) -> do
-          checkBound c ann a aBound
-          checkBound c ann b bBound
-        _ -> Left (ErrorMessage ann "expected a product bound")
+        ProductBound _ (LeftBound aBound) (RightBound bBound) -> do
+          checkBound c a aBound
+          checkBound c b bBound
+        _ -> Left (ErrorMessage (boundAnnotation bound)
+                     "expected a product bound")
     Coproduct _ a b ->
       case bound of
-        CoproductBound (LeftBound aBound) (RightBound bBound) -> do
-          checkBound c ann a aBound
-          checkBound c ann b bBound
-        _ -> Left (ErrorMessage ann "expected a coproduct bound")
+        CoproductBound _ (LeftBound aBound) (RightBound bBound) -> do
+          checkBound c a aBound
+          checkBound c b bBound
+        _ -> Left (ErrorMessage (boundAnnotation bound)
+                    "expected a coproduct bound")
     NamedType ann' name ->
       case getDeclaration c name of
         Just (Data a) ->
           case bound of
-            ToBound name' bound' ->
+            ToBound ann name' bound' ->
               if name == name'
-              then checkBound c ann a bound'
+              then checkBound c a bound'
               else Left (ErrorMessage ann "mismatching named type and to bound")
-            _ -> Left (ErrorMessage ann "expected a to bound")
+            _ -> Left (ErrorMessage (boundAnnotation bound)
+                        "expected a to bound")
         _ -> Left (ErrorMessage ann' "expected the name of a type")
     Maybe _ a ->
       case bound of
-        MaybeBound (ValuesBound bound') -> checkBound c ann a bound'
-        _ -> Left (ErrorMessage ann "expected a maybe bound")
+        MaybeBound _ (ValuesBound bound') -> checkBound c a bound'
+        _ -> Left (ErrorMessage (boundAnnotation bound)
+                     "expected a maybe bound")
 
 
 inferType :: Show ann => ValidContext ann -> Term ann -> Either (ErrorMessage ann) (Type ann)
@@ -702,13 +708,13 @@ inferType c t =
       return (Prop ann)
     ForAll ann varName varType varBound p -> do
       checkType c varType
-      checkBound c ann varType varBound
+      checkBound c varType varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
       return (Prop ann)
     ForSome ann varName varType varBound p -> do
       checkType c varType
-      checkBound c ann varType varBound
+      checkBound c varType varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
       return (Prop ann)

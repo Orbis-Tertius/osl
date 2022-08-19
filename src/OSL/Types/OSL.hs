@@ -122,14 +122,14 @@ data Term ann =
 
 
 data Bound ann =
-    ScalarBound (Term ann)
-  | ProductBound (LeftBound ann) (RightBound ann)
-  | CoproductBound (LeftBound ann) (RightBound ann)
-  | FunctionBound (DomainBound ann) (CodomainBound ann)
-  | ListBound (ValuesBound ann)
-  | MaybeBound (ValuesBound ann)
-  | MapBound (KeysBound ann) (ValuesBound ann)
-  | ToBound Name (Bound ann)
+    ScalarBound ann (Term ann)
+  | ProductBound ann (LeftBound ann) (RightBound ann)
+  | CoproductBound ann (LeftBound ann) (RightBound ann)
+  | FunctionBound ann (DomainBound ann) (CodomainBound ann)
+  | ListBound ann (ValuesBound ann)
+  | MaybeBound ann (ValuesBound ann)
+  | MapBound ann (KeysBound ann) (ValuesBound ann)
+  | ToBound ann Name (Bound ann)
   deriving Show
 
 
