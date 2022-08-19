@@ -203,6 +203,12 @@ translate ctx@(TranslationContext
           Mapping <$> translateToMapping ctx (OSL.List ann' a) xs
         Just _ -> Left (ErrorMessage ann' "expected the name of a type")
         Nothing -> Left (ErrorMessage ann' "undefined name")
+    OSL.Apply ann (OSL.ListFrom ann' name) xs ->
+      case getDeclaration decls name of
+        Just (OSL.Data a) -> do
+          Mapping <$> translateToMapping ctx (OSL.List ann' a) xs
+        Just _ -> Left (ErrorMessage ann' "expected the name of a type")
+        Nothing -> Left (ErrorMessage ann' "undefined name")
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
