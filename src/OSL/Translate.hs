@@ -179,6 +179,10 @@ translate ctx@(TranslationContext
       case xsM of
         ListMapping (LengthMapping lT) _ -> pure (Term lT)
         _ -> Left (ErrorMessage ann "expected a list")
+    OSL.Apply ann (OSL.Apply _ (OSL.Nth _) xs) i -> do
+      iT <- translateToTerm ctx (OSL.N ann) i
+      xsM <- translateToMapping ctx (OSL.List ann termType) xs
+      Mapping <$> applyMappings ann xsM (const iT <$> xsM)
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
