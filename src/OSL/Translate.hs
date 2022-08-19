@@ -332,11 +332,39 @@ applyTerms ann f x =
 
 
 translateBound
-  :: TranslationContext ann
+  :: Show ann
+  => TranslationContext ann
   -> OSL.Type ann
   -> OSL.Bound ann
   -> Either (ErrorMessage ann) [S11.Term]
-translateBound = todo
+translateBound ctx t =
+  \case
+    OSL.ScalarBound _ term -> (:[]) <$> translateToTerm ctx t term
+    OSL.ProductBound ann (OSL.LeftBound aBound) (OSL.RightBound bBound) ->
+      case t of
+        OSL.Product _ a b ->
+          (<>) <$> translateBound ctx a aBound
+               <*> translateBound ctx b bBound
+        _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
+    OSL.CoproductBound ann (OSL.LeftBound aBound) (OSL.RightBound bBound) ->
+      case t of 
+        OSL.Coproduct _ a b ->
+          (<>) <$> translateBound ctx a aBound
+               <*> translateBound ctx b bBound
+    OSL.FunctionBound ann (OSL.DomainBound aBound)
+                          (OSL.CodomainBound bBound) ->
+      case t of
+        OSL.F _ a b ->
+          (<>) <$> translateBound ctx a aBound
+               <*> translateBound ctx b bBound
+        _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
+    OSL.ListBound ann (OSL.LengthBound lBound) (OSL.ValuesBound vBound) ->
+      case t of
+        OSL.List ann' a ->
+          (<>) <$> translateBound ctx (OSL.N ann') lBound
+               <*> translateBound ctx (OSL.F ann' (OSL.N ann') a)
+                   (OSL.FunctionBound ann (OSL.DomainBound lBound)
+                                          (OSL.CodomainBound vBound))
 
 
 todo :: a

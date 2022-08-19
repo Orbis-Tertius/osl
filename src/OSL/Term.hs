@@ -73,7 +73,7 @@ boundAnnotation =
     ProductBound ann _ _ -> ann
     CoproductBound ann _ _ -> ann
     FunctionBound ann _ _ -> ann
-    ListBound ann _ -> ann
+    ListBound ann _ _ -> ann
     MaybeBound ann _ -> ann
     MapBound ann _ _ -> ann
     ToBound ann _ _ -> ann

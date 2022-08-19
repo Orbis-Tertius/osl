@@ -11,6 +11,7 @@ module OSL.Types.OSL
   , DomainBound (..)
   , CodomainBound (..)
   , ValuesBound (..)
+  , LengthBound (..)
   , KeysBound (..)
   , Declaration (..)
   , Context (..)
@@ -126,7 +127,7 @@ data Bound ann =
   | ProductBound ann (LeftBound ann) (RightBound ann)
   | CoproductBound ann (LeftBound ann) (RightBound ann)
   | FunctionBound ann (DomainBound ann) (CodomainBound ann)
-  | ListBound ann (ValuesBound ann)
+  | ListBound ann (LengthBound ann) (ValuesBound ann)
   | MaybeBound ann (ValuesBound ann)
   | MapBound ann (KeysBound ann) (ValuesBound ann)
   | ToBound ann Name (Bound ann)
@@ -146,6 +147,10 @@ newtype DomainBound ann = DomainBound { unDomainBound :: Bound ann }
 
 
 newtype CodomainBound ann = CodomainBound { unCodomainBound :: Bound ann }
+  deriving Show
+
+
+newtype LengthBound ann = LengthBound { unLengthBound :: Bound ann }
   deriving Show
 
 

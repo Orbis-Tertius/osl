@@ -14,7 +14,7 @@ import Data.Text (pack)
 import OSL.Term (termAnnotation, boundAnnotation)
 import OSL.Type (typeAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..), Bound (..), LeftBound (..), RightBound (..), DomainBound (..), CodomainBound (..), ValuesBound (..), KeysBound (..))
+import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..), Bound (..), LeftBound (..), RightBound (..), DomainBound (..), CodomainBound (..), ValuesBound (..), KeysBound (..), LengthBound (..))
 import OSL.ValidContext (getDeclaration)
 
 
@@ -502,9 +502,11 @@ checkBound c t bound =
         MaybeBound _ (ValuesBound bound') -> checkBound c a bound'
         _ -> Left (ErrorMessage (boundAnnotation bound)
                      "expected a maybe bound")
-    List _ a ->
+    List ann a ->
       case bound of
-        ListBound _ (ValuesBound bound') -> checkBound c a bound'
+        ListBound _ (LengthBound lBound) (ValuesBound vBound) -> do
+          checkBound c (N ann) lBound
+          checkBound c a vBound
         _ -> Left (ErrorMessage (boundAnnotation bound)
                      "expected a list bound")
     Map _ a b ->
