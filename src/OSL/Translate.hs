@@ -189,7 +189,7 @@ translate ctx@(TranslationContext
       Formula <$>
         (S11.Implies <$> translateToFormula ctx p
                      <*> translateToFormula ctx q)
-    OSL.ForAll ann varName varType p -> do
+    OSL.ForAll ann varName varType varBound p -> do
       varDim <- getMappingDimensions decls varType
       case varDim of
         FiniteDimensions n -> do
@@ -199,11 +199,12 @@ translate ctx@(TranslationContext
             buildTranslationContext' decls' [varName]
           let ctx' = TranslationContext decls'
                      (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
-          Formula . foldl (.) id (replicate n (S11.ForAll todo))
+          bounds <- translateBound ctx varType varBound
+          Formula . foldl (.) id (S11.ForAll <$> bounds)
             <$> translateToFormula ctx' p
         InfiniteDimensions ->
           Left (ErrorMessage ann "universal quantification over an infinite-dimensional type")
-    OSL.ForSome ann varName varType p -> do
+    OSL.ForSome ann varName varType varBound p -> do
      let decls' = OSL.ValidContext
           $ Map.insert varName (OSL.FreeVariable varType) declsMap
      varDim <- getMappingDimensions decls varType
@@ -213,8 +214,10 @@ translate ctx@(TranslationContext
            buildTranslationContext' decls' [varName]
          let ctx' = TranslationContext decls'
                     (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
-         Formula . foldl (.) id (replicate n (S11.ExistsFO todo))
+         bounds <- translateBound ctx varType varBound
+         Formula . foldl (.) id (S11.ExistsFO <$> bounds)
            <$> translateToFormula ctx' p
+       InfiniteDimensions -> todo
 
 
 getMappingDimensions
@@ -326,6 +329,14 @@ applyTerms ann f x =
     S11.Var f' -> pure $ S11.App f' [x]
     S11.App f' ys -> pure $ S11.App f' (ys <> [x])
     _ -> Left $ ErrorMessage ann "expected a function term"
+
+
+translateBound
+  :: TranslationContext ann
+  -> OSL.Type ann
+  -> OSL.Bound ann
+  -> Either (ErrorMessage ann) [S11.Term]
+translateBound = todo
 
 
 todo :: a
