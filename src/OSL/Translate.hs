@@ -148,6 +148,26 @@ translate ctx@(TranslationContext
           Mapping . MaybeMapping (ChoiceMapping (S11.Const 0))
             . ValuesMapping <$> getArbitraryMapping decls xType
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
+    OSL.Apply ann (OSL.Apply _ (OSL.Maybe' ann' f) b) a -> do
+      fType <- inferType decls f
+      case fType of
+        OSL.F _ aType _ -> do
+          aM <- translateToMapping ctx (OSL.Maybe ann aType) a
+          bT <- translateToTerm ctx termType b
+          fM <- translateToMapping ctx fType f
+          case aM of
+            MaybeMapping (ChoiceMapping choiceT) (ValuesMapping vM) -> do
+              fvM <- applyMappings ann fM vM
+              case fvM of
+                ScalarMapping fvT ->
+                  pure . Term $ (choiceT `S11.Mul` fvT)
+                    `S11.Add`
+                     ((S11.Const 1 `S11.Add`
+                       (S11.Const (-1) `S11.Mul` choiceT))
+                      `S11.Mul` bT)
+                _ -> Left . ErrorMessage ann $ "expected a scalar value"
+            _ -> Left . ErrorMessage ann $ "expected a maybe value"
+        _ -> Left . ErrorMessage ann' $ "expected a function"
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
@@ -218,7 +238,6 @@ translate ctx@(TranslationContext
          bounds <- translateBound ctx varType varBound
          Formula . foldl (.) id (S11.ExistsFO <$> bounds)
            <$> translateToFormula ctx' p
-       InfiniteDimensions -> todo
 
 
 getMappingDimensions
@@ -289,7 +308,7 @@ translateToTerm c tType t =
     Right (Term t') -> return t'
     Right (Mapping (ScalarMapping t')) -> return t'
     Right _ -> Left (ErrorMessage (termAnnotation t)
-                 "expected a term denoting a scalar")
+                 "expected a term denoting a scalar or a scalar function")
     Left err -> Left err
 
 
