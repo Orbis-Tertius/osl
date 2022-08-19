@@ -95,7 +95,7 @@ addFreeVariableMapping freeVariable = do
           bSym <- addGensym b
           aMap <- addFreeVariableMapping aSym
           bMap <- addFreeVariableMapping bSym
-          iSym <- getFreeS11NameM (Arity 0)
+          iSym <- ScalarMapping <$> getFreeS11NameM (Arity 0)
           let mapping = CoproductMapping
                         (ChoiceMapping iSym)
                         (LeftMapping aMap)
@@ -121,7 +121,7 @@ addFreeVariableMapping freeVariable = do
         Maybe _ a -> do
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
-          i <- getFreeS11NameM (Arity 0)
+          i <- ScalarMapping <$> getFreeS11NameM (Arity 0)
           let mapping = MaybeMapping
                 (ChoiceMapping i)
                 (ValuesMapping aMap)
@@ -130,7 +130,7 @@ addFreeVariableMapping freeVariable = do
         List _ a -> do
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
-          l <- getFreeS11NameM (Arity 0)
+          l <- ScalarMapping <$> getFreeS11NameM (Arity 0)
           let mapping = ListMapping
                 (LengthMapping l)
                 (ValuesMapping (mapAritiesInMapping (+1) aMap))
@@ -143,8 +143,8 @@ addFreeVariableMapping freeVariable = do
             $ getFiniteDimMappingArity ann aMap
           bSym <- addGensym b
           bMap <- addFreeVariableMapping bSym
-          lVar <- getFreeS11NameM (Arity 0)
-          iVar <- getFreeS11NameM aDim
+          lVar <- ScalarMapping <$> getFreeS11NameM (Arity 0)
+          iVar <- ScalarMapping <$> getFreeS11NameM aDim
           let mapping = MapMapping
                 (LengthMapping lVar)
                 (KeysMapping (mapAritiesInMapping (+1) aMap))
@@ -203,16 +203,16 @@ getBoundS11NamesInMapping arity =
       rec a `Set.union` rec b
     CoproductMapping (ChoiceMapping a)
         (LeftMapping b) (RightMapping c) ->
-      f a `Set.union` (rec b `Set.union` rec c)
+      rec a `Set.union` (rec b `Set.union` rec c)
     FunctionCoproductMapping (LeftMapping a) (RightMapping b) ->
       rec a `Set.union` rec b
     MaybeMapping (ChoiceMapping a) (ValuesMapping b) ->
-      f a `Set.union` rec b
+      rec a `Set.union` rec b
     ListMapping (LengthMapping a) (ValuesMapping b) ->
-      f a `Set.union` rec b
+      rec a `Set.union` rec b
     MapMapping (LengthMapping a) (KeysMapping b)
         (KeyIndicatorMapping c) (ValuesMapping d) ->
-      f a `Set.union` (rec b `Set.union` (f c `Set.union` rec d))
+      rec a `Set.union` (rec b `Set.union` (rec c `Set.union` rec d))
   where
     f :: S11.Term -> Set S11.Name
     f (S11.Var name) = g name
@@ -288,23 +288,23 @@ mapAritiesInMapping f =
     CoproductMapping (ChoiceMapping a)
         (LeftMapping b) (RightMapping c) ->
       CoproductMapping
-      (ChoiceMapping (g a))
+      (ChoiceMapping (rec a))
       (LeftMapping (rec b))
       (RightMapping (rec c))
     MaybeMapping (ChoiceMapping a) (ValuesMapping b) ->
       MaybeMapping
-      (ChoiceMapping (g a))
+      (ChoiceMapping (rec a))
       (ValuesMapping (rec b))
     ListMapping (LengthMapping a) (ValuesMapping b) ->
       ListMapping
-      (LengthMapping (g a))
+      (LengthMapping (rec a))
       (ValuesMapping (rec b))
     MapMapping (LengthMapping a) (KeysMapping b)
         (KeyIndicatorMapping c) (ValuesMapping d) ->
       MapMapping
-      (LengthMapping (g a))
+      (LengthMapping (rec a))
       (KeysMapping (rec b))
-      (KeyIndicatorMapping (g c))
+      (KeyIndicatorMapping (rec c))
       (ValuesMapping (rec d))
   where
     g (S11.Name arity i) = S11.Name (f arity) i

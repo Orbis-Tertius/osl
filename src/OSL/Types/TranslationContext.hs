@@ -68,7 +68,7 @@ instance Functor Mapping where
       CoproductMapping (ChoiceMapping a)
           (LeftMapping b) (RightMapping c) ->
         CoproductMapping
-        (ChoiceMapping (f a))
+        (ChoiceMapping (f <$> a))
         (LeftMapping (f <$> b))
         (RightMapping (f <$> c))
       FunctionCoproductMapping (LeftMapping a) (RightMapping b) ->
@@ -77,18 +77,18 @@ instance Functor Mapping where
         (RightMapping (f <$> b))
       MaybeMapping (ChoiceMapping a) (ValuesMapping b) ->
         MaybeMapping
-        (ChoiceMapping (f a))
+        (ChoiceMapping (f <$> a))
         (ValuesMapping (f <$> b))
       ListMapping (LengthMapping a) (ValuesMapping b) ->
         ListMapping
-        (LengthMapping (f a))
+        (LengthMapping (f <$> a))
         (ValuesMapping (f <$> b))
       MapMapping (LengthMapping a) (KeysMapping b)
           (KeyIndicatorMapping c) (ValuesMapping d) ->
         MapMapping
-        (LengthMapping (f a))
+        (LengthMapping (f <$> a))
         (KeysMapping (f <$> b))
-        (KeyIndicatorMapping (f c))
+        (KeyIndicatorMapping (f <$> c))
         (ValuesMapping (f <$> d))
 
 
@@ -101,11 +101,11 @@ newtype RightMapping a =
 
 
 newtype ChoiceMapping a
-  = ChoiceMapping { unChoiceMapping :: a }
+  = ChoiceMapping { unChoiceMapping :: Mapping a }
 
 
 newtype LengthMapping a =
-  LengthMapping { unLengthMapping :: a }
+  LengthMapping { unLengthMapping :: Mapping a }
 
 
 newtype ValuesMapping a
@@ -118,7 +118,7 @@ newtype KeysMapping a
 
 newtype KeyIndicatorMapping a
   = KeyIndicatorMapping
-    { unKeyIndicatorMapping :: a }
+    { unKeyIndicatorMapping :: Mapping a }
 
 
 data MappingDimensions

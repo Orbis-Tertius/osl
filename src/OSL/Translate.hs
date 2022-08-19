@@ -92,7 +92,7 @@ translate ctx@(TranslationContext
           bM <- getArbitraryMapping decls c
           return . Mapping
             $ CoproductMapping
-              (ChoiceMapping (S11.Const 0))
+              (ChoiceMapping (ScalarMapping (S11.Const 0)))
               (LeftMapping aM)
               (RightMapping bM)
         _ -> Left (ErrorMessage ann "expected a coproduct")
@@ -103,7 +103,7 @@ translate ctx@(TranslationContext
           bM <- translateToMapping ctx c a
           return . Mapping
             $ CoproductMapping
-              (ChoiceMapping (S11.Const 0))
+              (ChoiceMapping (ScalarMapping (S11.Const 0)))
               (LeftMapping aM)
               (RightMapping bM)
         _ -> Left (ErrorMessage ann "expected a coproduct")
@@ -139,13 +139,13 @@ translate ctx@(TranslationContext
     OSL.Apply ann (OSL.Just' _) x ->
       case termType of
         OSL.Maybe _ xType ->
-          Mapping . MaybeMapping (ChoiceMapping (S11.Const 1))
+          Mapping . MaybeMapping (ChoiceMapping (ScalarMapping (S11.Const 1)))
             . ValuesMapping <$> translateToMapping ctx xType x
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     OSL.Nothing' ann ->
       case termType of
         OSL.Maybe _ xType ->
-          Mapping . MaybeMapping (ChoiceMapping (S11.Const 0))
+          Mapping . MaybeMapping (ChoiceMapping (ScalarMapping (S11.Const 0)))
             . ValuesMapping <$> getArbitraryMapping decls xType
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     OSL.Apply ann (OSL.Apply _ (OSL.Maybe' ann' f) b) a -> do
@@ -156,7 +156,8 @@ translate ctx@(TranslationContext
           bT <- translateToTerm ctx termType b
           fM <- translateToMapping ctx fType f
           case aM of
-            MaybeMapping (ChoiceMapping choiceT) (ValuesMapping vM) -> do
+            MaybeMapping (ChoiceMapping (ScalarMapping choiceT))
+                         (ValuesMapping vM) -> do
               fvM <- applyMappings ann fM vM
               case fvM of
                 ScalarMapping fvT ->
@@ -177,7 +178,7 @@ translate ctx@(TranslationContext
       xsType <- inferType decls xs
       xsM <- translateToMapping ctx xsType xs
       case xsM of
-        ListMapping (LengthMapping lT) _ -> pure (Term lT)
+        ListMapping (LengthMapping (ScalarMapping lT)) _ -> pure (Term lT)
         _ -> Left (ErrorMessage ann "expected a list")
     OSL.Apply ann (OSL.Apply _ (OSL.Nth _) xs) i -> do
       iT <- translateToTerm ctx (OSL.N ann) i
@@ -197,18 +198,24 @@ translate ctx@(TranslationContext
         ListMapping lM (ValuesMapping (ProductMapping _ (RightMapping bM))) ->
           pure . Mapping $ ListMapping lM (ValuesMapping bM)
         _ -> Left . ErrorMessage ann $ "expected a list of pairs"
-    OSL.Apply ann (OSL.ListTo ann' name) xs -> do
+    OSL.Apply _ (OSL.ListTo ann' name) xs -> do
       case getDeclaration decls name of
         Just (OSL.Data a) -> do
           Mapping <$> translateToMapping ctx (OSL.List ann' a) xs
         Just _ -> Left (ErrorMessage ann' "expected the name of a type")
         Nothing -> Left (ErrorMessage ann' "undefined name")
-    OSL.Apply ann (OSL.ListFrom ann' name) xs ->
+    OSL.Apply _ (OSL.ListFrom ann' name) xs ->
       case getDeclaration decls name of
         Just (OSL.Data a) -> do
           Mapping <$> translateToMapping ctx (OSL.List ann' a) xs
         Just _ -> Left (ErrorMessage ann' "expected the name of a type")
         Nothing -> Left (ErrorMessage ann' "undefined name")
+    OSL.Apply _ (OSL.ListLength _) xs -> do
+      xsType <- inferType decls xs
+      xsM <- translateToMapping ctx xsType xs
+      case xsM of
+        ListMapping lM (ValuesMapping (ListMapping (LengthMapping xslM) _)) ->
+          pure . Mapping $ ListMapping lM (ValuesMapping xslM)
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
@@ -305,11 +312,11 @@ getArbitraryMapping ctx =
       <$> (LeftMapping <$> rec a)
       <*> (RightMapping <$> rec b)
     OSL.Coproduct _ a b ->
-      CoproductMapping (ChoiceMapping (S11.Const 0))
+      CoproductMapping (ChoiceMapping (ScalarMapping (S11.Const 0)))
       <$> (LeftMapping <$> rec a)
       <*> (RightMapping <$> rec b)
     OSL.Maybe _ a ->
-      MaybeMapping (ChoiceMapping (S11.Const 0))
+      MaybeMapping (ChoiceMapping (ScalarMapping (S11.Const 0)))
       . ValuesMapping <$> rec a
     OSL.NamedType ann a ->
       case getDeclaration ctx a of
