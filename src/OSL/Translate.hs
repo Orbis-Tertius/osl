@@ -244,7 +244,17 @@ translate ctx@(TranslationContext
               (ValuesMapping
                 (MaybeMapping cM (ValuesMapping bM)))
         _ -> Left (ErrorMessage ann "expected a list of maybe pair")
-
+    OSL.Apply ann (OSL.ListMaybeLength _) xs -> do
+      xsType <- inferType decls xs
+      xsM <- translateToMapping ctx xsType xs
+      case xsM of
+        ListMapping lM
+          (ValuesMapping
+            (MaybeMapping cM
+              (ValuesMapping (ListMapping (LengthMapping xslM) _)))) ->
+          pure . Mapping
+            $ ListMapping lM
+              (ValuesMapping (MaybeMapping cM (ValuesMapping xslM)))
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
