@@ -20,7 +20,7 @@ import OSL.Types.ErrorMessage (ErrorMessage (..))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.Translation (Translation (Formula, Term, Mapping))
-import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..), MappingDimensions (..), LengthMapping (..), KeyIndicatorMapping (..))
+import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..), MappingDimensions (..), LengthMapping (..), KeyIndicatorMapping (..), KeysMapping (..))
 import OSL.ValidContext (getDeclaration)
 import OSL.ValidateContext (inferType)
 
@@ -268,6 +268,14 @@ translate ctx@(TranslationContext
               vM <- applyMappings ann vM kM
               pure . Mapping
                 $ MaybeMapping (ChoiceMapping kExistsM) (ValuesMapping vM)
+    OSL.Apply _ (OSL.Keys _) xs -> do
+      xsType <- inferType decls xs
+      case xsType of
+        OSL.Map _ kType vType -> do
+          xsM <- translateToMapping ctx xsType xs
+          case xsM of
+            MapMapping lM (KeysMapping kM) _ _ ->
+              pure . Mapping $ ListMapping lM (ValuesMapping kM)
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
