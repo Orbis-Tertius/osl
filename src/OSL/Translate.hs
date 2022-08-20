@@ -8,6 +8,7 @@ module OSL.Translate
   ) where
 
 
+import Control.Applicative (liftA2)
 import qualified Data.Map as Map
 import Data.Text (pack)
 
@@ -255,6 +256,19 @@ translate ctx@(TranslationContext
           pure . Mapping
             $ ListMapping lM
               (ValuesMapping (MaybeMapping cM (ValuesMapping xslM)))
+    OSL.Apply ann (OSL.Sum _ (OSL.SumLength n)) xs -> do
+      xsType <- inferType decls xs
+      case xsType of
+        OSL.List _ _ -> do
+          xsM <- translateToMapping ctx xsType xs
+          case xsM of
+            ListMapping (LengthMapping (ScalarMapping lT))
+                        (ValuesMapping (ScalarMapping xsT)) ->
+              Term <$>
+              foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
+                [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
+                   <$> applyTerms ann xsT (S11.Const i)
+                | i <- [0..n-1] ]
     OSL.Apply ann (OSL.Apply _ (OSL.Lookup _) k) xs -> do
       xsType <- inferType decls xs
       case xsType of

@@ -5,6 +5,7 @@ module OSL.Types.OSL
   ( Name (..)
   , Type (..)
   , Term (..)
+  , SumLength (..)
   , Bound (..)
   , LeftBound (..)
   , RightBound (..)
@@ -122,7 +123,7 @@ data Term ann =
   deriving Show
 
 
-newtype SumLength = SumLength Int
+newtype SumLength = SumLength Integer
   deriving Show
 
 
