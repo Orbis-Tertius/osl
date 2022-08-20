@@ -277,6 +277,15 @@ translate ctx@(TranslationContext
             MapMapping lM kM iM (ValuesMapping
                 (ProductMapping (LeftMapping aM) _)) ->
               pure . Mapping $ MapMapping lM kM iM (ValuesMapping aM)
+    OSL.Apply ann (OSL.MapPi2 _) xs -> do
+      xsType <- inferType decls xs
+      case xsType of
+        OSL.Map _ _ (OSL.Product _ aType bType) -> do
+          xsM <- translateToMapping ctx xsType xs
+          case xsM of
+            MapMapping lM kM iM (ValuesMapping
+                (ProductMapping _ (RightMapping bM))) ->
+              pure . Mapping $ MapMapping lM kM iM (ValuesMapping bM)
     OSL.Apply _ (OSL.Keys _) xs -> do
       xsType <- inferType decls xs
       case xsType of
