@@ -102,15 +102,15 @@ data Term ann =
   | ListMaybePi1 ann
   | ListMaybePi2 ann
   | ListMaybeLength ann
-  | Sum ann
+  | Sum ann SumLength
   | Lookup ann
   | Keys ann
   | MapPi1 ann
   | MapPi2 ann
   | MapTo ann Name
   | MapFrom ann Name
-  | SumMapLength ann
-  | SumListLookup ann (Term ann)
+  | SumMapLength ann SumLength
+  | SumListLookup ann SumLength (Term ann)
   | Equal ann (Term ann) (Term ann)
   | LessOrEqual ann (Term ann) (Term ann)
   | And ann (Term ann) (Term ann)
@@ -119,6 +119,10 @@ data Term ann =
   | Implies ann (Term ann) (Term ann)
   | ForAll ann Name (Type ann) (Bound ann) (Term ann)
   | ForSome ann Name (Type ann) (Bound ann) (Term ann)
+  deriving Show
+
+
+newtype SumLength = SumLength Int
   deriving Show
 
 

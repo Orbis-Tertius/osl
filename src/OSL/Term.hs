@@ -47,15 +47,15 @@ termAnnotation =
     ListMaybePi1 ann -> ann
     ListMaybePi2 ann -> ann
     ListMaybeLength ann -> ann
-    Sum ann -> ann
+    Sum ann _ -> ann
     Lookup ann -> ann
     Keys ann -> ann
     MapPi1 ann -> ann
     MapPi2 ann -> ann
     MapTo ann _ -> ann
     MapFrom ann _ -> ann
-    SumMapLength ann -> ann
-    SumListLookup ann _ -> ann
+    SumMapLength ann _ -> ann
+    SumListLookup ann _ _ -> ann
     Equal ann _ _ -> ann
     LessOrEqual ann _ _ -> ann
     And ann _ _ -> ann
