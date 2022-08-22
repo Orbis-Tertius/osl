@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
 
 
 module OSL.Parse (parseContext) where
@@ -7,11 +8,11 @@ module OSL.Parse (parseContext) where
 import Control.Monad (guard, mzero)
 import Data.Either.Combinators (mapLeft)
 import Data.Text (Text, pack, unpack)
-import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try, choice, getPosition, option, many1)
+import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try, choice, getPosition, option, many1, optionMaybe)
 import qualified Text.Parsec.Prim as Prim
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.OSL (Context (..), Name, Declaration (..), Term (..), Type (..))
+import OSL.Types.OSL (Context (..), Name, Declaration (..), Term (..), Type (..), Bound (..), SumLength (..), LeftBound (..), RightBound (..), Cardinality (..))
 import qualified OSL.Types.Keyword as K
 import OSL.Types.Token (Token)
 import qualified OSL.Types.Token as T
@@ -104,10 +105,13 @@ type0 :: Parser (Type SourcePos)
 type0 = do
   p <- getPosition
   t <- type1
-  ts <- option Nothing (consumeExact_ T.ThinArrow >> (Just <$> type0))
-  case ts of
+  rest <- option Nothing $ do
+    consumeExact_ T.ThinArrow
+    n <- cardinality
+    Just . (n,) <$> type0
+  case rest of
     Nothing -> return t
-    Just t' -> return (F p t t')
+    Just (n, t') -> return (F p n t t')
 
 
 type1 :: Parser (Type SourcePos)
@@ -195,22 +199,24 @@ listType :: Parser (Type SourcePos)
 listType = do
   p <- getPosition
   consumeExact_ (T.Keyword K.List)
+  n <- cardinality
   consumeExact_ T.OpenParen
   t <- type0
   consumeExact_ T.CloseParen
-  return (List p t)
+  return (List p n t)
 
 
 mapType :: Parser (Type SourcePos)
 mapType = do
   p <- getPosition
   consumeExact_ (T.Keyword K.Map)
+  n <- cardinality
   consumeExact_ T.OpenParen
   t0 <- type0
   consumeExact_ T.Comma
   t1 <- type0
   consumeExact_ T.CloseParen
-  return (Map p t0 t1)
+  return (Map p n t0 t1)
 
 
 term0 :: Parser (Term SourcePos)
@@ -229,6 +235,7 @@ quantifier :: Token
   -> (SourcePos
       -> Name
       -> Type (SourcePos)
+      -> (Bound SourcePos)
       -> Term (SourcePos)
       -> Term SourcePos)
   -> Parser (Term SourcePos)
@@ -238,9 +245,19 @@ quantifier tok ctor = do
   varName <- name
   consumeExact_ T.Colon
   varType <- type0
+  consumeExact_ T.Less
+  varBound <- bound
   consumeExact_ T.Comma
   q <- term0
-  return (ctor p varName varType q)
+  return (ctor p varName varType varBound q)
+
+
+bound :: Parser (Bound SourcePos)
+bound = todo
+
+
+todo :: a
+todo = todo
 
 
 lambda :: Parser (Term SourcePos)
@@ -387,9 +404,51 @@ term3 =
   , functorApplication
   , builtin K.Lookup Lookup
   , builtin K.Keys Keys
-  , builtin K.SumMapLength SumMapLength
-  , unaryOp term0 (T.Keyword K.SumListLookup) SumListLookup
+  , summation K.Sum Sum
+  , summation K.SumMapLength SumMapLength
+  , sumListLookup
   ]
+
+
+summation :: K.Keyword
+          -> (SourcePos -> SumLength -> Term SourcePos)
+          -> Parser (Term SourcePos)
+summation k ctor = do
+  p <- getPosition
+  consumeExact_ (T.Keyword k)
+  ctor p <$> sumLength
+
+
+sumLength :: Parser SumLength
+sumLength = SumLength <$> caretBound
+
+
+cardinality :: Parser Cardinality
+cardinality = Cardinality <$> caretBound
+
+
+caretBound :: Parser Integer
+caretBound = do
+  consumeExact_ T.Caret
+  consume $
+    \case
+      (T.Const i, _) -> pure i
+      _              -> mzero
+
+
+
+sumListLookup :: Parser (Term SourcePos)
+sumListLookup = do
+  p <- getPosition
+  consumeExact_ (T.Keyword K.SumListLookup)
+  l <- sumLength
+  consumeExact_ T.OpenParen
+  k <- term1
+  v <- optionMaybe (consumeExact_ T.Comma >> term1)
+  consumeExact_ T.CloseParen
+  case v of
+    Nothing -> pure (SumListLookup p l k)
+    Just v' -> pure (Apply p (SumListLookup p l k) v')
 
 
 namedTerm :: Parser (Term SourcePos)

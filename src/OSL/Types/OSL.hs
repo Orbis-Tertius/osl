@@ -1,8 +1,11 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 
 module OSL.Types.OSL
   ( Name (..)
+  , Cardinality (..)
   , Type (..)
   , Term (..)
   , SumLength (..)
@@ -37,10 +40,14 @@ instance Ord Name where
   Sym _ <= GenSym _ = True
   GenSym _ <= Sym _ = False
 
+-- The maximum number of elements of a collection type.
+newtype Cardinality = Cardinality Integer
+  deriving newtype Show
+
 
 data Type ann =
     Prop ann
-  | F ann (Type ann) (Type ann) -- functions
+  | F ann Cardinality (Type ann) (Type ann) -- functions
   | N ann -- natural numbers
   | Z ann -- integers
   | Fin ann Integer
@@ -48,13 +55,13 @@ data Type ann =
   | Coproduct ann (Type ann) (Type ann)
   | NamedType ann Name
   | Maybe ann (Type ann)
-  | List ann (Type ann)
-  | Map ann (Type ann) (Type ann)
+  | List ann Cardinality (Type ann)
+  | Map ann Cardinality (Type ann) (Type ann)
 
 
 instance Show (Type ann) where
   show (Prop _) = "Prop"
-  show (F _ a b) = "(" <> show a <> " -> " <> show b <> ")"
+  show (F _ n a b) = "(" <> show a <> " ->^" <> show n <> " " <> show b <> ")"
   show (N _) = "N"
   show (Z _) = "Z"
   show (Fin _ n) = "Fin(" <> show n <> ")"
@@ -63,8 +70,8 @@ instance Show (Type ann) where
   show (NamedType _ (Sym a)) = unpack a
   show (NamedType _ (GenSym a)) = "$gensym" <> show a
   show (Maybe _ a) = "Maybe(" <> show a <> ")"
-  show (List _ a) = "List(" <> show a <> ")"
-  show (Map _ a b) = "Map(" <> show a <> ", " <> show b <> ")"
+  show (List _ n a) = "List^ " <> show n <> "(" <> show a <> ")"
+  show (Map _ n a b) = "Map^" <> show n <> "(" <> show a <> ", " <> show b <> ")"
 
 
 data Term ann =

@@ -87,6 +87,8 @@ token =
   , T.CoproductOp <$ string "⊕"
   , T.LessOrEqual <$ string "<="
   , T.LessOrEqual <$ string "≤"
+  , T.Caret <$ string "^"
+  , T.Less <$ string "<" -- NOTICE: must come after ascii LessOrEqual case
   , T.And <$ string "&"
   , T.And <$ string "∧"
   , T.Or <$ string "|"
