@@ -331,7 +331,7 @@ checkTerm c t x =
       case t of
         F _ _ (List _ _ (Maybe _ (List _ _ _))) (List _ _ (Maybe _ (N _))) -> return ()
         _ -> genericErrorMessage
-    Sum ann _ ->
+    Sum ann ->
       case t of
         F _ _ (List _ _ (Maybe _ a)) a' -> do
           checkTypeInclusion c ann a a'
@@ -392,12 +392,12 @@ checkTerm c t x =
             then return ()
             else genericErrorMessage
         _ -> genericErrorMessage
-    SumMapLength ann _ ->
+    SumMapLength ann ->
       case t of
         F _ _ (Map _ _ a (List _ _ _)) (Map _ _ a' (N _)) ->
           checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
-    SumListLookup _ann0 _ k ->
+    SumListLookup _ann0 k ->
       case t of
         F _ _ (List _ _ (Map ann1 _ a b)) b' -> do
           checkTypeInclusion c ann1 b b'
@@ -637,7 +637,7 @@ inferType c t =
         List _ n (Maybe _ (List _ _ _)) ->
           return (List ann n (Maybe ann (N ann)))
         _ -> Left (ErrorMessage ann "List(Maybe(length)) applied to a non-List-of-Maybe-Lists")
-    Apply ann (Sum _ _) xs -> do
+    Apply ann (Sum _) xs -> do
       a <- inferType c xs
       case a of
         List _ _ (Maybe _ b) -> do
@@ -679,12 +679,12 @@ inferType c t =
       case a of
         Map _ n b (Product _ _ d) -> return (Map ann n b d)
         _ -> Left (ErrorMessage ann "Map(pi2) applied to a non-Map or a Map whose value type is not a Cartesian product")
-    Apply ann (SumMapLength _ _) xs -> do
+    Apply ann (SumMapLength _) xs -> do
       a <- inferType c xs
       case a of
         Map _ _ _ (List _ _ _) -> return (N ann)
         _ -> Left (ErrorMessage ann "sum.Map(length) applied to a non-Map-of-Lists")
-    Apply ann (SumListLookup _ _ k) xs -> do
+    Apply ann (SumListLookup _ k) xs -> do
       a <- inferType c k
       b <- inferType c xs
       case b of

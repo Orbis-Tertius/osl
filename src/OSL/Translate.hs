@@ -15,6 +15,7 @@ import Data.Text (pack)
 import OSL.BuildTranslationContext (buildTranslationContext')
 import OSL.Sigma11 (incrementDeBruijnIndices)
 import OSL.Term (termAnnotation)
+import OSL.Type (typeCardinality)
 import OSL.TranslationContext (mappingDimensions)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
@@ -263,10 +264,11 @@ translate ctx@(TranslationContext
           pure . Mapping
             $ ListMapping lM
               (ValuesMapping (MaybeMapping cM (ValuesMapping xslM)))
-    OSL.Apply ann (OSL.Sum _ (OSL.SumLength n)) xs -> do
+    OSL.Apply ann (OSL.Sum _) xs -> do
       xsType <- inferType decls xs
-      case xsType of
-        OSL.List _ _ _ -> do
+      let n' = typeCardinality decls xsType
+      case (xsType, n') of
+        (OSL.List _ _ _, Just (OSL.Cardinality n)) -> do
           xsM <- translateToMapping ctx xsType xs
           case xsM of
             ListMapping (LengthMapping (ScalarMapping lT))

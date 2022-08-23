@@ -8,7 +8,6 @@ module OSL.Types.OSL
   , Cardinality (..)
   , Type (..)
   , Term (..)
-  , SumLength (..)
   , Bound (..)
   , LeftBound (..)
   , RightBound (..)
@@ -41,7 +40,7 @@ instance Ord Name where
 
 -- The maximum number of elements of a collection type.
 newtype Cardinality = Cardinality Integer
-  deriving newtype (Eq, Ord, Show)
+  deriving newtype (Eq, Ord, Show, Num)
 
 
 data Type ann =
@@ -110,15 +109,15 @@ data Term ann =
   | ListMaybePi1 ann
   | ListMaybePi2 ann
   | ListMaybeLength ann
-  | Sum ann SumLength
+  | Sum ann
   | Lookup ann
   | Keys ann
   | MapPi1 ann
   | MapPi2 ann
   | MapTo ann Name
   | MapFrom ann Name
-  | SumMapLength ann SumLength
-  | SumListLookup ann SumLength (Term ann)
+  | SumMapLength ann
+  | SumListLookup ann (Term ann)
   | Equal ann (Term ann) (Term ann)
   | LessOrEqual ann (Term ann) (Term ann)
   | And ann (Term ann) (Term ann)
@@ -127,10 +126,6 @@ data Term ann =
   | Implies ann (Term ann) (Term ann)
   | ForAll ann Name (Type ann) (Bound ann) (Term ann)
   | ForSome ann Name (Type ann) (Bound ann) (Term ann)
-  deriving Show
-
-
-newtype SumLength = SumLength Integer
   deriving Show
 
 

@@ -13,7 +13,7 @@ import qualified Text.Parsec.Prim as Prim
 
 import OSL.Bound (boundAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.OSL (Context (..), Name, Declaration (..), Term (..), Type (..), Bound (..), SumLength (..), LeftBound (..), RightBound (..), Cardinality (..), ValuesBound (..), KeysBound (..), DomainBound (..), CodomainBound (..))
+import OSL.Types.OSL (Context (..), Name, Declaration (..), Term (..), Type (..), Bound (..), LeftBound (..), RightBound (..), Cardinality (..), ValuesBound (..), KeysBound (..), DomainBound (..), CodomainBound (..))
 import qualified OSL.Types.Keyword as K
 import OSL.Types.Token (Token)
 import qualified OSL.Types.Token as T
@@ -526,23 +526,10 @@ term3 =
   , functorApplication
   , builtin K.Lookup Lookup
   , builtin K.Keys Keys
-  , summation K.Sum Sum
-  , summation K.SumMapLength SumMapLength
+  , builtin K.Sum Sum
+  , builtin K.SumMapLength SumMapLength
   , sumListLookup
   ]
-
-
-summation :: K.Keyword
-          -> (SourcePos -> SumLength -> Term SourcePos)
-          -> Parser (Term SourcePos)
-summation k ctor = do
-  p <- getPosition
-  consumeExact_ (T.Keyword k)
-  ctor p <$> sumLength
-
-
-sumLength :: Parser SumLength
-sumLength = SumLength <$> caretBound
 
 
 cardinality :: Parser Cardinality
@@ -563,14 +550,13 @@ sumListLookup :: Parser (Term SourcePos)
 sumListLookup = do
   p <- getPosition
   consumeExact_ (T.Keyword K.SumListLookup)
-  l <- sumLength
   consumeExact_ T.OpenParen
   k <- term1
   v <- optionMaybe (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
   case v of
-    Nothing -> pure (SumListLookup p l k)
-    Just v' -> pure (Apply p (SumListLookup p l k) v')
+    Nothing -> pure (SumListLookup p k)
+    Just v' -> pure (Apply p (SumListLookup p k) v')
 
 
 namedTerm :: Parser (Term SourcePos)
