@@ -274,6 +274,31 @@ translate ctx@(TranslationContext
           xsM <- translateToMapping ctx xsType xs
           case xsM of
             ListMapping (LengthMapping (ScalarMapping lT))
+              (ValuesMapping
+                (ListMapping (LengthMapping rT)
+                  (ValuesMapping
+                    (MaybeMapping
+                      (ChoiceMapping cT)
+                      (ValuesMapping (ScalarMapping vT)))))) ->
+              todo
+            ListMapping (LengthMapping (ScalarMapping lT))
+              (ValuesMapping
+                (ListMapping (LengthMapping rT)
+                  (ValuesMapping
+                    (MaybeMapping (ChoiceMapping cT)
+                      (ValuesMapping (ScalarMapping vT)))))) ->
+              todo
+            ListMapping (LengthMapping (ScalarMapping lT))
+              (ValuesMapping
+                (MaybeMapping (ChoiceMapping (ScalarMapping cT))
+                  (ValuesMapping (ScalarMapping vT)))) ->
+              Term <$>
+              foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
+                [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
+                  <$> (S11.Mul <$> applyTerms ann cT (S11.Const i)
+                               <*> applyTerms ann vT (S11.Const i))
+                | i <- [0..n-1] ]
+            ListMapping (LengthMapping (ScalarMapping lT))
                         (ValuesMapping (ScalarMapping xsT)) ->
               Term <$>
               foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
@@ -612,3 +637,7 @@ mconcatM [] = return mempty
 mconcatM (xM:xMs) = do
   x <- xM
   (x <>) <$> mconcatM xMs
+
+
+todo :: a
+todo = todo
