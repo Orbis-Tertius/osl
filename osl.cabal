@@ -8,6 +8,7 @@ maintainer:    morgan.thomas@platonic.systems
 
 library
   exposed-modules:
+    OSL.Bound
     OSL.BuildTranslationContext
     OSL.Die
     OSL.EntryPoint

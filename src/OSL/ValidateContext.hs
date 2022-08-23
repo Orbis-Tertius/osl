@@ -14,7 +14,7 @@ import Data.Text (pack)
 import OSL.Term (termAnnotation, boundAnnotation)
 import OSL.Type (typeAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..), Bound (..), LeftBound (..), RightBound (..), DomainBound (..), CodomainBound (..), ValuesBound (..), KeysBound (..), LengthBound (..))
+import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..), Bound (..), LeftBound (..), RightBound (..), DomainBound (..), CodomainBound (..), ValuesBound (..), KeysBound (..), Cardinality (..))
 import OSL.ValidContext (getDeclaration)
 
 
@@ -38,7 +38,7 @@ checkType :: ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
 checkType c t =
   case t of
     Prop _ -> return ()
-    F _ a b -> checkType c a >> checkType c b
+    F ann n a b -> checkMaybeCardinality ann n >> checkType c a >> checkType c b
     N _ -> return ()
     Z _ -> return ()
     (Fin ann n) -> checkFinType ann n
@@ -50,8 +50,10 @@ checkType c t =
         Just _ -> Left (ErrorMessage ann "expected a type but got a term")
         Nothing -> Left (ErrorMessage ann "reference to undefined name")
     Maybe _ a -> checkQuantifiableType c a
-    List _ a -> checkQuantifiableType c a
-    Map _ a b -> checkQuantifiableType c a >> checkFiniteDimType c b
+    List ann n a -> checkCardinality ann n >> checkQuantifiableType c a
+    Map ann n a b -> checkCardinality ann n
+      >> checkQuantifiableType c a
+      >> checkFiniteDimType c b
 
 
 checkFinType :: ann -> Integer -> Either (ErrorMessage ann) ()
@@ -82,7 +84,9 @@ checkQuantifiableType :: ValidContext ann -> Type ann -> Either (ErrorMessage an
 checkQuantifiableType c t =
   case t of
     Prop ann -> Left (ErrorMessage ann "expected a quantifiable type but got Prop")
-    F _ a b -> checkFiniteDimType c a >> checkQuantifiableType c b
+    F ann n a b -> checkFiniteDimType c a
+      >> checkMaybeCardinality ann n
+      >> checkQuantifiableType c b
     N _ -> return ()
     Z _ -> return ()
     Fin ann n -> checkFinType ann n
@@ -90,15 +94,19 @@ checkQuantifiableType c t =
     Coproduct _ a b -> checkQuantifiableType c a >> checkQuantifiableType c b
     NamedType ann name -> getNamedType c ann name >>= checkQuantifiableType c
     Maybe _ a -> checkQuantifiableType c a
-    List _ a -> checkQuantifiableType c a
-    Map _ a b -> checkFiniteDimType c a >> checkQuantifiableType c b
+    List ann n a -> checkCardinality ann n >> checkQuantifiableType c a
+    Map ann n a b -> checkCardinality ann n
+      >> checkFiniteDimType c a
+      >> checkQuantifiableType c b
 
 
 checkFiniteDimType :: ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
 checkFiniteDimType c t =
   case t of
     Prop ann -> Left (ErrorMessage ann "expected a finite-dimensional type but got Prop")
-    F _ a b -> checkFiniteDimType c a >> checkFiniteDimType c b
+    F ann n a b -> checkMaybeCardinality ann n
+      >> checkFiniteDimType c a
+      >> checkFiniteDimType c b
     N _ -> return ()
     Z _ -> return ()
     Fin ann n -> checkFinType ann n
@@ -106,35 +114,47 @@ checkFiniteDimType c t =
     Coproduct _ a b -> checkFiniteDimType c a >> checkFiniteDimType c b
     NamedType ann name -> getNamedType c ann name >>= checkFiniteDimType c
     Maybe _ a -> checkFiniteDimType c a
-    List _ a -> checkFiniteDimType c a
-    Map _ a b -> checkFiniteDimType c a >> checkFiniteDimType c b
+    List ann n a -> checkCardinality ann n >> checkFiniteDimType c a
+    Map ann n a b -> checkCardinality ann n
+      >> checkFiniteDimType c a
+      >> checkFiniteDimType c b
 
 
-checkTypeEquality :: Show ann => ValidContext ann -> ann -> Type ann -> Type ann -> Either (ErrorMessage ann) ()
-checkTypeEquality _ _ (Prop _) (Prop _) = return ()
-checkTypeEquality c ann (F _ a b) (F _ a' b') =
-  checkTypeEquality c ann a a' >> checkTypeEquality c ann b b'
-checkTypeEquality _ _ (N _) (N _) = return ()
-checkTypeEquality _ _ (Z _) (Z _) = return ()
-checkTypeEquality _ ann (Fin _ n) (Fin _ n') =
-  if n == n'
+checkTypeInclusion :: Show ann => ValidContext ann -> ann -> Type ann -> Type ann -> Either (ErrorMessage ann) ()
+checkTypeInclusion _ _ (Prop _) (Prop _) = return ()
+checkTypeInclusion c ann (F _ _ a b) (F _ Nothing a' b') =
+  checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
+checkTypeInclusion _ ann (F _ Nothing _ _) (F _ (Just _) _ _) =
+  Left (ErrorMessage ann "function type cardinality mismatch")
+checkTypeInclusion c ann (F _ (Just n) a b) (F _ (Just n') a' b') =
+  if n <= n'
+  then checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
+  else Left (ErrorMessage ann "function type cardinality mismatch")
+checkTypeInclusion _ _ (N _) (N _) = return ()
+checkTypeInclusion _ _ (Z _) (Z _) = return ()
+checkTypeInclusion _ ann (Fin _ n) (Fin _ n') =
+  if n <= n'
   then return ()
   else Left (ErrorMessage ann "finite type cardinality mismatch")
-checkTypeEquality c ann (Product _ a b) (Product _ a' b') =
-  checkTypeEquality c ann a a' >> checkTypeEquality c ann b b'
-checkTypeEquality c ann (Coproduct _ a b) (Coproduct _ a' b') =
-  checkTypeEquality c ann a a' >> checkTypeEquality c ann b b'
-checkTypeEquality _ ann (NamedType _ name) (NamedType _ name') =
+checkTypeInclusion c ann (Product _ a b) (Product _ a' b') =
+  checkTypeInclusion c ann a a' >> checkTypeInclusion c ann b b'
+checkTypeInclusion c ann (Coproduct _ a b) (Coproduct _ a' b') =
+  checkTypeInclusion c ann a a' >> checkTypeInclusion c ann b b'
+checkTypeInclusion _ ann (NamedType _ name) (NamedType _ name') =
   if name == name'
   then return ()
   else Left (ErrorMessage ann ("type mismatch: " <> pack (show name) <> " and " <> pack (show name')))
-checkTypeEquality c ann (Maybe _ a) (Maybe _ b) =
-  checkTypeEquality c ann a b
-checkTypeEquality c ann (List _ a) (List _ b) =
-  checkTypeEquality c ann a b
-checkTypeEquality c ann (Map _ a b) (Map _ a' b') =
-  checkTypeEquality c ann a a' >> checkTypeEquality c ann b b'
-checkTypeEquality _ ann t t' =
+checkTypeInclusion c ann (Maybe _ a) (Maybe _ b) =
+  checkTypeInclusion c ann a b
+checkTypeInclusion c ann (List _ n a) (List _ m b) =
+  if n <= m
+  then checkTypeInclusion c ann a b
+  else Left (ErrorMessage ann "list type cardinality mismatch")
+checkTypeInclusion c ann (Map _ n a b) (Map _ n' a' b') =
+  if n <= n'
+  then checkTypeInclusion c ann a a' >> checkTypeInclusion c ann b b'
+  else Left (ErrorMessage ann "map type cardinality mismatch")
+checkTypeInclusion _ ann t t' =
   Left . ErrorMessage ann $ "type mismatch: " <> pack (show t) <> " and " <> pack (show t')
 
 
@@ -143,23 +163,27 @@ checkTerm c t x =
   case x of
     NamedTerm ann name ->
       case getDeclaration c name of
-        Just (Defined t' _) -> checkTypeEquality c ann t t'
-        Just (FreeVariable t') -> checkTypeEquality c ann t t'
+        Just (Defined t' _) -> checkTypeInclusion c ann t t'
+        Just (FreeVariable t') -> checkTypeInclusion c ann t t'
         Just (Data _) -> Left (ErrorMessage ann "expected a term but got a type")
         Nothing -> Left (ErrorMessage ann "reference to undefined name")
-    AddN ann -> checkTypeEquality c ann t (F ann (N ann) (F ann (N ann) (N ann)))
-    MulN ann -> checkTypeEquality c ann t (F ann (N ann) (F ann (N ann) (N ann)))
+    AddN ann -> checkTypeInclusion c ann t
+       (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
+    MulN ann -> checkTypeInclusion c ann t
+       (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
     ConstN ann n -> do
-      checkTypeEquality c ann t (N ann)
+      checkTypeInclusion c ann t (N ann)
       if n >= 0
         then return ()
         else Left (ErrorMessage ann "expected a natural number but got a negative integer")
-    AddZ ann -> checkTypeEquality c ann t (F ann (Z ann) (F ann (Z ann) (Z ann)))
-    MulZ ann -> checkTypeEquality c ann t (F ann (Z ann) (F ann (Z ann) (Z ann)))
-    ConstZ ann _ -> checkTypeEquality c ann t (Z ann)
+    AddZ ann -> checkTypeInclusion c ann t
+      (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
+    MulZ ann -> checkTypeInclusion c ann t
+      (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
+    ConstZ ann _ -> checkTypeInclusion c ann t (Z ann)
     Cast ann ->
       case t of
-        F _ a b -> checkTypeIsNumeric c a >> checkTypeIsNumeric c b
+        F _ _ a b -> checkTypeIsNumeric c a >> checkTypeIsNumeric c b
         a -> Left . ErrorMessage ann $ "expected a " <> pack (show a) <> " but got cast"
     ConstFin ann n ->
       case t of
@@ -172,42 +196,42 @@ checkTerm c t x =
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t) <> " but got a constant of a finite type"
     Pair ann0 ->
       case t of
-        F ann1 a (F ann2 b (Product _ a' b')) -> do
-          checkTypeEquality c ann1 a a'
-          checkTypeEquality c ann2 b b'
+        F ann1 _ a (F ann2 _ b (Product _ a' b')) -> do
+          checkTypeInclusion c ann1 a a'
+          checkTypeInclusion c ann2 b b'
         _ -> Left . ErrorMessage ann0 $ "expected a " <> pack (show t) <> " but got the pairing function"
     Pi1 ann0 ->
       case t of
-        F ann1 (Product _ a _) a' -> checkTypeEquality c ann1 a a'
+        F ann1 _ (Product _ a _) a' -> checkTypeInclusion c ann1 a a'
         _ -> Left . ErrorMessage ann0 $ "expected a " <> pack (show t) <> " but got pi1"
     Pi2 ann0 ->
       case t of
-        F ann1 (Product _ _ b) b' -> checkTypeEquality c ann1 b b'
+        F ann1 _ (Product _ _ b) b' -> checkTypeInclusion c ann1 b b'
         _ -> Left . ErrorMessage ann0 $ "expected a " <> pack (show t) <> " but got pi2"
     Iota1 ann0 ->
       case t of
-        F ann1 a (Coproduct _ a' _) -> checkTypeEquality c ann1 a a'
+        F ann1 _ a (Coproduct _ a' _) -> checkTypeInclusion c ann1 a a'
         _ -> Left . ErrorMessage ann0 $ "expected a " <> pack (show t) <> " but got iota1"
     Iota2 ann0 ->
       case t of
-        F ann1 b (Coproduct _ _ b') -> checkTypeEquality c ann1 b b'
+        F ann1 _ b (Coproduct _ _ b') -> checkTypeInclusion c ann1 b b'
         _ -> Left . ErrorMessage ann0 $ "expected a " <> pack (show t) <> " but got iota1"
     FunctionProduct _ f g ->
       case t of
-        F ann1 a (Product _ b d) -> do
-          checkTerm c (F ann1 a b) f
-          checkTerm c (F ann1 a d) g
+        F ann1 n a (Product _ b d) -> do
+          checkTerm c (F ann1 n a b) f
+          checkTerm c (F ann1 n a d) g
         _ -> genericErrorMessage
     FunctionCoproduct _ f g ->
       case t of
-        F ann1 (Coproduct _ a b) d -> do
-          checkTerm c (F ann1 a d) f
-          checkTerm c (F ann1 b d) g
+        F ann1 n (Coproduct _ a b) d -> do
+          checkTerm c (F ann1 n a d) f
+          checkTerm c (F ann1 n b d) g
         _ -> genericErrorMessage
     Lambda ann varName varType def ->
       case t of
-        F _ a b -> do
-          checkTypeEquality c ann a varType
+        F _ _ a b -> do
+          checkTypeInclusion c ann a varType
           c' <- addToContext c (varName, FreeVariable varType)
           checkTerm c' b def
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
@@ -220,24 +244,24 @@ checkTerm c t x =
       case inferType c f of
         Left _ -> do
           a <- inferType c y
-          checkTerm c (F ann a t) f
-        Right (F _ a b) -> do
+          checkTerm c (F ann Nothing a t) f
+        Right (F _ _ a b) -> do
           checkTerm c a y
-          checkTypeEquality c ann t b
+          checkTypeInclusion c ann t b
         Right _ -> Left (ErrorMessage ann "function application head is not a function")
     To ann name -> do
       a <- getNamedType c ann name
-      checkTypeEquality c ann t (F ann a (NamedType ann name))
+      checkTypeInclusion c ann t (F ann Nothing a (NamedType ann name))
     From ann name -> do
       a <- getNamedType c ann name
-      checkTypeEquality c ann t (F ann (NamedType ann name) a)
+      checkTypeInclusion c ann t (F ann Nothing (NamedType ann name) a)
     Let _ varName varType varDef body -> do
       checkType c varType
       c' <- addToContext c (varName, Defined varType varDef)
       checkTerm c' t body
     Just' ann ->
       case t of
-        F _ a (Maybe _ a') -> checkTypeEquality c ann a a'
+        F _ _ a (Maybe _ a') -> checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
     Nothing' _ ->
       case t of
@@ -245,35 +269,37 @@ checkTerm c t x =
         _ -> genericErrorMessage
     Maybe' ann f ->
       case t of
-        F _ b (F _ (Maybe _ a) b') -> do
-          checkTypeEquality c ann b b'
-          checkTerm c (F ann a b) f
+        F _ n b (F _ _ (Maybe _ a) b') -> do
+          checkTypeInclusion c ann b b'
+          checkTerm c (F ann n a b) f
         _ -> genericErrorMessage
     Exists ann ->
       case t of
-        F _ (Maybe _ a) a' -> checkTypeEquality c ann a a'
+        F _ _ (Maybe _ a) a' -> checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
     Length _ ->
       case t of
-        F _ (List _ _) (N _) -> return ()
+        F _ _ (List _ _ _) (N _) -> return ()
         _ -> genericErrorMessage
     Nth ann ->
       case t of
-        F _ (List _ a) (F _ (N _) a') -> checkTypeEquality c ann a a'
+        F _ _ (List _ _ a) (F _ _ (N _) a') -> checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
     ListPi1 ann ->
       case t of
-        F _ (List _ (Product _ a _)) (List _ a') -> checkTypeEquality c ann a a'
+        F _ _ (List _ _ (Product _ a _)) (List _ _ a') ->
+          checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
     ListPi2 ann ->
       case t of
-        F _ (List _ (Product _ _ b)) (List _ b') -> checkTypeEquality c ann b b'
+        F _ _ (List _ _ (Product _ _ b)) (List _ _ b') ->
+          checkTypeInclusion c ann b b'
         _ -> genericErrorMessage
     ListTo ann name -> do
       a <- getNamedType c ann name
       case t of
-        F _ (List _ a') (List _ (NamedType _ name')) -> do
-          checkTypeEquality c ann a a'
+        F _ _ (List _ _ a') (List _ _ (NamedType _ name')) -> do
+          checkTypeInclusion c ann a a'
           if name == name'
             then return ()
             else genericErrorMessage
@@ -281,77 +307,77 @@ checkTerm c t x =
     ListFrom ann name -> do
       a <- getNamedType c ann name
       case t of
-        F _ (List _ (NamedType _ name')) (List _ a') -> do
-          checkTypeEquality c ann a a'
+        F _ _ (List _ _ (NamedType _ name')) (List _ _ a') -> do
+          checkTypeInclusion c ann a a'
           if name == name'
             then return ()
             else genericErrorMessage
         _ -> genericErrorMessage
     ListLength _ ->
       case t of
-        F _ (List _ (List _ _)) (List _ (N _)) -> return ()
+        F _ _ (List _ _ (List _ _ _)) (List _ _ (N _)) -> return ()
         _ -> genericErrorMessage
     ListMaybePi1 ann ->
       case t of
-        F _ (List _ (Maybe _ (Product _ a _))) (List _ (Maybe _ a')) ->
-          checkTypeEquality c ann a a'
+        F _ _ (List _ _ (Maybe _ (Product _ a _))) (List _ _ (Maybe _ a')) ->
+          checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
     ListMaybePi2 ann ->
       case t of
-        F _ (List _ (Maybe _ (Product _ _ b))) (List _ (Maybe _ b')) ->
-          checkTypeEquality c ann b b'
+        F _ _ (List _ _ (Maybe _ (Product _ _ b))) (List _ _ (Maybe _ b')) ->
+          checkTypeInclusion c ann b b'
         _ -> genericErrorMessage
     ListMaybeLength _ ->
       case t of
-        F _ (List _ (Maybe _ (List _ _))) (List _ (Maybe _ (N _))) -> return ()
+        F _ _ (List _ _ (Maybe _ (List _ _ _))) (List _ _ (Maybe _ (N _))) -> return ()
         _ -> genericErrorMessage
     Sum ann _ ->
       case t of
-        F _ (List _ (Maybe _ a)) a' -> do
-          checkTypeEquality c ann a a'
+        F _ _ (List _ _ (Maybe _ a)) a' -> do
+          checkTypeInclusion c ann a a'
           checkTypeIsNumeric c a
-        F _ (List _ (List _ (Maybe _ a))) a' -> do
-          checkTypeEquality c ann a a'
+        F _ _ (List _ _ (List _ _ (Maybe _ a))) a' -> do
+          checkTypeInclusion c ann a a'
           checkTypeIsNumeric c a
-        F _ (List _ (List _ a)) a' -> do
-          checkTypeEquality c ann a a'
+        F _ _ (List _ _ (List _ _ a)) a' -> do
+          checkTypeInclusion c ann a a'
           checkTypeIsNumeric c a
-        F _ (List _ a) a' -> do
-         checkTypeEquality c ann a a'
+        F _ _ (List _ _ a) a' -> do
+         checkTypeInclusion c ann a a'
          checkTypeIsNumeric c a
-        F _ (Map _ _ b) b' -> do
-          checkTypeEquality c ann b b'
+        F _ _ (Map _ _ _ b) b' -> do
+          checkTypeInclusion c ann b b'
           checkTypeIsNumeric c b
         _ -> genericErrorMessage
     Lookup ann ->
       case t of
-        F _ a (F _ (Map _ a' b) (Maybe _ b')) -> do
-          checkTypeEquality c ann a a'
-          checkTypeEquality c ann b b'
+        F _ _ a (F _ _ (Map _ _ a' b) (Maybe _ b')) -> do
+          checkTypeInclusion c ann a a'
+          checkTypeInclusion c ann b b'
         _ -> genericErrorMessage
     Keys ann ->
       case t of
-        F _ (Map _ a _) (List _ a') ->
-          checkTypeEquality c ann a a'
+        F _ _ (Map _ _ a _) (List _ _ a') ->
+          checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
     MapPi1 ann ->
       case t of
-        F _ (Map _ a (Product _ b _)) (Map _ a' b') -> do
-          checkTypeEquality c ann a a'
-          checkTypeEquality c ann b b'
+        F _ _ (Map _ _ a (Product _ b _)) (Map _ _ a' b') -> do
+          checkTypeInclusion c ann a a'
+          checkTypeInclusion c ann b b'
         _ -> genericErrorMessage
     MapPi2 ann ->
       case t of
-        F _ (Map _ a (Product _ _ d)) (Map _ a' d') -> do
-          checkTypeEquality c ann a a'
-          checkTypeEquality c ann d d'
+        F _ _ (Map _ _ a (Product _ _ d)) (Map _ _ a' d') -> do
+          checkTypeInclusion c ann a a'
+          checkTypeInclusion c ann d d'
         _ -> genericErrorMessage
     MapTo ann name -> do
       a <- getNamedType c ann name
       case t of
-        F _ (Map _ a' b) (Map _ (NamedType _ name') b') -> do
-          checkTypeEquality c ann a a'
-          checkTypeEquality c ann b b'
+        F _ _ (Map _ _ a' b) (Map _ _ (NamedType _ name') b') -> do
+          checkTypeInclusion c ann a a'
+          checkTypeInclusion c ann b b'
           if name' == name
             then return ()
             else genericErrorMessage
@@ -359,22 +385,22 @@ checkTerm c t x =
     MapFrom ann name -> do
       a <- getNamedType c ann name
       case t of
-        F _ (Map _ (NamedType _ name') b) (Map _ a' b') -> do
-          checkTypeEquality c ann a a'
-          checkTypeEquality c ann b b'
+        F _ _ (Map _ _ (NamedType _ name') b) (Map _ _ a' b') -> do
+          checkTypeInclusion c ann a a'
+          checkTypeInclusion c ann b b'
           if name' == name
             then return ()
             else genericErrorMessage
         _ -> genericErrorMessage
     SumMapLength ann _ ->
       case t of
-        F _ (Map _ a (List _ _)) (Map _ a' (N _)) ->
-          checkTypeEquality c ann a a'
+        F _ _ (Map _ _ a (List _ _ _)) (Map _ _ a' (N _)) ->
+          checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
     SumListLookup _ann0 _ k ->
       case t of
-        F _ (List _ (Map ann1 a b)) b' -> do
-          checkTypeEquality c ann1 b b'
+        F _ _ (List _ _ (Map ann1 _ a b)) b' -> do
+          checkTypeInclusion c ann1 b b'
           checkTypeIsNumeric c b
           checkTerm c a k
         _ -> genericErrorMessage
@@ -450,7 +476,7 @@ checkBound
 checkBound c t bound =
   case t of
     Prop ann -> Left (ErrorMessage ann "cannot quantify over Prop")
-    F _ a b ->
+    F _ _ a b ->
       case bound of
         FunctionBound _ (DomainBound aBound) (CodomainBound bBound) -> do
           checkBound c a aBound
@@ -502,19 +528,16 @@ checkBound c t bound =
         MaybeBound _ (ValuesBound bound') -> checkBound c a bound'
         _ -> Left (ErrorMessage (boundAnnotation bound)
                      "expected a maybe bound")
-    List ann a ->
+    List _ _ a ->
       case bound of
-        ListBound _ (LengthBound lBound) (ValuesBound vBound) -> do
-          checkBound c (N ann) lBound
+        ListBound _ (ValuesBound vBound) -> do
           checkBound c a vBound
         _ -> Left (ErrorMessage (boundAnnotation bound)
                      "expected a list bound")
-    Map ann a b ->
+    Map _ _ a b ->
       case bound of
-        MapBound _ (LengthBound lBound)
-                   (KeysBound aBound)
+        MapBound _ (KeysBound aBound)
                    (ValuesBound bBound) -> do
-          checkBound c (N ann) lBound
           checkBound c a aBound
           checkBound c b bBound
         _ -> Left (ErrorMessage (boundAnnotation bound)
@@ -528,35 +551,35 @@ inferType c t =
     ConstN ann _ -> return (N ann)
     ConstZ ann _ -> return (Z ann)
     ConstFin ann _ -> Left (ErrorMessage ann "cannot infer cardinality of type of finite constant")
-    AddN ann -> return (F ann (N ann) (F ann (N ann) (N ann)))
-    MulN ann -> return (F ann (N ann) (F ann (N ann) (N ann)))
+    AddN ann -> return (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
+    MulN ann -> return (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
     Cast ann -> Left (ErrorMessage ann "cannot infer the type of cast from context")
     To ann name -> do
       a <- getNamedType c ann name
-      return (F ann a (NamedType ann name))
+      return (F ann Nothing a (NamedType ann name))
     From ann name -> do
       a <- getNamedType c ann name
-      return (F ann (NamedType ann name) a)
+      return (F ann Nothing (NamedType ann name) a)
     FunctionProduct ann f g -> do
       a <- inferType c f
       b <- inferType c g
       case (a, b) of
-        (F _ d e, F _ d' e') -> do
-          checkTypeEquality c ann d d'
-          return (F ann d (Product ann e e'))
+        (F _ n d e, F _ n' d' e') -> do
+          checkTypeInclusion c ann d d'
+          return (F ann (min <$> n <*> n') d (Product ann e e'))
         _ -> Left (ErrorMessage ann "ill-typed function product; one of the arguments is not a function")
     FunctionCoproduct ann f g -> do
       a <- inferType c f
       b <- inferType c g
       case (a, b) of
-        (F _ d e, F _ d' e') -> do
-          checkTypeEquality c ann e e'
-          return (F ann (Coproduct ann d d') e)
+        (F _ n d e, F _ m d' e') -> do
+          checkTypeInclusion c ann e e'
+          return (F ann (min <$> n <*> m) (Coproduct ann d d') e)
         _ -> Left (ErrorMessage ann "ill-typed function coproduct; one of the arguments is not a function")
     Maybe' ann f -> do
       a <- inferType c f
       case a of
-        F _ b d -> return (F ann d (F ann (Maybe ann b) d))
+        F _ n b d -> return (F ann n d (F ann n (Maybe ann b) d))
         _ -> Left . ErrorMessage ann $ "expected a function as the first argument to maybe but got a " <> pack (show a)
     Apply ann (Apply _ (Pair _) x) y -> do
       a <- inferType c x
@@ -581,54 +604,55 @@ inferType c t =
     Apply ann (Nth _) xs -> do
       a <- inferType c xs
       case a of
-        List _ b -> return (F ann (N ann) b)
+        List _ n b -> return (F ann (Just n) (N ann) b)
         _ -> Left (ErrorMessage ann "nth applied to a non-List")
     Apply ann (ListPi1 _) xs -> do
       a <- inferType c xs
       case a of
-        List _ (Product _ b _) -> return (List ann b)
+        List _ n (Product _ b _) -> return (List ann n b)
         _ -> Left (ErrorMessage ann "List(pi1) applied to a non-List or a List of non-tuples")
     Apply ann (ListPi2 _) xs -> do
       a <- inferType c xs
       case a of
-        List _ (Product _ _ b) -> return (List ann b)
+        List _ n (Product _ _ b) -> return (List ann n b)
         _ -> Left (ErrorMessage ann "List(pi2) applied to a non-List or a List of non-tuples")
     Apply ann (ListLength _) xs -> do
       a <- inferType c xs
       case a of
-        List _ (List _ _) -> return (List ann (N ann))
+        List _ n (List _ _ _) -> return (List ann n (N ann))
         _ -> Left (ErrorMessage ann "List(length) applied to a non-List-of-Lists")
     Apply ann (ListMaybePi1 _) xs -> do
       a <- inferType c xs
       case a of
-        List _ (Maybe _ (Product _ b _)) -> return (List ann (Maybe ann b))
+        List _ n (Maybe _ (Product _ b _)) -> return (List ann n (Maybe ann b))
         _ -> Left (ErrorMessage ann "List(Maybe(pi1)) applied to a non-List-of-Maybe-tuples")
     Apply ann (ListMaybePi2 _) xs -> do
       a <- inferType c xs
       case a of
-        List _ (Maybe _ (Product _ _ b)) -> return (List ann (Maybe ann b))
+        List _ n (Maybe _ (Product _ _ b)) -> return (List ann n (Maybe ann b))
         _ -> Left (ErrorMessage ann "List(Maybe(pi2)) applied to a non-List-of-Maybe-tuples")
     Apply ann (ListMaybeLength _) xs -> do
       a <- inferType c xs
       case a of
-        List _ (Maybe _ (List _ _)) -> return (List ann (Maybe ann (N ann)))
+        List _ n (Maybe _ (List _ _ _)) ->
+          return (List ann n (Maybe ann (N ann)))
         _ -> Left (ErrorMessage ann "List(Maybe(length)) applied to a non-List-of-Maybe-Lists")
     Apply ann (Sum _ _) xs -> do
       a <- inferType c xs
       case a of
-        List _ (Maybe _ b) -> do
+        List _ _ (Maybe _ b) -> do
           checkTypeIsNumeric c b
           return b
-        List _ (List _ (Maybe _ b)) -> do
+        List _ _ (List _ _ (Maybe _ b)) -> do
           checkTypeIsNumeric c b
           return b
-        List _ (List _ b) -> do
+        List _ _ (List _ _ b) -> do
           checkTypeIsNumeric c b
           return b
-        List _ b -> do
+        List _ _ b -> do
           checkTypeIsNumeric c b
           return b
-        Map _ _ b -> do
+        Map _ _ _ b -> do
           checkTypeIsNumeric c b
           return b
         _ -> Left (ErrorMessage ann "sum applied to a non-summable term")
@@ -636,44 +660,44 @@ inferType c t =
       a <- inferType c k
       b <- inferType c xs
       case b of
-        Map _ a' d -> do
-          checkTypeEquality c ann a a'
+        Map _ _ a' d -> do
+          checkTypeInclusion c ann a a'
           return (Maybe ann d)
         _ -> Left (ErrorMessage ann "lookup applied to a non-Map")
     Apply ann (Keys _) xs -> do
       a <- inferType c xs
       case a of
-        Map _ b _ -> return (List ann b)
+        Map _ n b _ -> return (List ann n b)
         _ -> Left (ErrorMessage ann "keys applied to a non-Map")
     Apply ann (MapPi1 _) xs -> do
       a <- inferType c xs
       case a of
-        Map _ b (Product _ d _) -> return (Map ann b d)
+        Map _ n b (Product _ d _) -> return (Map ann n b d)
         _ -> Left (ErrorMessage ann "Map(pi1) applied to a non-Map or a Map whose value type is not a Cartesian product")
     Apply ann (MapPi2 _) xs -> do
       a <- inferType c xs
       case a of
-        Map _ b (Product _ _ d) -> return (Map ann b d)
+        Map _ n b (Product _ _ d) -> return (Map ann n b d)
         _ -> Left (ErrorMessage ann "Map(pi2) applied to a non-Map or a Map whose value type is not a Cartesian product")
     Apply ann (SumMapLength _ _) xs -> do
       a <- inferType c xs
       case a of
-        Map _ _ (List _ _) -> return (N ann)
+        Map _ _ _ (List _ _ _) -> return (N ann)
         _ -> Left (ErrorMessage ann "sum.Map(length) applied to a non-Map-of-Lists")
     Apply ann (SumListLookup _ _ k) xs -> do
       a <- inferType c k
       b <- inferType c xs
       case b of
-        List _ (Map _ a' d) -> do
+        List _ _ (Map _ _ a' d) -> do
           checkTypeIsNumeric c d
-          checkTypeEquality c ann a a'
+          checkTypeInclusion c ann a a'
           return d
         _ -> Left (ErrorMessage ann "sum.List(lookup(_)) applied to a non-List-of-Maps")
     -- generic application inference for those cases not covered above
     Apply ann f x -> do
       a <- inferType c f
       case a of
-        F _ b d -> do
+        F _ _ b d -> do
           checkTerm c b x
           return d
         _ -> Left (ErrorMessage ann "function application head does not contain a function")
@@ -681,7 +705,7 @@ inferType c t =
       checkType c domain
       c' <- addToContext c (varName, FreeVariable domain)
       codomain <- inferType c' def
-      return (F ann domain codomain)
+      return (F ann Nothing domain codomain)
     Let _ varName varType def body -> do
       checkType c varType
       c' <- addToContext c (varName, Defined varType def)
@@ -746,3 +770,15 @@ checkTypeIsNumeric c t =
     Fin _ _ -> return ()
     NamedType ann name -> getNamedType c ann name >>= checkTypeIsNumeric c
     _ -> Left . ErrorMessage (typeAnnotation t) $ "expected a numeric type but got " <> pack (show t)
+
+
+checkCardinality :: ann -> Cardinality -> Either (ErrorMessage ann) ()
+checkCardinality ann (Cardinality n) =
+  if n > 0
+  then pure ()
+  else Left (ErrorMessage ann "type is empty due to a non-positive cardinality")
+
+
+checkMaybeCardinality :: ann -> Maybe Cardinality -> Either (ErrorMessage ann) ()
+checkMaybeCardinality _ Nothing = pure ()
+checkMaybeCardinality ann (Just n) = checkCardinality ann n

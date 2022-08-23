@@ -102,7 +102,7 @@ addFreeVariableMapping freeVariable = do
                         (RightMapping bMap)
           addMapping freeVariable mapping
           return mapping
-        F _ a b -> do
+        F _ _ a b -> do
           aSym <- addGensym a
           bSym <- addGensym b
           aMap <- addFreeVariableMapping aSym
@@ -127,7 +127,7 @@ addFreeVariableMapping freeVariable = do
                 (ValuesMapping aMap)
           addMapping freeVariable mapping
           return mapping
-        List _ a -> do
+        List _ _ a -> do
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
           l <- ScalarMapping <$> getFreeS11NameM (Arity 0)
@@ -136,7 +136,7 @@ addFreeVariableMapping freeVariable = do
                 (ValuesMapping (mapAritiesInMapping (+1) aMap))
           addMapping freeVariable mapping 
           return mapping
-        Map ann a b -> do
+        Map ann _ a b -> do
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
           aDim <- lift . except

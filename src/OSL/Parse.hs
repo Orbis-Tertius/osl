@@ -11,8 +11,9 @@ import Data.Text (Text, pack, unpack)
 import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try, choice, getPosition, option, many1, optionMaybe)
 import qualified Text.Parsec.Prim as Prim
 
+import OSL.Bound (boundAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.OSL (Context (..), Name, Declaration (..), Term (..), Type (..), Bound (..), SumLength (..), LeftBound (..), RightBound (..), Cardinality (..))
+import OSL.Types.OSL (Context (..), Name, Declaration (..), Term (..), Type (..), Bound (..), SumLength (..), LeftBound (..), RightBound (..), Cardinality (..), ValuesBound (..), KeysBound (..), DomainBound (..), CodomainBound (..))
 import qualified OSL.Types.Keyword as K
 import OSL.Types.Token (Token)
 import qualified OSL.Types.Token as T
@@ -107,7 +108,7 @@ type0 = do
   t <- type1
   rest <- option Nothing $ do
     consumeExact_ T.ThinArrow
-    n <- cardinality
+    n <- optionMaybe cardinality
     Just . (n,) <$> type0
   case rest of
     Nothing -> return t
@@ -246,18 +247,139 @@ quantifier tok ctor = do
   consumeExact_ T.Colon
   varType <- type0
   consumeExact_ T.Less
-  varBound <- bound
+  varBound <- bound0
   consumeExact_ T.Comma
   q <- term0
   return (ctor p varName varType varBound q)
 
 
-bound :: Parser (Bound SourcePos)
-bound = todo
+bound0 :: Parser (Bound SourcePos)
+bound0 = do
+  b0 <- bound1
+  bs <- option Nothing
+    (Just <$> (productBoundTail
+          <|> coproductBoundTail
+          <|> functionBoundTail))
+  case bs of
+    Nothing -> pure b0
+    Just bs' -> pure (appendBoundTail b0 bs')
 
 
-todo :: a
-todo = todo
+-- The bound tail takes a constructor which takes the head
+-- and returns the whole bound.
+data BoundTail =
+    ProductBoundTail [Bound SourcePos]
+  | CoproductBoundTail [Bound SourcePos]
+  | FunctionBoundTail [Bound SourcePos]
+
+
+appendBoundTail :: Bound SourcePos -> BoundTail -> Bound SourcePos
+appendBoundTail b0 =
+  \case
+    ProductBoundTail bs ->
+      foldl (\bAcc bNext ->
+        ProductBound
+        (boundAnnotation bAcc)
+        (LeftBound bAcc)
+        (RightBound bNext))
+      b0 bs
+    CoproductBoundTail bs ->
+      foldl (\bAcc bNext ->
+        CoproductBound
+        (boundAnnotation bAcc)
+        (LeftBound bAcc)
+        (RightBound bNext))
+      b0 bs
+    FunctionBoundTail bs ->
+      foldl (\bAcc bNext ->
+        FunctionBound
+        (boundAnnotation bAcc)
+        (DomainBound bAcc)
+        (CodomainBound bNext))
+      b0 bs
+
+
+productBoundTail :: Parser BoundTail
+productBoundTail = boundTail T.ProductOp ProductBoundTail
+
+
+coproductBoundTail :: Parser BoundTail
+coproductBoundTail = boundTail T.CoproductOp CoproductBoundTail
+
+
+functionBoundTail :: Parser BoundTail
+functionBoundTail = boundTail T.ThinArrow FunctionBoundTail
+
+
+boundTail
+  :: T.Token
+  -> ([Bound SourcePos] -> BoundTail)
+  -> Parser BoundTail
+boundTail op ctor =
+  ctor <$> many1 (consumeExact_ op >> bound1)
+
+
+bound1 :: Parser (Bound SourcePos)
+bound1 =
+  choice
+  $
+  [ scalarBound
+  , listBound
+  , maybeBound
+  , mapBound
+  , toBound
+  , parenthesizedBound
+  ]
+
+
+parenthesizedBound :: Parser (Bound SourcePos)
+parenthesizedBound = do
+  consumeExact_ T.OpenParen
+  b <- bound0
+  consumeExact_ T.CloseParen
+  pure b
+
+
+scalarBound :: Parser (Bound SourcePos)
+scalarBound = ScalarBound <$> getPosition <*> term1
+
+
+listBound :: Parser (Bound SourcePos)
+listBound =
+  ListBound
+    <$> getPosition
+    <*> (ValuesBound <$> parenthesizedBound)
+
+
+maybeBound :: Parser (Bound SourcePos)
+maybeBound =
+  MaybeBound 
+    <$> getPosition
+    <*> (ValuesBound <$> parenthesizedBound)
+
+
+mapBound :: Parser (Bound SourcePos)
+mapBound =
+  MapBound
+    <$> getPosition
+    <*> (KeysBound <$> (consumeExact_ T.OpenParen >> bound0))
+    <*> (ValuesBound <$> (consumeExact_ T.Comma
+          >> bound0 `preceding` consumeExact_ T.CloseParen))
+
+
+preceding :: Monad m => m a -> m () -> m a
+preceding f g = do
+  r <- f
+  g
+  pure r
+
+
+toBound :: Parser (Bound SourcePos)
+toBound =
+  ToBound
+    <$> getPosition
+    <*> (consumeExact_ T.OpenParen >> name)
+    <*> (consumeExact_ T.Comma >> bound0 `preceding` consumeExact_ T.CloseParen)
 
 
 lambda :: Parser (Term SourcePos)

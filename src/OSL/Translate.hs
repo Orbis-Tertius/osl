@@ -110,19 +110,19 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a coproduct")
     OSL.FunctionProduct ann f g ->
       case termType of
-        OSL.F ann' a (OSL.Product _ b c) ->
+        OSL.F ann' n a (OSL.Product _ b c) ->
           Mapping
           <$> (ProductMapping
-            <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' a b) f)
-            <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' a c) g))
+            <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' n a b) f)
+            <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' n a c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     OSL.FunctionCoproduct ann f g ->
       case termType of
-        OSL.F ann' a (OSL.Coproduct _ b c) ->
+        OSL.F ann' n a (OSL.Coproduct _ b c) ->
           Mapping
           <$> (FunctionCoproductMapping
-            <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' a b) f)
-            <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' a c) g))
+            <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' n a b) f)
+            <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' n a c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     OSL.Apply _ (OSL.Lambda _ varName varType body) x -> do
       xM <- translateToMapping ctx varType x
@@ -152,7 +152,7 @@ translate ctx@(TranslationContext
     OSL.Apply ann (OSL.Apply _ (OSL.Maybe' ann' f) b) a -> do
       fType <- inferType decls f
       case fType of
-        OSL.F _ aType _ -> do
+        OSL.F _ _ aType _ -> do
           aM <- translateToMapping ctx (OSL.Maybe ann aType) a
           bT <- translateToTerm ctx termType b
           fM <- translateToMapping ctx fType f
@@ -183,7 +183,8 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a list")
     OSL.Apply ann (OSL.Apply _ (OSL.Nth _) xs) i -> do
       iT <- translateToTerm ctx (OSL.N ann) i
-      xsM <- translateToMapping ctx (OSL.List ann termType) xs
+      xsType <- inferType decls xs
+      xsM <- translateToMapping ctx xsType xs
       Mapping <$> applyMappings ann xsM (const iT <$> xsM)
     OSL.Apply ann (OSL.ListPi1 _) xs -> do
       xsType <- inferType decls xs
@@ -202,13 +203,19 @@ translate ctx@(TranslationContext
     OSL.Apply _ (OSL.ListTo ann' name) xs -> do
       case getDeclaration decls name of
         Just (OSL.Data a) -> do
-          Mapping <$> translateToMapping ctx (OSL.List ann' a) xs
+          xsType <- inferType decls xs
+          case xsType of
+            OSL.List _ n _ ->
+              Mapping <$> translateToMapping ctx (OSL.List ann' n a) xs
         Just _ -> Left (ErrorMessage ann' "expected the name of a type")
         Nothing -> Left (ErrorMessage ann' "undefined name")
     OSL.Apply _ (OSL.ListFrom ann' name) xs ->
       case getDeclaration decls name of
         Just (OSL.Data a) -> do
-          Mapping <$> translateToMapping ctx (OSL.List ann' a) xs
+          xsType <- inferType decls xs
+          case xsType of
+            OSL.List _ n _ ->
+              Mapping <$> translateToMapping ctx (OSL.List ann' n a) xs
         Just _ -> Left (ErrorMessage ann' "expected the name of a type")
         Nothing -> Left (ErrorMessage ann' "undefined name")
     OSL.Apply _ (OSL.ListLength _) xs -> do
@@ -259,7 +266,7 @@ translate ctx@(TranslationContext
     OSL.Apply ann (OSL.Sum _ (OSL.SumLength n)) xs -> do
       xsType <- inferType decls xs
       case xsType of
-        OSL.List _ _ -> do
+        OSL.List _ _ _ -> do
           xsM <- translateToMapping ctx xsType xs
           case xsM of
             ListMapping (LengthMapping (ScalarMapping lT))
@@ -272,7 +279,7 @@ translate ctx@(TranslationContext
     OSL.Apply ann (OSL.Apply _ (OSL.Lookup _) k) xs -> do
       xsType <- inferType decls xs
       case xsType of
-        OSL.Map _ kType vType -> do
+        OSL.Map _ _ kType vType -> do
           xsM <- translateToMapping ctx xsType xs
           kM <- translateToMapping ctx kType k
           case xsM of
@@ -285,7 +292,7 @@ translate ctx@(TranslationContext
     OSL.Apply ann (OSL.MapPi1 _) xs -> do
       xsType <- inferType decls xs
       case xsType of
-        OSL.Map _ _ (OSL.Product _ aType bType) -> do
+        OSL.Map _ _ _ (OSL.Product _ aType bType) -> do
           xsM <- translateToMapping ctx xsType xs
           case xsM of
             MapMapping lM kM iM (ValuesMapping
@@ -294,7 +301,7 @@ translate ctx@(TranslationContext
     OSL.Apply ann (OSL.MapPi2 _) xs -> do
       xsType <- inferType decls xs
       case xsType of
-        OSL.Map _ _ (OSL.Product _ aType bType) -> do
+        OSL.Map _ _ _ (OSL.Product _ aType bType) -> do
           xsM <- translateToMapping ctx xsType xs
           case xsM of
             MapMapping lM kM iM (ValuesMapping
@@ -309,7 +316,7 @@ translate ctx@(TranslationContext
     OSL.Apply _ (OSL.Keys _) xs -> do
       xsType <- inferType decls xs
       case xsType of
-        OSL.Map _ kType vType -> do
+        OSL.Map _ _ kType vType -> do
           xsM <- translateToMapping ctx xsType xs
           case xsM of
             MapMapping lM (KeysMapping kM) _ _ ->
@@ -319,7 +326,7 @@ translate ctx@(TranslationContext
     OSL.Apply ann f x -> do
       fType <- inferType decls f
       case fType of
-        OSL.F _ a _ -> do
+        OSL.F _ _ a _ -> do
           fM <- translateToMapping ctx fType f
           xM <- translateToMapping ctx a x
           Mapping <$> applyMappings ann fM xM
@@ -401,7 +408,7 @@ getArbitraryMapping
 getArbitraryMapping ctx =
   \case
     OSL.Prop ann -> Left (ErrorMessage ann "expected a finite-dimensional type; got a Prop")
-    OSL.F ann _ _ -> Left (ErrorMessage ann "expected a finite-dimensional type; got a function")
+    OSL.F ann _ _ _ -> Left (ErrorMessage ann "expected a finite-dimensional type; got a function")
     OSL.N _ -> return $ ScalarMapping (S11.Const 0)
     OSL.Z _ -> return $ ScalarMapping (S11.Const 0)
     OSL.Fin _ _ -> return $ ScalarMapping (S11.Const 0)
@@ -421,8 +428,8 @@ getArbitraryMapping ctx =
         Just (OSL.Data b) -> rec b
         Just _ -> Left (ErrorMessage ann "expected the name of a type")
         Nothing -> Left (ErrorMessage ann "undefined name")
-    OSL.List ann _ -> Left (ErrorMessage ann "expected a finite-dimensional type; got a List")
-    OSL.Map ann _ _ -> Left (ErrorMessage ann "expected a finite-dimensional type; got a Map")
+    OSL.List ann _ _ -> Left (ErrorMessage ann "expected a finite-dimensional type; got a List")
+    OSL.Map ann _ _ _ -> Left (ErrorMessage ann "expected a finite-dimensional type; got a Map")
   where
     rec = getArbitraryMapping ctx      
 
@@ -533,17 +540,19 @@ translateBound ctx@(TranslationContext decls _) t =
     OSL.FunctionBound ann (OSL.DomainBound aBound)
                           (OSL.CodomainBound bBound) ->
       case t of
-        OSL.F _ a b ->
+        OSL.F _ _ a b ->
           (<>) <$> translateBound ctx a aBound
                <*> translateBound ctx b bBound
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
-    OSL.ListBound ann (OSL.LengthBound lBound) (OSL.ValuesBound vBound) ->
+    OSL.ListBound ann (OSL.ValuesBound vBound) ->
       case t of
-        OSL.List ann' a ->
+        OSL.List ann' n'@(OSL.Cardinality n) a ->
+          let lBound = OSL.ScalarBound ann' (OSL.ConstN ann n) in
           (<>) <$> translateBound ctx (OSL.N ann') lBound
-               <*> translateBound ctx (OSL.F ann' (OSL.N ann') a)
-                   (OSL.FunctionBound ann (OSL.DomainBound lBound)
-                                          (OSL.CodomainBound vBound))
+               <*> translateBound ctx (OSL.F ann' (Just n') (OSL.N ann') a)
+                   (OSL.FunctionBound ann
+                     (OSL.DomainBound lBound)
+                     (OSL.CodomainBound vBound))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
     OSL.MaybeBound ann (OSL.ValuesBound vBound) ->
       case t of
@@ -551,21 +560,20 @@ translateBound ctx@(TranslationContext decls _) t =
           ((S11.Const 2):) <$> translateBound ctx a vBound
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
     OSL.MapBound ann
-        (OSL.LengthBound lBound)
         (OSL.KeysBound kBound)
         (OSL.ValuesBound vBound) ->
       case t of
-        OSL.Map ann' k v ->
+        OSL.Map ann' n'@(OSL.Cardinality n) k v ->
           mconcatM
-          [ translateBound ctx (OSL.N ann') lBound
-          , translateBound ctx (OSL.F ann' (OSL.N ann') k)
+          [ translateBound ctx (OSL.N ann') (OSL.ScalarBound ann' (OSL.ConstN ann' n))
+          , translateBound ctx (OSL.F ann' (Just n') (OSL.N ann') k)
               (OSL.FunctionBound ann'
-                 (OSL.DomainBound lBound)
+                 (OSL.DomainBound (OSL.ScalarBound ann' (OSL.ConstN ann' n)))
                  (OSL.CodomainBound kBound))
-          , translateBound ctx (OSL.F ann' k (OSL.N ann'))
+          , translateBound ctx (OSL.F ann' (Just n') k (OSL.N ann'))
               (OSL.FunctionBound ann' (OSL.DomainBound kBound)
                 (OSL.CodomainBound (OSL.ScalarBound ann' (OSL.ConstN ann' 2))))
-          , translateBound ctx (OSL.F ann' k v)
+          , translateBound ctx (OSL.F ann' (Just n') k v)
               (OSL.FunctionBound ann'
                 (OSL.DomainBound kBound)
                 (OSL.CodomainBound vBound))

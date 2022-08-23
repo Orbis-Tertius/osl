@@ -15,7 +15,6 @@ module OSL.Types.OSL
   , DomainBound (..)
   , CodomainBound (..)
   , ValuesBound (..)
-  , LengthBound (..)
   , KeysBound (..)
   , Declaration (..)
   , Context (..)
@@ -42,12 +41,12 @@ instance Ord Name where
 
 -- The maximum number of elements of a collection type.
 newtype Cardinality = Cardinality Integer
-  deriving newtype Show
+  deriving newtype (Eq, Ord, Show)
 
 
 data Type ann =
     Prop ann
-  | F ann Cardinality (Type ann) (Type ann) -- functions
+  | F ann (Maybe Cardinality) (Type ann) (Type ann) -- functions
   | N ann -- natural numbers
   | Z ann -- integers
   | Fin ann Integer
@@ -61,7 +60,8 @@ data Type ann =
 
 instance Show (Type ann) where
   show (Prop _) = "Prop"
-  show (F _ n a b) = "(" <> show a <> " ->^" <> show n <> " " <> show b <> ")"
+  show (F _ (Just n) a b) = "(" <> show a <> " ->^" <> show n <> " " <> show b <> ")"
+  show (F _ Nothing a b) = "(" <> show a <> " -> " <> show b <> ")"
   show (N _) = "N"
   show (Z _) = "Z"
   show (Fin _ n) = "Fin(" <> show n <> ")"
@@ -139,9 +139,9 @@ data Bound ann =
   | ProductBound ann (LeftBound ann) (RightBound ann)
   | CoproductBound ann (LeftBound ann) (RightBound ann)
   | FunctionBound ann (DomainBound ann) (CodomainBound ann)
-  | ListBound ann (LengthBound ann) (ValuesBound ann)
+  | ListBound ann (ValuesBound ann)
   | MaybeBound ann (ValuesBound ann)
-  | MapBound ann (LengthBound ann) (KeysBound ann) (ValuesBound ann)
+  | MapBound ann (KeysBound ann) (ValuesBound ann)
   | ToBound ann Name (Bound ann)
   deriving Show
 
@@ -159,10 +159,6 @@ newtype DomainBound ann = DomainBound { unDomainBound :: Bound ann }
 
 
 newtype CodomainBound ann = CodomainBound { unCodomainBound :: Bound ann }
-  deriving Show
-
-
-newtype LengthBound ann = LengthBound { unLengthBound :: Bound ann }
   deriving Show
 
 
