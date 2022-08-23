@@ -15,7 +15,6 @@ import Data.Text (pack)
 import OSL.BuildTranslationContext (buildTranslationContext')
 import OSL.Sigma11 (incrementDeBruijnIndices)
 import OSL.Term (termAnnotation)
-import OSL.Type (typeCardinality)
 import OSL.TranslationContext (mappingDimensions)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
@@ -201,30 +200,33 @@ translate ctx@(TranslationContext
         ListMapping lM (ValuesMapping (ProductMapping _ (RightMapping bM))) ->
           pure . Mapping $ ListMapping lM (ValuesMapping bM)
         _ -> Left . ErrorMessage ann $ "expected a list of pairs"
-    OSL.Apply _ (OSL.ListTo ann' name) xs -> do
+    OSL.Apply ann (OSL.ListTo ann' name) xs -> do
       case getDeclaration decls name of
         Just (OSL.Data a) -> do
           xsType <- inferType decls xs
           case xsType of
             OSL.List _ n _ ->
               Mapping <$> translateToMapping ctx (OSL.List ann' n a) xs
+            _ -> Left (ErrorMessage ann "expected a list")
         Just _ -> Left (ErrorMessage ann' "expected the name of a type")
         Nothing -> Left (ErrorMessage ann' "undefined name")
-    OSL.Apply _ (OSL.ListFrom ann' name) xs ->
+    OSL.Apply ann (OSL.ListFrom ann' name) xs ->
       case getDeclaration decls name of
         Just (OSL.Data a) -> do
           xsType <- inferType decls xs
           case xsType of
             OSL.List _ n _ ->
               Mapping <$> translateToMapping ctx (OSL.List ann' n a) xs
+            _ -> Left (ErrorMessage ann "expected a list")
         Just _ -> Left (ErrorMessage ann' "expected the name of a type")
         Nothing -> Left (ErrorMessage ann' "undefined name")
-    OSL.Apply _ (OSL.ListLength _) xs -> do
+    OSL.Apply ann (OSL.ListLength _) xs -> do
       xsType <- inferType decls xs
       xsM <- translateToMapping ctx xsType xs
       case xsM of
         ListMapping lM (ValuesMapping (ListMapping (LengthMapping xslM) _)) ->
           pure . Mapping $ ListMapping lM (ValuesMapping xslM)
+        _ -> Left (ErrorMessage ann "expected a list of lists")
     OSL.Apply ann (OSL.ListMaybePi1 _) xs -> do
       xsType <- inferType decls xs
       xsM <- translateToMapping ctx xsType xs
@@ -264,11 +266,11 @@ translate ctx@(TranslationContext
           pure . Mapping
             $ ListMapping lM
               (ValuesMapping (MaybeMapping cM (ValuesMapping xslM)))
+        _ -> Left (ErrorMessage ann "expected a list of maybe list")
     OSL.Apply ann (OSL.Sum _) xs -> do
       xsType <- inferType decls xs
-      let n' = typeCardinality decls xsType
-      case (xsType, n') of
-        (OSL.List _ _ _, Just (OSL.Cardinality n)) -> do
+      case xsType of
+        OSL.List _ (OSL.Cardinality n) _ -> do
           xsM <- translateToMapping ctx xsType xs
           case xsM of
             ListMapping (LengthMapping (ScalarMapping lT))
@@ -278,51 +280,73 @@ translate ctx@(TranslationContext
                 [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
                    <$> applyTerms ann xsT (S11.Const i)
                 | i <- [0..n-1] ]
+            _ -> Left (ErrorMessage ann "expected a list mapping")
+        OSL.Map _ (OSL.Cardinality n) _ _ -> do
+          xsM <- translateToMapping ctx xsType xs
+          case xsM of
+            MapMapping (LengthMapping (ScalarMapping lT))
+                       (KeysMapping (ScalarMapping kT))
+                       _
+                       (ValuesMapping (ScalarMapping vT)) ->
+              Term <$>
+              foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
+                [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
+                  <$> (applyTerms ann vT =<< applyTerms ann kT (S11.Const i))
+                | i <- [0..n-1] ]
+            _ -> Left (ErrorMessage ann "expected a map mapping")
     OSL.Apply ann (OSL.Apply _ (OSL.Lookup _) k) xs -> do
       xsType <- inferType decls xs
       case xsType of
-        OSL.Map _ _ kType vType -> do
+        OSL.Map _ _ kType _ -> do
           xsM <- translateToMapping ctx xsType xs
           kM <- translateToMapping ctx kType k
           case xsM of
             MapMapping _ _ (KeyIndicatorMapping indM)
                 (ValuesMapping vM) -> do
               kExistsM <- applyMappings ann indM kM
-              vM <- applyMappings ann vM kM
+              vM' <- applyMappings ann vM kM
               pure . Mapping
-                $ MaybeMapping (ChoiceMapping kExistsM) (ValuesMapping vM)
+                $ MaybeMapping (ChoiceMapping kExistsM) (ValuesMapping vM')
+            _ -> Left (ErrorMessage ann "expected a map mapping")
+        _ -> Left (ErrorMessage ann "expected a map")
     OSL.Apply ann (OSL.MapPi1 _) xs -> do
       xsType <- inferType decls xs
       case xsType of
-        OSL.Map _ _ _ (OSL.Product _ aType bType) -> do
+        OSL.Map _ _ _ (OSL.Product _ _ _) -> do
           xsM <- translateToMapping ctx xsType xs
           case xsM of
             MapMapping lM kM iM (ValuesMapping
                 (ProductMapping (LeftMapping aM) _)) ->
               pure . Mapping $ MapMapping lM kM iM (ValuesMapping aM)
+            _ -> Left (ErrorMessage ann "expected a map mapping")
+        _ -> Left (ErrorMessage ann "expected a map")
     OSL.Apply ann (OSL.MapPi2 _) xs -> do
       xsType <- inferType decls xs
       case xsType of
-        OSL.Map _ _ _ (OSL.Product _ aType bType) -> do
+        OSL.Map _ _ _ (OSL.Product _ _ _) -> do
           xsM <- translateToMapping ctx xsType xs
           case xsM of
             MapMapping lM kM iM (ValuesMapping
                 (ProductMapping _ (RightMapping bM))) ->
               pure . Mapping $ MapMapping lM kM iM (ValuesMapping bM)
-    OSL.Apply ann (OSL.MapTo _ _) xs -> do
+            _ -> Left (ErrorMessage ann "expected a map mapping")
+        _ -> Left (ErrorMessage ann "expected a map")
+    OSL.Apply _ (OSL.MapTo _ _) xs -> do
       xsType <- inferType decls xs
       translate ctx xsType xs
-    OSL.Apply ann (OSL.MapFrom _ _) xs -> do
+    OSL.Apply _ (OSL.MapFrom _ _) xs -> do
       xsType <- inferType decls xs
       translate ctx xsType xs
-    OSL.Apply _ (OSL.Keys _) xs -> do
+    OSL.Apply ann (OSL.Keys _) xs -> do
       xsType <- inferType decls xs
       case xsType of
-        OSL.Map _ _ kType vType -> do
+        OSL.Map _ _ _ _ -> do
           xsM <- translateToMapping ctx xsType xs
           case xsM of
             MapMapping lM (KeysMapping kM) _ _ ->
               pure . Mapping $ ListMapping lM (ValuesMapping kM)
+            _ -> Left (ErrorMessage ann "expected a map mapping")
+        _ -> Left (ErrorMessage ann "expected a map")
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
