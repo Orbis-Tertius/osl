@@ -269,9 +269,9 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a list of maybe list")
     OSL.Apply ann (OSL.Sum _) xs -> do
       xsType <- inferType decls xs
+      xsM <- translateToMapping ctx xsType xs
       case xsType of
-        OSL.List _ (OSL.Cardinality n) _ -> do
-          xsM <- translateToMapping ctx xsType xs
+        OSL.List _ (OSL.Cardinality n) (OSL.List _ (OSL.Cardinality m) _) ->
           case xsM of
             ListMapping (LengthMapping (ScalarMapping lT))
               (ValuesMapping
@@ -285,9 +285,16 @@ translate ctx@(TranslationContext
               (ValuesMapping
                 (ListMapping (LengthMapping rT)
                   (ValuesMapping
-                    (MaybeMapping (ChoiceMapping cT)
-                      (ValuesMapping (ScalarMapping vT)))))) ->
-              todo
+                    (ScalarMapping vT)))) ->
+              Term <$>
+              foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
+              [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
+                . (S11.IndLess (S11.Const j) lT `S11.Mul`)
+                <$> (flip (applyTerms ann) (S11.Const j)
+                     =<< applyTerms ann vT (S11.Const i))
+              | i <- [0..n-1], j <- [0..m-1] ]
+        OSL.List _ (OSL.Cardinality n) _ ->
+          case xsM of
             ListMapping (LengthMapping (ScalarMapping lT))
               (ValuesMapping
                 (MaybeMapping (ChoiceMapping (ScalarMapping cT))
