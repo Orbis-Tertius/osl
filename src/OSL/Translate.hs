@@ -278,9 +278,18 @@ translate ctx@(TranslationContext
                 (ListMapping (LengthMapping rT)
                   (ValuesMapping
                     (MaybeMapping
-                      (ChoiceMapping cT)
+                      (ChoiceMapping (ScalarMapping cT))
                       (ValuesMapping (ScalarMapping vT)))))) ->
-              todo
+              Term <$>
+              foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
+              [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
+              . (S11.IndLess (S11.Const j) lT `S11.Mul`)
+               <$> (S11.Mul
+                 <$> (flip (applyTerms ann) (S11.Const j)
+                        =<< applyTerms ann vT (S11.Const i))
+                 <*> (flip (applyTerms ann) (S11.Const j)
+                        =<< applyTerms ann cT (S11.Const i)))
+              | i <- [0..n-1], j <- [0..m-1] ]
             ListMapping (LengthMapping (ScalarMapping lT))
               (ValuesMapping
                 (ListMapping (LengthMapping rT)
@@ -289,7 +298,7 @@ translate ctx@(TranslationContext
               Term <$>
               foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
               [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
-                . (S11.IndLess (S11.Const j) lT `S11.Mul`)
+              . (S11.IndLess (S11.Const j) lT `S11.Mul`)
                 <$> (flip (applyTerms ann) (S11.Const j)
                      =<< applyTerms ann vT (S11.Const i))
               | i <- [0..n-1], j <- [0..m-1] ]
