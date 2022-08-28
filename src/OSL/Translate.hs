@@ -469,6 +469,7 @@ translate ctx@(TranslationContext
            getExistentialQuantifierStringAndMapping ctx varType varBound
          let ctx' = TranslationContext decls'
                     (mergeMappings (Map.singleton varName newMapping) mappings)
+         -- TODO: add additional conditions for map quantification
          Formula . (\f -> foldl' (flip S11.Exists) f qs)
            <$> translateToFormula ctx' p
 
@@ -555,6 +556,20 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
                , ListMapping
                  (LengthMapping (ScalarMapping lT))
                  (ValuesMapping vM) )
+    OSL.Map ann (OSL.Cardinality n) a b ->
+      case varBound of
+        OSL.MapBound _ (OSL.KeysBound aBound) (OSL.ValuesBound bBound) -> do
+          (kQs, kM) <- getExistentialQuantifierStringAndMapping
+            ctx
+            (OSL.List ann (OSL.Cardinality n) a)
+            (OSL.ListBound ann (OSL.ValuesBound aBound))
+          (vQs, vM) <- getExistentialQuantifierStringAndMapping
+            ctx
+            (OSL.F ann Nothing a b)
+            (OSL.FunctionBound ann
+              (OSL.DomainBound aBound)
+              (OSL.CodomainBound bBound))
+          pure (kQs <> vQs, mergeMapping kM vM)
   where
     scalarResult =
       case varBound of
