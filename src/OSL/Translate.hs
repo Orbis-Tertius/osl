@@ -450,15 +450,17 @@ translate ctx@(TranslationContext
      let decls' = OSL.ValidContext
           $ Map.insert varName (OSL.FreeVariable varType) declsMap
      varDim <- getMappingDimensions decls varType
+     TranslationContext _ qCtx <-
+       buildTranslationContext' decls' [varName]
      case varDim of
        FiniteDimensions n -> do
-         TranslationContext _ qCtx <-
-           buildTranslationContext' decls' [varName]
          let ctx' = TranslationContext decls'
                     (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
          bounds <- translateBound ctx varType varBound
          Formula . foldl (.) id (S11.ExistsFO <$> bounds)
            <$> translateToFormula ctx' p
+       InfiniteDimensions -> do
+         todo
 
 
 getMappingDimensions
