@@ -473,6 +473,7 @@ translate ctx@(TranslationContext
          -- TODO: add additional conditions for map quantification
          Formula . (\f -> foldl' (flip S11.Exists) f qs)
            <$> translateToFormula ctx' p
+    term -> Left (ErrorMessage (termAnnotation term) "could not translate term")
 
 
 getExplicitOrInferredBound
