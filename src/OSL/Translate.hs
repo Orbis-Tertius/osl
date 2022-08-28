@@ -482,7 +482,8 @@ getExplicitOrInferredBound
   -> OSL.Type ann
   -> Maybe (OSL.Bound ann)
   -> Either (ErrorMessage ann) (OSL.Bound ann)
-getExplicitOrInferredBound = todo
+getExplicitOrInferredBound ctx t =
+  maybe (inferBound ctx t) pure
 
 
 getExistentialQuantifierStringAndMapping
@@ -819,7 +820,39 @@ inferBound
   :: OSL.ValidContext ann
   -> OSL.Type ann
   -> Either (ErrorMessage ann) (OSL.Bound ann)
-inferBound = todo
+inferBound ctx =
+  \case
+    OSL.Prop ann -> Left (ErrorMessage ann "expected a quantifiable type but got Prop")
+    OSL.F ann _ a b ->
+      OSL.FunctionBound ann
+      <$> (OSL.DomainBound <$> inferBound ctx a)
+      <*> (OSL.CodomainBound <$> inferBound ctx b)
+    OSL.N ann -> Left (ErrorMessage ann "cannot infer bound for N")
+    OSL.Z ann -> Left (ErrorMessage ann "cannot infer bound for Z")
+    OSL.Fin ann n -> pure (OSL.ScalarBound ann (OSL.ConstN ann n))
+    OSL.Product ann a b ->
+      OSL.ProductBound ann
+      <$> (OSL.LeftBound <$> inferBound ctx a)
+      <*> (OSL.RightBound <$> inferBound ctx b)
+    OSL.Coproduct ann a b ->
+      OSL.CoproductBound ann
+      <$> (OSL.LeftBound <$> inferBound ctx a)
+      <*> (OSL.RightBound <$> inferBound ctx b)
+    OSL.NamedType ann name ->
+      case getDeclaration ctx name of
+        Just (OSL.Data a) ->
+          OSL.ToBound ann name <$> inferBound ctx a
+        _ -> Left (ErrorMessage ann "expected the name of a type")
+    OSL.Maybe ann a ->
+      OSL.MaybeBound ann . OSL.ValuesBound 
+        <$> inferBound ctx a
+    OSL.List ann _ a ->
+      OSL.ListBound ann . OSL.ValuesBound
+        <$> inferBound ctx a
+    OSL.Map ann _ a b ->
+      OSL.MapBound ann
+      <$> (OSL.KeysBound <$> inferBound ctx a)
+      <*> (OSL.ValuesBound <$> inferBound ctx b)
 
 
 mconcatM :: Monad m => Monoid a => [m a] -> m a
@@ -827,7 +860,3 @@ mconcatM [] = return mempty
 mconcatM (xM:xMs) = do
   x <- xM
   (x <>) <$> mconcatM xMs
-
-
-todo :: a
-todo = todo
