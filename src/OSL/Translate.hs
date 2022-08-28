@@ -505,6 +505,14 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls _) varTyp
                  _ -> Left (ErrorMessage ann "expected the name of a type")
           else Left (ErrorMessage ann "named type mismatch in bound")
         OSL.ScalarBound _ bT -> scalarResult
+        _ -> Left (ErrorMessage ann ("expected a " <> pack (show name) <> " bound"))
+    OSL.Maybe _ a ->
+      case varBound of
+        OSL.MaybeBound _ (OSL.ValuesBound aBound) -> do
+          let cQ = S11.ExistsFO (S11.Const 2)
+              cM = ScalarMapping (S11.Var (S11.Name 0 0))
+          (vQs, vM) <- getExistentialQuantifierStringAndMapping ctx a aBound
+          pure (cQ : vQs, MaybeMapping (ChoiceMapping cM) (ValuesMapping vM))
   where
     scalarResult =
       case varBound of
