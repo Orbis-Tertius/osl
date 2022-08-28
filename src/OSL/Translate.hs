@@ -5,6 +5,8 @@
 
 module OSL.Translate
   ( translate
+  , translateToTerm
+  , translateToFormula
   ) where
 
 

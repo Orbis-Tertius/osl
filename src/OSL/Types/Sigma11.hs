@@ -18,7 +18,7 @@ import OSL.Types.DeBruijnIndex (DeBruijnIndex)
 
 
 data Name = Name { arity :: Arity, deBruijnIndex :: DeBruijnIndex }
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord, Show, Generic)
 
 
 data Term =
@@ -28,6 +28,7 @@ data Term =
   | Mul Term Term
   | IndLess Term Term
   | Const Integer
+  deriving Show
 
 
 data Formula =
@@ -39,8 +40,10 @@ data Formula =
   | Implies Formula Formula
   | ForAll Term Formula
   | Exists ExistentialQuantifier Formula
+  deriving Show
 
 
 data ExistentialQuantifier =
     ExistsFO Term
   | ExistsSO Term (NonEmpty Term)
+  deriving Show
