@@ -3,6 +3,7 @@
 
 module OSL.TranslationContext
   ( mappingDimensions
+  , mergeMapping
   , mergeMappings
   , mappingIndices
   , highestIndicesInMappings
@@ -57,6 +58,13 @@ mergeMappings as bs =
   in Map.union as (f <$> bs)
 
 
+mergeMapping
+  :: Mapping Term
+  -> Mapping Term
+  -> Mapping Term
+mergeMapping = todo
+
+
 mappingIndices
   :: Mapping Term
   -> Map Arity (Set DeBruijnIndex)
@@ -71,3 +79,7 @@ highestIndicesInMappings
 highestIndicesInMappings =
   foldl' (Map.unionWith max) mempty
     . fmap (compact . fmap Set.lookupMax . mappingIndices)
+
+
+todo :: a
+todo = todo

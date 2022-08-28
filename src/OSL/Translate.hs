@@ -16,7 +16,7 @@ import Data.Text (pack)
 import OSL.BuildTranslationContext (buildTranslationContext')
 import OSL.Sigma11 (incrementDeBruijnIndices)
 import OSL.Term (termAnnotation, boundAnnotation)
-import OSL.TranslationContext (mappingDimensions, mergeMappings)
+import OSL.TranslationContext (mappingDimensions, mergeMappings, mergeMapping)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import qualified OSL.Types.OSL as OSL
@@ -462,32 +462,59 @@ translate ctx@(TranslationContext
            <$> translateToFormula ctx' p
        InfiniteDimensions -> do
          (qs, newMapping) <-
-           getExistentialQuantifierStringAndMappings ctx varType varBound
+           getExistentialQuantifierStringAndMapping ctx varType varBound
          let ctx' = TranslationContext decls'
                     (mergeMappings (Map.singleton varName newMapping) mappings)
          Formula . (\f -> foldl' (flip S11.Exists) f qs)
            <$> translateToFormula ctx' p
 
 
-getExistentialQuantifierStringAndMappings
+getExistentialQuantifierStringAndMapping
   :: Show ann
   => TranslationContext ann
   -> OSL.Type ann
   -> OSL.Bound ann
   -> Either (ErrorMessage ann)
      ([S11.ExistentialQuantifier], Mapping S11.Term)
-getExistentialQuantifierStringAndMappings ctx varType varBound =
+getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls _) varType varBound =
   case varType of
     OSL.Prop ann -> Left (ErrorMessage ann "cannot quantify over Prop")
     OSL.N _ -> scalarResult
     OSL.Z _ -> scalarResult
     OSL.Fin _ _ -> scalarResult
+    OSL.Product _ a b ->
+      case varBound of
+        OSL.ProductBound _ (OSL.LeftBound aBound) (OSL.RightBound bBound) -> do
+          (aQs, aM) <- getExistentialQuantifierStringAndMapping ctx a aBound
+          (bQs, bM) <- getExistentialQuantifierStringAndMapping ctx b bBound
+          pure (aQs <> bQs, mergeMapping bM aM)
+        _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a product bound")
+    OSL.Coproduct _ a b ->
+      case varBound of
+        OSL.CoproductBound _ (OSL.LeftBound aBound) (OSL.RightBound bBound) -> do
+          (aQs, aM) <- getExistentialQuantifierStringAndMapping ctx a aBound
+          (bQs, bM) <- getExistentialQuantifierStringAndMapping ctx b bBound
+          pure (aQs <> bQs, mergeMapping bM aM)
+    OSL.NamedType ann name ->
+      case varBound of
+        OSL.ToBound _ name' aBound ->
+          if name == name'
+          then case getDeclaration decls name of
+                 Just (OSL.Data a) ->
+                   getExistentialQuantifierStringAndMapping ctx a aBound
+                 _ -> Left (ErrorMessage ann "expected the name of a type")
+          else Left (ErrorMessage ann "named type mismatch in bound")
+        OSL.ScalarBound _ bT -> scalarResult
   where
     scalarResult =
       case varBound of
         OSL.ScalarBound _ b -> do
-          bT <- translateBound ctx varType varBound
-          pure (S11.ExistsFO <$> bT, todo)
+          bTs <- translateBound ctx varType varBound
+          case bTs of
+            [bT] -> 
+              pure ( [S11.ExistsFO bT]
+                   , ScalarMapping bT )
+            _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a scalar bound")
         _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a scalar bound")
 
 
