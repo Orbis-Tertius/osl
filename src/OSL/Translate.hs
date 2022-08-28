@@ -787,6 +787,14 @@ translateBound ctx@(TranslationContext decls _) t =
                 (OSL.CodomainBound vBound)))
           ]
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
+    Nothing -> translateBound ctx t . Just =<< inferBound decls t
+
+
+inferBound
+  :: OSL.ValidContext ann
+  -> OSL.Type ann
+  -> Either (ErrorMessage ann) (OSL.Bound ann)
+inferBound = todo
 
 
 mconcatM :: Monad m => Monoid a => [m a] -> m a
