@@ -1,0 +1,2 @@
+def false : Prop
+  := 0N = 1N.
