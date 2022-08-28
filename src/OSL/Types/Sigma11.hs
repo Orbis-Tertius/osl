@@ -5,6 +5,7 @@ module OSL.Types.Sigma11
   ( Name (Name)
   , Term (..)
   , Formula (..)
+  , ExistentialQuantifier (..)
   ) where
 
 
@@ -37,5 +38,9 @@ data Formula =
   | Or Formula Formula
   | Implies Formula Formula
   | ForAll Term Formula
-  | ExistsFO Term Formula -- first order existential
-  | ExistsSO Term (NonEmpty Term) Formula -- second order existential
+  | Exists ExistentialQuantifier Formula
+
+
+data ExistentialQuantifier =
+    ExistsFO Term
+  | ExistsSO Term (NonEmpty Term)

@@ -11,7 +11,7 @@ import Data.List.NonEmpty (NonEmpty)
 
 import OSL.Types.Arity (Arity)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Name (..), Term (Var, App, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Not, And, Or, Implies, ForAll, ExistsFO, ExistsSO))
+import OSL.Types.Sigma11 (Name (..), Term (Var, App, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Not, And, Or, Implies, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO))
 import OSL.Types.TranslationContext (Mapping (..))
 
 
@@ -44,9 +44,10 @@ instance MapNames Formula where
       Not p -> Not (mapNames f p)
       Implies p q -> Implies (mapNames f p) (mapNames f q)
       ForAll bound p -> ForAll (mapNames f bound) (mapNames f p)
-      ExistsFO bound p -> ExistsFO (mapNames f bound) (mapNames f p)
-      ExistsSO outBound inBounds p ->
-        ExistsSO (mapNames f outBound) (mapNames f inBounds) (mapNames f p)
+      Exists (ExistsFO bound) p ->
+        Exists (ExistsFO (mapNames f bound)) (mapNames f p)
+      Exists (ExistsSO outBound inBounds) p ->
+        Exists (ExistsSO (mapNames f outBound) (mapNames f inBounds)) (mapNames f p)
 
 
 instance MapNames a => MapNames (Mapping a) where

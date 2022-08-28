@@ -9,13 +9,14 @@ module OSL.Translate
 
 
 import Control.Applicative (liftA2)
+import Data.List (foldl')
 import qualified Data.Map as Map
 import Data.Text (pack)
 
 import OSL.BuildTranslationContext (buildTranslationContext')
 import OSL.Sigma11 (incrementDeBruijnIndices)
 import OSL.Term (termAnnotation)
-import OSL.TranslationContext (mappingDimensions)
+import OSL.TranslationContext (mappingDimensions, mergeMappings)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import qualified OSL.Types.OSL as OSL
@@ -450,17 +451,29 @@ translate ctx@(TranslationContext
      let decls' = OSL.ValidContext
           $ Map.insert varName (OSL.FreeVariable varType) declsMap
      varDim <- getMappingDimensions decls varType
-     TranslationContext _ qCtx <-
-       buildTranslationContext' decls' [varName]
      case varDim of
        FiniteDimensions n -> do
+         TranslationContext _ qCtx <-
+           buildTranslationContext' decls' [varName]
          let ctx' = TranslationContext decls'
                     (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
          bounds <- translateBound ctx varType varBound
-         Formula . foldl (.) id (S11.ExistsFO <$> bounds)
+         Formula . foldl (.) id (S11.Exists . S11.ExistsFO <$> bounds)
            <$> translateToFormula ctx' p
        InfiniteDimensions -> do
-         todo
+         (qs, newMapping) <- getExistentialQuantifierStringAndMappings decls varType
+         let ctx' = TranslationContext decls'
+                    (mergeMappings (Map.singleton varName newMapping) mappings)
+         Formula . (\f -> foldl' (flip S11.Exists) f qs)
+           <$> translateToFormula ctx' p
+
+
+getExistentialQuantifierStringAndMappings
+  :: OSL.ValidContext ann
+  -> OSL.Type ann
+  -> Either (ErrorMessage ann)
+     ([S11.ExistentialQuantifier], Mapping S11.Term)
+getExistentialQuantifierStringAndMappings = todo
 
 
 getMappingDimensions
