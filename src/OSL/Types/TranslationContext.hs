@@ -92,6 +92,28 @@ instance Functor Mapping where
         (ValuesMapping (f <$> d))
 
 
+instance Foldable Mapping where
+  foldMap f =
+    \case
+      ScalarMapping x -> f x
+      ProductMapping (LeftMapping x) (RightMapping y) ->
+        foldMap f x <> foldMap f y
+      CoproductMapping (ChoiceMapping x) (LeftMapping y) (RightMapping z) ->
+        foldMap f x <> foldMap f y <> foldMap f z
+      FunctionCoproductMapping (LeftMapping x) (RightMapping y) ->
+        foldMap f x <> foldMap f y
+      MaybeMapping (ChoiceMapping x) (ValuesMapping y) ->
+        foldMap f x <> foldMap f y
+      ListMapping (LengthMapping x) (ValuesMapping y) ->
+        foldMap f x <> foldMap f y
+      MapMapping (LengthMapping w)
+                 (KeysMapping x)
+                 (KeyIndicatorMapping y)
+                 (ValuesMapping z) ->
+        foldMap f w <> foldMap f x
+          <> foldMap f y <> foldMap f z
+
+
 newtype LeftMapping a
   = LeftMapping { unLeftMapping :: Mapping a }
 

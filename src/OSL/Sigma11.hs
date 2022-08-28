@@ -4,10 +4,17 @@
 module OSL.Sigma11
   ( MapNames (mapNames)
   , incrementDeBruijnIndices
+  , unionIndices
+  , termIndices
   ) where
 
 
+import Data.List (foldl')
 import Data.List.NonEmpty (NonEmpty)
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 import OSL.Types.Arity (Arity)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
@@ -60,3 +67,26 @@ incrementDeBruijnIndices arity b =
     if arity' == arity
     then Name arity' (index + DeBruijnIndex b)
     else Name arity' index)
+
+
+unionIndices
+  :: Map Arity (Set DeBruijnIndex)
+  -> Map Arity (Set DeBruijnIndex)
+  -> Map Arity (Set DeBruijnIndex)
+unionIndices = Map.unionWith Set.union
+
+
+termIndices :: Term -> Map Arity (Set DeBruijnIndex)
+termIndices =
+  \case
+    Var (Name arity i) ->
+      Map.singleton arity (Set.singleton i)
+    App (Name fArity fIndex) x ->
+      Map.singleton fArity (Set.singleton fIndex)
+        `unionIndices`
+        (foldl' unionIndices mempty
+          (termIndices <$> x))
+    Add x y -> termIndices x `unionIndices` termIndices y
+    Mul x y -> termIndices x `unionIndices` termIndices y
+    IndLess x y -> termIndices x `unionIndices` termIndices y
+    Const _ -> mempty
