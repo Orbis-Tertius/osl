@@ -236,7 +236,7 @@ quantifier :: Token
   -> (SourcePos
       -> Name
       -> Type (SourcePos)
-      -> (Bound SourcePos)
+      -> Maybe (Bound SourcePos)
       -> Term (SourcePos)
       -> Term SourcePos)
   -> Parser (Term SourcePos)
@@ -246,8 +246,7 @@ quantifier tok ctor = do
   varName <- name
   consumeExact_ T.Colon
   varType <- type0
-  consumeExact_ T.Less
-  varBound <- bound0
+  varBound <- optionMaybe (consumeExact_ T.Less >> bound0)
   consumeExact_ T.Comma
   q <- term0
   return (ctor p varName varType varBound q)
