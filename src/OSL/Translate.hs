@@ -15,7 +15,7 @@ import Data.Text (pack)
 
 import OSL.BuildTranslationContext (buildTranslationContext')
 import OSL.Sigma11 (incrementDeBruijnIndices)
-import OSL.Term (termAnnotation)
+import OSL.Term (termAnnotation, boundAnnotation)
 import OSL.TranslationContext (mappingDimensions, mergeMappings)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
@@ -461,7 +461,8 @@ translate ctx@(TranslationContext
          Formula . foldl (.) id (S11.Exists . S11.ExistsFO <$> bounds)
            <$> translateToFormula ctx' p
        InfiniteDimensions -> do
-         (qs, newMapping) <- getExistentialQuantifierStringAndMappings decls varType
+         (qs, newMapping) <-
+           getExistentialQuantifierStringAndMappings ctx varType varBound
          let ctx' = TranslationContext decls'
                     (mergeMappings (Map.singleton varName newMapping) mappings)
          Formula . (\f -> foldl' (flip S11.Exists) f qs)
@@ -469,11 +470,25 @@ translate ctx@(TranslationContext
 
 
 getExistentialQuantifierStringAndMappings
-  :: OSL.ValidContext ann
+  :: Show ann
+  => TranslationContext ann
   -> OSL.Type ann
+  -> OSL.Bound ann
   -> Either (ErrorMessage ann)
      ([S11.ExistentialQuantifier], Mapping S11.Term)
-getExistentialQuantifierStringAndMappings = todo
+getExistentialQuantifierStringAndMappings ctx varType varBound =
+  case varType of
+    OSL.Prop ann -> Left (ErrorMessage ann "cannot quantify over Prop")
+    OSL.N _ -> scalarResult
+    OSL.Z _ -> scalarResult
+    OSL.Fin _ _ -> scalarResult
+  where
+    scalarResult =
+      case varBound of
+        OSL.ScalarBound _ b -> do
+          bT <- translateBound ctx varType varBound
+          pure (S11.ExistsFO <$> bT, todo)
+        _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a scalar bound")
 
 
 getMappingDimensions
