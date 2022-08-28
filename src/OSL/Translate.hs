@@ -17,6 +17,7 @@ import qualified Data.Map as Map
 import Data.Text (pack)
 
 import OSL.BuildTranslationContext (buildTranslationContext', getFreeOSLName, addFreeVariableMapping)
+import OSL.Die (die)
 import OSL.Sigma11 (incrementDeBruijnIndices, incrementArities, prependBounds)
 import OSL.Term (termAnnotation, boundAnnotation)
 import OSL.TranslationContext (mappingDimensions, mergeMappings, mergeMapping)
@@ -522,14 +523,29 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
         OSL.ProductBound _ (OSL.LeftBound aBound) (OSL.RightBound bBound) -> do
           (aQs, aM) <- getExistentialQuantifierStringAndMapping ctx a aBound
           (bQs, bM) <- getExistentialQuantifierStringAndMapping ctx b bBound
-          pure (aQs <> bQs, mergeMapping bM aM)
+          pure ( aQs <> bQs
+               , mergeMapping
+                 (\aM' bM' -> ProductMapping (LeftMapping aM') (RightMapping bM'))
+                 bM aM )
         _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a product bound")
-    OSL.Coproduct _ a b ->
+    OSL.Coproduct ann a b ->
       case varBound of
         OSL.CoproductBound _ (OSL.LeftBound aBound) (OSL.RightBound bBound) -> do
-          (aQs, aM) <- getExistentialQuantifierStringAndMapping ctx a aBound
-          (bQs, bM) <- getExistentialQuantifierStringAndMapping ctx b bBound
-          pure (aQs <> bQs, mergeMapping bM aM)
+          let cQ = S11.ExistsFO (S11.Const 2)
+              cT = S11.Var (S11.Name 0 0)
+              cM = ChoiceMapping (ScalarMapping cT)
+              cSym = getFreeOSLName ctx
+              decls' = addDeclaration cSym (OSL.FreeVariable (OSL.Fin ann 2)) decls
+              ctx' = TranslationContext decls' mappings
+          -- TODO: can this result in overlap between cM and bM/aM?
+          ctx'' <- runIdentity . runExceptT
+            $ execStateT (addFreeVariableMapping cSym) ctx'
+          (aQs, aM) <- getExistentialQuantifierStringAndMapping ctx'' a aBound
+          (bQs, bM) <- getExistentialQuantifierStringAndMapping ctx'' b bBound
+          pure ( [cQ] <> aQs <> bQs
+               , mergeMapping
+                 (\bM' aM' -> CoproductMapping cM (LeftMapping aM') (RightMapping bM'))
+                 bM aM )
         _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a coproduct bound")
     OSL.NamedType ann name ->
       case varBound of
@@ -585,7 +601,15 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
             (OSL.FunctionBound ann
               (OSL.DomainBound aBound)
               (OSL.CodomainBound bBound))
-          pure (kQs <> vQs, mergeMapping kM vM)
+          pure ( kQs <> vQs
+               , mergeMapping
+                 (curry (\case
+                    ( ListMapping (LengthMapping lM) (ValuesMapping kM''),
+                      MaybeMapping (ChoiceMapping cM) (ValuesMapping vM'') ) ->
+                      MapMapping (LengthMapping lM) (KeysMapping kM'')
+                                 (KeyIndicatorMapping cM) (ValuesMapping vM'')
+                    _ -> die "logical impossibility in map quantifier translation"))
+                 kM vM )
         _ -> Left (ErrorMessage ann "expected a map bound")
   where
     scalarResult =
