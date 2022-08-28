@@ -454,12 +454,12 @@ checkTerm c t x =
         _ -> genericErrorMessage
     ForAll ann varName varType varBound p -> do
       checkType c varType
-      checkBound c varType varBound
+      maybe (pure ()) (checkBound c varType) varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
     ForSome ann varName varType varBound p -> do
       checkType c varType
-      checkBound c varType varBound
+      maybe (pure ()) (checkBound c varType) varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
   where
@@ -749,13 +749,13 @@ inferType c t =
       return (Prop ann)
     ForAll ann varName varType varBound p -> do
       checkType c varType
-      checkBound c varType varBound
+      maybe (pure ()) (checkBound c varType) varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
       return (Prop ann)
     ForSome ann varName varType varBound p -> do
       checkType c varType
-      checkBound c varType varBound
+      maybe (pure ()) (checkBound c varType) varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
       return (Prop ann)

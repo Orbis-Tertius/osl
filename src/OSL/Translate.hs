@@ -466,12 +466,21 @@ translate ctx@(TranslationContext
            <$> translateToFormula ctx' p
        InfiniteDimensions -> do
          (qs, newMapping) <-
-           getExistentialQuantifierStringAndMapping ctx varType varBound
+           getExistentialQuantifierStringAndMapping ctx varType
+             =<< getExplicitOrInferredBound decls varType varBound
          let ctx' = TranslationContext decls'
                     (mergeMappings (Map.singleton varName newMapping) mappings)
          -- TODO: add additional conditions for map quantification
          Formula . (\f -> foldl' (flip S11.Exists) f qs)
            <$> translateToFormula ctx' p
+
+
+getExplicitOrInferredBound
+  :: OSL.ValidContext ann
+  -> OSL.Type ann
+  -> Maybe (OSL.Bound ann)
+  -> Either (ErrorMessage ann) (OSL.Bound ann)
+getExplicitOrInferredBound = todo
 
 
 getExistentialQuantifierStringAndMapping
@@ -498,7 +507,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
             b
             bBound
           let fM = incrementArities n bM
-          aBounds <- translateBound ctx a aBound
+          aBounds <- translateBound ctx a (Just aBound)
           let fQs = prependBounds aBounds <$> bQs
           pure (fQs, fM)
         (InfiniteDimensions, _) ->
@@ -574,7 +583,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
     scalarResult =
       case varBound of
         OSL.ScalarBound _ b -> do
-          bTs <- translateBound ctx varType varBound
+          bTs <- translateBound ctx varType (Just varBound)
           case bTs of
             [bT] -> 
               pure ( [S11.ExistsFO bT]
@@ -705,68 +714,70 @@ translateBound
   :: Show ann
   => TranslationContext ann
   -> OSL.Type ann
-  -> OSL.Bound ann
+  -> Maybe (OSL.Bound ann)
   -> Either (ErrorMessage ann) [S11.Term]
 translateBound ctx@(TranslationContext decls _) t =
   \case
-    OSL.ScalarBound _ term -> (:[]) <$> translateToTerm ctx t term
-    OSL.ProductBound ann (OSL.LeftBound aBound) (OSL.RightBound bBound) ->
+    Just (OSL.ScalarBound _ term) -> (:[]) <$> translateToTerm ctx t term
+    Just (OSL.ProductBound ann (OSL.LeftBound aBound) (OSL.RightBound bBound)) ->
       case t of
         OSL.Product _ a b ->
-          (<>) <$> translateBound ctx a aBound
-               <*> translateBound ctx b bBound
+          (<>) <$> translateBound ctx a (Just aBound)
+               <*> translateBound ctx b (Just bBound)
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
-    OSL.ToBound ann name bound ->
+    Just (OSL.ToBound ann name bound) ->
       case getDeclaration decls name of
-        Just (OSL.Data a) -> translateBound ctx a bound
+        Just (OSL.Data a) -> translateBound ctx a (Just bound)
         Just _ -> Left . ErrorMessage ann $ "expected the name of a type"
         Nothing -> Left . ErrorMessage ann $ "undefined name"
-    OSL.CoproductBound ann (OSL.LeftBound aBound) (OSL.RightBound bBound) ->
+    Just (OSL.CoproductBound ann (OSL.LeftBound aBound) (OSL.RightBound bBound)) ->
       case t of 
         OSL.Coproduct _ a b ->
-          (<>) <$> translateBound ctx a aBound
-               <*> translateBound ctx b bBound
+          (<>) <$> translateBound ctx a (Just aBound)
+               <*> translateBound ctx b (Just bBound)
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
-    OSL.FunctionBound ann (OSL.DomainBound aBound)
-                          (OSL.CodomainBound bBound) ->
+    Just (OSL.FunctionBound ann
+            (OSL.DomainBound aBound)
+            (OSL.CodomainBound bBound)) ->
       case t of
         OSL.F _ _ a b ->
-          (<>) <$> translateBound ctx a aBound
-               <*> translateBound ctx b bBound
+          (<>) <$> translateBound ctx a (Just aBound)
+               <*> translateBound ctx b (Just bBound)
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
-    OSL.ListBound ann (OSL.ValuesBound vBound) ->
+    Just (OSL.ListBound ann (OSL.ValuesBound vBound)) ->
       case t of
         OSL.List ann' n'@(OSL.Cardinality n) a ->
           let lBound = OSL.ScalarBound ann' (OSL.ConstN ann n) in
-          (<>) <$> translateBound ctx (OSL.N ann') lBound
+          (<>) <$> translateBound ctx (OSL.N ann') (Just lBound)
                <*> translateBound ctx (OSL.F ann' (Just n') (OSL.N ann') a)
-                   (OSL.FunctionBound ann
-                     (OSL.DomainBound lBound)
-                     (OSL.CodomainBound vBound))
+                   (Just
+                     (OSL.FunctionBound ann
+                       (OSL.DomainBound lBound)
+                       (OSL.CodomainBound vBound)))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
-    OSL.MaybeBound ann (OSL.ValuesBound vBound) ->
+    Just (OSL.MaybeBound ann (OSL.ValuesBound vBound)) ->
       case t of
         OSL.Maybe _ a ->
-          ((S11.Const 2):) <$> translateBound ctx a vBound
+          ((S11.Const 2):) <$> translateBound ctx a (Just vBound)
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
-    OSL.MapBound ann
-        (OSL.KeysBound kBound)
-        (OSL.ValuesBound vBound) ->
+    Just (OSL.MapBound ann
+            (OSL.KeysBound kBound)
+            (OSL.ValuesBound vBound)) ->
       case t of
         OSL.Map ann' n'@(OSL.Cardinality n) k v ->
           mconcatM
-          [ translateBound ctx (OSL.N ann') (OSL.ScalarBound ann' (OSL.ConstN ann' n))
+          [ translateBound ctx (OSL.N ann') (Just (OSL.ScalarBound ann' (OSL.ConstN ann' n)))
           , translateBound ctx (OSL.F ann' (Just n') (OSL.N ann') k)
-              (OSL.FunctionBound ann'
+              (Just (OSL.FunctionBound ann'
                  (OSL.DomainBound (OSL.ScalarBound ann' (OSL.ConstN ann' n)))
-                 (OSL.CodomainBound kBound))
+                 (OSL.CodomainBound kBound)))
           , translateBound ctx (OSL.F ann' (Just n') k (OSL.N ann'))
-              (OSL.FunctionBound ann' (OSL.DomainBound kBound)
-                (OSL.CodomainBound (OSL.ScalarBound ann' (OSL.ConstN ann' 2))))
+              (Just (OSL.FunctionBound ann' (OSL.DomainBound kBound)
+                (OSL.CodomainBound (OSL.ScalarBound ann' (OSL.ConstN ann' 2)))))
           , translateBound ctx (OSL.F ann' (Just n') k v)
-              (OSL.FunctionBound ann'
+              (Just (OSL.FunctionBound ann'
                 (OSL.DomainBound kBound)
-                (OSL.CodomainBound vBound))
+                (OSL.CodomainBound vBound)))
           ]
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
 
