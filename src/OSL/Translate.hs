@@ -14,7 +14,7 @@ import qualified Data.Map as Map
 import Data.Text (pack)
 
 import OSL.BuildTranslationContext (buildTranslationContext')
-import OSL.Sigma11 (incrementDeBruijnIndices)
+import OSL.Sigma11 (incrementDeBruijnIndices, incrementArities)
 import OSL.Term (termAnnotation, boundAnnotation)
 import OSL.TranslationContext (mappingDimensions, mergeMappings, mergeMapping)
 import OSL.Types.Arity (Arity (..))
@@ -513,6 +513,17 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls _) varTyp
               cM = ScalarMapping (S11.Var (S11.Name 0 0))
           (vQs, vM) <- getExistentialQuantifierStringAndMapping ctx a aBound
           pure (cQ : vQs, MaybeMapping (ChoiceMapping cM) (ValuesMapping vM))
+    OSL.List _ (OSL.Cardinality n) a ->
+      case varBound of
+        OSL.ListBound _ (OSL.ValuesBound aBound) -> do
+          let lQ = S11.ExistsFO (S11.Const n)
+              lM = ScalarMapping (S11.Var (S11.Name 0 0))
+          (vQs, vM) <- getExistentialQuantifierStringAndMapping ctx a aBound
+          pure
+            ( lQ : vQs
+            , ListMapping
+              (LengthMapping lM)
+              (ValuesMapping (incrementArities 1 vM)))
   where
     scalarResult =
       case varBound of

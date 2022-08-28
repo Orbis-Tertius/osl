@@ -4,6 +4,7 @@
 module OSL.Sigma11
   ( MapNames (mapNames)
   , incrementDeBruijnIndices
+  , incrementArities
   , unionIndices
   , termIndices
   ) where
@@ -16,7 +17,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import OSL.Types.Arity (Arity)
+import OSL.Types.Arity (Arity (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.Sigma11 (Name (..), Term (Var, App, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Not, And, Or, Implies, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO))
 import OSL.Types.TranslationContext (Mapping (..))
@@ -61,11 +62,18 @@ instance MapNames a => MapNames (Mapping a) where
   mapNames f = fmap (mapNames f)
 
 
+incrementArities :: MapNames a => Int -> a -> a
+incrementArities by =
+  mapNames
+  (\(Name (Arity arity) index) ->
+     Name (Arity (arity + by)) index)
+
+
 incrementDeBruijnIndices :: MapNames a => Arity -> Int -> a -> a
-incrementDeBruijnIndices arity b =
+incrementDeBruijnIndices arity by =
   mapNames (\(Name arity' index) ->
     if arity' == arity
-    then Name arity' (index + DeBruijnIndex b)
+    then Name arity' (index + DeBruijnIndex by)
     else Name arity' index)
 
 
