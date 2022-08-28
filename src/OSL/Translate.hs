@@ -9,21 +9,25 @@ module OSL.Translate
 
 
 import Control.Applicative (liftA2)
+import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Trans.State.Strict (execStateT)
+import Data.Functor.Identity (runIdentity)
 import Data.List (foldl')
 import qualified Data.Map as Map
 import Data.Text (pack)
 
-import OSL.BuildTranslationContext (buildTranslationContext')
-import OSL.Sigma11 (incrementDeBruijnIndices, incrementArities)
+import OSL.BuildTranslationContext (buildTranslationContext', getFreeOSLName, addFreeVariableMapping)
+import OSL.Sigma11 (incrementDeBruijnIndices, incrementArities, prependBounds)
 import OSL.Term (termAnnotation, boundAnnotation)
 import OSL.TranslationContext (mappingDimensions, mergeMappings, mergeMapping)
+import OSL.Type (typeAnnotation)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.Translation (Translation (Formula, Term, Mapping))
 import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..), MappingDimensions (..), LengthMapping (..), KeyIndicatorMapping (..), KeysMapping (..))
-import OSL.ValidContext (getDeclaration)
+import OSL.ValidContext (getDeclaration, addDeclaration)
 import OSL.ValidateContext (inferType)
 
 
@@ -476,12 +480,29 @@ getExistentialQuantifierStringAndMapping
   -> OSL.Bound ann
   -> Either (ErrorMessage ann)
      ([S11.ExistentialQuantifier], Mapping S11.Term)
-getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls _) varType varBound =
+getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings) varType varBound =
   case varType of
     OSL.Prop ann -> Left (ErrorMessage ann "cannot quantify over Prop")
     OSL.N _ -> scalarResult
     OSL.Z _ -> scalarResult
     OSL.Fin _ _ -> scalarResult
+    OSL.F _ _cardinality a b -> do
+      -- TODO: use cardinality (modify S11)
+      aDim <- getMappingDimensions decls a
+      case (aDim, varBound) of
+        (FiniteDimensions n, OSL.FunctionBound _ (OSL.DomainBound aBound) (OSL.CodomainBound bBound)) -> do
+          (bQs, bM) <-
+            getExistentialQuantifierStringAndMapping
+            ctx
+            b
+            bBound
+          let fM = incrementArities n bM
+          aBounds <- translateBound ctx a aBound
+          let fQs = prependBounds aBounds <$> bQs
+          pure (fQs, fM)
+        (InfiniteDimensions, _) ->
+          Left (ErrorMessage (typeAnnotation a)
+               "expected a finite-dimensional type")
     OSL.Product _ a b ->
       case varBound of
         OSL.ProductBound _ (OSL.LeftBound aBound) (OSL.RightBound bBound) -> do
@@ -513,17 +534,27 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls _) varTyp
               cM = ScalarMapping (S11.Var (S11.Name 0 0))
           (vQs, vM) <- getExistentialQuantifierStringAndMapping ctx a aBound
           pure (cQ : vQs, MaybeMapping (ChoiceMapping cM) (ValuesMapping vM))
-    OSL.List _ (OSL.Cardinality n) a ->
+    OSL.List ann (OSL.Cardinality n) a ->
       case varBound of
         OSL.ListBound _ (OSL.ValuesBound aBound) -> do
           let lQ = S11.ExistsFO (S11.Const n)
-              lM = ScalarMapping (S11.Var (S11.Name 0 0))
-          (vQs, vM) <- getExistentialQuantifierStringAndMapping ctx a aBound
-          pure
-            ( lQ : vQs
-            , ListMapping
-              (LengthMapping lM)
-              (ValuesMapping (incrementArities 1 vM)))
+              lT = S11.Var (S11.Name 0 0)
+              lSym = getFreeOSLName ctx
+              decls' = addDeclaration lSym (OSL.FreeVariable (OSL.N ann)) decls
+              ctx' = TranslationContext decls' mappings
+          ctx'' <- runIdentity . runExceptT
+            $ execStateT (addFreeVariableMapping lSym) ctx'
+          (vQs, vM) <-
+            getExistentialQuantifierStringAndMapping
+            ctx''
+            (OSL.F ann (Just (OSL.Cardinality n)) (OSL.N ann) a)
+            (OSL.FunctionBound ann
+               (OSL.DomainBound (OSL.ScalarBound ann (OSL.NamedTerm ann lSym)))
+               (OSL.CodomainBound aBound))
+          pure ( lQ : vQs
+               , ListMapping
+                 (LengthMapping (ScalarMapping lT))
+                 (ValuesMapping vM) )
   where
     scalarResult =
       case varBound of

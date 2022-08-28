@@ -7,11 +7,13 @@ module OSL.Sigma11
   , incrementArities
   , unionIndices
   , termIndices
+  , prependBounds
   ) where
 
 
 import Data.List (foldl')
 import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -98,3 +100,17 @@ termIndices =
     Mul x y -> termIndices x `unionIndices` termIndices y
     IndLess x y -> termIndices x `unionIndices` termIndices y
     Const _ -> mempty
+
+
+prependBounds
+  :: [Term]
+  -> ExistentialQuantifier
+  -> ExistentialQuantifier
+prependBounds bs (ExistsFO b) =
+  case NonEmpty.nonEmpty bs of
+    Just bs' -> ExistsSO b bs'
+    Nothing -> ExistsFO b
+prependBounds bs' (ExistsSO b bs) =
+  case NonEmpty.nonEmpty bs' of
+    Just bs'' -> ExistsSO b (bs'' <> bs)
+    Nothing -> ExistsSO b bs
