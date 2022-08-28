@@ -510,6 +510,9 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
           aBounds <- translateBound ctx a (Just aBound)
           let fQs = prependBounds aBounds <$> bQs
           pure (fQs, fM)
+        (FiniteDimensions _, _) ->
+          Left (ErrorMessage (boundAnnotation varBound)
+                "expected a function bound")
         (InfiniteDimensions, _) ->
           Left (ErrorMessage (typeAnnotation a)
                "expected a finite-dimensional type")
@@ -526,6 +529,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
           (aQs, aM) <- getExistentialQuantifierStringAndMapping ctx a aBound
           (bQs, bM) <- getExistentialQuantifierStringAndMapping ctx b bBound
           pure (aQs <> bQs, mergeMapping bM aM)
+        _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a coproduct bound")
     OSL.NamedType ann name ->
       case varBound of
         OSL.ToBound _ name' aBound ->
@@ -535,7 +539,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
                    getExistentialQuantifierStringAndMapping ctx a aBound
                  _ -> Left (ErrorMessage ann "expected the name of a type")
           else Left (ErrorMessage ann "named type mismatch in bound")
-        OSL.ScalarBound _ bT -> scalarResult
+        OSL.ScalarBound _ _ -> scalarResult
         _ -> Left (ErrorMessage ann ("expected a " <> pack (show name) <> " bound"))
     OSL.Maybe _ a ->
       case varBound of
@@ -544,6 +548,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
               cM = ScalarMapping (S11.Var (S11.Name 0 0))
           (vQs, vM) <- getExistentialQuantifierStringAndMapping ctx a aBound
           pure (cQ : vQs, MaybeMapping (ChoiceMapping cM) (ValuesMapping vM))
+        _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a maybe bound")
     OSL.List ann (OSL.Cardinality n) a ->
       case varBound of
         OSL.ListBound _ (OSL.ValuesBound aBound) -> do
@@ -565,6 +570,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
                , ListMapping
                  (LengthMapping (ScalarMapping lT))
                  (ValuesMapping vM) )
+        _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a list bound")
     OSL.Map ann (OSL.Cardinality n) a b ->
       case varBound of
         OSL.MapBound _ (OSL.KeysBound aBound) (OSL.ValuesBound bBound) -> do
@@ -579,10 +585,11 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
               (OSL.DomainBound aBound)
               (OSL.CodomainBound bBound))
           pure (kQs <> vQs, mergeMapping kM vM)
+        _ -> Left (ErrorMessage ann "expected a map bound")
   where
     scalarResult =
       case varBound of
-        OSL.ScalarBound _ b -> do
+        OSL.ScalarBound _ _ -> do
           bTs <- translateBound ctx varType (Just varBound)
           case bTs of
             [bT] -> 
