@@ -413,10 +413,10 @@ translate ctx@(TranslationContext
       let decls' = OSL.ValidContext
                      (Map.insert varName (OSL.Defined varType varDef) declsMap)
           ctx' = TranslationContext decls' (Map.insert varName varDefM mappings)
-      Mapping <$> translateToMapping ctx' termType body
-    OSL.Equal _ x y -> do
+      translate ctx' termType body
+    OSL.Equal ann x y -> do
       xType <- inferType decls x
-      Formula <$> translateEquality ctx xType x y
+      Formula <$> translateEquality ann ctx xType x y
     OSL.LessOrEqual _ x y -> do
       xType <- inferType decls x
       Formula <$>
@@ -678,7 +678,8 @@ translateToMapping c tType t =
     Right (Term t') -> return (ScalarMapping t')
     Right (Formula _) ->
       Left (ErrorMessage (termAnnotation t)
-             "expected a value but got a proposition")
+           $ "expected a value but got a proposition: "
+             <> pack (show t))
     Left err -> Left err
     
 
@@ -874,44 +875,16 @@ inferBound ctx =
 
 translateEquality
   :: Show ann
-  => TranslationContext ann
+  => ann
+  -> TranslationContext ann
   -> OSL.Type ann
   -> OSL.Term ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Formula
-translateEquality ctx@(TranslationContext decls _) t x y =
-  case t of
-    OSL.N _ -> translateSimpleEquality ctx t x y
-    OSL.Z _ -> translateSimpleEquality ctx t x y
-    OSL.Fin _ _ -> translateSimpleEquality ctx t x y
-    OSL.Product ann a b ->
-      S11.And
-      <$> translateEquality ctx a
-          (OSL.Apply ann (OSL.Pi1 ann) x)
-          (OSL.Apply ann (OSL.Pi1 ann) y)
-      <*> translateEquality ctx b
-          (OSL.Apply ann (OSL.Pi2 ann) x)
-          (OSL.Apply ann (OSL.Pi2 ann) y)
-    OSL.NamedType ann name ->
-      case getDeclaration decls name of
-        Just (OSL.Data a) ->
-          translateEquality ctx a
-          (OSL.Apply ann (OSL.From ann name) x)
-          (OSL.Apply ann (OSL.From ann name) y)
-        _ -> Left (ErrorMessage ann "expected the name of a type")
-    OSL.Maybe ann _ -> do
-      xM <- translateToMapping ctx t x
-      yM <- translateToMapping ctx t y
-      case (xM, yM) of
-        ( MaybeMapping
-            (ChoiceMapping (ScalarMapping xcM))
-            (ValuesMapping xvM),
-          MaybeMapping
-            (ChoiceMapping (ScalarMapping ycM))
-            (ValuesMapping yvM) ) ->
-          S11.And (S11.Equal xcM ycM)
-            <$> applyEqualityToMappings ann t xvM yvM
-        _ -> Left (ErrorMessage ann "expected maybe mappings (this is a compiler bug)")
+translateEquality ann ctx t x y = do
+  xM <- translateToMapping ctx t x
+  yM <- translateToMapping ctx t y
+  applyEqualityToMappings ann t xM yM
 
 
 applyEqualityToMappings
@@ -953,19 +926,7 @@ applyEqualityToMappings ann t x y =
        S11.And (S11.Equal xcM ycM)
        . S11.Or (S11.Equal xcM (S11.Const 0))
        <$> applyEqualityToMappings ann a xvM yvM
-
-
-translateSimpleEquality
-  :: Show ann
-  => TranslationContext ann
-  -> OSL.Type ann
-  -> OSL.Term ann
-  -> OSL.Term ann
-  -> Either (ErrorMessage ann) S11.Formula
-translateSimpleEquality ctx t x y =
-  S11.Equal
-  <$> translateToTerm ctx t x
-  <*> translateToTerm ctx t y
+    _ -> Left (ErrorMessage ann "cannot compare these things for equality")
 
 
 mconcatM :: Monad m => Monoid a => [m a] -> m a
