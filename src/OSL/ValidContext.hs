@@ -9,6 +9,8 @@ module OSL.ValidContext
 
 
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
+import Data.Text (pack)
 
 import OSL.Die (die)
 import OSL.Types.OSL (ValidContext (..), Name, Declaration)
@@ -22,9 +24,10 @@ getExistingDeclaration
   :: ValidContext ann
   -> Name
   -> Declaration ann
-getExistingDeclaration c =
-  (die "logically impossible: could not find a declaration known to exist")
-  . getDeclaration c
+getExistingDeclaration c name =
+  fromMaybe
+  (die $ "logically impossible: could not find a declaration known to exist: " <> pack (show name))
+  (getDeclaration c name)
 
 
 addDeclaration
