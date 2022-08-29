@@ -1,0 +1,2 @@
+def isPositive : N -> Prop
+  := \x : N => 1N <= x.
