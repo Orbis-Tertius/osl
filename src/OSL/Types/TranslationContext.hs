@@ -57,6 +57,7 @@ data Mapping a =
     (KeyIndicatorMapping a)
     (ValuesMapping a)
   | LambdaMapping
+  deriving Show
 
 
 instance Functor Mapping where
@@ -120,36 +121,44 @@ instance Foldable Mapping where
 
 newtype LeftMapping a
   = LeftMapping { unLeftMapping :: Mapping a }
+  deriving Show
 
 
 newtype RightMapping a =
   RightMapping { unRightMapping :: Mapping a }
+  deriving Show
 
 
 newtype ChoiceMapping a
   = ChoiceMapping { unChoiceMapping :: Mapping a }
+  deriving Show
 
 
 newtype LengthMapping a =
   LengthMapping { unLengthMapping :: Mapping a }
+  deriving Show
 
 
 newtype ValuesMapping a
   = ValuesMapping { unValuesMapping :: Mapping a }
+  deriving Show
 
 
 newtype KeysMapping a
   = KeysMapping { unKeysMapping :: Mapping a }
+  deriving Show
 
 
 newtype KeyIndicatorMapping a
   = KeyIndicatorMapping
     { unKeyIndicatorMapping :: Mapping a }
+  deriving Show
 
 
 data MappingDimensions
   = FiniteDimensions Int
   | InfiniteDimensions
+  deriving Show
 
 instance Semigroup MappingDimensions where
   (FiniteDimensions x) <> (FiniteDimensions y) = FiniteDimensions (x + y)

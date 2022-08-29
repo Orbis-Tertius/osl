@@ -416,10 +416,7 @@ translate ctx@(TranslationContext
       Mapping <$> translateToMapping ctx' termType body
     OSL.Equal _ x y -> do
       xType <- inferType decls x
-      Formula <$>
-        (S11.Equal
-          <$> translateToTerm ctx xType x
-          <*> translateToTerm ctx xType y)
+      Formula <$> translateEquality ctx xType x y
     OSL.LessOrEqual _ x y -> do
       xType <- inferType decls x
       Formula <$>
@@ -732,16 +729,23 @@ applyMappings ann f x =
   case (f, x) of
     (ScalarMapping f', ScalarMapping x') ->
       ScalarMapping <$> applyTerms ann f' x'
+    (f', ProductMapping (LeftMapping x') (RightMapping y')) -> do
+      f'' <- applyMappings ann f' x'
+      applyMappings ann f'' y'
     (ProductMapping (LeftMapping g) (RightMapping h), x') ->
       ProductMapping
       <$> (LeftMapping <$> applyMappings ann g x')
       <*> (RightMapping <$> applyMappings ann h x')
+    (MaybeMapping (ChoiceMapping g) (ValuesMapping h), x') ->
+      MaybeMapping
+      <$> (ChoiceMapping <$> applyMappings ann g x')
+      <*> (ValuesMapping <$> applyMappings ann h x')
     (FunctionCoproductMapping (LeftMapping g) (RightMapping h),
      CoproductMapping (ChoiceMapping a) (LeftMapping b) (RightMapping d)) ->
       CoproductMapping (ChoiceMapping a)
       <$> (LeftMapping <$> applyMappings ann g b)
       <*> (RightMapping <$> applyMappings ann h d)
-    _ -> Left (ErrorMessage ann "unable to apply mappings")
+    _ -> Left (ErrorMessage ann ("unable to apply mappings:\n" <> pack (show f) <> "\n<---\n" <> pack (show x)))
 
 
 applyTerms
@@ -866,6 +870,48 @@ inferBound ctx =
       OSL.MapBound ann
       <$> (OSL.KeysBound <$> inferBound ctx a)
       <*> (OSL.ValuesBound <$> inferBound ctx b)
+
+
+translateEquality
+  :: Show ann
+  => TranslationContext ann
+  -> OSL.Type ann
+  -> OSL.Term ann
+  -> OSL.Term ann
+  -> Either (ErrorMessage ann) S11.Formula
+translateEquality ctx@(TranslationContext decls _) t x y =
+  case t of
+    OSL.N _ -> translateSimpleEquality ctx t x y
+    OSL.Z _ -> translateSimpleEquality ctx t x y
+    OSL.Fin _ _ -> translateSimpleEquality ctx t x y
+    OSL.Product ann a b ->
+      S11.And
+      <$> translateEquality ctx a
+          (OSL.Apply ann (OSL.Pi1 ann) x)
+          (OSL.Apply ann (OSL.Pi1 ann) y)
+      <*> translateEquality ctx b
+          (OSL.Apply ann (OSL.Pi2 ann) x)
+          (OSL.Apply ann (OSL.Pi2 ann) y)
+    OSL.NamedType ann name ->
+      case getDeclaration decls name of
+        Just (OSL.Data a) ->
+          translateEquality ctx a
+          (OSL.Apply ann (OSL.From ann name) x)
+          (OSL.Apply ann (OSL.From ann name) y)
+        _ -> Left (ErrorMessage ann "expected the name of a type")
+
+
+translateSimpleEquality
+  :: Show ann
+  => TranslationContext ann
+  -> OSL.Type ann
+  -> OSL.Term ann
+  -> OSL.Term ann
+  -> Either (ErrorMessage ann) S11.Formula
+translateSimpleEquality ctx t x y =
+  S11.Equal
+  <$> translateToTerm ctx t x
+  <*> translateToTerm ctx t y
 
 
 mconcatM :: Monad m => Monoid a => [m a] -> m a
