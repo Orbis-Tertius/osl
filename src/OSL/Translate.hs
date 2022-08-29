@@ -899,6 +899,60 @@ translateEquality ctx@(TranslationContext decls _) t x y =
           (OSL.Apply ann (OSL.From ann name) x)
           (OSL.Apply ann (OSL.From ann name) y)
         _ -> Left (ErrorMessage ann "expected the name of a type")
+    OSL.Maybe ann _ -> do
+      xM <- translateToMapping ctx t x
+      yM <- translateToMapping ctx t y
+      case (xM, yM) of
+        ( MaybeMapping
+            (ChoiceMapping (ScalarMapping xcM))
+            (ValuesMapping xvM),
+          MaybeMapping
+            (ChoiceMapping (ScalarMapping ycM))
+            (ValuesMapping yvM) ) ->
+          S11.And (S11.Equal xcM ycM)
+            <$> applyEqualityToMappings ann t xvM yvM
+        _ -> Left (ErrorMessage ann "expected maybe mappings (this is a compiler bug)")
+
+
+applyEqualityToMappings
+  :: ann
+  -> OSL.Type ann
+  -> Mapping S11.Term
+  -> Mapping S11.Term
+  -> Either (ErrorMessage ann) S11.Formula
+applyEqualityToMappings ann t x y =
+  case (x,y,t) of
+    (ScalarMapping xT, ScalarMapping yT, _) ->
+      pure (S11.Equal xT yT)
+    (ProductMapping (LeftMapping xlM) (RightMapping xrM),
+     ProductMapping (LeftMapping ylM) (RightMapping yrM),
+     OSL.Product _ a b) ->
+      S11.And
+      <$> applyEqualityToMappings ann a xlM ylM
+      <*> applyEqualityToMappings ann b xrM yrM
+    (CoproductMapping
+      (ChoiceMapping (ScalarMapping xcM))
+      (LeftMapping xlM)
+      (RightMapping xrM),
+     CoproductMapping
+      (ChoiceMapping (ScalarMapping ycM))
+      (LeftMapping ylM)
+      (RightMapping yrM),
+     OSL.Coproduct _ a b) ->
+      S11.And (S11.Equal xcM ycM)
+      <$> (S11.Or
+          <$> (S11.And (S11.Equal xcM (S11.Const 0))
+               <$> applyEqualityToMappings ann a xlM ylM)
+          <*> (S11.And (S11.Equal xcM (S11.Const 1))
+               <$> applyEqualityToMappings ann b xrM yrM))
+    (MaybeMapping (ChoiceMapping (ScalarMapping xcM))
+        (ValuesMapping xvM),
+      MaybeMapping (ChoiceMapping (ScalarMapping ycM))
+        (ValuesMapping yvM),
+      OSL.Maybe _ a) ->
+       S11.And (S11.Equal xcM ycM)
+       . S11.Or (S11.Equal xcM (S11.Const 0))
+       <$> applyEqualityToMappings ann a xvM yvM
 
 
 translateSimpleEquality
