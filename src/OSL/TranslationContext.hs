@@ -38,7 +38,7 @@ mappingDimensions =
       one <> rec a
     ListMapping _ _ -> InfiniteDimensions
     MapMapping _ _ _ _ -> InfiniteDimensions
-    LambdaMapping _ -> InfiniteDimensions
+    LambdaMapping -> InfiniteDimensions
   where
     one = FiniteDimensions 1
     rec = mappingDimensions

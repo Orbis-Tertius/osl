@@ -56,10 +56,7 @@ data Mapping a =
     (KeysMapping a)
     (KeyIndicatorMapping a)
     (ValuesMapping a)
-    -- a lambda mapping only has to specify the name of the variable,
-    -- from which we can deduce how to create a translation context
-    -- from the body.
-  | LambdaMapping OSL.Name
+  | LambdaMapping
 
 
 instance Functor Mapping where
@@ -95,7 +92,7 @@ instance Functor Mapping where
         (KeysMapping (f <$> b))
         (KeyIndicatorMapping (f <$> c))
         (ValuesMapping (f <$> d))
-      LambdaMapping x -> LambdaMapping x
+      LambdaMapping -> LambdaMapping
 
 
 instance Foldable Mapping where
@@ -118,7 +115,7 @@ instance Foldable Mapping where
                  (ValuesMapping z) ->
         foldMap f w <> foldMap f x
           <> foldMap f y <> foldMap f z
-      LambdaMapping _ -> mempty
+      LambdaMapping -> mempty
 
 
 newtype LeftMapping a

@@ -132,6 +132,7 @@ translate ctx@(TranslationContext
             <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' n a b) f)
             <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' n a c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
+    OSL.Lambda _ _ _ _ -> pure (Mapping LambdaMapping)
     OSL.Apply _ (OSL.Lambda _ varName varType body) x -> do
       xM <- translateToMapping ctx varType x
       let decls' = OSL.ValidContext
@@ -704,9 +705,19 @@ translateToFormula
   => TranslationContext ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Formula
-translateToFormula c t =
+translateToFormula c@(TranslationContext decls mappings) t =
   case translate c (OSL.Prop (termAnnotation t)) t of
-    Right (Formula f) -> return f
+    Right (Formula f) -> pure f
+    Right (Mapping LambdaMapping) ->
+      case t of
+        OSL.Lambda _ varName varType body -> do
+          let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
+              ctx' = TranslationContext decls' mappings
+          ctx'' <- runIdentity . runExceptT
+            $ execStateT (addFreeVariableMapping varName) ctx'
+          translateToFormula ctx'' body
+        _ -> Left (ErrorMessage (termAnnotation t)
+              "lambda mapping for a non-lambda (this is a compiler bug")
     Right _ -> Left (ErrorMessage (termAnnotation t)
                  "expected a term denoting a Prop")
     Left err -> Left err
