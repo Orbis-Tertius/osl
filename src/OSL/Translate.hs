@@ -142,7 +142,7 @@ translate ctx@(TranslationContext
       let decls' = OSL.ValidContext
                      (Map.insert varName (OSL.Defined varType x) declsMap)
           ctx' = TranslationContext decls' (Map.insert varName xM mappings)
-      Mapping <$> translateToMapping ctx' termType body
+      translate ctx' termType body
     OSL.Apply _ (OSL.To ann typeName) x ->
       case getDeclaration decls typeName of
         Just (OSL.Data typeDef) -> translate ctx typeDef x
@@ -624,7 +624,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
           case bTs of
             [bT] -> 
               pure ( [S11.ExistsFO bT]
-                   , ScalarMapping bT )
+                   , ScalarMapping (S11.Var (S11.Name 0 0)) )
             _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a scalar bound")
         _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a scalar bound")
 
