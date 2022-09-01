@@ -22,7 +22,7 @@ import OSL.BuildTranslationContext (buildTranslationContext', getFreeOSLName, ad
 import OSL.Die (die)
 import OSL.Sigma11 (incrementDeBruijnIndices, incrementArities, prependBounds)
 import OSL.Term (termAnnotation, boundAnnotation)
-import OSL.TranslationContext (mappingDimensions, mergeMappings, mergeMapping)
+import OSL.TranslationContext (mergeMappings, mergeMapping)
 import OSL.Type (typeAnnotation)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
@@ -630,7 +630,27 @@ getMappingDimensions
   -> OSL.Type ann
   -> Either (ErrorMessage ann) MappingDimensions
 getMappingDimensions ctx t =
-  mappingDimensions <$> getArbitraryMapping ctx t
+  case t of
+    OSL.Prop ann -> Left (ErrorMessage ann "expected a quantifiable type; got Prop")
+    OSL.F _ _ _ _ -> pure InfiniteDimensions
+    OSL.N _ -> pure (FiniteDimensions 1)
+    OSL.Z _ -> pure (FiniteDimensions 1)
+    OSL.Fin _ _ -> pure (FiniteDimensions 1)
+    OSL.Product _ a b ->
+      (<>) <$> getMappingDimensions ctx a
+           <*> getMappingDimensions ctx b
+    OSL.Coproduct _ a b ->
+      (FiniteDimensions 1 <>)
+      <$> ((<>) <$> getMappingDimensions ctx a
+                <*> getMappingDimensions ctx b)
+    OSL.Maybe _ a ->
+      (FiniteDimensions 1 <>) <$> getMappingDimensions ctx a
+    OSL.NamedType ann a ->
+      case getDeclaration ctx a of
+        Just (OSL.Data b) -> getMappingDimensions ctx b
+        _ -> Left (ErrorMessage ann "expected the name of a type")
+    OSL.List _ _ _ -> pure InfiniteDimensions
+    OSL.Map _ _ _ _ -> pure InfiniteDimensions
 
 
 getArbitraryMapping
