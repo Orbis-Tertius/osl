@@ -788,7 +788,8 @@ applyTerms ann f x =
   case f of
     S11.Var f' -> pure $ S11.App f' [x]
     S11.App f' ys -> pure $ S11.App f' (ys <> [x])
-    _ -> Left $ ErrorMessage ann "expected a function term"
+    _ -> Left $ ErrorMessage ann
+      ("expected a function term; got " <> pack (show f))
 
 
 translateBound
