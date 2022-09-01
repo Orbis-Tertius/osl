@@ -61,6 +61,7 @@ data Mapping ann a =
     OSL.Name
     (OSL.Type ann)
     (OSL.Term ann)
+  | PropMapping S11.Formula
   deriving Show
 
 
@@ -98,6 +99,7 @@ instance Functor (Mapping ann) where
         (KeyIndicatorMapping (f <$> c))
         (ValuesMapping (f <$> d))
       LambdaMapping ctx v vT t -> LambdaMapping ctx v vT t
+      PropMapping p -> PropMapping p
 
 
 instance Foldable (Mapping ann) where
@@ -121,6 +123,7 @@ instance Foldable (Mapping ann) where
         foldMap f w <> foldMap f x
           <> foldMap f y <> foldMap f z
       LambdaMapping _ _ _ _ -> mempty
+      PropMapping _ -> mempty
 
 
 newtype LeftMapping ann a

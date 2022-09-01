@@ -227,6 +227,7 @@ getBoundS11NamesInMapping arity =
         (KeyIndicatorMapping c) (ValuesMapping d) ->
       rec a `Set.union` (rec b `Set.union` (rec c `Set.union` rec d))
     LambdaMapping _ _ _ _ -> mempty
+    PropMapping _ -> mempty
   where
     f :: S11.Term -> Set S11.Name
     f (S11.Var name) = g name
@@ -321,6 +322,7 @@ mapAritiesInMapping f =
       (KeyIndicatorMapping (rec c))
       (ValuesMapping (rec d))
     LambdaMapping ctx v vT t -> LambdaMapping ctx v vT t
+    PropMapping p -> PropMapping p
   where
     g (S11.Name arity i) = S11.Name (f arity) i
     rec = mapAritiesInMapping f

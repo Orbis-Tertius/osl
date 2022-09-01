@@ -699,11 +699,8 @@ translateToMapping
 translateToMapping c tType t =
   case translate c tType t of
     Right (Mapping m) -> return m
-    Right (Term t') -> return (ScalarMapping t')
-    Right (Formula _) ->
-      Left (ErrorMessage (termAnnotation t)
-           $ "expected a value but got a proposition: "
-             <> pack (show t))
+    Right (Term t') -> pure (ScalarMapping t')
+    Right (Formula p) -> pure (PropMapping p)
     Left err -> Left err
     
 
@@ -730,6 +727,7 @@ translateToFormula
 translateToFormula c t =
   case translate c (OSL.Prop (termAnnotation t)) t of
     Right (Formula f) -> pure f
+    Right (Mapping (PropMapping f)) -> pure f
     Right (Mapping (LambdaMapping (TranslationContext decls mappings) _ _ _)) ->
       case t of
         OSL.Lambda _ varName varType body -> do
