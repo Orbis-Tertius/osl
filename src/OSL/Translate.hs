@@ -63,6 +63,9 @@ translate ctx@(TranslationContext
     OSL.Apply ann (OSL.Apply _ (OSL.MulZ _) a) b ->
       Term <$> (S11.Mul <$> translateToTerm ctx (OSL.Z ann) a
                         <*> translateToTerm ctx (OSL.Z ann) b)
+    OSL.Apply _ (OSL.Cast _) a -> do
+      aT <- inferType decls a
+      translate ctx aT a
     OSL.ConstN _ x -> return (Term (S11.Const x))
     OSL.ConstZ _ x -> return (Term (S11.Const x))
     OSL.ConstFin _ x -> return (Term (S11.Const x))
