@@ -188,10 +188,11 @@ constantInteger = do
 constantFinite :: Parser Token
 constantFinite = do
   void $ string "fin"
-  whitespace
+  _ <- many whitespace
   void $ char '('
+  _ <- many whitespace
   i <- integerLiteral
-  whitespace
+  _ <- many whitespace
   void $ char ')'
   return (T.ConstFin i)
 

@@ -20,6 +20,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 import OSL.Types.Arity (Arity (..))
+import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.Sigma11 (Name (..), Term (Var, App, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Not, And, Or, Implies, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO))
 import OSL.Types.TranslationContext (Mapping (..))
@@ -56,8 +57,8 @@ instance MapNames Formula where
       ForAll bound p -> ForAll (mapNames f bound) (mapNames f p)
       Exists (ExistsFO bound) p ->
         Exists (ExistsFO (mapNames f bound)) (mapNames f p)
-      Exists (ExistsSO outBound inBounds) p ->
-        Exists (ExistsSO (mapNames f outBound) (mapNames f inBounds)) (mapNames f p)
+      Exists (ExistsSO n outBound inBounds) p ->
+        Exists (ExistsSO n (mapNames f outBound) (mapNames f inBounds)) (mapNames f p)
 
 
 instance MapNames a => MapNames (Mapping ann a) where
@@ -103,14 +104,15 @@ termIndices =
 
 
 prependBounds
-  :: [Term]
+  :: Maybe Cardinality
+  -> [Term]
   -> ExistentialQuantifier
   -> ExistentialQuantifier
-prependBounds bs (ExistsFO b) =
+prependBounds n bs (ExistsFO b) =
   case NonEmpty.nonEmpty bs of
-    Just bs' -> ExistsSO b bs'
+    Just bs' -> ExistsSO n b bs'
     Nothing -> ExistsFO b
-prependBounds bs' (ExistsSO b bs) =
+prependBounds _ bs' (ExistsSO n b bs) =
   case NonEmpty.nonEmpty bs' of
-    Just bs'' -> ExistsSO b (bs'' <> bs)
-    Nothing -> ExistsSO b bs
+    Just bs'' -> ExistsSO n b (bs'' <> bs)
+    Nothing -> ExistsSO n b bs

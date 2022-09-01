@@ -503,8 +503,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
     OSL.N _ -> scalarResult
     OSL.Z _ -> scalarResult
     OSL.Fin _ _ -> scalarResult
-    OSL.F _ _cardinality a b -> do
-      -- TODO: use cardinality (modify S11)
+    OSL.F _ cardinality a b -> do
       aDim <- getMappingDimensions decls a
       case (aDim, varBound) of
         (FiniteDimensions n, OSL.FunctionBound _ (OSL.DomainBound aBound) (OSL.CodomainBound bBound)) -> do
@@ -515,7 +514,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
             bBound
           let fM = incrementArities n bM
           aBounds <- translateBound ctx a (Just aBound)
-          let fQs = prependBounds aBounds <$> bQs
+          let fQs = prependBounds cardinality aBounds <$> bQs
           pure (fQs, fM)
         (FiniteDimensions _, _) ->
           Left (ErrorMessage (boundAnnotation varBound)

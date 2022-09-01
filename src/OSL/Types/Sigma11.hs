@@ -15,6 +15,7 @@ import Data.Generics.Labels ()
 import GHC.Generics (Generic)
 
 import OSL.Types.Arity (Arity)
+import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex)
 
 
@@ -76,11 +77,16 @@ instance Show Formula where
 
 data ExistentialQuantifier =
     ExistsFO Term
-  | ExistsSO Term (NonEmpty Term)
+  | ExistsSO (Maybe Cardinality) Term (NonEmpty Term)
 
 instance Show ExistentialQuantifier where
   show (ExistsFO b) = "<" <> show b
-  show (ExistsSO b bs) =
+  show (ExistsSO (Just (Cardinality n)) b bs) =
+    "^" <> show n <>
+    "<" <> show b <> "("
+      <> intercalate ", " (("<" <>) . show <$> toList bs)
+      <> ")"
+  show (ExistsSO Nothing b bs) =
     "<" <> show b <> "("
       <> intercalate ", " (("<" <>) . show <$> toList bs)
       <> ")"

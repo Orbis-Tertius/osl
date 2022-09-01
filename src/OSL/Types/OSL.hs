@@ -26,6 +26,8 @@ import Data.Map (Map)
 import Data.Text (Text, unpack)
 import GHC.Generics (Generic)
 
+import OSL.Types.Cardinality (Cardinality (..))
+
 
 data Name =
     Sym Text
@@ -37,10 +39,6 @@ instance Ord Name where
   GenSym a <= GenSym b = a <= b
   Sym _ <= GenSym _ = True
   GenSym _ <= Sym _ = False
-
--- The maximum number of elements of a collection type.
-newtype Cardinality = Cardinality Integer
-  deriving newtype (Eq, Ord, Show, Num)
 
 
 data Type ann =
