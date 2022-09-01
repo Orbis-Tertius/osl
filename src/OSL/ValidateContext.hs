@@ -544,7 +544,11 @@ checkBound c t bound =
                      "expected a map bound")
 
 
-inferType :: Show ann => ValidContext ann -> Term ann -> Either (ErrorMessage ann) (Type ann)
+inferType
+  :: Show ann
+  => ValidContext ann
+  -> Term ann
+  -> Either (ErrorMessage ann) (Type ann)
 inferType c t =
   case t of
     NamedTerm ann name -> getNamedTermType c ann name

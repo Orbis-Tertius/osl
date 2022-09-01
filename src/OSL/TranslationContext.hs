@@ -28,9 +28,9 @@ import OSL.Types.TranslationContext (Mapping (..))
 -- de Bruijn indices in the right hand mapping
 -- out of the way.
 mergeMappings
-  :: Map Name (Mapping Term)
-  -> Map Name (Mapping Term)
-  -> Map Name (Mapping Term)
+  :: Map Name (Mapping ann Term)
+  -> Map Name (Mapping ann Term)
+  -> Map Name (Mapping ann Term)
 mergeMappings as bs =
   let aMaxes = highestIndicesInMappings as
       f = foldl (.) id
@@ -40,10 +40,10 @@ mergeMappings as bs =
 
 
 mergeMapping
-  :: (Mapping Term -> Mapping Term -> Mapping Term)
-  -> Mapping Term
-  -> Mapping Term
-  -> Mapping Term
+  :: (Mapping ann Term -> Mapping ann Term -> Mapping ann Term)
+  -> Mapping ann Term
+  -> Mapping ann Term
+  -> Mapping ann Term
 mergeMapping f a b =
   let aMaxes = highestIndicesInMapping a
       g = foldl (.) id
@@ -53,7 +53,7 @@ mergeMapping f a b =
 
 
 mappingIndices
-  :: Mapping Term
+  :: Mapping ann Term
   -> Map Arity (Set DeBruijnIndex)
 mappingIndices =
   foldl' unionIndices mempty . fmap termIndices
@@ -61,12 +61,14 @@ mappingIndices =
 
 -- Gets the highest de Bruijn index of each arity.
 highestIndicesInMappings
-  :: Map Name (Mapping Term)
+  :: Map Name (Mapping ann Term)
   -> Map Arity DeBruijnIndex
 highestIndicesInMappings =
   foldl' (Map.unionWith max) mempty . fmap highestIndicesInMapping
 
 
-highestIndicesInMapping :: Mapping Term -> Map Arity DeBruijnIndex
+highestIndicesInMapping
+  :: Mapping ann Term
+  -> Map Arity DeBruijnIndex
 highestIndicesInMapping =
   compact . fmap Set.lookupMax . mappingIndices

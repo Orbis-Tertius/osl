@@ -60,7 +60,7 @@ instance MapNames Formula where
         Exists (ExistsSO (mapNames f outBound) (mapNames f inBounds)) (mapNames f p)
 
 
-instance MapNames a => MapNames (Mapping a) where
+instance MapNames a => MapNames (Mapping ann a) where
   mapNames f = fmap (mapNames f)
 
 

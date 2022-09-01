@@ -18,7 +18,7 @@ import Data.List (foldl')
 import qualified Data.Map as Map
 import Data.Text (pack)
 
-import OSL.BuildTranslationContext (buildTranslationContext', getFreeOSLName, addFreeVariableMapping)
+import OSL.BuildTranslationContext (buildTranslationContext', getFreeOSLName, addFreeVariableMapping, addTermMapping)
 import OSL.Die (die)
 import OSL.Sigma11 (incrementDeBruijnIndices, incrementArities, prependBounds)
 import OSL.Term (termAnnotation, boundAnnotation)
@@ -41,7 +41,7 @@ translate
   => TranslationContext ann
   -> OSL.Type ann
   -> OSL.Term ann
-  -> Either (ErrorMessage ann) Translation
+  -> Either (ErrorMessage ann) (Translation ann)
 translate ctx@(TranslationContext
           decls@(OSL.ValidContext declsMap) mappings)
           termType =
@@ -132,7 +132,8 @@ translate ctx@(TranslationContext
             <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' n a b) f)
             <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' n a c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
-    OSL.Lambda _ _ _ _ -> pure (Mapping LambdaMapping)
+    OSL.Lambda _ v vT t ->
+      pure (Mapping (LambdaMapping v vT t))
     OSL.Apply _ (OSL.Lambda _ varName varType body) x -> do
       xM <- translateToMapping ctx varType x
       let decls' = OSL.ValidContext
@@ -168,7 +169,7 @@ translate ctx@(TranslationContext
           case aM of
             MaybeMapping (ChoiceMapping (ScalarMapping choiceT))
                          (ValuesMapping vM) -> do
-              fvM <- applyMappings ann fM vM
+              fvM <- applyMappings ann ctx fM vM
               case fvM of
                 ScalarMapping fvT ->
                   pure . Term $ (choiceT `S11.Mul` fvT)
@@ -194,7 +195,7 @@ translate ctx@(TranslationContext
       iT <- translateToTerm ctx (OSL.N ann) i
       xsType <- inferType decls xs
       xsM <- translateToMapping ctx xsType xs
-      Mapping <$> applyMappings ann xsM (const iT <$> xsM)
+      Mapping <$> applyMappings ann ctx xsM (const iT <$> xsM)
     OSL.Apply ann (OSL.ListPi1 _) xs -> do
       xsType <- inferType decls xs
       xsM <- translateToMapping ctx xsType xs
@@ -354,8 +355,8 @@ translate ctx@(TranslationContext
           case xsM of
             MapMapping _ _ (KeyIndicatorMapping indM)
                 (ValuesMapping vM) -> do
-              kExistsM <- applyMappings ann indM kM
-              vM' <- applyMappings ann vM kM
+              kExistsM <- applyMappings ann ctx indM kM
+              vM' <- applyMappings ann ctx vM kM
               pure . Mapping
                 $ MaybeMapping (ChoiceMapping kExistsM) (ValuesMapping vM')
             _ -> Left (ErrorMessage ann "expected a map mapping")
@@ -406,7 +407,7 @@ translate ctx@(TranslationContext
         OSL.F _ _ a _ -> do
           fM <- translateToMapping ctx fType f
           xM <- translateToMapping ctx a x
-          Mapping <$> applyMappings ann fM xM
+          Mapping <$> applyMappings ann ctx fM xM
         _ -> Left (ErrorMessage ann "expected a function")
     OSL.Let _ varName varType varDef body -> do
       varDefM <- translateToMapping ctx varType varDef
@@ -492,7 +493,7 @@ getExistentialQuantifierStringAndMapping
   -> OSL.Type ann
   -> OSL.Bound ann
   -> Either (ErrorMessage ann)
-     ([S11.ExistentialQuantifier], Mapping S11.Term)
+     ([S11.ExistentialQuantifier], Mapping ann S11.Term)
 getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings) varType varBound =
   case varType of
     OSL.Prop ann -> Left (ErrorMessage ann "cannot quantify over Prop")
@@ -656,7 +657,7 @@ getMappingDimensions ctx t =
 getArbitraryMapping
   :: OSL.ValidContext ann
   -> OSL.Type ann
-  -> Either (ErrorMessage ann) (Mapping S11.Term)
+  -> Either (ErrorMessage ann) (Mapping ann S11.Term)
 getArbitraryMapping ctx =
   \case
     OSL.Prop ann -> Left (ErrorMessage ann "expected a finite-dimensional type; got a Prop")
@@ -691,7 +692,7 @@ translateToMapping
   => TranslationContext ann
   -> OSL.Type ann
   -> OSL.Term ann
-  -> Either (ErrorMessage ann) (Mapping S11.Term)
+  -> Either (ErrorMessage ann) (Mapping ann S11.Term)
 translateToMapping c tType t =
   case translate c tType t of
     Right (Mapping m) -> return m
@@ -726,7 +727,7 @@ translateToFormula
 translateToFormula c@(TranslationContext decls mappings) t =
   case translate c (OSL.Prop (termAnnotation t)) t of
     Right (Formula f) -> pure f
-    Right (Mapping LambdaMapping) ->
+    Right (Mapping (LambdaMapping _ _ _)) ->
       case t of
         OSL.Lambda _ varName varType body -> do
           let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
@@ -742,30 +743,39 @@ translateToFormula c@(TranslationContext decls mappings) t =
 
 
 applyMappings
-  :: ann
-  -> Mapping S11.Term
-  -> Mapping S11.Term
-  -> Either (ErrorMessage ann) (Mapping S11.Term)
-applyMappings ann f x =
+  :: Show ann
+  => ann
+  -> TranslationContext ann
+  -> Mapping ann S11.Term
+  -> Mapping ann S11.Term
+  -> Either (ErrorMessage ann) (Mapping ann S11.Term)
+applyMappings ann ctx@(TranslationContext decls mappings) f x =
   case (f, x) of
+    (LambdaMapping v vT t, _) -> do
+      let decls' = addDeclaration v (OSL.FreeVariable vT) decls
+          ctx' = TranslationContext decls' mappings
+      ctx'' <- runIdentity . runExceptT
+               $ execStateT (addTermMapping v x) ctx'
+      tT <- inferType decls' t
+      translateToMapping ctx'' tT t
     (ScalarMapping f', ScalarMapping x') ->
       ScalarMapping <$> applyTerms ann f' x'
     (f', ProductMapping (LeftMapping x') (RightMapping y')) -> do
-      f'' <- applyMappings ann f' x'
-      applyMappings ann f'' y'
+      f'' <- applyMappings ann ctx f' x'
+      applyMappings ann ctx f'' y'
     (ProductMapping (LeftMapping g) (RightMapping h), x') ->
       ProductMapping
-      <$> (LeftMapping <$> applyMappings ann g x')
-      <*> (RightMapping <$> applyMappings ann h x')
+      <$> (LeftMapping <$> applyMappings ann ctx g x')
+      <*> (RightMapping <$> applyMappings ann ctx h x')
     (MaybeMapping (ChoiceMapping g) (ValuesMapping h), x') ->
       MaybeMapping
-      <$> (ChoiceMapping <$> applyMappings ann g x')
-      <*> (ValuesMapping <$> applyMappings ann h x')
+      <$> (ChoiceMapping <$> applyMappings ann ctx g x')
+      <*> (ValuesMapping <$> applyMappings ann ctx h x')
     (FunctionCoproductMapping (LeftMapping g) (RightMapping h),
      CoproductMapping (ChoiceMapping a) (LeftMapping b) (RightMapping d)) ->
       CoproductMapping (ChoiceMapping a)
-      <$> (LeftMapping <$> applyMappings ann g b)
-      <*> (RightMapping <$> applyMappings ann h d)
+      <$> (LeftMapping <$> applyMappings ann ctx g b)
+      <*> (RightMapping <$> applyMappings ann ctx h d)
     _ -> Left (ErrorMessage ann ("unable to apply mappings:\n" <> pack (show f) <> "\n<---\n" <> pack (show x)))
 
 
@@ -910,8 +920,8 @@ translateEquality ann ctx t x y = do
 applyEqualityToMappings
   :: ann
   -> OSL.Type ann
-  -> Mapping S11.Term
-  -> Mapping S11.Term
+  -> Mapping ann S11.Term
+  -> Mapping ann S11.Term
   -> Either (ErrorMessage ann) S11.Formula
 applyEqualityToMappings ann t x y =
   case (x,y,t) of
