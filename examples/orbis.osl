@@ -1,0 +1,252 @@
+data Byte ~= Fin(256).
+
+data ByteString ~= List^8192(Byte).
+
+data Datum ~= ByteString.
+
+data Redeemer ~= ByteString.
+
+data F ~= Fin(18446744069414584321).
+
+data PubKeyHash ~= F.
+
+data Time ~= F.
+
+data ValidRange ~= Time * Time.
+
+data MintQuantity ~= Z.
+
+data CurrencySymbol ~= F.
+
+data TokenName ~= F.
+
+data AssetClass ~= CurrencySymbol * TokenName.
+
+data Mint ~= Map^128(AssetClass, MintQuantity).
+
+data Quantity ~= N.
+
+data Value ~= Map^128(AssetClass, Quantity).
+
+data Fee ~= Value.
+
+data Address ~= F.
+
+data ScriptAddress ~= F.
+
+data RootOut ~= Address * Value.
+
+data TxOut ~= Address * Value * Maybe(Datum * Redeemer).
+
+data TxId ~= Time * F.
+
+data RootOutRefIndex ~= F.
+
+data TxOutRefIndex ~= F.
+
+data RootOutRef ~= Time * RootOutRefIndex.
+
+data TxOutRef ~= TxId * TxOutRefIndex.
+
+data LeafOut ~= TxOutRef + RootOutRef.
+
+data SpendIn ~= TxOutRef + RootOutRef.
+
+data RefIn ~= TxOutRef + RootOutRef.
+
+data MintInputs ~= Map^8(CurrencySymbol, Datum * Redeemer).
+
+data Signatories ~= List^128(PubKeyHash).
+
+data Tx ~=
+    List^128(SpendIn)
+  * List^128(RefIn)
+  * List^128(TxOut)
+  * Fee
+  * Mint
+  * MintInputs
+  * ValidRange
+  * Signatories.
+
+data Unit ~= Fin(1).
+
+def unit : Unit := to(Unit)(fin(0)).
+
+data Rollup ~=
+    Map^18446744069414584321(TxId, Tx)
+  * Map^18446744069414584321(Time, List^128(RootOut))
+  * Map^18446744069414584321(LeafOut, Unit).
+
+def spendingInputs : Tx -> List^128(SpendIn)
+  := \t : Tx => pi1(from(Tx)(t)).
+
+def referenceInputs : Tx -> List^128(RefIn)
+  := \t : Tx => pi1(pi2(from(Tx)(t))).
+
+def outputs : Tx -> List^128(TxOut)
+  := \t : Tx => pi1(pi2(pi2(from(Tx)(t)))).
+
+def fee : Tx -> Fee
+  := \t : Tx => pi1(pi2(pi2(pi2(from(Tx)(t))))).
+
+def mint : Tx -> Mint
+  := \t : Tx => pi1(pi2(pi2(pi2(pi2(from(Tx)(t)))))).
+
+def mintInputs : Tx -> MintInputs
+  := \t : Tx => pi1(pi2(pi2(pi2(pi2(pi2(from(Tx)(t))))))).
+
+def validRange : Tx -> ValidRange
+  := \t : Tx => pi1(pi2(pi2(pi2(pi2(pi2(pi2(from(Tx)(t)))))))).
+
+def signatories : Tx -> Signatories
+  := \t : Tx => pi2(pi2(pi2(pi2(pi2(pi2(pi2(from(Tx)(t)))))))).
+
+def txs : Rollup -> Map^18446744069414584321(TxId, Tx)
+  := \r : Rollup => pi1(from(Rollup)(r)).
+
+def roots : Rollup -> Map^18446744069414584321(Time, List^128(RootOut))
+  := \r : Rollup => pi1(pi2(from(Rollup)(r))).
+
+def leaves : Rollup -> Map^18446744069414584321(LeafOut, Unit)
+  := \r : Rollup => pi2(pi2(from(Rollup)(r))).
+
+def txOutRefId : TxOutRef -> TxId
+  := \r : TxOutRef => pi1(from(TxOutRef)(r)).
+
+def txIdTime : TxId -> Time
+  := \i : TxId => pi1(from(TxId)(i)).
+
+def txOutRefIndex : TxOutRef -> TxOutRefIndex
+  := \r : TxOutRef => pi2(from(TxOutRef)(r)).
+
+def rootOutRef : RootIn -> RootOutRef
+  := \i : RootIn => pi1(from(RootIn)(i)).
+
+def rootOut : RootIn -> RootOut
+  := \i : RootIn => pi2(from(RootIn)(i)).
+
+def rootOutRefTime : RootOutRef -> Time
+  := \r : RootOutRef => pi1(from(RootOutRef)(r)).
+
+def rootOutRefIndex : RootOutRef -> RootOutRefIndex
+  := \r : RootOutRef => pi2(from(RootOutRef)(r)).
+
+def txOutAddress : TxOut -> Address
+  := \o : TxOut => pi1(from(TxOut)(o)).
+
+def value : TxOut -> Value
+  := \o : TxOut => pi2(pi2(from(TxOut)(o))).
+
+def values : List^128(TxOut) -> List^128(Value)
+  := \vs : List^128(TxOut) => List(pi2)(List(pi2)(List(from(TxOut))(vs))).
+
+def scriptInfo : TxOut -> Maybe(Datum * Redeemer * ScriptAddress)
+  := \o : TxOut => pi2(pi2(from(TxOut)(o))).
+
+def currencySymbol : AssetClass -> CurrencySymbol
+  := \a : AssetClass => pi1(from(AssetClass)(a)).
+
+def tokenName : AssetClass -> TokenName
+  := \a : AssetClass => pi2(from(AssetClass)(a)).
+
+def start : ValidRange -> Time
+  := \r : ValidRange => pi1(from(ValidRange)(r)).
+
+def end : ValidRange -> Time
+  := \r : ValidRange => pi2(from(ValidRange)(r)).
+
+def feeValue : Fee -> Value := from(Fee).
+
+def mintValue := Mint -> Map(AssetClass, MintQuantity) := from(Mint).
+
+def valueMap : Value -> Map(AssetClass, Quantity) := from(Value).
+
+def mintInputsMap : MintInputs -> Map(CurrencySymbol, Datum * Redeemer)
+  := from(MintInputs).
+
+def getSignatories : Signatories -> List(PubKeyHash)
+  := from(Signatories).
+
+def getQuantity : Quantity -> N
+  := from(Quantity).
+
+def getMintQuantity : MintQuantity -> Z
+  := from(MintQuantity).
+
+def makeCurrencySymbol : ScriptAddress -> CurrencySymbol
+  := \a : ScriptAddress => to(CurrencySymbol)(from(ScriptAddress)(a)).
+
+def fromScriptAddress : ScriptAddress -> Address
+  := \a : ScriptAddress => to(Address)(from(ScriptAddress)(a)).
+
+def fromPubKeyHash : PubKeyHash -> Address
+  := \h : PubKeyHash => to(Address)(from(PubKeyHash)(h)).
+
+def txOutToLeaf : TxOutRef -> LeafOut
+  := \r : TxOutRef => to(LeafOut)(iota1(r)).
+
+def rootOutToLeaf : RootOutRef -> LeafOut
+  := \r : RootOutRef => to(LeafOut)(iota2(r)).
+
+def datumSize : Datum -> N
+  := \d : Datum => length(from(Datum)(d)).
+
+def datumSizes : List(Datum) -> List(N)
+  := \ds : List(Datum) => List(length)(List(from(Datum))(ds)).
+
+def redeemerSize : Redeemer -> N
+  := \r : Redeemer => length(from(Redeemer(r))).
+
+def redeemerSizes : List(Redeemer) -> List(N)
+  := \rs : List(Redeemer) => List(length)(List(from(Redeemer))(r)).
+
+data Minting ~= CurrencySymbol.
+
+data Spending ~= TxOutRef.
+
+data ScriptPurpose ~= Minting + Spending.
+
+data ScriptContext ~= Tx * ScriptPurpose.
+
+def makeContext : (Tx * ScriptPurpose) -> ScriptContext := to(ScriptContext).
+
+def minting : CurrencySymbol -> ScriptPurpose
+  := \s : CurrencySymbol => to(ScriptPurpose)(iota1(to(Minting)(s))).
+
+def spending : TxOutRef -> ScriptPurpose
+  := \r : TxOutRef => to(ScriptPurpose)(iota2(to(Spending)(r))).
+
+data Steps ~= N.
+
+data ScriptSize ~= N.
+
+accepts
+  : ScriptAddress
+  -> ScriptSize
+  -> Steps
+  -> Datum
+  -> Redeemer
+  -> ScriptContext
+  -> Prop.
+
+data Frac ~= N.
+
+def precision : N := 32.
+
+def toFrac : N -> Frac
+  := \x : N => to(Frac)(precision *N cast(x)).
+
+def add : Frac -> Frac -> Frac
+  := \x : Frac => \y : Frac
+  => to(Frac)(from(Frac)(x) +N from(Frac)(y)).
+
+def isProd : Frac -> Frac -> Frac -> Prop
+  := \x : Frac => \y : Frac => \z : Frac
+  => precision *N from(Frac)(z)
+   = from(Frac)(x) *N from(Frac)(y).
+
+def roundsUpTo : Frac -> N -> Prop
+  := \x : Frac => \y : N
+  => (from(Frac)(x) <= precision *N y)
+   & ((cast(precision *N y) +Z ((-1Z) *Z cast(from(Frac)(x))))
+      <= cast(precision) +Z (-1Z)).
