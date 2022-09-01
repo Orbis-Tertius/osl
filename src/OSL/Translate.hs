@@ -133,7 +133,7 @@ translate ctx@(TranslationContext
             <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' n a c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     OSL.Lambda _ v vT t ->
-      pure (Mapping (LambdaMapping v vT t))
+      pure (Mapping (LambdaMapping ctx v vT t))
     OSL.Apply _ (OSL.Lambda _ varName varType body) x -> do
       xM <- translateToMapping ctx varType x
       let decls' = OSL.ValidContext
@@ -724,10 +724,10 @@ translateToFormula
   => TranslationContext ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Formula
-translateToFormula c@(TranslationContext decls mappings) t =
+translateToFormula c t =
   case translate c (OSL.Prop (termAnnotation t)) t of
     Right (Formula f) -> pure f
-    Right (Mapping (LambdaMapping _ _ _)) ->
+    Right (Mapping (LambdaMapping (TranslationContext decls mappings) _ _ _)) ->
       case t of
         OSL.Lambda _ varName varType body -> do
           let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
@@ -749,9 +749,9 @@ applyMappings
   -> Mapping ann S11.Term
   -> Mapping ann S11.Term
   -> Either (ErrorMessage ann) (Mapping ann S11.Term)
-applyMappings ann ctx@(TranslationContext decls mappings) f x =
+applyMappings ann ctx f x =
   case (f, x) of
-    (LambdaMapping v vT t, _) -> do
+    (LambdaMapping (TranslationContext decls mappings) v vT t, _) -> do
       let decls' = addDeclaration v (OSL.FreeVariable vT) decls
           ctx' = TranslationContext decls' mappings
       ctx'' <- runIdentity . runExceptT

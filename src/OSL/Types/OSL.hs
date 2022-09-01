@@ -169,6 +169,7 @@ data Declaration ann =
     FreeVariable (Type ann)
   | Data (Type ann)
   | Defined (Type ann) (Term ann)
+  deriving Show
 
 
 newtype Context ann = Context { unContext :: [(Name, Declaration ann)] }
@@ -176,3 +177,4 @@ newtype Context ann = Context { unContext :: [(Name, Declaration ann)] }
 
 newtype ValidContext ann =
   ValidContext { unValidContext :: Map Name (Declaration ann) }
+  deriving Show

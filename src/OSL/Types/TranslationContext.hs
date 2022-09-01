@@ -30,7 +30,7 @@ data TranslationContext ann =
   { context :: OSL.ValidContext ann
   , mappings :: Map OSL.Name (Mapping ann S11.Term)
   }
-  deriving Generic
+  deriving (Show, Generic)
 
 
 data Mapping ann a =
@@ -56,7 +56,11 @@ data Mapping ann a =
     (KeysMapping ann a)
     (KeyIndicatorMapping ann a)
     (ValuesMapping ann a)
-  | LambdaMapping OSL.Name (OSL.Type ann) (OSL.Term ann)
+  | LambdaMapping
+    (TranslationContext ann)
+    OSL.Name
+    (OSL.Type ann)
+    (OSL.Term ann)
   deriving Show
 
 
@@ -93,7 +97,7 @@ instance Functor (Mapping ann) where
         (KeysMapping (f <$> b))
         (KeyIndicatorMapping (f <$> c))
         (ValuesMapping (f <$> d))
-      LambdaMapping v vT t -> LambdaMapping v vT t
+      LambdaMapping ctx v vT t -> LambdaMapping ctx v vT t
 
 
 instance Foldable (Mapping ann) where
@@ -116,7 +120,7 @@ instance Foldable (Mapping ann) where
                  (ValuesMapping z) ->
         foldMap f w <> foldMap f x
           <> foldMap f y <> foldMap f z
-      LambdaMapping _ _ _ -> mempty
+      LambdaMapping _ _ _ _ -> mempty
 
 
 newtype LeftMapping ann a
