@@ -555,8 +555,10 @@ inferType c t =
     ConstN ann _ -> return (N ann)
     ConstZ ann _ -> return (Z ann)
     ConstFin ann _ -> Left (ErrorMessage ann "cannot infer cardinality of type of finite constant")
-    AddN ann -> return (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
-    MulN ann -> return (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
+    AddN ann -> pure (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
+    MulN ann -> pure (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
+    AddZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
+    MulZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
     Cast ann -> Left (ErrorMessage ann "cannot infer the type of cast from context")
     To ann name -> do
       a <- getNamedType c ann name
