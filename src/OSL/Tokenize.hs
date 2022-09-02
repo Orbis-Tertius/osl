@@ -7,7 +7,7 @@ module OSL.Tokenize (tokenize) where
 import Control.Monad (void)
 import Data.Either.Combinators (mapLeft)
 import Data.Text (Text, pack, cons)
-import Text.Parsec (SourceName, SourcePos, getPosition, eof, oneOf, (<|>), try, string, noneOf, anyChar, choice, char, many1)
+import Text.Parsec (SourceName, SourcePos, getPosition, eof, oneOf, (<|>), try, string, noneOf, anyChar, choice, char, many1, lookAhead)
 import Text.Parsec.Prim (parse, many)
 import Text.Parsec.Text (Parser)
 
@@ -63,7 +63,10 @@ token =
   $
   try
   <$>
-  [ T.Keyword <$> keyword
+  [ T.Keyword <$>
+    (do tok <- keyword
+        _ <- lookAhead (noneOf (['a'..'z'] <> ['A'..'Z'] <> "_" <> ['0'..'9'] <> "_\'"))
+        pure tok)
   , T.ThinArrow <$ string "->"
   , T.ThinArrow <$ string "→"
   , T.OpenParen <$ string "("

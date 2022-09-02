@@ -641,6 +641,23 @@ inferType c t =
         List _ n (Maybe _ (List _ _ _)) ->
           return (List ann n (Maybe ann (N ann)))
         _ -> Left (ErrorMessage ann "List(Maybe(length)) applied to a non-List-of-Maybe-Lists")
+    Apply ann (ListTo _ name) xs -> do
+      a <- getNamedType c ann name
+      xsT <- inferType c xs
+      case xsT of
+        List _ n a' -> do
+          checkTypeInclusion c ann a a'
+          pure (List ann n (NamedType ann name))
+        _ -> Left (ErrorMessage ann "expected a list")
+    Apply ann (ListFrom _ name) xs -> do
+      a <- getNamedType c ann name
+      xsT <- inferType c xs
+      case xsT of
+        List _ n (NamedType _ name') ->
+          if name == name'
+          then pure (List ann n a)
+          else Left (ErrorMessage ann "type name mismatch in inferring type of List(to) application")
+        _ -> Left (ErrorMessage ann "expected a list of a named type")
     Apply ann (Sum _) xs -> do
       a <- inferType c xs
       case a of

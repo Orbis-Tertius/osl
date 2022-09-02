@@ -36,7 +36,7 @@ data ScriptAddress ~= F.
 
 data RootOut ~= Address * Value.
 
-data TxOut ~= Address * Value * Maybe(Datum * Redeemer).
+data TxOut ~= Address * Value * Maybe(Datum * Redeemer * ScriptAddress).
 
 data TxId ~= Time * F.
 
@@ -49,6 +49,8 @@ data RootOutRef ~= Time * RootOutRefIndex.
 data TxOutRef ~= TxId * TxOutRefIndex.
 
 data LeafOut ~= TxOutRef + RootOutRef.
+
+data RootIn ~= RootOutRef * RootOut.
 
 data SpendIn ~= TxOutRef + RootOutRef.
 
@@ -135,10 +137,10 @@ def txOutAddress : TxOut -> Address
   := \o : TxOut => pi1(from(TxOut)(o)).
 
 def value : TxOut -> Value
-  := \o : TxOut => pi2(pi2(from(TxOut)(o))).
+  := \o : TxOut => pi1(pi2(from(TxOut)(o))).
 
 def values : List^128(TxOut) -> List^128(Value)
-  := \vs : List^128(TxOut) => List(pi2)(List(pi2)(List(from(TxOut))(vs))).
+  := \vs : List^128(TxOut) => List(pi1)(List(pi2)(List(from(TxOut))(vs))).
 
 def scriptInfo : TxOut -> Maybe(Datum * Redeemer * ScriptAddress)
   := \o : TxOut => pi2(pi2(from(TxOut)(o))).
@@ -157,14 +159,14 @@ def end : ValidRange -> Time
 
 def feeValue : Fee -> Value := from(Fee).
 
-def mintValue := Mint -> Map(AssetClass, MintQuantity) := from(Mint).
+def mintValue : Mint -> Map^128(AssetClass, MintQuantity) := from(Mint).
 
-def valueMap : Value -> Map(AssetClass, Quantity) := from(Value).
+def valueMap : Value -> Map^128(AssetClass, Quantity) := from(Value).
 
-def mintInputsMap : MintInputs -> Map(CurrencySymbol, Datum * Redeemer)
+def mintInputsMap : MintInputs -> Map^8(CurrencySymbol, Datum * Redeemer)
   := from(MintInputs).
 
-def getSignatories : Signatories -> List(PubKeyHash)
+def getSignatories : Signatories -> List^128(PubKeyHash)
   := from(Signatories).
 
 def getQuantity : Quantity -> N
@@ -189,16 +191,16 @@ def rootOutToLeaf : RootOutRef -> LeafOut
   := \r : RootOutRef => to(LeafOut)(iota2(r)).
 
 def datumSize : Datum -> N
-  := \d : Datum => length(from(Datum)(d)).
+  := \d : Datum => length(from(ByteString)(from(Datum)(d))).
 
-def datumSizes : List(Datum) -> List(N)
-  := \ds : List(Datum) => List(length)(List(from(Datum))(ds)).
+def datumSizes : List^128(Datum) -> List^128(N)
+  := \ds : List^128(Datum) => List(length)(List(from(ByteString))(List(from(Datum))(ds))).
 
 def redeemerSize : Redeemer -> N
-  := \r : Redeemer => length(from(Redeemer(r))).
+  := \r : Redeemer => length(from(ByteString)(from(Redeemer)(r))).
 
-def redeemerSizes : List(Redeemer) -> List(N)
-  := \rs : List(Redeemer) => List(length)(List(from(Redeemer))(r)).
+def redeemerSizes : List^128(Redeemer) -> List^128(N)
+  := \rs : List^128(Redeemer) => List(length)(List(from(ByteString))(List(from(Redeemer))(rs))).
 
 data Minting ~= CurrencySymbol.
 
@@ -231,7 +233,7 @@ accepts
 
 data Frac ~= N.
 
-def precision : N := 32.
+def precision : N := 32N.
 
 def toFrac : N -> Frac
   := \x : N => to(Frac)(precision *N cast(x)).
@@ -242,11 +244,11 @@ def add : Frac -> Frac -> Frac
 
 def isProd : Frac -> Frac -> Frac -> Prop
   := \x : Frac => \y : Frac => \z : Frac
-  => precision *N from(Frac)(z)
-   = from(Frac)(x) *N from(Frac)(y).
+  => (precision *N from(Frac)(z))
+   = (from(Frac)(x) *N from(Frac)(y)).
 
 def roundsUpTo : Frac -> N -> Prop
   := \x : Frac => \y : N
-  => (from(Frac)(x) <= precision *N y)
+  => (from(Frac)(x) <= (precision *N y))
    & ((cast(precision *N y) +Z ((-1Z) *Z cast(from(Frac)(x))))
-      <= cast(precision) +Z (-1Z)).
+      <= (cast(precision) +Z (-1Z))).
