@@ -222,14 +222,17 @@ data Steps ~= N.
 
 data ScriptSize ~= N.
 
-accepts
+def accepts
   : ScriptAddress
   -> ScriptSize
   -> Steps
   -> Datum
   -> Redeemer
   -> ScriptContext
-  -> Prop.
+  -> Prop
+  := \a : ScriptAddress => \sz : ScriptSize => \s : Steps
+  => \d : Datum => \r : Redeemer => \c : ScriptContext
+  => 0N = 0N. -- TODO: make this a free variable.
 
 data Frac ~= N.
 
