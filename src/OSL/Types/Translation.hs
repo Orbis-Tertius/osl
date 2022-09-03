@@ -5,7 +5,7 @@ import OSL.Types.Sigma11 (Formula, Term)
 import OSL.Types.TranslationContext (Mapping)
 
 
-data Translation =
+data Translation ann =
     Formula Formula
   | Term Term
-  | Mapping (Mapping Term)
+  | Mapping (Mapping ann Term)

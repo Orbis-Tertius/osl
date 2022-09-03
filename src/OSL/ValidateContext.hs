@@ -544,15 +544,21 @@ checkBound c t bound =
                      "expected a map bound")
 
 
-inferType :: Show ann => ValidContext ann -> Term ann -> Either (ErrorMessage ann) (Type ann)
+inferType
+  :: Show ann
+  => ValidContext ann
+  -> Term ann
+  -> Either (ErrorMessage ann) (Type ann)
 inferType c t =
   case t of
     NamedTerm ann name -> getNamedTermType c ann name
     ConstN ann _ -> return (N ann)
     ConstZ ann _ -> return (Z ann)
     ConstFin ann _ -> Left (ErrorMessage ann "cannot infer cardinality of type of finite constant")
-    AddN ann -> return (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
-    MulN ann -> return (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
+    AddN ann -> pure (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
+    MulN ann -> pure (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
+    AddZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
+    MulZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
     Cast ann -> Left (ErrorMessage ann "cannot infer the type of cast from context")
     To ann name -> do
       a <- getNamedType c ann name
@@ -637,6 +643,23 @@ inferType c t =
         List _ n (Maybe _ (List _ _ _)) ->
           return (List ann n (Maybe ann (N ann)))
         _ -> Left (ErrorMessage ann "List(Maybe(length)) applied to a non-List-of-Maybe-Lists")
+    Apply ann (ListTo _ name) xs -> do
+      a <- getNamedType c ann name
+      xsT <- inferType c xs
+      case xsT of
+        List _ n a' -> do
+          checkTypeInclusion c ann a a'
+          pure (List ann n (NamedType ann name))
+        _ -> Left (ErrorMessage ann "expected a list")
+    Apply ann (ListFrom _ name) xs -> do
+      a <- getNamedType c ann name
+      xsT <- inferType c xs
+      case xsT of
+        List _ n (NamedType _ name') ->
+          if name == name'
+          then pure (List ann n a)
+          else Left (ErrorMessage ann "type name mismatch in inferring type of List(to) application")
+        _ -> Left (ErrorMessage ann "expected a list of a named type")
     Apply ann (Sum _) xs -> do
       a <- inferType c xs
       case a of
