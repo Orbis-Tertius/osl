@@ -20,6 +20,7 @@ library
     OSL.TranslationContext
     OSL.Type
     OSL.Types.Arity
+    OSL.Types.Cardinality
     OSL.Types.DeBruijnIndex
     OSL.Types.ErrorMessage
     OSL.Types.Keyword

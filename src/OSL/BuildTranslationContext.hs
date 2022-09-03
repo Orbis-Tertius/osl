@@ -8,6 +8,7 @@ module OSL.BuildTranslationContext
   , buildTranslationContext'
   , addFreeVariableMapping
   , addMapping
+  , addTermMapping
   , addFreeVariableDeclaration
   , getFreeVariables
   , getBoundS11NamesInContext
@@ -67,7 +68,7 @@ addFreeVariableMapping
   :: Monad m
   => OSL.Name
   -> StateT (TranslationContext ann)
-       (ExceptT (ErrorMessage ann) m) (Mapping S11.Name)
+       (ExceptT (ErrorMessage ann) m) (Mapping ann S11.Name)
 addFreeVariableMapping freeVariable = do
   TranslationContext c _ <- get
   let decl = getExistingDeclaration c freeVariable
@@ -163,10 +164,19 @@ addFreeVariableMapping freeVariable = do
 addMapping
   :: Monad m
   => OSL.Name
-  -> Mapping S11.Name
+  -> Mapping ann S11.Name
   -> StateT (TranslationContext ann) m ()
 addMapping name mapping =
-  modify ( #mappings %~ Map.insert name (S11.Var <$> mapping) )
+  addTermMapping name (S11.Var <$> mapping)
+
+
+addTermMapping
+  :: Monad m
+  => OSL.Name
+  -> Mapping ann S11.Term
+  -> StateT (TranslationContext ann) m ()
+addTermMapping name mapping =
+  modify ( #mappings %~ Map.insert name mapping )
 
 
 addFreeVariableDeclaration
@@ -195,7 +205,10 @@ getBoundS11NamesInContext arity (TranslationContext _ ctx) =
     $ getBoundS11NamesInMapping arity <$> ctx
 
 
-getBoundS11NamesInMapping :: Arity -> Mapping S11.Term -> Set S11.Name
+getBoundS11NamesInMapping
+  :: Arity
+  -> Mapping ann S11.Term
+  -> Set S11.Name
 getBoundS11NamesInMapping arity =
   \case
     ScalarMapping name -> f name
@@ -213,7 +226,8 @@ getBoundS11NamesInMapping arity =
     MapMapping (LengthMapping a) (KeysMapping b)
         (KeyIndicatorMapping c) (ValuesMapping d) ->
       rec a `Set.union` (rec b `Set.union` (rec c `Set.union` rec d))
-    LambdaMapping -> mempty
+    LambdaMapping _ _ _ _ -> mempty
+    PropMapping _ -> mempty
   where
     f :: S11.Term -> Set S11.Name
     f (S11.Var name) = g name
@@ -272,8 +286,8 @@ getFreeOSLName (TranslationContext (ValidContext c) _) =
 
 mapAritiesInMapping
   :: (Arity -> Arity)
-  -> Mapping S11.Name
-  -> Mapping S11.Name
+  -> Mapping ann S11.Name
+  -> Mapping ann S11.Name
 mapAritiesInMapping f =
   \case
     ScalarMapping a ->
@@ -307,7 +321,8 @@ mapAritiesInMapping f =
       (KeysMapping (rec b))
       (KeyIndicatorMapping (rec c))
       (ValuesMapping (rec d))
-    LambdaMapping -> LambdaMapping
+    LambdaMapping ctx v vT t -> LambdaMapping ctx v vT t
+    PropMapping p -> PropMapping p
   where
     g (S11.Name arity i) = S11.Name (f arity) i
     rec = mapAritiesInMapping f
@@ -315,7 +330,7 @@ mapAritiesInMapping f =
 
 getFiniteDimMappingArity
   :: ann
-  -> Mapping S11.Name
+  -> Mapping ann S11.Name
   -> Either (ErrorMessage ann) Arity
 getFiniteDimMappingArity ann =
   \case
