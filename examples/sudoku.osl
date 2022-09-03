@@ -14,9 +14,9 @@ def getCell : Square → SquareCell → Cell
   ⇨ let s' : Fin(3) × Fin(3) := from(Square)(s);
     let c' : Fin(3) × Fin(3) := from(SquareCell)(c);
     to(Cell)(( to(Row)(cast((3N ×ℕ cast(π1(s')))
-                 +ℕ cast(pi1(c'))))
+                 +ℕ cast(π1(c'))))
              , to(Col)(cast((3N ×ℕ cast(π2(s')))
-                 +ℕ cast(pi2(c')))) )).
+                 +ℕ cast(π2(c')))) )).
 
 def solutionIsWellFormed : Solution → Prop
   := λs : Solution
