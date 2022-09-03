@@ -10,7 +10,7 @@ data Square ≅ Fin(3) × Fin(3).
 data SquareCell ≅ Fin(3) × Fin(3).
 
 def getCell : Square → SquareCell → Cell
-  := \s : Square ⇨ \c : SquareCell
+  := λs : Square ⇨ λc : SquareCell
   ⇨ let s' : Fin(3) × Fin(3) := from(Square)(s);
     let c' : Fin(3) × Fin(3) := from(SquareCell)(c);
     to(Cell)(( to(Row)(cast((3N ×ℕ cast(π1(s')))
@@ -19,18 +19,18 @@ def getCell : Square → SquareCell → Cell
                  +ℕ cast(pi2(c')))) )).
 
 def solutionIsWellFormed : Solution → Prop
-  := \s : Solution
+  := λs : Solution
   ⇨ let f : Cell → Value := from(Solution)(s);
      (∀r : Row, ∀v : Value, ∃c : Col, f(to(Cell)((r,c))) = v)
    ∧ (∀c : Col, ∀v : Value, ∃r : Row, f(to(Cell)((r,c))) = v)
    ∧ (∀r : Square, ∀v : Value, ∃c : SquareCell, f(getCell(r,c)) = v).
 
 def solutionMatchesProblem : Problem → Solution → Prop
-  := \p : Problem ⇨ \s : Solution
+  := λp : Problem ⇨ λs : Solution
   ⇨ let f : Cell → Maybe(Value) := from(Problem)(p);
-     let g : Cell → Value := from(Solution)(s);
-     ∀c : Cell, ((f(c) = nothing) ∨ (f(c) = just(g(c)))).
+    let g : Cell → Value := from(Solution)(s);
+    ∀c : Cell, ((f(c) = nothing) ∨ (f(c) = just(g(c)))).
 
 def problemIsSolvable : Problem → Prop
-  := \p : Problem ⇨ ∃s : Solution,
+  := λp : Problem ⇨ ∃s : Solution,
      solutionMatchesProblem(p, s) ∧ solutionIsWellFormed(s).
