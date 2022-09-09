@@ -50,7 +50,13 @@ translate ctx@(TranslationContext
       case Map.lookup name mappings of
         Just (ScalarMapping x) -> return (Term x)
         Just m -> return (Mapping m)
-        Nothing -> Left (ErrorMessage ann "un-mapped name")
+        Nothing ->
+          case Map.lookup name declsMap of
+            Just (OSL.Defined defType def) -> do
+              translate (TranslationContext decls mempty) defType def
+            _ ->
+              Left . ErrorMessage ann
+              $ "un-mapped name: " <> pack (show name)
     OSL.Apply ann (OSL.Apply _ (OSL.AddN _) a) b ->
       Term <$> (S11.Add <$> translateToTerm ctx (OSL.N ann) a
                         <*> translateToTerm ctx (OSL.N ann) b)

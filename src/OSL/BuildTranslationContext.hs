@@ -62,7 +62,9 @@ buildTranslationContext' c freeVariables =
 buildTranslationContext
   :: ValidContext ann
   -> Either (ErrorMessage ann) (TranslationContext ann)
-buildTranslationContext c = buildTranslationContext' c (getFreeVariables c)
+buildTranslationContext c =
+  buildTranslationContext' c (getFreeVariables c)
+
 
 addFreeVariableMapping
   :: Monad m
