@@ -150,6 +150,8 @@ keyword =
   , K.Length <$ string "length"
   , K.Nth <$ string "nth"
   , K.Sum <$ string "Σ"
+  , K.SumMapLength <$ string "sumMapLength"
+  , K.SumListLookup <$ string "sumListLookup"
   , K.Sum <$ string "sum"
   , K.Pi1 <$ string "π1"
   , K.Pi1 <$ string "pi1"
@@ -162,8 +164,6 @@ keyword =
   , K.Map <$ string "Map"
   , K.Lookup <$ string "lookup"
   , K.Keys <$ string "keys"
-  , K.SumMapLength <$ string "sumMapLength"
-  , K.SumListLookup <$ string "sumListLookup"
   ]
 
 
