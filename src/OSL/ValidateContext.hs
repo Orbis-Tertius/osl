@@ -534,12 +534,14 @@ checkBound c t bound =
       case getDeclaration c name of
         Just (Data a) ->
           case bound of
+            ScalarBound _ boundTerm ->
+              checkTerm c (NamedType ann' name) boundTerm
             ToBound ann name' bound' ->
               if name == name'
               then checkBound c a bound'
               else Left (ErrorMessage ann "mismatching named type and to bound")
             _ -> Left (ErrorMessage (boundAnnotation bound)
-                        "expected a to bound")
+                        "expected a to bound or a scalar bound")
         _ -> Left (ErrorMessage ann' "expected the name of a type")
     Maybe _ a ->
       case bound of

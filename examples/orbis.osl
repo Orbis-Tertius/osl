@@ -244,6 +244,8 @@ def precision : N := 32N.
 def toFrac : N -> Frac
   := \x : N => to(Frac)(precision *N cast(x)).
 
+def maxFrac : Frac := toFrac(576460748008456192N).
+
 def add : Frac -> Frac -> Frac
   := \x : Frac => \y : Frac
   => to(Frac)(from(Frac)(x) +N from(Frac)(y)).
@@ -366,3 +368,18 @@ def paysFeeToCorrectAddress : FeeParams -> Tx -> Prop
    & (all i : N < length(keys(f)),
       let k : AssetClass := nth(keys(f), i);
       lookup(k, f) = lookup(k, from(Value)(value(o)))).
+
+def checkCost : FeeParams -> Tx -> List^128(ScriptSize * Steps) -> Frac -> Prop
+  := \p : FeeParams
+  => \t : Tx
+  => \s : List^128(ScriptSize * Steps)
+  => \x : Frac
+  => let scriptSizeAgg : N := from(ScriptSize)(sum(List(pi1)(s)));
+     let sumSteps : N := sum(List(from(Steps))(List(pi2)(s)));
+     some d : Frac < maxFrac,
+     some e : Frac < maxFrac,
+     some f : Frac < maxFrac,
+       isProd(a(p), toFrac(txSize(t)), d)
+     & isProd(b(p), toFrac(scriptSizeAgg), e)
+     & isProd(c(p), toFrac(sumSteps), f)
+     & (x = add(d, add(e, f))).

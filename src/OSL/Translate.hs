@@ -435,6 +435,8 @@ translate ctx@(TranslationContext
               pure . Mapping $ ListMapping lM (ValuesMapping kM)
             _ -> Left (ErrorMessage ann "expected a map mapping")
         _ -> Left (ErrorMessage ann "expected a map")
+    OSL.Apply ann (OSL.SumMapLength _) _ ->
+      Left (ErrorMessage ann "not implemented: sumMapLength translation")
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
