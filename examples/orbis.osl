@@ -282,3 +282,7 @@ def spendInListSize : List^128(SpendIn) -> N
 def refInListSize : List^128(RefIn) -> N
   := \x : List^128(RefIn)
   => bytesPerWord +N ((1N +N (3N *N bytesPerWord)) *N length(x)).
+
+def valueSize : Value -> N
+  := \x : Value
+  => bytesPerWord +N ((3N *N bytesPerWord) *N length(keys(from(Value)(x)))).
