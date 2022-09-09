@@ -321,3 +321,35 @@ def txSize : Tx -> N
   +N mintSize(mint(x))
   +N mintInputsSize(mintInputs(x))
   +N signatoriesSize(signatories(x)).
+
+data A ~= Frac.
+
+data B ~= Frac.
+
+data C ~= Frac.
+
+data F0 ~= Frac.
+
+data M ~= Frac.
+
+data FeePaymentAddress ~= Address.
+
+data FeeParams ~= A * B * C * F0 * M * FeePaymentAddress.
+
+def a : FeeParams -> Frac
+  := \x : FeeParams => from(A)(pi1(from(FeeParams)(x))).
+
+def b : FeeParams -> Frac
+  := \x : FeeParams => from(B)(pi1(pi2(from(FeeParams)(x)))).
+
+def c : FeeParams -> Frac
+  := \x : FeeParams => from(C)(pi1(pi2(pi2(from(FeeParams)(x))))).
+
+def f0 : FeeParams -> Frac
+  := \x : FeeParams => from(F0)(pi1(pi2(pi2(pi2(from(FeeParams)(x)))))).
+
+def m : FeeParams -> Frac
+  := \x : FeeParams => from(M)(pi1(pi2(pi2(pi2(pi2(from(FeeParams)(x))))))).
+
+def feePaymentAddress : FeeParams -> FeePaymentAddress
+  := \x : FeeParams => pi2(pi2(pi2(pi2(pi2(from(FeeParams)(x)))))).
