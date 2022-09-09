@@ -313,6 +313,24 @@ checkTerm c t x =
             then return ()
             else genericErrorMessage
         _ -> genericErrorMessage
+    ListMaybeTo ann name -> do
+      a <- getNamedType c ann name
+      case t of
+        F _ _ (List _ _ (Maybe _ a')) (List _ _ (Maybe _ (NamedType _ name'))) -> do
+          checkTypeInclusion c ann a a'
+          if name == name'
+            then return ()
+            else genericErrorMessage
+        _ -> genericErrorMessage
+    ListMaybeFrom ann name -> do
+      a <- getNamedType c ann name
+      case t of
+        F _ _ (List _ _ (Maybe _ (NamedType _ name'))) (List _ _ (Maybe _ a')) -> do
+          checkTypeInclusion c ann a a'
+          if name == name'
+            then return ()
+            else genericErrorMessage
+        _ -> genericErrorMessage
     ListLength _ ->
       case t of
         F _ _ (List _ _ (List _ _ _)) (List _ _ (N _)) -> return ()
@@ -612,6 +630,11 @@ inferType c t =
       case a of
         List _ n b -> return (F ann (Just n) (N ann) b)
         _ -> Left (ErrorMessage ann "nth applied to a non-List")
+    Apply ann (Length _) xs -> do
+      a <- inferType c xs
+      case a of
+        List _ _ _ -> pure (N ann)
+        _ -> Left (ErrorMessage ann "length applied to a non-List")
     Apply ann (ListPi1 _) xs -> do
       a <- inferType c xs
       case a of
@@ -651,6 +674,23 @@ inferType c t =
           checkTypeInclusion c ann a a'
           pure (List ann n (NamedType ann name))
         _ -> Left (ErrorMessage ann "expected a list")
+    Apply ann (ListMaybeTo _ name) xs -> do
+      a <- getNamedType c ann name
+      xsT <- inferType c xs
+      case xsT of
+        List _ n (Maybe _ a') -> do
+          checkTypeInclusion c ann a a'
+          pure (List ann n (Maybe ann (NamedType ann name)))
+        _ -> Left (ErrorMessage ann "expected a list")
+    Apply ann (ListMaybeFrom _ name) xs -> do
+      a <- getNamedType c ann name
+      xsT <- inferType c xs
+      case xsT of
+        List _ n (Maybe _ (NamedType _ name')) ->
+          if name == name'
+          then pure (List ann n (Maybe ann a))
+          else Left (ErrorMessage ann "type name mismatch in inferring type of List(Maybe(from)) application")
+        _ -> Left (ErrorMessage ann "expected a list of a named type")
     Apply ann (ListFrom _ name) xs -> do
       a <- getNamedType c ann name
       xsT <- inferType c xs
@@ -658,7 +698,7 @@ inferType c t =
         List _ n (NamedType _ name') ->
           if name == name'
           then pure (List ann n a)
-          else Left (ErrorMessage ann "type name mismatch in inferring type of List(to) application")
+          else Left (ErrorMessage ann "type name mismatch in inferring type of List(from) application")
         _ -> Left (ErrorMessage ann "expected a list of a named type")
     Apply ann (Sum _) xs -> do
       a <- inferType c xs

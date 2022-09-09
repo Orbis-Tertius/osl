@@ -107,6 +107,8 @@ data Term ann =
   | ListMaybePi1 ann
   | ListMaybePi2 ann
   | ListMaybeLength ann
+  | ListMaybeFrom ann Name
+  | ListMaybeTo ann Name
   | Sum ann
   | Lookup ann
   | Keys ann

@@ -47,6 +47,8 @@ termAnnotation =
     ListMaybePi1 ann -> ann
     ListMaybePi2 ann -> ann
     ListMaybeLength ann -> ann
+    ListMaybeTo ann _ -> ann
+    ListMaybeFrom ann _ -> ann
     Sum ann -> ann
     Lookup ann -> ann
     Keys ann -> ann

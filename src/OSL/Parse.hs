@@ -36,7 +36,7 @@ consume = token (unpack . printToken . fst) snd
 
 consumeExact :: Token -> (SourcePos -> a) -> Parser a
 consumeExact tok tm =
-  consume (\(t, p) -> guard (t == tok) >> return (tm p))
+  consume (\(t, p) -> guard (t == tok) >> pure (tm p))
 
 
 consumeExact_ :: Token -> Parser ()
@@ -51,7 +51,7 @@ context :: Parser (Context SourcePos)
 context = do
   decls <- many declaration
   eof
-  return (Context decls)
+  pure (Context decls)
 
 
 declaration :: Parser (Name, Declaration SourcePos)
@@ -70,7 +70,7 @@ dataDeclaration = do
   consumeExact_ T.Congruent
   t <- type0
   consumeExact_ T.Period
-  return (n, Data t)
+  pure (n, Data t)
 
 
 defDeclaration :: Parser (Name, Declaration SourcePos)
@@ -82,7 +82,7 @@ defDeclaration = do
   consumeExact_ T.DefEquals
   def <- term0
   consumeExact_ T.Period
-  return (n, Defined ty def)
+  pure (n, Defined ty def)
 
 
 freeDeclaration :: Parser (Name, Declaration SourcePos)
@@ -91,7 +91,7 @@ freeDeclaration = do
   consumeExact_ T.Colon
   t <- type0
   consumeExact_ T.Period
-  return (n, FreeVariable t)
+  pure (n, FreeVariable t)
 
 
 name :: Parser Name
@@ -111,8 +111,8 @@ type0 = do
     n <- optionMaybe cardinality
     Just . (n,) <$> type0
   case rest of
-    Nothing -> return t
-    Just (n, t') -> return (F p n t t')
+    Nothing -> pure t
+    Just (n, t') -> pure (F p n t t')
 
 
 type1 :: Parser (Type SourcePos)
@@ -121,9 +121,9 @@ type1 = do
   t <- type2
   ts <- option Nothing ((Just. Left <$> productTail) <|> (Just . Right <$> coproductTail))
   case ts of
-    Nothing -> return t
-    Just (Left ts') -> return (Product p t ts')
-    Just (Right ts') -> return (Coproduct p t ts')
+    Nothing -> pure t
+    Just (Left ts') -> pure (Product p t ts')
+    Just (Right ts') -> pure (Coproduct p t ts')
 
 
 productTail :: Parser (Type SourcePos)
@@ -133,8 +133,8 @@ productTail = do
   t <- type2
   ts <- option Nothing (Just <$> productTail)
   case ts of
-    Nothing -> return t
-    Just ts' -> return (Product p t ts')
+    Nothing -> pure t
+    Just ts' -> pure (Product p t ts')
 
 
 coproductTail :: Parser (Type SourcePos)
@@ -144,8 +144,8 @@ coproductTail = do
   t <- type2
   ts <- option Nothing (Just <$> coproductTail)
   case ts of
-    Nothing -> return t
-    Just ts' -> return (Coproduct p t ts')
+    Nothing -> pure t
+    Just ts' -> pure (Coproduct p t ts')
 
 
 type2 :: Parser (Type SourcePos)
@@ -171,7 +171,7 @@ parenthesizedType = do
   consumeExact_ T.OpenParen
   t <- type0
   consumeExact_ T.CloseParen
-  return t
+  pure t
 
 
 finiteType :: Parser (Type SourcePos)
@@ -180,10 +180,10 @@ finiteType = do
   consumeExact_ T.OpenParen
   t <- consume $
     \case
-      (T.Const i, p) -> return (Fin p i)
+      (T.Const i, p) -> pure (Fin p i)
       _ -> mzero
   consumeExact_ T.CloseParen
-  return t
+  pure t
 
 
 maybeType :: Parser (Type SourcePos)
@@ -193,7 +193,7 @@ maybeType = do
   consumeExact_ T.OpenParen
   t <- type0
   consumeExact_ T.CloseParen
-  return (Maybe p t)
+  pure (Maybe p t)
 
 
 listType :: Parser (Type SourcePos)
@@ -204,7 +204,7 @@ listType = do
   consumeExact_ T.OpenParen
   t <- type0
   consumeExact_ T.CloseParen
-  return (List p n t)
+  pure (List p n t)
 
 
 mapType :: Parser (Type SourcePos)
@@ -217,7 +217,7 @@ mapType = do
   consumeExact_ T.Comma
   t1 <- type0
   consumeExact_ T.CloseParen
-  return (Map p n t0 t1)
+  pure (Map p n t0 t1)
 
 
 term0 :: Parser (Term SourcePos)
@@ -249,7 +249,7 @@ quantifier tok ctor = do
   varBound <- optionMaybe (consumeExact_ T.Less >> bound0)
   consumeExact_ T.Comma
   q <- term0
-  return (ctor p varName varType varBound q)
+  pure (ctor p varName varType varBound q)
 
 
 bound0 :: Parser (Bound SourcePos)
@@ -265,7 +265,7 @@ bound0 = do
 
 
 -- The bound tail takes a constructor which takes the head
--- and returns the whole bound.
+-- and pures the whole bound.
 data BoundTail =
     ProductBoundTail [Bound SourcePos]
   | CoproductBoundTail [Bound SourcePos]
@@ -390,7 +390,7 @@ lambda = do
   varType <- type0
   consumeExact_ T.ThickArrow
   y <- term0
-  return (Lambda p varName varType y)
+  pure (Lambda p varName varType y)
 
 
 letExpr :: Parser (Term SourcePos)
@@ -404,13 +404,13 @@ letExpr = do
   def <- term0
   consumeExact_ T.Semicolon
   y <- term0
-  return (Let p varName varType def y)
+  pure (Let p varName varType def y)
 
 
 term1 :: Parser (Term SourcePos)
 term1 = do
   x <- term2
-  try (operatorOn x) <|> return x
+  try (operatorOn x) <|> pure x
 
 
 operatorOn :: Term SourcePos -> Parser (Term SourcePos)
@@ -418,26 +418,26 @@ operatorOn x = do
   p <- getPosition
   op <- consume $
     \case
-      (T.And, _) -> return T.And
-      (T.Or, _) -> return T.Or
-      (T.AddNOp, _) -> return T.AddNOp
-      (T.MulNOp, _) -> return T.MulNOp
-      (T.AddZOp, _) -> return T.AddZOp
-      (T.MulZOp, _) -> return T.MulZOp
-      (T.ProductOp, _) -> return T.ProductOp
-      (T.CoproductOp, _) -> return T.CoproductOp
-      (T.ThinArrow, _) -> return T.ThinArrow
-      (T.Equal, _) -> return T.Equal
-      (T.LessOrEqual, _) -> return T.LessOrEqual
+      (T.And, _) -> pure T.And
+      (T.Or, _) -> pure T.Or
+      (T.AddNOp, _) -> pure T.AddNOp
+      (T.MulNOp, _) -> pure T.MulNOp
+      (T.AddZOp, _) -> pure T.AddZOp
+      (T.MulZOp, _) -> pure T.MulZOp
+      (T.ProductOp, _) -> pure T.ProductOp
+      (T.CoproductOp, _) -> pure T.CoproductOp
+      (T.ThinArrow, _) -> pure T.ThinArrow
+      (T.Equal, _) -> pure T.Equal
+      (T.LessOrEqual, _) -> pure T.LessOrEqual
       _ -> Nothing
   xs <-
     if isAssociative op
     then do
       y <- term2
       ys <- many (consumeExact_ op >> term2)
-      return (y:ys)
+      pure (y:ys)
     else (:[]) <$> term2
-  return (foldl (opCtor op p) x xs)
+  pure (foldl (opCtor op p) x xs)
   where
     opCtor =
       \case
@@ -491,7 +491,7 @@ functionApplication = do
   arg <- term1
   args <- many (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
-  return (foldl (Apply p) f (arg:args))
+  pure (foldl (Apply p) f (arg:args))
 
 
 parenthesizedTerm :: Parser (Term SourcePos)
@@ -499,7 +499,7 @@ parenthesizedTerm = do
   consumeExact_ T.OpenParen
   x <- term0
   consumeExact_ T.CloseParen
-  return x
+  pure x
 
 
 term3 :: Parser (Term SourcePos)
@@ -568,9 +568,9 @@ constant :: Parser (Term SourcePos)
 constant =
   consume $
     \case
-      (T.ConstN i, p) -> return (ConstN p i)
-      (T.ConstZ i, p) -> return (ConstZ p i)
-      (T.ConstFin i, p) -> return (ConstFin p i)
+      (T.ConstN i, p) -> pure (ConstN p i)
+      (T.ConstZ i, p) -> pure (ConstZ p i)
+      (T.ConstFin i, p) -> pure (ConstFin p i)
       _ -> Nothing
 
 
@@ -580,85 +580,97 @@ builtin :: K.Keyword
 builtin k op = do
   p <- getPosition
   consumeExact_ (T.Keyword k)
-  return (op p)
+  pure (op p)
 
 
 functorApplication :: Parser (Term SourcePos)
 functorApplication = do
   (f, p) <- consume $
     \case
-      (T.Keyword K.List, p) -> return (K.List, p)
-      (T.Keyword K.Map, p) -> return (K.Map, p)
+      (T.Keyword K.List, p) -> pure (K.List, p)
+      (T.Keyword K.Map, p) -> pure (K.Map, p)
       _ -> Nothing
   case f of
     K.List -> do
       consumeExact_ T.OpenParen
       g <- consume $
         \case
-          (T.Keyword K.Pi1, _) -> return K.Pi1
-          (T.Keyword K.Pi2, _) -> return K.Pi2 
-          (T.Keyword K.To, _) -> return K.To
-          (T.Keyword K.From, _) -> return K.From
-          (T.Keyword K.Length, _) -> return K.Length
-          (T.Keyword K.Maybe, _) -> return K.Maybe
+          (T.Keyword K.Pi1, _) -> pure K.Pi1
+          (T.Keyword K.Pi2, _) -> pure K.Pi2 
+          (T.Keyword K.To, _) -> pure K.To
+          (T.Keyword K.From, _) -> pure K.From
+          (T.Keyword K.Length, _) -> pure K.Length
+          (T.Keyword K.Maybe, _) -> pure K.Maybe
           _ -> Nothing
       h <- case g of
-        K.Pi1 -> return (ListPi1 p)
-        K.Pi2 -> return (ListPi2 p)
+        K.Pi1 -> pure (ListPi1 p)
+        K.Pi2 -> pure (ListPi2 p)
         K.To -> do
           consumeExact_ T.OpenParen
           a <- name
           consumeExact_ T.CloseParen
-          return (ListTo p a)
+          pure (ListTo p a)
         K.From -> do
           consumeExact_ T.OpenParen
           a <- name
           consumeExact_ T.CloseParen
-          return (ListFrom p a)
-        K.Length -> return (ListLength p)
+          pure (ListFrom p a)
+        K.Length -> pure (ListLength p)
         K.Maybe -> do
           consumeExact_ T.OpenParen
           i <- consume $
             \case
-              (T.Keyword K.Pi1, _) -> return K.Pi1
-              (T.Keyword K.Pi2, _) -> return K.Pi2
-              (T.Keyword K.Length, _) -> return K.Length
+              (T.Keyword K.Pi1, _) -> pure K.Pi1
+              (T.Keyword K.Pi2, _) -> pure K.Pi2
+              (T.Keyword K.Length, _) -> pure K.Length
+              (T.Keyword K.To, _) -> pure K.To
+              (T.Keyword K.From, _) -> pure K.From
               _ -> Nothing
           j <- case i of
-            K.Pi1 -> return (ListMaybePi1 p)
-            K.Pi2 -> return (ListMaybePi2 p)
-            K.Length -> return (ListMaybeLength p)
+            K.Pi1 -> pure (ListMaybePi1 p)
+            K.Pi2 -> pure (ListMaybePi2 p)
+            K.Length -> pure (ListMaybeLength p)
+            K.To -> do
+              consumeExact_ T.OpenParen
+              x <- name
+              consumeExact_ T.CloseParen
+              pure (ListMaybeTo p x)
+            K.From -> do
+              consumeExact_ T.OpenParen
+              x <- name
+              consumeExact_ T.CloseParen
+              pure (ListMaybeFrom p x)
             _ -> mzero
           consumeExact_ T.CloseParen
-          return j
+          pure j
         _ -> mzero
       consumeExact_ T.CloseParen
-      return h
+      pure h
     K.Map -> do
       consumeExact_ T.OpenParen
       g <- consume $
         \case
-          (T.Keyword K.Pi1, _) -> return K.Pi1
-          (T.Keyword K.Pi2, _) -> return K.Pi2
-          (T.Keyword K.To, _) -> return K.To
-          (T.Keyword K.From, _) -> return K.From
+          (T.Keyword K.Pi1, _) -> pure K.Pi1
+          (T.Keyword K.Pi2, _) -> pure K.Pi2
+          (T.Keyword K.To, _) -> pure K.To
+          (T.Keyword K.From, _) -> pure K.From
           _ -> Nothing
       h <- case g of
-        K.Pi1 -> return (MapPi1 p)
-        K.Pi2 -> return (MapPi2 p)
+        K.Pi1 -> pure (MapPi1 p)
+        K.Pi2 -> pure (MapPi2 p)
         K.To -> do
           consumeExact_ T.OpenParen
           a <- name
           consumeExact_ T.CloseParen
-          return (MapTo p a)
+          pure (MapTo p a)
         K.From -> do
           consumeExact_ T.OpenParen
           a <- name
           consumeExact_ T.CloseParen
-          return (MapFrom p a)
+          pure (MapFrom p a)
         _ -> mzero
       consumeExact_ T.CloseParen
-      return h
+      pure h
     _ -> mzero
 
 
@@ -680,7 +692,7 @@ unaryOp subexpr opTok opCtor = do
   consumeExact_ T.OpenParen
   x <- subexpr
   consumeExact_ T.CloseParen
-  return (opCtor p x)
+  pure (opCtor p x)
 
 
 tuple :: Parser (Term SourcePos)
@@ -690,7 +702,7 @@ tuple = do
   x <- term1
   xs <- many1 (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
-  return
+  pure
     (foldl
       (\y z -> Apply p (Apply p (Pair p) y) z)
       x

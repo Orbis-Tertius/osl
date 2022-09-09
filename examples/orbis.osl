@@ -6,7 +6,10 @@ data Datum ~= ByteString.
 
 data Redeemer ~= ByteString.
 
+-- Goldilocks field size, 2^64-2^32+1.
 data F ~= Fin(18446744069414584321).
+
+def bytesPerWord : N := 8N.
 
 data PubKeyHash ~= F.
 
@@ -255,3 +258,19 @@ def roundsUpTo : Frac -> N -> Prop
   => (from(Frac)(x) <= (precision *N y))
    & ((cast(precision *N y) +Z ((-1Z) *Z cast(from(Frac)(x))))
       <= (cast(precision) +Z (-1Z))).
+
+def txOutListSize : List^128(TxOut) -> N
+  := \x : List^128(TxOut)
+  => let txdata : List^128(Maybe(Datum * Redeemer * ScriptAddress))
+       := List(pi2)(List(pi2)(List(from(TxOut))(x)));
+     let datums : List^128(Maybe(List^8192(Byte)))
+       := List(Maybe(from(ByteString)))
+            (List(Maybe(from(Datum)))
+              (List(Maybe(pi1))(txdata)));
+     let redeemers : List^128(Maybe(List^8192(Byte)))
+       := List(Maybe(from(ByteString)))
+            (List(Maybe(from(Redeemer)))
+              (List(Maybe(pi1))(List(Maybe(pi2))(txdata))));
+     (2N *N bytesPerWord *N length(x))
+  +N sum(List(Maybe(length))(datums))
+  +N sum(List(Maybe(length))(redeemers)).

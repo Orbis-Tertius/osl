@@ -231,11 +231,13 @@ translate ctx@(TranslationContext
         Nothing -> Left (ErrorMessage ann' "undefined name")
     OSL.Apply ann (OSL.ListFrom ann' name) xs ->
       case getDeclaration decls name of
-        Just (OSL.Data a) -> do
+        Just (OSL.Data _) -> do
           xsType <- inferType decls xs
           case xsType of
             OSL.List _ n _ ->
-              Mapping <$> translateToMapping ctx (OSL.List ann' n a) xs
+              Mapping <$> translateToMapping ctx
+                (OSL.List ann' n (OSL.NamedType ann' name))
+                xs
             _ -> Left (ErrorMessage ann "expected a list")
         Just _ -> Left (ErrorMessage ann' "expected the name of a type")
         Nothing -> Left (ErrorMessage ann' "undefined name")
@@ -246,6 +248,28 @@ translate ctx@(TranslationContext
         ListMapping lM (ValuesMapping (ListMapping (LengthMapping xslM) _)) ->
           pure . Mapping $ ListMapping lM (ValuesMapping xslM)
         _ -> Left (ErrorMessage ann "expected a list of lists")
+    OSL.Apply ann (OSL.ListMaybeTo ann' name) xs -> do
+      case getDeclaration decls name of
+        Just (OSL.Data a) -> do
+          xsType <- inferType decls xs
+          case xsType of
+            OSL.List _ n (OSL.Maybe _ _) ->
+              Mapping <$> translateToMapping ctx (OSL.List ann' n a) xs
+            _ -> Left (ErrorMessage ann "expected a list of maybe")
+        Just _ -> Left (ErrorMessage ann' "expected the name of a type")
+        Nothing -> Left (ErrorMessage ann' "undefined name")
+    OSL.Apply ann (OSL.ListMaybeFrom ann' name) xs -> do
+      case getDeclaration decls name of
+        Just (OSL.Data _) -> do
+          xsType <- inferType decls xs
+          case xsType of
+            OSL.List _ n (OSL.Maybe _ _) ->
+              Mapping <$> translateToMapping ctx
+                (OSL.List ann' n (OSL.NamedType ann' name))
+                xs
+            _ -> Left (ErrorMessage ann "expected a list of maybe")
+        Just _ -> Left (ErrorMessage ann' "expected the name of a type")
+        Nothing -> Left (ErrorMessage ann' "undefined name")
     OSL.Apply ann (OSL.ListMaybePi1 _) xs -> do
       xsType <- inferType decls xs
       xsM <- translateToMapping ctx xsType xs
