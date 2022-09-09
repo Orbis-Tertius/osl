@@ -204,7 +204,10 @@ translate ctx@(TranslationContext
       iT <- translateToTerm ctx (OSL.N ann) i
       xsType <- inferType decls xs
       xsM <- translateToMapping ctx xsType xs
-      Mapping <$> applyMappings ann ctx xsM (const iT <$> xsM)
+      case xsM of
+        ListMapping _ (ValuesMapping vM) ->
+          Mapping <$> mapNth ann ctx vM iT
+        _ -> Left (ErrorMessage ann "nth expected a list mapping")
     OSL.Apply ann (OSL.ListPi1 _) xs -> do
       xsType <- inferType decls xs
       xsM <- translateToMapping ctx xsType xs
@@ -807,6 +810,39 @@ applyMappings ann ctx f x =
       <$> (LeftMapping <$> applyMappings ann ctx g b)
       <*> (RightMapping <$> applyMappings ann ctx h d)
     _ -> Left (ErrorMessage ann ("unable to apply mappings:\n" <> pack (show f) <> "\n<---\n" <> pack (show x)))
+
+
+mapNth
+  :: ann
+  -> TranslationContext ann
+  -> Mapping ann S11.Term
+  -> S11.Term
+  -> Either (ErrorMessage ann) (Mapping ann S11.Term)
+mapNth ann ctx f i =
+  case f of
+    ScalarMapping f' -> ScalarMapping <$> applyTerms ann f' i
+    ProductMapping (LeftMapping g) (RightMapping h) ->
+      ProductMapping <$> (LeftMapping <$> mapNth ann ctx g i)
+                     <*> (RightMapping <$> mapNth ann ctx h i)
+    MaybeMapping (ChoiceMapping g) (ValuesMapping h) ->
+      MaybeMapping <$> (ChoiceMapping <$> mapNth ann ctx g i)
+                   <*> (ValuesMapping <$> mapNth ann ctx h i)
+    CoproductMapping (ChoiceMapping g) (LeftMapping h) (RightMapping j) ->
+      CoproductMapping
+      <$> (ChoiceMapping <$> mapNth ann ctx g i)
+      <*> (LeftMapping <$> mapNth ann ctx h i)
+      <*> (RightMapping <$> mapNth ann ctx j i)
+    MapMapping (LengthMapping g) (KeysMapping h) (KeyIndicatorMapping j)
+               (ValuesMapping k) ->
+      MapMapping
+      <$> (LengthMapping <$> mapNth ann ctx g i)
+      <*> (KeysMapping <$> mapNth ann ctx h i)
+      <*> (KeyIndicatorMapping <$> mapNth ann ctx j i)
+      <*> (ValuesMapping <$> mapNth ann ctx k i)
+    ListMapping (LengthMapping g) (ValuesMapping h) ->
+      ListMapping <$> (LengthMapping <$> mapNth ann ctx g i)
+                  <*> (ValuesMapping <$> mapNth ann ctx h i)
+    _ -> Left (ErrorMessage ann "could not apply mappings in nth application")
 
 
 applyTerms

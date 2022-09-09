@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
 
@@ -12,6 +13,7 @@ import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try,
 import qualified Text.Parsec.Prim as Prim
 
 import OSL.Bound (boundAnnotation)
+import OSL.Die (die)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.OSL (Context (..), Name, Declaration (..), Term (..), Type (..), Bound (..), LeftBound (..), RightBound (..), Cardinality (..), ValuesBound (..), KeysBound (..), DomainBound (..), CodomainBound (..))
 import qualified OSL.Types.Keyword as K
@@ -119,7 +121,7 @@ type1 :: Parser (Type SourcePos)
 type1 = do
   p <- getPosition
   t <- type2
-  ts <- option Nothing ((Just. Left <$> productTail) <|> (Just . Right <$> coproductTail))
+  ts <- option Nothing ((Just . Left <$> productTail) <|> (Just . Right <$> coproductTail))
   case ts of
     Nothing -> pure t
     Just (Left ts') -> pure (Product p t ts')
@@ -702,8 +704,11 @@ tuple = do
   x <- term1
   xs <- many1 (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
-  pure
-    (foldl
-      (\y z -> Apply p (Apply p (Pair p) y) z)
-      x
-      xs)
+  case reverse (x:xs) of
+    (x':xs') ->
+      pure
+        (foldr
+          (\y z -> Apply p (Apply p (Pair p) y) z)
+          x'
+          xs')
+    [] -> die "logical impossibility: reverse of non-empty list is empty"

@@ -429,10 +429,7 @@ checkTerm c t x =
       case t of
         Prop _ -> do
           a <- case inferType c y of
-            Left _ -> do
-              a <- inferType c z
-              checkTerm c a y
-              return a
+            Left err -> Left err
             Right a -> do
               checkTerm c a z
               return a
@@ -628,10 +625,11 @@ inferType c t =
       case a of
         Maybe _ b -> return b
         _ -> Left (ErrorMessage ann "exists applied to a non-Maybe")
-    Apply ann (Nth _) xs -> do
+    Apply ann (Apply _ (Nth _) xs) i -> do
       a <- inferType c xs
+      checkTerm c (N ann) i
       case a of
-        List _ n b -> return (F ann (Just n) (N ann) b)
+        List _ _ b -> pure b
         _ -> Left (ErrorMessage ann "nth applied to a non-List")
     Apply ann (Length _) xs -> do
       a <- inferType c xs
@@ -842,7 +840,9 @@ inferType c t =
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
       return (Prop ann)
-    _ -> Left (ErrorMessage (termAnnotation t) "could not infer type of term from context")
+    _ -> Left . ErrorMessage (termAnnotation t)
+     $ "could not infer type of term from context: "
+       <> pack (show t)
 
 
 checkTypeIsNumeric :: Show ann => ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
