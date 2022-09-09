@@ -414,10 +414,9 @@ checkTerm c t x =
             then return ()
             else genericErrorMessage
         _ -> genericErrorMessage
-    SumMapLength ann ->
+    SumMapLength _ ->
       case t of
-        F _ _ (Map _ _ a (List _ _ _)) (Map _ _ a' (N _)) ->
-          checkTypeInclusion c ann a a'
+        F _ _ (Map _ _ _ (List _ _ _)) (N _) -> pure ()
         _ -> genericErrorMessage
     SumListLookup _ann0 k ->
       case t of
