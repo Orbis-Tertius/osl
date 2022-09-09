@@ -285,4 +285,8 @@ def refInListSize : List^128(RefIn) -> N
 
 def valueSize : Value -> N
   := \x : Value
-  => bytesPerWord +N ((3N *N bytesPerWord) *N length(keys(from(Value)(x)))).
+  => bytesPerWord +N (3N *N bytesPerWord *N length(keys(from(Value)(x)))).
+
+def mintSize : Mint -> N
+  := \x : Mint
+  => bytesPerWord +N (3N *N bytesPerWord *N length(keys(from(Mint)(x)))).
