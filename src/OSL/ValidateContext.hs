@@ -732,6 +732,23 @@ inferType c t =
       case a of
         Map _ n b _ -> return (List ann n b)
         _ -> Left (ErrorMessage ann "keys applied to a non-Map")
+    Apply ann (MapTo _ name) xs -> do
+      xsType <- inferType c xs
+      a <- getNamedType c ann name
+      case xsType of
+       Map _ n k b -> do
+          checkTypeInclusion c ann b a
+          pure (Map ann n k (NamedType ann name))
+       _ -> Left (ErrorMessage ann "Map(to) applied to a non-Map")
+    Apply ann (MapFrom _ name) xs -> do
+      xsType <- inferType c xs
+      a <- getNamedType c ann name
+      case xsType of
+        Map _ n k (NamedType _ name') -> do
+          if name == name'
+            then pure (Map ann n k a)
+            else Left (ErrorMessage ann "mismatching type names in Map(from) application")
+        _ -> Left (ErrorMessage ann "Map(from) applied to a non-Map")
     Apply ann (MapPi1 _) xs -> do
       a <- inferType c xs
       case a of
