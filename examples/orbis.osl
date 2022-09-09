@@ -290,3 +290,34 @@ def valueSize : Value -> N
 def mintSize : Mint -> N
   := \x : Mint
   => bytesPerWord +N (3N *N bytesPerWord *N length(keys(from(Mint)(x)))).
+
+def mintInputsSize : MintInputs -> N
+  := \x : MintInputs
+  => let x' : Map^8(CurrencySymbol, Datum * Redeemer)
+       := from(MintInputs)(x);
+     let datums : Map^8(CurrencySymbol, List^8192(Byte))
+       := Map(from(ByteString))(Map(from(Datum))(Map(pi1)(x')));
+     let redeemers : Map^8(CurrencySymbol, List^8192(Byte))
+       := Map(from(ByteString))(Map(from(Redeemer))(Map(pi2)(x')));
+     bytesPerWord +N ((3N *N bytesPerWord) *N length(keys(x')))
+       +N sumMapLength(datums)
+       +N sumMapLength(redeemers).
+
+def signatoriesSize : Signatories -> N
+  := \x : Signatories
+  => 2N *N bytesPerWord *N length(from(Signatories)(x)).
+
+def feeSize : Fee -> N
+  := \x : Fee
+  => valueSize(from(Fee)(x)).
+
+def txSize : Tx -> N
+  := \x : Tx
+  => (4N *N bytesPerWord)
+  +N spendInListSize(spendingInputs(x))
+  +N refInListSize(referenceInputs(x))
+  +N txOutListSize(outputs(x))
+  +N feeSize(fee(x))
+  +N mintSize(mint(x))
+  +N mintInputsSize(mintInputs(x))
+  +N signatoriesSize(signatories(x)).
