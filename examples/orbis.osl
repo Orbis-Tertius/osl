@@ -360,8 +360,9 @@ def noScriptInfo : Maybe(Datum * Redeemer * ScriptAddress)
 def paysFeeToCorrectAddress : FeeParams -> Tx -> Prop
   := \p : FeeParams => \t : Tx
   => some i : N < length(outputs(t)),
-     nth(outputs(t), i) =
-       to(TxOut)
-       (( from(FeePaymentAddress)(feePaymentAddress(p))
-        , ( from(Fee)(fee(t))
-           , noScriptInfo ))).
+     let o : TxOut := nth(outputs(t), i);
+     let f : Map^128(AssetClass, Quantity) := from(Value)(feeValue(fee(t)));
+     (txOutAddress(o) = from(FeePaymentAddress)(feePaymentAddress(p)))
+   & (all i : N < length(keys(f)),
+      let k : AssetClass := nth(keys(f), i);
+      lookup(k, f) = lookup(k, from(Value)(value(o)))).

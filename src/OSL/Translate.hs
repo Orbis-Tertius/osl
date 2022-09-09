@@ -695,8 +695,7 @@ getArbitraryMapping
   -> Either (ErrorMessage ann) (Mapping ann S11.Term)
 getArbitraryMapping ctx =
   \case
-    OSL.Prop ann -> Left (ErrorMessage ann "expected a finite-dimensional type; got a Prop")
-    OSL.F ann _ _ _ -> Left (ErrorMessage ann "expected a finite-dimensional type; got a function")
+    OSL.Prop _ -> pure $ PropMapping (S11.Equal (S11.Const 0) (S11.Const 1))
     OSL.N _ -> return $ ScalarMapping (S11.Const 0)
     OSL.Z _ -> return $ ScalarMapping (S11.Const 0)
     OSL.Fin _ _ -> return $ ScalarMapping (S11.Const 0)
@@ -716,8 +715,21 @@ getArbitraryMapping ctx =
         Just (OSL.Data b) -> rec b
         Just _ -> Left (ErrorMessage ann "expected the name of a type")
         Nothing -> Left (ErrorMessage ann "undefined name")
-    OSL.List ann _ _ -> Left (ErrorMessage ann "expected a finite-dimensional type; got a List")
-    OSL.Map ann _ _ _ -> Left (ErrorMessage ann "expected a finite-dimensional type; got a Map")
+    OSL.List ann n a ->
+      ListMapping <$> (LengthMapping <$> rec (OSL.N ann))
+        <*> (ValuesMapping <$> rec (OSL.F ann (Just n) (OSL.N ann) a))
+    OSL.Map ann n a b ->
+      MapMapping <$> (LengthMapping <$> rec (OSL.N ann))
+        <*> (KeysMapping <$> rec a)
+        <*> (KeyIndicatorMapping <$> rec (OSL.F ann (Just n) a (OSL.Fin ann 2)))
+        <*> (ValuesMapping <$> rec (OSL.F ann (Just n) a b))
+    OSL.F ann _ a b ->
+      case getMappingDimensions ctx a of
+        Left err -> Left err
+        Right (FiniteDimensions m) ->
+          incrementArities m <$> getArbitraryMapping ctx b
+        Right InfiniteDimensions ->
+          Left (ErrorMessage ann "expected a finite-dimensional domain type")
   where
     rec = getArbitraryMapping ctx      
 
