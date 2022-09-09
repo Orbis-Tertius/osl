@@ -48,7 +48,8 @@ checkType c t =
       case getDeclaration c name of
         Just (Data _) -> return ()
         Just _ -> Left (ErrorMessage ann "expected a type but got a term")
-        Nothing -> Left (ErrorMessage ann "reference to undefined name")
+        Nothing -> Left . ErrorMessage ann
+          $ "reference to undefined name: " <> pack (show name)
     Maybe _ a -> checkQuantifiableType c a
     List ann n a -> checkCardinality ann n >> checkQuantifiableType c a
     Map ann n a b -> checkCardinality ann n
@@ -68,7 +69,8 @@ getNamedType c ann name =
   case getDeclaration c name of
     Just (Data t) -> return t
     Just _ -> Left (ErrorMessage ann "expected a type but got a term")
-    Nothing -> Left (ErrorMessage ann "reference to undefined name")
+    Nothing -> Left . ErrorMessage ann
+      $ "reference to undefined name: " <> pack (show name)
 
 
 getNamedTermType :: ValidContext ann -> ann -> Name -> Either (ErrorMessage ann) (Type ann)
@@ -77,7 +79,8 @@ getNamedTermType c ann name =
     Just (FreeVariable t) -> return t
     Just (Defined t _) -> return t
     Just _ -> Left (ErrorMessage ann "expected a term but got a type")
-    Nothing -> Left (ErrorMessage ann "reference to undefined name")
+    Nothing -> Left . ErrorMessage ann
+      $ "reference to undefined name: " <> pack (show name)
 
 
 checkQuantifiableType :: ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
@@ -166,7 +169,8 @@ checkTerm c t x =
         Just (Defined t' _) -> checkTypeInclusion c ann t t'
         Just (FreeVariable t') -> checkTypeInclusion c ann t t'
         Just (Data _) -> Left (ErrorMessage ann "expected a term but got a type")
-        Nothing -> Left (ErrorMessage ann "reference to undefined name")
+        Nothing -> Left . ErrorMessage ann
+          $ "reference to undefined name: " <> pack (show name)
     AddN ann -> checkTypeInclusion c ann t
        (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
     MulN ann -> checkTypeInclusion c ann t
@@ -403,9 +407,9 @@ checkTerm c t x =
     MapFrom ann name -> do
       a <- getNamedType c ann name
       case t of
-        F _ _ (Map _ _ (NamedType _ name') b) (Map _ _ a' b') -> do
-          checkTypeInclusion c ann a a'
-          checkTypeInclusion c ann b b'
+        F _ _ (Map _ _ k (NamedType _ name')) (Map _ _ k' b) -> do
+          checkTypeInclusion c ann k k'
+          checkTypeInclusion c ann a b
           if name' == name
             then return ()
             else genericErrorMessage
