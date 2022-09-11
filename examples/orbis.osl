@@ -467,3 +467,23 @@ def isRelatedScriptAddress : Tx -> Address -> Prop
 def isAuthorizedAddress : Tx -> Address -> Prop
   := \t : Tx => \a : Address
   => isSignatory(t, a) | isRelatedScriptAddress(t, a).
+
+
+def inputAddressesAreAuthorized : Rollup -> Tx -> Prop
+  := \R : Rollup => \t : Tx
+  => all i : N < length(spendingInputs(t)),
+     let x : SpendIn := nth(spendingInputs(t), i);
+     (some y : TxOutRef, some a : Address,
+        (x = to(SpendIn)(iota1(y)))
+      & isAuthorizedAddress(t, a)
+      & (a = txOutAddress(getTxOut(R, y))))
+   | (some y : RootOutRef, some a : Address,
+      let o : Maybe(RootOut) :=
+            maybe((\rs : List^128(RootOut)
+                     => just(nth(rs, cast(from(F)(from(RootOutRefIndex)(rootOutRefIndex(y))))))))(
+                  nothing,
+                  lookup(rootOutRefTime(y), roots(R)));
+      let r : Maybe(Address) := Maybe(pi1)(Maybe(from(RootOut))(o));
+        (x = to(SpendIn)(iota2(y)))
+      & isAuthorizedAddress(t, a)
+      & (just(a) = r)).

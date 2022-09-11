@@ -287,12 +287,12 @@ checkTerm c t x =
         _ -> genericErrorMessage
     MaybePi1 ann ->
       case t of
-        F _ _ (Maybe _ (Product _ a _)) a' ->
+        F _ _ (Maybe _ (Product _ a _)) (Maybe _ a') ->
           checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
     MaybePi2 ann ->
       case t of
-        F _ _ (Maybe _ (Product _ _ b)) b' ->
+        F _ _ (Maybe _ (Product _ _ b)) (Maybe _ b') ->
           checkTypeInclusion c ann b b'
         _ -> genericErrorMessage
     MaybeTo ann name -> do
