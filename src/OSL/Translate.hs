@@ -764,7 +764,7 @@ translateToMapping
   -> Either (ErrorMessage ann) (Mapping ann S11.Term)
 translateToMapping c tType t =
   case translate c tType t of
-    Right (Mapping m) -> return m
+    Right (Mapping m) -> pure m
     Right (Term t') -> pure (ScalarMapping t')
     Right (Formula p) -> pure (PropMapping p)
     Left err -> Left err
