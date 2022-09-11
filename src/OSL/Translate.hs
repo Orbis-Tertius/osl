@@ -484,8 +484,32 @@ translate ctx@(TranslationContext
               ]
             _ -> Left (ErrorMessage ann "expected a map of scalar to scalar")
         _ -> Left (ErrorMessage ann "expected a map of list")
-    OSL.Apply ann (OSL.SumListLookup _ _) _ -> -- TODO
-      Left (ErrorMessage ann "not implemented: sumListLookup translation")
+    OSL.Apply ann (OSL.SumListLookup _ k) xs -> do
+      xsType <- inferType decls xs
+      xsM <- translateToMapping ctx xsType xs
+      case xsType of
+        OSL.List _ (OSL.Cardinality n) (OSL.Map _ _ kType _) -> do
+          kM <- translateToMapping ctx kType k
+          case xsM of
+            ListMapping (LengthMapping (ScalarMapping lT))
+             (ValuesMapping (MapMapping (LengthMapping _)
+               (KeysMapping _)
+               (KeyIndicatorMapping kiM)
+               (ValuesMapping vM))) ->
+             Term <$>
+             foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
+             [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
+               <$> ( S11.Mul
+                 <$> (mappingToTerm ann
+                       =<< flip (applyMappings ann ctx) kM
+                       =<< applyMappings ann ctx kiM (ScalarMapping (S11.Const i)))
+                 <*> (mappingToTerm ann
+                       =<< flip (applyMappings ann ctx) kM
+                       =<< applyMappings ann ctx vM (ScalarMapping (S11.Const i))) )
+             | i <- [0..n-1]
+             ]
+            _ -> Left (ErrorMessage ann "could not translate sumListLookup application")
+        _ -> Left (ErrorMessage ann "type error in sumListLookup application")
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
@@ -836,6 +860,16 @@ translateToFormula c t =
     Right _ -> Left (ErrorMessage (termAnnotation t)
                  "expected a term denoting a Prop")
     Left err -> Left err
+
+
+mappingToTerm
+  :: ann
+  -> Mapping ann S11.Term
+  -> Either (ErrorMessage ann) S11.Term
+mappingToTerm ann =
+  \case
+    ScalarMapping t -> pure t
+    _ -> Left (ErrorMessage ann "expected a scalar mapping")
 
 
 applyMappings

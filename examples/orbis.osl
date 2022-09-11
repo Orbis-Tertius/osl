@@ -484,3 +484,8 @@ def inputAddressesAreAuthorized : Rollup -> Tx -> Prop
         !(isNothing(os))
       & isAuthorizedAddress(t, a)
       & (a = r)).
+
+
+def valueSum : List^128(Value) -> AssetClass -> Quantity
+  := \x : List^128(Value) => \k : AssetClass
+  => sumListLookup(k)(List(from(Value))((x))).
