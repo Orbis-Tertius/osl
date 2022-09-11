@@ -527,8 +527,10 @@ def txBalances
 
 
 -- self-contained definition of txBalances for purposes of testing translation
+-- Question: why can't txBalances be translated directly with the function
+-- and list in instance data?
 def txBalances'
-  : TxId -> Tx -> Prop
+   : TxId -> Tx -> Prop
   := \i : TxId
   => \t : Tx
   => some inputValues : TxId ->^18446744069414584321 List^128(Value),

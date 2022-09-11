@@ -709,10 +709,10 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
             (OSL.ListBound ann (OSL.ValuesBound aBound))
           (vQs, vM) <- getExistentialQuantifierStringAndMapping
             ctx
-            (OSL.F ann Nothing a b)
+            (OSL.F ann (Just (OSL.Cardinality n)) a (OSL.Maybe ann b))
             (OSL.FunctionBound ann
               (OSL.DomainBound aBound)
-              (OSL.CodomainBound bBound))
+              (OSL.CodomainBound (OSL.MaybeBound ann (OSL.ValuesBound bBound))))
           pure ( kQs <> vQs
                , mergeMapping
                  (curry (\case
@@ -720,7 +720,8 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
                       MaybeMapping (ChoiceMapping cM) (ValuesMapping vM'') ) ->
                       MapMapping (LengthMapping lM) (KeysMapping kM'')
                                  (KeyIndicatorMapping cM) (ValuesMapping vM'')
-                    _ -> die "logical impossibility in map quantifier translation"))
+                    d -> die $ "logical impossibility in map quantifier translation: "
+                               <> pack (show d)))
                  kM vM )
         _ -> Left (ErrorMessage ann "expected a map bound")
   where
@@ -856,7 +857,7 @@ translateToFormula c t =
             $ execStateT (addFreeVariableMapping varName) ctx'
           translateToFormula ctx'' body
         _ -> Left (ErrorMessage (termAnnotation t)
-              "lambda mapping for a non-lambda (this is a compiler bug")
+              "lambda mapping for a non-lambda (this is a compiler bug)")
     Right _ -> Left (ErrorMessage (termAnnotation t)
                  "expected a term denoting a Prop")
     Left err -> Left err
