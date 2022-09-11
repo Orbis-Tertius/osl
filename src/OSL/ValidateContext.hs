@@ -244,6 +244,15 @@ checkTerm c t x =
       checkTypeIsNumeric c t
       a <- inferType c y
       checkTypeIsNumeric c a
+    Apply ann (Apply _ (Nth _) xs) i -> do
+      checkTerm c (N ann) i
+      a <- inferType c xs
+      case a of
+        List _ _ b ->
+          checkTypeInclusion c ann b t
+        _ -> genericErrorMessage
+    -- NOTICE: This is the generic Apply case, which must come after
+    -- all other Apply cases.
     Apply ann f y -> do
       case inferType c f of
         Left _ -> do
