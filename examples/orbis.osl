@@ -429,6 +429,11 @@ def spendingInputExists : Rollup -> SpendIn -> Prop
   => inputExists(R, from(SpendIn)(i)).
 
 
+def referenceInputExists : Rollup -> RefIn -> Prop
+  := \R : Rollup => \i : RefIn
+  => inputExists(R, from(RefIn)(i)).
+
+
 -- def inputsExist : Rollup -> Tx -> Prop
 --   := \R : Rollup
 --   => \t : Tx
