@@ -454,3 +454,11 @@ def isSignatory : Tx -> Address -> Prop
   := \t : Tx => \a : Address
   => let s : List^128(PubKeyHash) := getSignatories(signatories(t));
      some i : N < length(s), fromPubKeyHash(nth(s, i)) = a.
+
+
+def isRelatedScriptAddress : Tx -> Address -> Prop
+  := \t : Tx => \a : Address
+  => let o : List^128(TxOut) := outputs(t);
+     some i : N < length(o),
+     a = (Maybe(to(Address))(Maybe(from(ScriptAddress))
+           (Maybe(pi2)(Maybe(pi2)(scriptInfo(nth(o, i))))))).
