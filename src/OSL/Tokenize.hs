@@ -141,6 +141,7 @@ keyword =
   , K.To <$ string "to"
   , K.From <$ string "from"
   , K.Def <$ string "def"
+  , K.IsNothing <$ string "isNothing"
   , K.Maybe <$ string "Maybe"
   , K.Maybe' <$ string "maybe"
   , K.Just' <$ string "just"

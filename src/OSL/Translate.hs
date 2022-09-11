@@ -156,6 +156,13 @@ translate ctx@(TranslationContext
         Nothing -> Left (ErrorMessage ann "undefined name")
     OSL.Apply _ (OSL.From ann typeName) x ->
       translate ctx (OSL.NamedType ann typeName) x
+    OSL.Apply ann (OSL.IsNothing _) x -> do
+      xT <- inferType decls x
+      xM <- translateToMapping ctx xT x
+      case xM of
+        MaybeMapping (ChoiceMapping (ScalarMapping cT)) _ ->
+          pure (Formula (S11.Equal cT (S11.Const 0)))
+        _ -> Left (ErrorMessage ann "expected a Maybe mapping")
     OSL.Apply ann (OSL.Just' _) x ->
       case termType of
         OSL.Maybe _ xType ->
@@ -827,9 +834,24 @@ applyMappings ann ctx f x =
       translateToMapping ctx'' tT t
     (ScalarMapping f', ScalarMapping x') ->
       ScalarMapping <$> applyTerms ann f' x'
-    (f', ProductMapping (LeftMapping x') (RightMapping y')) -> do
-      f'' <- applyMappings ann ctx f' x'
-      applyMappings ann ctx f'' y'
+    -- TODO: this is wrong; need to recurse into functors
+    (ScalarMapping _, ProductMapping (LeftMapping x') (RightMapping y')) -> do
+      f' <- applyMappings ann ctx f x'
+      applyMappings ann ctx f' y'
+    (ListMapping (LengthMapping lM) (ValuesMapping vM), _) ->
+      ListMapping (LengthMapping lM) . ValuesMapping
+        <$> applyMappings ann ctx vM x
+    (MapMapping (LengthMapping lM) (KeysMapping kM)
+       (KeyIndicatorMapping kiM) (ValuesMapping vM), _) ->
+      MapMapping (LengthMapping lM) (KeysMapping kM)
+        (KeyIndicatorMapping kiM) . ValuesMapping
+        <$> applyMappings ann ctx vM x
+    (CoproductMapping (ChoiceMapping cM)
+       (LeftMapping lM) (RightMapping rM), _) ->
+      CoproductMapping
+        <$> (ChoiceMapping <$> applyMappings ann ctx cM x)
+        <*> (LeftMapping <$> applyMappings ann ctx lM x)
+        <*> (RightMapping <$> applyMappings ann ctx rM x)
     (ProductMapping (LeftMapping g) (RightMapping h), x') ->
       ProductMapping
       <$> (LeftMapping <$> applyMappings ann ctx g x')

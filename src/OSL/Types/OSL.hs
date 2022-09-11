@@ -93,6 +93,7 @@ data Term ann =
   | To ann Name
   | From ann Name
   | Let ann Name (Type ann) (Term ann) (Term ann)
+  | IsNothing ann
   | Just' ann
   | Nothing' ann
   | Maybe' ann (Term ann)

@@ -263,6 +263,10 @@ checkTerm c t x =
       checkType c varType
       c' <- addToContext c (varName, Defined varType varDef)
       checkTerm c' t body
+    IsNothing _ ->
+      case t of
+        F _ _ (Maybe _ _) (Prop _) -> pure ()
+        _ -> genericErrorMessage
     Just' ann ->
       case t of
         F _ _ a (Maybe _ a') -> checkTypeInclusion c ann a a'
@@ -621,6 +625,11 @@ inferType c t =
       case a of
         Product _ _ b -> return b
         _ -> Left (ErrorMessage ann "pi2 applied to a non-tuple")
+    Apply ann (IsNothing _) x -> do
+      a <- inferType c x
+      case a of
+        Maybe _ _ -> pure (Prop ann)
+        _ -> Left (ErrorMessage ann "isNothing applied to a non-Maybe")
     Apply ann (Just' _) x -> Maybe ann <$> inferType c x
     Apply ann (Exists _) x -> do
       a <- inferType c x

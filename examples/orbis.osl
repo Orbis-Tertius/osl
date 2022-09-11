@@ -405,12 +405,9 @@ def feeRequirementMet
     & roundsUpTo(d, e)).
 
 
-def noTx : Maybe(Tx) := nothing.
-
-
 def txExists : Rollup -> TxId -> Prop
   := \R : Rollup => \i : TxId
-  => !(noTx = lookup(i, txs(R))).
+  => !(isNothing(lookup(i, txs(R)))).
 
 
 def inputExists : Rollup -> TxOutRef + RootOutRef -> Prop

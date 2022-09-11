@@ -518,6 +518,7 @@ term3 =
   , builtin K.Iota2 Iota2
   , unaryOp name (T.Keyword K.To) To
   , unaryOp name (T.Keyword K.From) From
+  , builtin K.IsNothing IsNothing
   , builtin K.Nothing' Nothing'
   , builtin K.Just' Just'
   , unaryOp term0 (T.Keyword K.Maybe') Maybe'

@@ -34,6 +34,7 @@ termAnnotation =
     From ann _ -> ann
     Let ann _ _ _ _ -> ann
     Just' ann -> ann
+    IsNothing ann -> ann
     Nothing' ann -> ann
     Maybe' ann _ -> ann
     Exists ann -> ann
