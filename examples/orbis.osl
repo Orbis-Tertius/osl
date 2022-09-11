@@ -478,14 +478,9 @@ def inputAddressesAreAuthorized : Rollup -> Tx -> Prop
       & isAuthorizedAddress(t, a)
       & (a = txOutAddress(getTxOut(R, y))))
    | (some y : RootOutRef, some a : Address,
-      let noAddress : Maybe(Address) := nothing;
-      let r : Maybe(Address) :=
-            maybe((\rs : List^128(RootOut)
-                     => just(pi1(from(RootOut)
-                          (nth(rs, cast(from(F)(from(RootOutRefIndex)
-                            (rootOutRefIndex(y))))))))))
-                  (noAddress,
-                   lookup(rootOutRefTime(y), roots(R)));
-        (x = to(SpendIn)(iota2(y)))
+      let os : Maybe(List^128(RootOut)) := lookup(rootOutRefTime(y), roots(R));
+      let r : Address := pi1(from(RootOut)
+            (nth(exists(os), cast(from(F)(from(RootOutRefIndex)(rootOutRefIndex(y)))))));
+        !(isNothing(os))
       & isAuthorizedAddress(t, a)
-      & (just(a) = r)).
+      & (a = r)).
