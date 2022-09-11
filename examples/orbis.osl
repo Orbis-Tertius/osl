@@ -499,3 +499,22 @@ def totalOutput : Tx -> AssetClass -> Quantity
 def totalInput : (TxId -> List^128(Value)) -> TxId -> AssetClass -> Quantity
   := \inputValues : TxId -> List^128(Value) => \t : TxId => \k : AssetClass
   => valueSum(inputValues(t), k).
+
+
+def txBalances
+   : (TxId -> List^128(Value))
+  -> List^4294967296(AssetClass)
+  -> TxId
+  -> Tx
+  -> Prop
+  := \inputValues : TxId -> List^128(Value)
+  => \assetClasses : List^4294967296(AssetClass)
+  => \i : TxId
+  => \t : Tx
+  => all j : N < length(assetClasses),
+     let y : AssetClass := nth(assetClasses, j);
+     let a : Z := cast(from(Quantity)(totalInput(inputValues, i, y)));
+     let b : Z := maybe((\x : MintQuantity => cast(from(MintQuantity)(x))))
+                    (0Z, lookup(y, mintValue(mint(t))));
+     let c : Z := cast(from(Quantity)(totalOutput(t, y)));
+     (a +Z b) = c.
