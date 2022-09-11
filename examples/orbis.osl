@@ -489,3 +489,13 @@ def inputAddressesAreAuthorized : Rollup -> Tx -> Prop
 def valueSum : List^128(Value) -> AssetClass -> Quantity
   := \x : List^128(Value) => \k : AssetClass
   => sumListLookup(k)(List(from(Value))((x))).
+
+
+def totalOutput : Tx -> AssetClass -> Quantity
+  := \t : Tx => \k : AssetClass
+  => valueSum(values(outputs(t)), k).
+
+
+def totalInput : (TxId -> List^128(Value)) -> TxId -> AssetClass -> Quantity
+  := \inputValues : TxId -> List^128(Value) => \t : TxId => \k : AssetClass
+  => valueSum(inputValues(t), k).
