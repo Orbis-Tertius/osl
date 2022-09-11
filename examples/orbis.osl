@@ -383,3 +383,23 @@ def checkCost : FeeParams -> Tx -> List^128(ScriptSize * Steps) -> Frac -> Prop
      & isProd(b(p), toFrac(scriptSizeAgg), e)
      & isProd(c(p), toFrac(sumSteps), f)
      & (x = add(d, add(e, f))).
+
+def feeRequirementMet
+   : FeeParams
+  -> Tx
+  -> List^128(ScriptSize * Steps)
+  -> N
+  -> Prop
+  := \p : FeeParams
+  => \t : Tx
+  => \s : List^128(ScriptSize * Steps)
+  => \x : N
+  => paysFeeToCorrectAddress(p, t)
+   & (f0(p) <= toFrac(x))
+   & (some c : Frac < maxFrac,
+      some d : Frac < maxFrac,
+      some e : N,
+      (e <= x)
+    & checkCost(p, t, s, c)
+    & isProd(m(p), c, d)
+    & roundsUpTo(d, e)).
