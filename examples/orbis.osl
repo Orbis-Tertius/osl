@@ -462,3 +462,8 @@ def isRelatedScriptAddress : Tx -> Address -> Prop
      some i : N < length(o),
      just(a) = (Maybe(to(Address))(Maybe(from(ScriptAddress))
                  (Maybe(pi2)(Maybe(pi2)(scriptInfo(nth(o, i))))))).
+
+
+def isAuthorizedAddress : Tx -> Address -> Prop
+  := \t : Tx => \a : Address
+  => isSignatory(t, a) | isRelatedScriptAddress(t, a).
