@@ -416,12 +416,12 @@ def inputExists : Rollup -> TxOutRef + RootOutRef -> Prop
     & ((1N +N cast(from(F)(from(TxOutRefIndex)(txOutRefIndex(y)))))
         <= maybe((\t : Tx => length(outputs(t))))(
                  0N,
-                 lookup(txOutRefId(y), txs(R))))).
---    | (some y : RootOutRef, (x = iota2(y))
---     & ((1N +N cast(from(F)(from(RootOutRefIndex)(rootOutRefIndex(y)))))
---        <= maybe((\rs : List^128(RootOut) => length(rs)))(
---                 0N,
---                 lookup(rootOutRefTime(y), roots(R))))).
+                 lookup(txOutRefId(y), txs(R)))))
+    | (some y : RootOutRef, (x = iota2(y))
+     & ((1N +N cast(from(F)(from(RootOutRefIndex)(rootOutRefIndex(y)))))
+        <= maybe((\rs : List^128(RootOut) => length(rs)))(
+                 0N,
+                 lookup(rootOutRefTime(y), roots(R))))).
 
 
 -- def inputsExist : Rollup -> Tx -> Prop
