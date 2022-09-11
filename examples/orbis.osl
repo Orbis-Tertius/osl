@@ -27,7 +27,7 @@ data AssetClass ~= CurrencySymbol * TokenName.
 
 data Mint ~= Map^128(AssetClass, MintQuantity).
 
-data Quantity ~= N.
+data Quantity ~= F.
 
 data Value ~= Map^128(AssetClass, Quantity).
 
@@ -173,7 +173,7 @@ def getSignatories : Signatories -> List^128(PubKeyHash)
   := from(Signatories).
 
 def getQuantity : Quantity -> N
-  := from(Quantity).
+  := \x : Quantity => cast(from(F)(from(Quantity)(x))).
 
 def getMintQuantity : MintQuantity -> Z
   := from(MintQuantity).
@@ -496,19 +496,25 @@ def totalOutput : Tx -> AssetClass -> Quantity
   => valueSum(values(outputs(t)), k).
 
 
-def totalInput : (TxId -> List^128(Value)) -> TxId -> AssetClass -> Quantity
-  := \inputValues : TxId -> List^128(Value) => \t : TxId => \k : AssetClass
+def totalInput
+   : (TxId ->^18446744069414584321 List^128(Value))
+  -> TxId
+  -> AssetClass
+  -> Quantity
+  := \inputValues : TxId ->^18446744069414584321 List^128(Value) 
+  => \t : TxId 
+  => \k : AssetClass
   => valueSum(inputValues(t), k).
 
 
 def txBalances
-   : (TxId -> List^128(Value))
-  -> List^4294967296(AssetClass)
+   : (TxId ->^18446744069414584321 List^128(Value))
+  -> List^18446744069414584321(AssetClass)
   -> TxId
   -> Tx
   -> Prop
-  := \inputValues : TxId -> List^128(Value)
-  => \assetClasses : List^4294967296(AssetClass)
+  := \inputValues : TxId ->^18446744069414584321 List^128(Value)
+  => \assetClasses : List^18446744069414584321(AssetClass)
   => \i : TxId
   => \t : Tx
   => all j : N < length(assetClasses),
@@ -518,3 +524,13 @@ def txBalances
                     (0Z, lookup(y, mintValue(mint(t))));
      let c : Z := cast(from(Quantity)(totalOutput(t, y)));
      (a +Z b) = c.
+
+
+-- self-contained definition of txBalances for purposes of testing translation
+def txBalances'
+  : TxId -> Tx -> Prop
+  := \i : TxId
+  => \t : Tx
+  => some inputValues : TxId ->^18446744069414584321 List^128(Value),
+     some assetClasses : List^18446744069414584321(AssetClass),
+     txBalances(inputValues, assetClasses, i, t).
