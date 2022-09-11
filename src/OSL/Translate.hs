@@ -1012,28 +1012,35 @@ translateEquality
   -> OSL.Term ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Formula
-translateEquality ann ctx t x y = do
+translateEquality ann ctx@(TranslationContext decls _) t x y = do
   xM <- translateToMapping ctx t x
   yM <- translateToMapping ctx t y
-  applyEqualityToMappings ann t xM yM
+  applyEqualityToMappings ann decls t xM yM
 
 
 applyEqualityToMappings
-  :: ann
+  :: Show ann
+  => ann
+  -> OSL.ValidContext ann
   -> OSL.Type ann
   -> Mapping ann S11.Term
   -> Mapping ann S11.Term
   -> Either (ErrorMessage ann) S11.Formula
-applyEqualityToMappings ann t x y =
+applyEqualityToMappings ann ctx t x y =
   case (x,y,t) of
+    (_, _, OSL.NamedType ann' name) ->
+      case getDeclaration ctx name of
+        Just (OSL.Data a) -> rec a x y
+        _ ->
+          Left (ErrorMessage ann' "expected the name of a type")
     (ScalarMapping xT, ScalarMapping yT, _) ->
       pure (S11.Equal xT yT)
     (ProductMapping (LeftMapping xlM) (RightMapping xrM),
      ProductMapping (LeftMapping ylM) (RightMapping yrM),
      OSL.Product _ a b) ->
       S11.And
-      <$> applyEqualityToMappings ann a xlM ylM
-      <*> applyEqualityToMappings ann b xrM yrM
+      <$> rec a xlM ylM
+      <*> rec b xrM yrM
     (CoproductMapping
       (ChoiceMapping (ScalarMapping xcM))
       (LeftMapping xlM)
@@ -1046,9 +1053,9 @@ applyEqualityToMappings ann t x y =
       S11.And (S11.Equal xcM ycM)
       <$> (S11.Or
           <$> (S11.And (S11.Equal xcM (S11.Const 0))
-               <$> applyEqualityToMappings ann a xlM ylM)
+               <$> rec a xlM ylM)
           <*> (S11.And (S11.Equal xcM (S11.Const 1))
-               <$> applyEqualityToMappings ann b xrM yrM))
+               <$> rec b xrM yrM))
     (MaybeMapping (ChoiceMapping (ScalarMapping xcM))
         (ValuesMapping xvM),
       MaybeMapping (ChoiceMapping (ScalarMapping ycM))
@@ -1056,8 +1063,12 @@ applyEqualityToMappings ann t x y =
       OSL.Maybe _ a) ->
        S11.And (S11.Equal xcM ycM)
        . S11.Or (S11.Equal xcM (S11.Const 0))
-       <$> applyEqualityToMappings ann a xvM yvM
-    _ -> Left (ErrorMessage ann "cannot compare these things for equality")
+       <$> rec a xvM yvM
+    _ -> Left . ErrorMessage ann
+      $ "cannot compare these things for equality: "
+        <> pack (show (x,y))
+  where
+    rec = applyEqualityToMappings ann ctx
 
 
 mconcatM :: Monad m => Monoid a => [m a] -> m a
