@@ -448,3 +448,9 @@ def getTxOut : Rollup -> TxOutRef -> TxOut
   => let o : List^128(TxOut) := outputs(exists(lookup(txOutRefId(x), txs(R))));
      let i : N := cast(from(F)(from(TxOutRefIndex)(txOutRefIndex(x))));
      nth(o,i).
+
+
+def isSignatory : Tx -> Address -> Prop
+  := \t : Tx => \a : Address
+  => let s : List^128(PubKeyHash) := getSignatories(signatories(t));
+     some i : N < length(s), fromPubKeyHash(nth(s, i)) = a.
