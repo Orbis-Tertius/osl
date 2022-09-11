@@ -285,6 +285,32 @@ checkTerm c t x =
       case t of
         F _ _ (Maybe _ a) a' -> checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
+    MaybePi1 ann ->
+      case t of
+        F _ _ (Maybe _ (Product _ a _)) a' ->
+          checkTypeInclusion c ann a a'
+        _ -> genericErrorMessage
+    MaybePi2 ann ->
+      case t of
+        F _ _ (Maybe _ (Product _ _ b)) b' ->
+          checkTypeInclusion c ann b b'
+        _ -> genericErrorMessage
+    MaybeTo ann name -> do
+      a <- getNamedType c ann name
+      case t of
+        F _ _ (Maybe _ a') (Maybe _ (NamedType _ name')) ->
+          if name == name'
+          then checkTypeInclusion c ann a' a
+          else genericErrorMessage
+        _ -> genericErrorMessage
+    MaybeFrom ann name -> do
+      a <- getNamedType c ann name
+      case t of
+        F _ _ (Maybe _ (NamedType _ name')) (Maybe _ a') ->
+          if name == name'
+          then checkTypeInclusion c ann a a'
+          else genericErrorMessage
+        _ -> genericErrorMessage
     Length _ ->
       case t of
         F _ _ (List _ _ _) (N _) -> return ()
@@ -636,6 +662,44 @@ inferType c t =
       case a of
         Maybe _ b -> return b
         _ -> Left (ErrorMessage ann "exists applied to a non-Maybe")
+    Apply ann (MaybePi1 _) x -> do
+      a <- inferType c x
+      case a of
+        Maybe _ (Product _ b _) -> pure (Maybe ann b)
+        _ -> Left . ErrorMessage ann
+          $ "expected a Maybe(_ * _) as argument to Maybe(pi1) but got a "
+            <> pack (show a)
+    Apply ann (MaybePi2 _) x -> do
+      a <- inferType c x
+      case a of
+        Maybe _ (Product _ _ b) -> pure (Maybe ann b)
+        _ -> Left . ErrorMessage ann
+          $ "expected a Maybe(_ * _) as argument to Maybe(pi2) but got a "
+            <> pack (show a)
+    Apply ann (MaybeFrom _ name) x -> do
+      a <- getNamedType c ann name
+      b <- inferType c x
+      let err = Left . ErrorMessage ann
+            $ "expected a Maybe(" <> pack (show name)
+               <> " as argument to Maybe(from(" <> pack (show name) <> "))"
+               <> " but got a " <> pack (show a)
+      case b of
+        Maybe _ (NamedType _ name') ->
+          if name == name'
+          then pure (Maybe ann a)
+          else err
+        _ -> err
+    Apply ann (MaybeTo _ name) x -> do
+      a <- getNamedType c ann name
+      b <- inferType c x
+      case b of
+        Maybe _ a' -> do
+          checkTypeInclusion c ann a' a
+          pure (Maybe ann (NamedType ann name))
+        _ -> Left . ErrorMessage ann
+              $ "expected a Maybe(" <> pack (show a)
+                 <> " as argument to Maybe(to(" <> pack (show name)
+                 <> " but got a " <> pack (show a)
     Apply ann (Apply _ (Nth _) xs) i -> do
       a <- inferType c xs
       checkTerm c (N ann) i

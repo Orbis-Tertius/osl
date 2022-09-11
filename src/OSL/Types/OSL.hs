@@ -97,6 +97,10 @@ data Term ann =
   | Just' ann
   | Nothing' ann
   | Maybe' ann (Term ann)
+  | MaybePi1 ann
+  | MaybePi2 ann
+  | MaybeTo ann Name
+  | MaybeFrom ann Name
   | Exists ann
   | Length ann
   | Nth ann

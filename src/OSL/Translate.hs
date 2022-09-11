@@ -201,6 +201,28 @@ translate ctx@(TranslationContext
       case mxM of
         MaybeMapping _ (ValuesMapping xM) -> pure (Mapping xM)
         _ -> Left . ErrorMessage ann $ "expected a maybe mapping"
+    OSL.Apply ann (OSL.MaybePi1 _) x -> do
+      xT <- inferType decls x
+      xM <- translateToMapping ctx xT x
+      case xM of
+        MaybeMapping choiceM
+            (ValuesMapping (ProductMapping (LeftMapping aM) _)) ->
+          pure . Mapping $ MaybeMapping choiceM (ValuesMapping aM)
+        _ -> Left (ErrorMessage ann "expected a Maybe(_ * _) mapping")
+    OSL.Apply ann (OSL.MaybePi2 _) x -> do
+      xT <- inferType decls x
+      xM <- translateToMapping ctx xT x
+      case xM of
+        MaybeMapping choiceM
+            (ValuesMapping (ProductMapping _ (RightMapping aM))) ->
+          pure . Mapping $ MaybeMapping choiceM (ValuesMapping aM)
+        _ -> Left (ErrorMessage ann "expected a Maybe(_ * _) mapping")
+    OSL.Apply _ (OSL.MaybeFrom _ _) x -> do
+      xT <- inferType decls x
+      translate ctx xT x
+    OSL.Apply _ (OSL.MaybeTo _ _) x -> do
+      xT <- inferType decls x
+      translate ctx xT x
     OSL.Apply ann (OSL.Length _) xs -> do
       xsType <- inferType decls xs
       xsM <- translateToMapping ctx xsType xs

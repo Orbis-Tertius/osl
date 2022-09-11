@@ -592,8 +592,34 @@ functorApplication = do
     \case
       (T.Keyword K.List, p) -> pure (K.List, p)
       (T.Keyword K.Map, p) -> pure (K.Map, p)
+      (T.Keyword K.Maybe, p) -> pure (K.Maybe, p)
       _ -> Nothing
   case f of
+    K.Maybe -> do
+      consumeExact_ T.OpenParen
+      g <- consume $
+        \case
+          (T.Keyword K.Pi1, _) -> pure K.Pi1
+          (T.Keyword K.Pi2, _) -> pure K.Pi2
+          (T.Keyword K.To, _) -> pure K.To
+          (T.Keyword K.From, _) -> pure K.From
+          _ -> Nothing
+      h <- case g of
+        K.Pi1 -> pure (MaybePi1 p)
+        K.Pi2 -> pure (MaybePi2 p)
+        K.To -> do
+          consumeExact_ T.OpenParen
+          a <- name
+          consumeExact_ T.CloseParen
+          pure (MaybeTo p a)
+        K.From -> do
+          consumeExact_ T.OpenParen
+          a <- name
+          consumeExact_ T.CloseParen
+          pure (MaybeFrom p a)
+        _ -> mzero
+      consumeExact_ T.CloseParen
+      pure h
     K.List -> do
       consumeExact_ T.OpenParen
       g <- consume $

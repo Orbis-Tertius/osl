@@ -38,6 +38,10 @@ termAnnotation =
     Nothing' ann -> ann
     Maybe' ann _ -> ann
     Exists ann -> ann
+    MaybePi1 ann -> ann
+    MaybePi2 ann -> ann
+    MaybeTo ann _ -> ann
+    MaybeFrom ann _ -> ann
     Length ann -> ann
     Nth ann -> ann
     ListPi1 ann -> ann

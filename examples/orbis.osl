@@ -145,7 +145,7 @@ def value : TxOut -> Value
 def values : List^128(TxOut) -> List^128(Value)
   := \vs : List^128(TxOut) => List(pi1)(List(pi2)(List(from(TxOut))(vs))).
 
-def scriptInfo : TxOut -> Maybe(Datum * Redeemer * ScriptAddress)
+def scriptInfo : TxOut -> Maybe(Datum * (Redeemer * ScriptAddress))
   := \o : TxOut => pi2(pi2(from(TxOut)(o))).
 
 def currencySymbol : AssetClass -> CurrencySymbol
@@ -460,5 +460,5 @@ def isRelatedScriptAddress : Tx -> Address -> Prop
   := \t : Tx => \a : Address
   => let o : List^128(TxOut) := outputs(t);
      some i : N < length(o),
-     a = (Maybe(to(Address))(Maybe(from(ScriptAddress))
-           (Maybe(pi2)(Maybe(pi2)(scriptInfo(nth(o, i))))))).
+     just(a) = (Maybe(to(Address))(Maybe(from(ScriptAddress))
+                 (Maybe(pi2)(Maybe(pi2)(scriptInfo(nth(o, i))))))).
