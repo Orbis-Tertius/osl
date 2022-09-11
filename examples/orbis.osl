@@ -434,11 +434,13 @@ def referenceInputExists : Rollup -> RefIn -> Prop
   => inputExists(R, from(RefIn)(i)).
 
 
--- def inputsExist : Rollup -> Tx -> Prop
---   := \R : Rollup
---   => \t : Tx
---   => all i : N < length(spendingInputs(t)),
---      
+def inputsExist : Rollup -> Tx -> Prop
+  := \R : Rollup
+  => \t : Tx
+  => (all i : N < length(spendingInputs(t)),
+      spendingInputExists(R, nth(spendingInputs(t), i)))
+   & (all i : N < length(referenceInputs(t)),
+      referenceInputExists(R, nth(referenceInputs(t), i))).
 
 
 def getTxOut : Rollup -> TxOutRef -> TxOut
