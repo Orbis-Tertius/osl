@@ -435,8 +435,28 @@ translate ctx@(TranslationContext
               pure . Mapping $ ListMapping lM (ValuesMapping kM)
             _ -> Left (ErrorMessage ann "expected a map mapping")
         _ -> Left (ErrorMessage ann "expected a map")
-    OSL.Apply ann (OSL.SumMapLength _) _ ->
-      Left (ErrorMessage ann "not implemented: sumMapLength translation")
+    OSL.Apply ann (OSL.SumMapLength _) xs -> do
+      xsType <- inferType decls xs
+      xsM <- translateToMapping ctx xsType xs
+      case xsType of
+        OSL.Map _ (OSL.Cardinality n) _ (OSL.List _ _ _) ->
+          case xsM of
+            MapMapping (LengthMapping (ScalarMapping lT))
+                (KeysMapping _)
+                (KeyIndicatorMapping _)
+                (ValuesMapping
+                  (ListMapping (LengthMapping (ScalarMapping mT))
+                    (ValuesMapping _))) ->
+              Term <$>
+              foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
+              [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
+                <$> applyTerms ann mT (S11.Const i)
+              | i <- [0..n-1]
+              ]
+            _ -> Left (ErrorMessage ann "expected a map of scalar to scalar")
+        _ -> Left (ErrorMessage ann "expected a map of list")
+    OSL.Apply ann (OSL.SumListLookup _ _) _ -> -- TODO
+      Left (ErrorMessage ann "not implemented: sumListLookup translation")
     -- NOTICE: what follows is the last Apply case. It is generic and must
     -- come last among all the Apply cases.
     OSL.Apply ann f x -> do
@@ -856,7 +876,7 @@ mapNth ann ctx f i =
     ListMapping (LengthMapping g) (ValuesMapping h) ->
       ListMapping <$> (LengthMapping <$> mapNth ann ctx g i)
                   <*> (ValuesMapping <$> mapNth ann ctx h i)
-    _ -> Left (ErrorMessage ann "could not apply mappings in nth application")
+    _ -> Left (ErrorMessage ann "could not apply mappings in mapNth")
 
 
 applyTerms
