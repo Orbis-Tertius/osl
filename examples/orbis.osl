@@ -496,23 +496,23 @@ def totalOutput : Tx -> AssetClass -> Quantity
 
 
 def totalInput
-   : (TxId ->^4096 List^128(Value))
+   : (TxId -> List^128(Value))
   -> TxId
   -> AssetClass
   -> Quantity
-  := \inputValues : TxId ->^4096 List^128(Value) 
+  := \inputValues : TxId -> List^128(Value) 
   => \t : TxId 
   => \k : AssetClass
   => valueSum(inputValues(t), k).
 
 
 def txBalances
-   : (TxId ->^4096 List^128(Value))
+   : (TxId -> List^128(Value))
   -> List^4096(AssetClass)
   -> TxId
   -> Tx
   -> Prop
-  := \inputValues : TxId ->^4096 List^128(Value)
+  := \inputValues : TxId -> List^128(Value)
   => \assetClasses : List^4096(AssetClass)
   => \i : TxId
   => \t : Tx
@@ -525,13 +525,25 @@ def txBalances
      (a +Z b) = c.
 
 
--- self-contained definition of txBalances for purposes of testing translation
--- Question: why can't txBalances be translated directly with the function
--- and list in instance data?
-def txBalances'
-   : TxId -> Tx -> Prop
-  := \i : TxId
+def spendingScriptsAcceptTx
+   : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+  -> TxId
+  -> Tx
+  -> Prop
+  := \scriptLimits : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+  => \x : TxId
   => \t : Tx
-  => some inputValues : TxId ->^4096 List^128(Value),
-     some assetClasses : List^4096(AssetClass),
-     txBalances(inputValues, assetClasses, i, t).
+  => all i : Fin(128) < (length(outputs(t))),
+     let o : TxOut := nth(outputs(t), cast(i));
+     !(isNothing(scriptInfo(o)))
+   | (let s : Datum * Redeemer * ScriptAddress := exists(scriptInfo(o));
+      let a : ScriptAddress := pi2(pi2(s));
+      let d : Datum := pi1(s);
+      let r : Redeemer := pi1(pi2(s));
+      let l : ScriptSize * Steps := scriptLimits(a, x);
+      let c : ScriptContext := to(ScriptContext)(
+            ( t
+            , to(ScriptPurpose)(iota2(to(Spending)(to(TxOutRef)
+                ((x, to(TxOutRefIndex)(to(F)(cast(i))))))))
+            ));
+      accepts(a, pi1(l), pi2(l), d, r, c)).

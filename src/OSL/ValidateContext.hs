@@ -135,6 +135,9 @@ checkTypeInclusion c ann (F _ (Just n) a b) (F _ (Just n') a' b') =
   else Left (ErrorMessage ann "function type cardinality mismatch")
 checkTypeInclusion _ _ (N _) (N _) = return ()
 checkTypeInclusion _ _ (Z _) (Z _) = return ()
+checkTypeInclusion _ _ (Fin _ _) (N _) = return ()
+checkTypeInclusion _ _ (Fin _ _) (Z _) = return ()
+checkTypeInclusion _ _ (N _) (Z _) = return ()
 checkTypeInclusion _ ann (Fin _ n) (Fin _ n') =
   if n <= n'
   then return ()
@@ -552,7 +555,9 @@ checkBound c t bound =
                      "expected an integer bound")
     Fin ann' n ->
       case bound of
-        ScalarBound _ boundTerm -> checkTerm c (Fin ann' n) boundTerm
+        ScalarBound _ boundTerm -> do
+          boundTermType <- inferType c boundTerm
+          checkTypeInclusion c ann' (Fin ann' n) boundTermType
         _ -> Left . ErrorMessage (boundAnnotation bound)
               $ "expected a Fin(" <> pack (show n) <> ") bound"
     Product _ a b ->
