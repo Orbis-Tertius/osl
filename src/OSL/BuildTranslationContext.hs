@@ -114,7 +114,9 @@ addFreeVariableMapping freeVariable = do
                   getFiniteDimMappingArity
                   (typeAnnotation a) 
                   aMap
-          return (mapAritiesInMapping (+aDim) bMap)
+          let mapping = (mapAritiesInMapping (+aDim) bMap)
+          addMapping freeVariable mapping
+          return mapping
         NamedType ann aName -> do
           a <- getTypeDeclaration ann aName
           aSym <- addGensym a

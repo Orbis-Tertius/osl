@@ -78,7 +78,11 @@ translate ctx@(TranslationContext
     OSL.Apply ann (OSL.NamedTerm ann' fName) x ->
       case getDeclaration decls fName of
         Just (OSL.Defined _ f) -> translate ctx termType (OSL.Apply ann f x)
-        Just _ -> Left (ErrorMessage ann' "expected the name of a defined function")
+        Just (OSL.FreeVariable fType@(OSL.F _ _ a _)) -> do
+          fM <- translateToMapping ctx fType (OSL.NamedTerm ann' fName)
+          xM <- translateToMapping ctx a x
+          Mapping <$> applyMappings ann ctx fM xM
+        Just _ -> Left (ErrorMessage ann' "expected the name of a function")
         Nothing -> Left (ErrorMessage ann' "undefined name")
     OSL.Apply ann (OSL.Apply _ (OSL.Pair _) a) b ->
       case termType of
@@ -844,11 +848,11 @@ translateToFormula
   => TranslationContext ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Formula
-translateToFormula c t =
+translateToFormula c@(TranslationContext decls mappings) t =
   case translate c (OSL.Prop (termAnnotation t)) t of
     Right (Formula f) -> pure f
     Right (Mapping (PropMapping f)) -> pure f
-    Right (Mapping (LambdaMapping (TranslationContext decls mappings) _ _ _)) ->
+    Right (Mapping (LambdaMapping _ _ _ _)) ->
       case t of
         OSL.Lambda _ varName varType body -> do
           let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
