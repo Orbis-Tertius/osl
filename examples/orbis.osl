@@ -6,8 +6,7 @@ data Datum ~= ByteString.
 
 data Redeemer ~= ByteString.
 
--- Goldilocks field size, 2^64-2^32+1.
-data F ~= Fin(18446744069414584321).
+data F ~= Fin(4096).
 
 def bytesPerWord : N := 8N.
 
@@ -78,9 +77,9 @@ data Unit ~= Fin(1).
 def unit : Unit := to(Unit)(fin(0)).
 
 data Rollup ~=
-    Map^18446744069414584321(TxId, Tx)
-  * Map^18446744069414584321(Time, List^128(RootOut))
-  * Map^18446744069414584321(LeafOut, Unit).
+    Map^4096(TxId, Tx)
+  * Map^4096(Time, List^128(RootOut))
+  * Map^4096(LeafOut, Unit).
 
 def spendingInputs : Tx -> List^128(SpendIn)
   := \t : Tx => pi1(from(Tx)(t)).
@@ -106,13 +105,13 @@ def validRange : Tx -> ValidRange
 def signatories : Tx -> Signatories
   := \t : Tx => pi2(pi2(pi2(pi2(pi2(pi2(pi2(from(Tx)(t)))))))).
 
-def txs : Rollup -> Map^18446744069414584321(TxId, Tx)
+def txs : Rollup -> Map^4096(TxId, Tx)
   := \r : Rollup => pi1(from(Rollup)(r)).
 
-def roots : Rollup -> Map^18446744069414584321(Time, List^128(RootOut))
+def roots : Rollup -> Map^4096(Time, List^128(RootOut))
   := \r : Rollup => pi1(pi2(from(Rollup)(r))).
 
-def leaves : Rollup -> Map^18446744069414584321(LeafOut, Unit)
+def leaves : Rollup -> Map^4096(LeafOut, Unit)
   := \r : Rollup => pi2(pi2(from(Rollup)(r))).
 
 def txOutRefId : TxOutRef -> TxId
@@ -497,24 +496,24 @@ def totalOutput : Tx -> AssetClass -> Quantity
 
 
 def totalInput
-   : (TxId ->^18446744069414584321 List^128(Value))
+   : (TxId ->^4096 List^128(Value))
   -> TxId
   -> AssetClass
   -> Quantity
-  := \inputValues : TxId ->^18446744069414584321 List^128(Value) 
+  := \inputValues : TxId ->^4096 List^128(Value) 
   => \t : TxId 
   => \k : AssetClass
   => valueSum(inputValues(t), k).
 
 
 def txBalances
-   : (TxId ->^18446744069414584321 List^128(Value))
-  -> List^18446744069414584321(AssetClass)
+   : (TxId ->^4096 List^128(Value))
+  -> List^4096(AssetClass)
   -> TxId
   -> Tx
   -> Prop
-  := \inputValues : TxId ->^18446744069414584321 List^128(Value)
-  => \assetClasses : List^18446744069414584321(AssetClass)
+  := \inputValues : TxId ->^4096 List^128(Value)
+  => \assetClasses : List^4096(AssetClass)
   => \i : TxId
   => \t : Tx
   => all j : N < length(assetClasses),
@@ -533,6 +532,6 @@ def txBalances'
    : TxId -> Tx -> Prop
   := \i : TxId
   => \t : Tx
-  => some inputValues : TxId ->^18446744069414584321 List^128(Value),
-     some assetClasses : List^18446744069414584321(AssetClass),
+  => some inputValues : TxId ->^4096 List^128(Value),
+     some assetClasses : List^4096(AssetClass),
      txBalances(inputValues, assetClasses, i, t).
