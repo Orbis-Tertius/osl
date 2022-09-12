@@ -519,7 +519,7 @@ def txBalances
   => all j : N < length(assetClasses),
      let y : AssetClass := nth(assetClasses, j);
      let a : Z := cast(from(Quantity)(totalInput(inputValues, i, y)));
-     let b : Z := maybe((\x : MintQuantity => cast(from(MintQuantity)(x))))
+     let b : Z := maybe((\x : MintQuantity => from(MintQuantity)(x)))
                     (0Z, lookup(y, mintValue(mint(t))));
      let c : Z := cast(from(Quantity)(totalOutput(t, y)));
      (a +Z b) = c.

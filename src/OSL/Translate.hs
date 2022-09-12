@@ -150,7 +150,7 @@ translate ctx@(TranslationContext
     OSL.Apply _ (OSL.Lambda _ varName varType body) x -> do
       xM <- translateToMapping ctx varType x
       let decls' = OSL.ValidContext
-                     (Map.insert varName (OSL.Defined varType x) declsMap)
+                     (Map.insert varName (OSL.FreeVariable varType) declsMap)
           ctx' = TranslationContext decls' (Map.insert varName xM mappings)
       translate ctx' termType body
     OSL.Apply _ (OSL.To ann typeName) x ->
@@ -895,7 +895,6 @@ applyMappings ann ctx f x =
       translateToMapping ctx'' tT t
     (ScalarMapping f', ScalarMapping x') ->
       ScalarMapping <$> applyTerms ann f' x'
-    -- TODO: this is wrong; need to recurse into functors
     (ScalarMapping _, ProductMapping (LeftMapping x') (RightMapping y')) -> do
       f' <- applyMappings ann ctx f x'
       applyMappings ann ctx f' y'
