@@ -1,0 +1,8 @@
+def bar : (N -> N) -> N
+  := \f : N -> N
+  => f(0N).
+
+
+def foo : (N -> N) -> Prop
+  := \f : N -> N
+  => bar(f) = 0N.
