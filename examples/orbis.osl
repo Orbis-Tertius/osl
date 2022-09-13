@@ -547,3 +547,26 @@ def spendingScriptsAcceptTx
                 ((x, to(TxOutRefIndex)(to(F)(cast(i))))))))
             ));
       accepts(a, pi1(l), pi2(l), d, r, c)).
+
+
+def mintingScriptsAcceptTx
+   : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+  -> TxId
+  -> Tx
+  -> Prop
+  := \scriptLimits : ScriptAddress -> TxId -> (ScriptSize * Steps)
+  => \x : TxId
+  => \t : Tx
+  => let v : Map^128(AssetClass, MintQuantity) := mintValue(mint(t));
+     let inputs : Map^8(CurrencySymbol, Datum * Redeemer)
+       := mintInputsMap(mintInputs(t));
+     all i : N < length(keys(v)),
+     let k : AssetClass := nth(keys(v), i);
+     let c : CurrencySymbol := currencySymbol(k);
+     let a : ScriptAddress := to(ScriptAddress)(from(CurrencySymbol)(c));
+     let ctx : ScriptContext
+       := to(ScriptContext)((t, to(ScriptPurpose)(iota1(to(Minting)(c)))));
+     !(isNothing(lookup(c, inputs)))
+   & (let m : Datum * Redeemer := exists(lookup(c, inputs));
+      let l : ScriptSize * Steps := scriptLimits(a, x);
+      accepts(a, pi1(l), pi2(l), pi1(m), pi2(m), ctx)).
