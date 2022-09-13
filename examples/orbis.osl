@@ -399,12 +399,12 @@ def feeRequirementMet
   => \x : Z
   => paysFeeToCorrectAddress(p, t)
    & (f0(p) <= toFrac(x))
-   & (some c : Frac < maxFrac,
+   & (some c' : Frac < maxFrac,
       some d : Frac < maxFrac,
       some e : N < maxInt,
       (natToInt(e) <= x)
-    & checkCost(p, t, s, c)
-    & isProd(m(p), c, d)
+    & checkCost(p, t, s, c')
+    & isProd(m(p), c', d)
     & roundsUpTo(d, e)).
 
 
