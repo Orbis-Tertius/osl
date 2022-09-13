@@ -586,3 +586,8 @@ def scriptsAcceptTx
 
 def signatureExists : TxId -> PubKeyHash -> Prop
   := \x : TxId => \h : PubKeyHash => 0N = 0N. -- TODO: make this a free variable.
+
+def isSignedByAllSignatories : TxId -> Tx -> Prop
+  := \x : TxId => \t : Tx
+  => let s : List^128(PubKeyHash) := getSignatories(signatories(t));
+     all i : N < length(s), signatureExists(x, nth(s, i)).
