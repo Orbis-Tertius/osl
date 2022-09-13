@@ -1,3 +1,5 @@
+def natToInt : N -> Z := cast.
+
 data Byte ~= Fin(256).
 
 data ByteString ~= List^8192(Byte).
@@ -243,7 +245,9 @@ def precision : N := 32N.
 def toFrac : N -> Frac
   := \x : N => to(Frac)(precision *N cast(x)).
 
-def maxFrac : Frac := toFrac(576460748008456192N).
+def maxInt : N := 576460748008456192N.
+
+def maxFrac : Frac := toFrac(maxInt).
 
 def add : Frac -> Frac -> Frac
   := \x : Frac => \y : Frac
@@ -387,18 +391,18 @@ def feeRequirementMet
    : FeeParams
   -> Tx
   -> List^128(ScriptSize * Steps)
-  -> N
+  -> Z
   -> Prop
   := \p : FeeParams
   => \t : Tx
   => \s : List^128(ScriptSize * Steps)
-  => \x : N
+  => \x : Z
   => paysFeeToCorrectAddress(p, t)
    & (f0(p) <= toFrac(x))
    & (some c : Frac < maxFrac,
       some d : Frac < maxFrac,
-      some e : N,
-      (e <= x)
+      some e : N < maxInt,
+      (natToInt(e) <= x)
     & checkCost(p, t, s, c)
     & isProd(m(p), c, d)
     & roundsUpTo(d, e)).
@@ -591,3 +595,25 @@ def isSignedByAllSignatories : TxId -> Tx -> Prop
   := \x : TxId => \t : Tx
   => let s : List^128(PubKeyHash) := getSignatories(signatories(t));
      all i : N < length(s), signatureExists(x, nth(s, i)).
+
+
+def HALO : AssetClass
+  := to(AssetClass)(
+       ( to(CurrencySymbol)(to(F)(fin(42)))
+       , to(TokenName)(to(F)(fin(42))) )).
+
+
+def paysEnoughFee
+   : (TxId -> List^128(ScriptSize * Steps))
+  -> (Time -> FeeParams)
+  -> TxId
+  -> Tx
+  -> Prop
+  := \txScriptLimits : TxId -> List^128(ScriptSize * Steps)
+  => \p : Time -> FeeParams
+  => \x : TxId
+  => \t : Tx
+  => let f : Z :=
+           maybe((\x : MintQuantity => from(MintQuantity)(x)))
+           (0Z, lookup(HALO, mintValue(mint(t))));
+     feeRequirementMet(p(txIdTime(x)), t, txScriptLimits(x), f).
