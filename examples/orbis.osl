@@ -570,3 +570,15 @@ def mintingScriptsAcceptTx
    & (let m : Datum * Redeemer := exists(lookup(c, inputs));
       let l : ScriptSize * Steps := scriptLimits(a, x);
       accepts(a, pi1(l), pi2(l), pi1(m), pi2(m), ctx)).
+
+
+def scriptsAcceptTx
+   : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+  -> TxId
+  -> Tx
+  -> Prop
+  := \scriptLimits : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+  => \x : TxId
+  => \t : Tx
+  => spendingScriptsAcceptTx(scriptLimits, x, t)
+   & mintingScriptsAcceptTx(scriptLimits, x, t).
