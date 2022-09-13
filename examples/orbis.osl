@@ -582,3 +582,7 @@ def scriptsAcceptTx
   => \t : Tx
   => spendingScriptsAcceptTx(scriptLimits, x, t)
    & mintingScriptsAcceptTx(scriptLimits, x, t).
+
+
+def signatureExists : TxId -> PubKeyHash -> Prop
+  := \x : TxId => \h : PubKeyHash => 0N = 0N. -- TODO: make this a free variable.
