@@ -4,4 +4,4 @@ def foo : N -> Prop
   := \x : N => c(x) = x.
 
 def bar : N -> Prop
-  := \x : N => foo(x).
+  := \c : N => foo(c).
