@@ -1,0 +1,7 @@
+def g : N -> N := \x : N => x +N 1N.
+
+def h : N -> N := \x : N => x.
+
+def f : (N + N) -> N := \y : N + N => (g + h)(y).
+
+def foo : (N + N) -> Prop := \x : N + N => f(x) = 1N.

@@ -73,6 +73,7 @@ test-suite spec
   main-is: Spec.hs
 
   other-modules:
+    OSL.Spec
 
   build-tools:
     sydtest-discover
@@ -97,6 +98,7 @@ test-suite spec
     process,
     QuickCheck,
     random,
+    raw-strings-qq,
     sydtest,
     text -any,
     transformers,

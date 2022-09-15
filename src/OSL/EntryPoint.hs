@@ -1,4 +1,4 @@
-module OSL.EntryPoint (main) where
+module OSL.EntryPoint (main, runMain) where
 
 
 import Data.Text (pack)
@@ -20,25 +20,29 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [fileName, targetName] -> do
-      source <- readFile fileName
-      case tokenize fileName source of
-        Left err -> putStrLn $ "Tokenizing error: " <> show err
-        Right toks -> do
-          case parseContext fileName toks of
-            Left err -> putStrLn $ "Parse error: " <> show err
-            Right rawCtx -> do
-              case validateContext rawCtx of
-                Left err -> putStrLn $ "Type checking error: " <> show err
-                Right validCtx ->
-                  case buildTranslationContext validCtx of
-                    Right gc -> do
-                      let lc = toLocalTranslationContext gc
-                      case getDeclaration validCtx (Sym (pack targetName)) of
-                        Just (Defined _ targetTerm) ->
-                          case translateToFormula gc lc targetTerm of
-                            Left err -> putStrLn $ "Error translating: " <> show err
-                            Right translated -> putStrLn $ "Translated OSL:\n" <> show translated
-                        _ -> putStrLn "please provide the name of a defined term"
-                    Left err -> putStrLn $ "Error building context: " <> show err
+    [fileName, targetName] -> putStrLn =<< runMain fileName targetName
     _ -> putStrLn "Error: please provide a filename and the name of a term and nothing else"
+
+
+runMain :: String -> String -> IO String
+runMain fileName targetName = do
+  source <- readFile fileName
+  case tokenize fileName source of
+    Left err -> pure $ "Tokenizing error: " <> show err
+    Right toks -> do
+      case parseContext fileName toks of
+        Left err -> pure $ "Parse error: " <> show err
+        Right rawCtx -> do
+          case validateContext rawCtx of
+            Left err -> pure $ "Type checking error: " <> show err
+            Right validCtx ->
+              case buildTranslationContext validCtx of
+                Right gc -> do
+                  let lc = toLocalTranslationContext gc
+                  case getDeclaration validCtx (Sym (pack targetName)) of
+                    Just (Defined _ targetTerm) ->
+                      case translateToFormula gc lc targetTerm of
+                        Left err -> pure $ "Error translating: " <> show err
+                        Right translated -> pure $ "Translated OSL:\n" <> show translated
+                    _ -> pure "please provide the name of a defined term"
+                Left err -> pure $ "Error building context: " <> show err
