@@ -840,3 +840,32 @@ def assetClassesCohere
       all j : N < length(l),
       valueInAssetClasses(assetClasses,
         pi2(from(RootOut)(nth(l, j))))).
+
+
+def scriptLimitsCohere
+   : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+  -> (TxId -> List^128(ScriptSize * Steps))
+  -> Rollup
+  -> Prop
+  := \scriptLimits : ScriptAddress -> TxId -> (ScriptSize * Steps)
+  => \txScriptLimits : TxId -> List^128(ScriptSize * Steps)
+  => \R : Rollup
+  => all i : N < length(keys(txs(R))),
+     let x : TxId := nth(keys(txs(R)), i);
+     let t : Tx := exists(lookup(x, txs(R)));
+     let m : Map^8(CurrencySymbol, Datum * Redeemer)
+       := mintInputsMap(mintInputs(t));
+     (all j : N < length(outputs(t)),
+      let o : TxOut := nth(outputs(t), j);
+      let s : Maybe(Datum * Redeemer * ScriptAddress)
+        := scriptInfo(o);
+      isNothing(s)
+      | (let a : ScriptAddress := pi2(pi2(exists(s)));
+         some k : N < length(txScriptLimits(x)),
+         nth(txScriptLimits(x), k) = scriptLimits(a, x)))
+   & (all j : N < length(keys(m)),
+      let c : CurrencySymbol := nth(keys(m), j);
+      let a : ScriptAddress := to(ScriptAddress)
+        (from(CurrencySymbol)(c));
+      some k : N < length(txScriptLimits(x)),
+      nth(txScriptLimits(x), k) = scriptLimits(a, x)).
