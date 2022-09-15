@@ -10,6 +10,8 @@ data Redeemer ~= ByteString.
 
 data F ~= Fin(4096).
 
+def fToNat : F -> N := \x : F => cast(from(F)(x)).
+
 def bytesPerWord : N := 8N.
 
 data PubKeyHash ~= F.
@@ -619,3 +621,16 @@ def paysEnoughFee
            maybe((\x : MintQuantity => from(MintQuantity)(x)))
            (0Z, lookup(HALO, mintValue(mint(t))));
      feeRequirementMet(p(txIdTime(x)), t, txScriptLimits(x), f).
+
+
+def spendingInputTime : SpendIn -> Time
+  := \x : SpendIn
+  => ((\x : TxOutRef => txIdTime(txOutRefId(x))) + rootOutRefTime)
+       (from(SpendIn)(x)).
+
+
+def txSpendingInputsPrecedeTx : TxId -> Tx -> Prop
+  := \x : TxId => \t : Tx
+  => all i : N < length(spendingInputs(t)),
+     (fToNat(from(Time)(spendingInputTime(nth(spendingInputs(t), i)))) +N 1N)
+       <= fToNat(from(Time)(txIdTime(x))).
