@@ -714,3 +714,11 @@ def leavesExist : Rollup -> Prop
        & spendingInputExists(R, to(SpendIn)(iota1(y))))
    | (some y : RootOutRef, (x = to(LeafOut)(iota2(y)))
        & spendingInputExists(R, to(SpendIn)(iota2(y)))).
+
+
+def leavesAreSigned : Rollup -> Prop
+  := \R : Rollup
+  => all i : N < length(keys(leaves(R))),
+     let x : LeafOut := nth(keys(leaves(R)), i);
+     let k : PubKeyHash := to(PubKeyHash)(from(Address)(leafOutAddress(R, x)));
+     leafSignatureExists(x, k).
