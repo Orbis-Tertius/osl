@@ -817,3 +817,26 @@ def mintInAssetClasses
      all i : N < length(keys(v)),
      some j : N < length(assetClasses),
      nth(keys(v), i) = nth(assetClasses, j).
+
+
+def assetClassesCohere
+   : List^4096(AssetClass)
+  -> Rollup
+  -> Prop
+  := \assetClasses : List^4096(AssetClass)
+  => \R : Rollup
+  => (all i : N < length(keys(txs(R))),
+      let x : TxId := nth(keys(txs(R)), i);
+      let t : Tx := exists(lookup(x, txs(R)));
+      valueInAssetClasses(assetClasses, from(Fee)(fee(t)))
+    & mintInAssetClasses(assetClasses, mint(t))
+    & (all j : N < length(outputs(t)),
+       let o : TxOut := nth(outputs(t), j);
+       valueInAssetClasses(assetClasses, value(o))))
+   & (all i : N < length(keys(roots(R))),
+      let t : Time := nth(keys(roots(R)), i);
+      let l : List^128(RootOut) :=
+        exists(lookup(t, roots(R)));
+      all j : N < length(l),
+      valueInAssetClasses(assetClasses,
+        pi2(from(RootOut)(nth(l, j))))).
