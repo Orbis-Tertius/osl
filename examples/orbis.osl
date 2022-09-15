@@ -169,7 +169,8 @@ def feeValue : Fee -> Value
 def mintValue : Mint -> Map^128(AssetClass, MintQuantity)
   := \x : Mint => from(Mint)(x).
 
-def valueMap : Value -> Map^128(AssetClass, Quantity) := from(Value).
+def valueMap : Value -> Map^128(AssetClass, Quantity)
+  := \x : Value => from(Value)(x).
 
 def mintInputsMap : MintInputs -> Map^8(CurrencySymbol, Datum * Redeemer)
   := \x : MintInputs => from(MintInputs)(x).
@@ -792,3 +793,15 @@ def referencesAreUnspent
      isNothing(c)
    | (some y : TxId, (txIdTime(x) <= txIdTime(y))
        & (c = just(to(Consumer)(iota1(y))))).
+
+
+def valueInAssetClasses
+   : List^4096(AssetClass)
+  -> Value
+  -> Prop
+  := \assetClasses : List^4096(AssetClass)
+  => \v : Value
+  => let v' : Map^128(AssetClass, Quantity) := valueMap(v);
+     all i : N < length(keys(v')),
+     some j : N < length(assetClasses),
+     nth(keys(v'), i) = nth(assetClasses, j).
