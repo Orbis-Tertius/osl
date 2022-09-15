@@ -1,4 +1,4 @@
-def natToInt : N -> Z := cast.
+def natToInt : N -> Z := \x : N => cast(x).
 
 data Byte ~= Fin(256).
 
@@ -161,17 +161,19 @@ def start : ValidRange -> Time
 def end : ValidRange -> Time
   := \r : ValidRange => pi2(from(ValidRange)(r)).
 
-def feeValue : Fee -> Value := from(Fee).
+def feeValue : Fee -> Value
+  := \x : Fee => from(Fee)(x).
 
-def mintValue : Mint -> Map^128(AssetClass, MintQuantity) := from(Mint).
+def mintValue : Mint -> Map^128(AssetClass, MintQuantity)
+  := \x : Mint => from(Mint)(x).
 
 def valueMap : Value -> Map^128(AssetClass, Quantity) := from(Value).
 
 def mintInputsMap : MintInputs -> Map^8(CurrencySymbol, Datum * Redeemer)
-  := from(MintInputs).
+  := \x : MintInputs => from(MintInputs)(x).
 
 def getSignatories : Signatories -> List^128(PubKeyHash)
-  := from(Signatories).
+  := \s : Signatories => from(Signatories)(s).
 
 def getQuantity : Quantity -> N
   := \x : Quantity => cast(from(F)(from(Quantity)(x))).

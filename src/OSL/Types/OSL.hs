@@ -1,6 +1,8 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
 
 
 module OSL.Types.OSL
@@ -17,6 +19,7 @@ module OSL.Types.OSL
   , KeysBound (..)
   , Declaration (..)
   , Context (..)
+  , ContextType (..)
   , ValidContext (..)
   ) where
 
@@ -180,6 +183,10 @@ data Declaration ann =
 newtype Context ann = Context { unContext :: [(Name, Declaration ann)] }
 
 
-newtype ValidContext ann =
+data ContextType = Global | Local
+  deriving Show
+
+
+newtype ValidContext (t :: ContextType) ann =
   ValidContext { unValidContext :: Map Name (Declaration ann) }
   deriving Show

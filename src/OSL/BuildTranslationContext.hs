@@ -46,9 +46,9 @@ import OSL.ValidContext (getExistingDeclaration, addDeclaration)
 -- builds a translation context providing mappings
 -- for the given free variables.
 buildTranslationContext'
-  :: ValidContext ann
+  :: ValidContext t ann
   -> [OSL.Name]
-  -> Either (ErrorMessage ann) (TranslationContext ann)
+  -> Either (ErrorMessage ann) (TranslationContext t ann)
 buildTranslationContext' c freeVariables =
   runIdentity $
     runExceptT
@@ -60,8 +60,8 @@ buildTranslationContext' c freeVariables =
 -- builds a translation context providing mappings
 -- for all of the free variables in the given context.
 buildTranslationContext
-  :: ValidContext ann
-  -> Either (ErrorMessage ann) (TranslationContext ann)
+  :: ValidContext t ann
+  -> Either (ErrorMessage ann) (TranslationContext t ann)
 buildTranslationContext c =
   buildTranslationContext' c (getFreeVariables c)
 
@@ -69,7 +69,7 @@ buildTranslationContext c =
 addFreeVariableMapping
   :: Monad m
   => OSL.Name
-  -> StateT (TranslationContext ann)
+  -> StateT (TranslationContext t ann)
        (ExceptT (ErrorMessage ann) m) (Mapping ann S11.Name)
 addFreeVariableMapping freeVariable = do
   TranslationContext c _ <- get
@@ -169,7 +169,7 @@ addMapping
   :: Monad m
   => OSL.Name
   -> Mapping ann S11.Name
-  -> StateT (TranslationContext ann) m ()
+  -> StateT (TranslationContext t ann) m ()
 addMapping name mapping =
   addTermMapping name (S11.Var <$> mapping)
 
@@ -178,7 +178,7 @@ addTermMapping
   :: Monad m
   => OSL.Name
   -> Mapping ann S11.Term
-  -> StateT (TranslationContext ann) m ()
+  -> StateT (TranslationContext t ann) m ()
 addTermMapping name mapping =
   modify ( #mappings %~ Map.insert name mapping )
 
@@ -187,12 +187,12 @@ addFreeVariableDeclaration
   :: Monad m
   => OSL.Name
   -> Type ann
-  -> StateT (TranslationContext ann) m ()
+  -> StateT (TranslationContext t ann) m ()
 addFreeVariableDeclaration name t =
   modify ( #context %~ addDeclaration name (FreeVariable t) )
 
 
-getFreeVariables :: ValidContext ann -> [OSL.Name]
+getFreeVariables :: ValidContext t ann -> [OSL.Name]
 getFreeVariables (ValidContext decls) =
   Map.keys (Map.filter isFree decls)
   where
@@ -202,7 +202,7 @@ getFreeVariables (ValidContext decls) =
 
 getBoundS11NamesInContext
   :: Arity
-  -> TranslationContext ann
+  -> TranslationContext t ann
   -> Set S11.Name
 getBoundS11NamesInContext arity (TranslationContext _ ctx) =
   Map.foldl' Set.union Set.empty
@@ -230,7 +230,7 @@ getBoundS11NamesInMapping arity =
     MapMapping (LengthMapping a) (KeysMapping b)
         (KeyIndicatorMapping c) (ValuesMapping d) ->
       rec a `Set.union` (rec b `Set.union` (rec c `Set.union` rec d))
-    LambdaMapping _ _ _ _ -> mempty
+    LambdaMapping _ _ _ _ _ -> mempty
     PropMapping _ -> mempty
   where
     f :: S11.Term -> Set S11.Name
@@ -252,7 +252,7 @@ getBoundS11NamesInMapping arity =
 
 getFreeS11Name
   :: Arity
-  -> TranslationContext ann
+  -> TranslationContext t ann
   -> S11.Name
 getFreeS11Name arity ctx =
   fromMaybe (S11.Name arity (DeBruijnIndex 0))
@@ -263,7 +263,7 @@ getFreeS11Name arity ctx =
 getFreeS11NameM
   :: Monad m
   => Arity
-  -> StateT (TranslationContext ann) m S11.Name
+  -> StateT (TranslationContext t ann) m S11.Name
 getFreeS11NameM arity =
   getFreeS11Name arity <$> get
 
@@ -271,7 +271,7 @@ getFreeS11NameM arity =
 addGensym
   :: Monad m
   => Type ann
-  -> StateT (TranslationContext ann) m OSL.Name
+  -> StateT (TranslationContext t ann) m OSL.Name
 addGensym t = do
   name <- getFreeOSLName <$> get
   addFreeVariableDeclaration name t
@@ -279,7 +279,7 @@ addGensym t = do
 
 
 getFreeOSLName
-  :: TranslationContext ann
+  :: TranslationContext t ann
   -> OSL.Name
 getFreeOSLName (TranslationContext (ValidContext c) _) =
   case fst <$> Map.lookupMax c of
@@ -325,7 +325,9 @@ mapAritiesInMapping f =
       (KeysMapping (rec b))
       (KeyIndicatorMapping (rec c))
       (ValuesMapping (rec d))
-    LambdaMapping ctx v vT t -> LambdaMapping ctx v vT t
+    LambdaMapping gc lc v vT t ->
+      -- TODO: should recurse into gc and/or lc?
+      LambdaMapping gc lc v vT t
     PropMapping p -> PropMapping p
   where
     g (S11.Name arity i) = S11.Name (f arity) i
@@ -352,7 +354,7 @@ getTypeDeclaration
   :: Monad m
   => ann
   -> OSL.Name
-  -> StateT (TranslationContext ann)
+  -> StateT (TranslationContext t ann)
        (ExceptT (ErrorMessage ann) m)
        (Type ann)
 getTypeDeclaration ann name = do

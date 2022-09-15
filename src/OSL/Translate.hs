@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -38,12 +39,13 @@ import OSL.ValidateContext (inferType)
 -- the given context.
 translate
   :: Show ann
-  => TranslationContext ann
+  => TranslationContext 'OSL.Global ann
+  -> TranslationContext 'OSL.Local ann
   -> OSL.Type ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) (Translation ann)
-translate ctx@(TranslationContext
-          decls@(OSL.ValidContext declsMap) mappings)
+translate gc
+          lc@(TranslationContext decls@(OSL.ValidContext declsMap) mappings)
           termType =
   \case
     OSL.NamedTerm ann name ->
@@ -53,35 +55,39 @@ translate ctx@(TranslationContext
         Nothing ->
           case Map.lookup name declsMap of
             Just (OSL.Defined defType def) -> do
-              translate (TranslationContext decls mempty) defType def
+              translate gc (TranslationContext decls mempty) defType def
             _ ->
               Left . ErrorMessage ann
               $ "un-mapped name: " <> pack (show name)
     OSL.Apply ann (OSL.Apply _ (OSL.AddN _) a) b ->
-      Term <$> (S11.Add <$> translateToTerm ctx (OSL.N ann) a
-                        <*> translateToTerm ctx (OSL.N ann) b)
+      Term <$> (S11.Add <$> translateToTerm gc lc (OSL.N ann) a
+                        <*> translateToTerm gc lc (OSL.N ann) b)
     OSL.Apply ann (OSL.Apply _ (OSL.MulN _) a) b ->
-      Term <$> (S11.Mul <$> translateToTerm ctx (OSL.N ann) a
-                        <*> translateToTerm ctx (OSL.N ann) b)
+      Term <$> (S11.Mul <$> translateToTerm gc lc (OSL.N ann) a
+                        <*> translateToTerm gc lc (OSL.N ann) b)
     OSL.Apply ann (OSL.Apply _ (OSL.AddZ _) a) b ->
-      Term <$> (S11.Add <$> translateToTerm ctx (OSL.Z ann) a
-                        <*> translateToTerm ctx (OSL.Z ann) b)
+      Term <$> (S11.Add <$> translateToTerm gc lc (OSL.Z ann) a
+                        <*> translateToTerm gc lc (OSL.Z ann) b)
     OSL.Apply ann (OSL.Apply _ (OSL.MulZ _) a) b ->
-      Term <$> (S11.Mul <$> translateToTerm ctx (OSL.Z ann) a
-                        <*> translateToTerm ctx (OSL.Z ann) b)
+      Term <$> (S11.Mul <$> translateToTerm gc lc (OSL.Z ann) a
+                        <*> translateToTerm gc lc (OSL.Z ann) b)
     OSL.Apply _ (OSL.Cast _) a -> do
       aT <- inferType decls a
-      translate ctx aT a
+      translate gc lc aT a
     OSL.ConstN _ x -> return (Term (S11.Const x))
     OSL.ConstZ _ x -> return (Term (S11.Const x))
     OSL.ConstFin _ x -> return (Term (S11.Const x))
     OSL.Apply ann (OSL.NamedTerm ann' fName) x ->
       case getDeclaration decls fName of
-        Just (OSL.Defined _ f) -> translate ctx termType (OSL.Apply ann f x)
+        Just (OSL.Defined fType f) -> do
+          fM <- translateToMapping gc lc fType f
+          xType <- inferType decls x
+          xM <- translateToMapping gc lc xType x
+          Mapping <$> applyMappings ann termType fM xM
         Just (OSL.FreeVariable fType@(OSL.F _ _ a _)) -> do
-          fM <- translateToMapping ctx fType (OSL.NamedTerm ann' fName)
-          xM <- translateToMapping ctx a x
-          Mapping <$> applyMappings ann ctx fM xM
+          fM <- translateToMapping gc lc fType (OSL.NamedTerm ann' fName)
+          xM <- translateToMapping gc lc a x
+          Mapping <$> applyMappings ann termType fM xM
         Just _ -> Left (ErrorMessage ann' "expected the name of a function")
         Nothing -> Left (ErrorMessage ann' "undefined name")
     OSL.Apply ann (OSL.Apply _ (OSL.Pair _) a) b ->
@@ -89,20 +95,20 @@ translate ctx@(TranslationContext
         OSL.Product _ aType bType -> do
           Mapping <$>
             (ProductMapping
-              <$> (LeftMapping <$> translateToMapping ctx aType a)
-              <*> (RightMapping <$> translateToMapping ctx bType b))
+              <$> (LeftMapping <$> translateToMapping gc lc aType a)
+              <*> (RightMapping <$> translateToMapping gc lc bType b))
         _ -> Left (ErrorMessage ann $
           "expected a " <> pack (show termType))
     OSL.Apply ann (OSL.Pi1 _) a -> do
       aT <- inferType decls a
-      aM <- translateToMapping ctx aT a
+      aM <- translateToMapping gc lc aT a
       case aM of
         ProductMapping (LeftMapping m) _ ->
           return (Mapping m)
         _ -> Left (ErrorMessage ann "expected a pair")
     OSL.Apply ann (OSL.Pi2 _) a -> do
       aT <- inferType decls a
-      aM <- translateToMapping ctx aT a
+      aM <- translateToMapping gc lc aT a
       case aM of
         ProductMapping _ (RightMapping m) ->
           return (Mapping m)
@@ -110,7 +116,7 @@ translate ctx@(TranslationContext
     OSL.Apply ann (OSL.Iota1 _) a ->
       case termType of
         OSL.Coproduct _ b c -> do
-          aM <- translateToMapping ctx b a
+          aM <- translateToMapping gc lc b a
           bM <- getArbitraryMapping decls c
           return . Mapping
             $ CoproductMapping
@@ -122,7 +128,7 @@ translate ctx@(TranslationContext
       case termType of
         OSL.Coproduct _ b c -> do
           aM <- getArbitraryMapping decls b
-          bM <- translateToMapping ctx c a
+          bM <- translateToMapping gc lc c a
           return . Mapping
             $ CoproductMapping
               (ChoiceMapping (ScalarMapping (S11.Const 0)))
@@ -134,35 +140,41 @@ translate ctx@(TranslationContext
         OSL.F ann' n a (OSL.Product _ b c) ->
           Mapping
           <$> (ProductMapping
-            <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' n a b) f)
-            <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' n a c) g))
+            <$> (LeftMapping <$> translateToMapping gc lc (OSL.F ann' n a b) f)
+            <*> (RightMapping <$> translateToMapping gc lc (OSL.F ann' n a c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     OSL.FunctionCoproduct ann f g ->
       case termType of
         OSL.F ann' n a (OSL.Coproduct _ b c) ->
           Mapping
           <$> (FunctionCoproductMapping
-            <$> (LeftMapping <$> translateToMapping ctx (OSL.F ann' n a b) f)
-            <*> (RightMapping <$> translateToMapping ctx (OSL.F ann' n a c) g))
+            <$> (LeftMapping <$> translateToMapping gc lc (OSL.F ann' n a b) f)
+            <*> (RightMapping <$> translateToMapping gc lc (OSL.F ann' n a c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     OSL.Lambda _ v vT t ->
-      pure (Mapping (LambdaMapping ctx v vT t))
+      pure (Mapping (LambdaMapping gc
+                      (TranslationContext
+                        (addDeclaration v (OSL.FreeVariable vT)
+                          -- convert context of unknown type to local context
+                          (OSL.ValidContext (OSL.unValidContext decls)))
+                        mappings)
+                      v vT t))
     OSL.Apply _ (OSL.Lambda _ varName varType body) x -> do
-      xM <- translateToMapping ctx varType x
+      xM <- translateToMapping gc lc varType x
       let decls' = OSL.ValidContext
                      (Map.insert varName (OSL.FreeVariable varType) declsMap)
-          ctx' = TranslationContext decls' (Map.insert varName xM mappings)
-      translate ctx' termType body
+          lc' = TranslationContext decls' (Map.insert varName xM mappings)
+      translate gc lc' termType body
     OSL.Apply _ (OSL.To ann typeName) x ->
       case getDeclaration decls typeName of
-        Just (OSL.Data typeDef) -> translate ctx typeDef x
+        Just (OSL.Data typeDef) -> translate gc lc typeDef x
         Just _ -> Left (ErrorMessage ann "expected the name of a type")
         Nothing -> Left (ErrorMessage ann "undefined name")
     OSL.Apply _ (OSL.From ann typeName) x ->
-      translate ctx (OSL.NamedType ann typeName) x
+      translate gc lc (OSL.NamedType ann typeName) x
     OSL.Apply ann (OSL.IsNothing _) x -> do
       xT <- inferType decls x
-      xM <- translateToMapping ctx xT x
+      xM <- translateToMapping gc lc xT x
       case xM of
         MaybeMapping (ChoiceMapping (ScalarMapping cT)) _ ->
           pure (Formula (S11.Equal cT (S11.Const 0)))
@@ -171,7 +183,7 @@ translate ctx@(TranslationContext
       case termType of
         OSL.Maybe _ xType ->
           Mapping . MaybeMapping (ChoiceMapping (ScalarMapping (S11.Const 1)))
-            . ValuesMapping <$> translateToMapping ctx xType x
+            . ValuesMapping <$> translateToMapping gc lc xType x
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
     OSL.Nothing' ann ->
       case termType of
@@ -183,13 +195,13 @@ translate ctx@(TranslationContext
       fType <- inferType decls f
       case fType of
         OSL.F _ _ aType _ -> do
-          aM <- translateToMapping ctx (OSL.Maybe ann aType) a
-          bT <- translateToTerm ctx termType b
-          fM <- translateToMapping ctx fType f
+          aM <- translateToMapping gc lc (OSL.Maybe ann aType) a
+          bT <- translateToTerm gc lc termType b
+          fM <- translateToMapping gc lc fType f
           case aM of
             MaybeMapping (ChoiceMapping (ScalarMapping choiceT))
                          (ValuesMapping vM) -> do
-              fvM <- applyMappings ann ctx fM vM
+              fvM <- applyMappings ann termType fM vM
               case fvM of
                 ScalarMapping fvT ->
                   pure . Term $ (choiceT `S11.Mul` fvT)
@@ -201,13 +213,13 @@ translate ctx@(TranslationContext
             _ -> Left . ErrorMessage ann $ "expected a maybe value"
         _ -> Left . ErrorMessage ann' $ "expected a function"
     OSL.Apply ann (OSL.Exists _) mx -> do
-      mxM <- translateToMapping ctx (OSL.Maybe ann termType) mx
+      mxM <- translateToMapping gc lc (OSL.Maybe ann termType) mx
       case mxM of
         MaybeMapping _ (ValuesMapping xM) -> pure (Mapping xM)
         _ -> Left . ErrorMessage ann $ "expected a maybe mapping"
     OSL.Apply ann (OSL.MaybePi1 _) x -> do
       xT <- inferType decls x
-      xM <- translateToMapping ctx xT x
+      xM <- translateToMapping gc lc xT x
       case xM of
         MaybeMapping choiceM
             (ValuesMapping (ProductMapping (LeftMapping aM) _)) ->
@@ -215,7 +227,7 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a Maybe(_ * _) mapping")
     OSL.Apply ann (OSL.MaybePi2 _) x -> do
       xT <- inferType decls x
-      xM <- translateToMapping ctx xT x
+      xM <- translateToMapping gc lc xT x
       case xM of
         MaybeMapping choiceM
             (ValuesMapping (ProductMapping _ (RightMapping aM))) ->
@@ -223,34 +235,34 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a Maybe(_ * _) mapping")
     OSL.Apply _ (OSL.MaybeFrom _ _) x -> do
       xT <- inferType decls x
-      translate ctx xT x
+      translate gc lc xT x
     OSL.Apply _ (OSL.MaybeTo _ _) x -> do
       xT <- inferType decls x
-      translate ctx xT x
+      translate gc lc xT x
     OSL.Apply ann (OSL.Length _) xs -> do
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsM of
         ListMapping (LengthMapping (ScalarMapping lT)) _ -> pure (Term lT)
         _ -> Left (ErrorMessage ann "expected a list")
     OSL.Apply ann (OSL.Apply _ (OSL.Nth _) xs) i -> do
-      iT <- translateToTerm ctx (OSL.N ann) i
+      iT <- translateToTerm gc lc (OSL.N ann) i
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsM of
         ListMapping _ (ValuesMapping vM) ->
-          Mapping <$> mapNth ann ctx vM iT
+          Mapping <$> mapNth ann vM iT
         _ -> Left (ErrorMessage ann "nth expected a list mapping")
     OSL.Apply ann (OSL.ListPi1 _) xs -> do
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsM of
         ListMapping lM (ValuesMapping (ProductMapping (LeftMapping aM) _)) ->
           pure . Mapping $ ListMapping lM (ValuesMapping aM)
         _ -> Left . ErrorMessage ann $ "expected a list of pairs"
     OSL.Apply ann (OSL.ListPi2 _) xs -> do
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsM of
         ListMapping lM (ValuesMapping (ProductMapping _ (RightMapping bM))) ->
           pure . Mapping $ ListMapping lM (ValuesMapping bM)
@@ -261,7 +273,7 @@ translate ctx@(TranslationContext
           xsType <- inferType decls xs
           case xsType of
             OSL.List _ n _ ->
-              Mapping <$> translateToMapping ctx (OSL.List ann' n a) xs
+              Mapping <$> translateToMapping gc lc (OSL.List ann' n a) xs
             _ -> Left (ErrorMessage ann "expected a list")
         Just _ -> Left (ErrorMessage ann' "expected the name of a type")
         Nothing -> Left (ErrorMessage ann' "undefined name")
@@ -271,7 +283,7 @@ translate ctx@(TranslationContext
           xsType <- inferType decls xs
           case xsType of
             OSL.List _ n _ ->
-              Mapping <$> translateToMapping ctx
+              Mapping <$> translateToMapping gc lc
                 (OSL.List ann' n (OSL.NamedType ann' name))
                 xs
             _ -> Left (ErrorMessage ann "expected a list")
@@ -279,7 +291,7 @@ translate ctx@(TranslationContext
         Nothing -> Left (ErrorMessage ann' "undefined name")
     OSL.Apply ann (OSL.ListLength _) xs -> do
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsM of
         ListMapping lM (ValuesMapping (ListMapping (LengthMapping xslM) _)) ->
           pure . Mapping $ ListMapping lM (ValuesMapping xslM)
@@ -290,7 +302,7 @@ translate ctx@(TranslationContext
           xsType <- inferType decls xs
           case xsType of
             OSL.List _ n (OSL.Maybe _ _) ->
-              Mapping <$> translateToMapping ctx (OSL.List ann' n a) xs
+              Mapping <$> translateToMapping gc lc (OSL.List ann' n a) xs
             _ -> Left (ErrorMessage ann "expected a list of maybe")
         Just _ -> Left (ErrorMessage ann' "expected the name of a type")
         Nothing -> Left (ErrorMessage ann' "undefined name")
@@ -300,7 +312,7 @@ translate ctx@(TranslationContext
           xsType <- inferType decls xs
           case xsType of
             OSL.List _ n (OSL.Maybe _ _) ->
-              Mapping <$> translateToMapping ctx
+              Mapping <$> translateToMapping gc lc
                 (OSL.List ann' n (OSL.NamedType ann' name))
                 xs
             _ -> Left (ErrorMessage ann "expected a list of maybe")
@@ -308,7 +320,7 @@ translate ctx@(TranslationContext
         Nothing -> Left (ErrorMessage ann' "undefined name")
     OSL.Apply ann (OSL.ListMaybePi1 _) xs -> do
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsM of
         ListMapping lM
           (ValuesMapping
@@ -322,7 +334,7 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a list of maybe pair")
     OSL.Apply ann (OSL.ListMaybePi2 _) xs -> do
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsM of
         ListMapping lM
           (ValuesMapping
@@ -336,7 +348,7 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a list of maybe pair")
     OSL.Apply ann (OSL.ListMaybeLength _) xs -> do
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsM of
         ListMapping lM
           (ValuesMapping
@@ -348,7 +360,7 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a list of maybe list")
     OSL.Apply ann (OSL.Sum _) xs -> do
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsType of
         OSL.List _ (OSL.Cardinality n) (OSL.List _ (OSL.Cardinality m) _) ->
           case xsM of
@@ -418,14 +430,14 @@ translate ctx@(TranslationContext
     OSL.Apply ann (OSL.Apply _ (OSL.Lookup _) k) xs -> do
       xsType <- inferType decls xs
       case xsType of
-        OSL.Map _ _ kType _ -> do
-          xsM <- translateToMapping ctx xsType xs
-          kM <- translateToMapping ctx kType k
+        OSL.Map _ _ kType vType -> do
+          xsM <- translateToMapping gc lc xsType xs
+          kM <- translateToMapping gc lc kType k
           case xsM of
             MapMapping _ _ (KeyIndicatorMapping indM)
                 (ValuesMapping vM) -> do
-              kExistsM <- applyMappings ann ctx indM kM
-              vM' <- applyMappings ann ctx vM kM
+              kExistsM <- applyMappings ann (OSL.N ann) indM kM
+              vM' <- applyMappings ann vType vM kM
               pure . Mapping
                 $ MaybeMapping (ChoiceMapping kExistsM) (ValuesMapping vM')
             _ -> Left (ErrorMessage ann "expected a map mapping")
@@ -434,7 +446,7 @@ translate ctx@(TranslationContext
       xsType <- inferType decls xs
       case xsType of
         OSL.Map _ _ _ (OSL.Product _ _ _) -> do
-          xsM <- translateToMapping ctx xsType xs
+          xsM <- translateToMapping gc lc xsType xs
           case xsM of
             MapMapping lM kM iM (ValuesMapping
                 (ProductMapping (LeftMapping aM) _)) ->
@@ -445,7 +457,7 @@ translate ctx@(TranslationContext
       xsType <- inferType decls xs
       case xsType of
         OSL.Map _ _ _ (OSL.Product _ _ _) -> do
-          xsM <- translateToMapping ctx xsType xs
+          xsM <- translateToMapping gc lc xsType xs
           case xsM of
             MapMapping lM kM iM (ValuesMapping
                 (ProductMapping _ (RightMapping bM))) ->
@@ -454,15 +466,15 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a map")
     OSL.Apply _ (OSL.MapTo _ _) xs -> do
       xsType <- inferType decls xs
-      translate ctx xsType xs
+      translate gc lc xsType xs
     OSL.Apply _ (OSL.MapFrom _ _) xs -> do
       xsType <- inferType decls xs
-      translate ctx xsType xs
+      translate gc lc xsType xs
     OSL.Apply ann (OSL.Keys _) xs -> do
       xsType <- inferType decls xs
       case xsType of
         OSL.Map _ _ _ _ -> do
-          xsM <- translateToMapping ctx xsType xs
+          xsM <- translateToMapping gc lc xsType xs
           case xsM of
             MapMapping lM (KeysMapping kM) _ _ ->
               pure . Mapping $ ListMapping lM (ValuesMapping kM)
@@ -470,7 +482,7 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a map")
     OSL.Apply ann (OSL.SumMapLength _) xs -> do
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsType of
         OSL.Map _ (OSL.Cardinality n) _ (OSL.List _ _ _) ->
           case xsM of
@@ -490,10 +502,10 @@ translate ctx@(TranslationContext
         _ -> Left (ErrorMessage ann "expected a map of list")
     OSL.Apply ann (OSL.SumListLookup _ k) xs -> do
       xsType <- inferType decls xs
-      xsM <- translateToMapping ctx xsType xs
+      xsM <- translateToMapping gc lc xsType xs
       case xsType of
         OSL.List _ (OSL.Cardinality n) (OSL.Map _ _ kType _) -> do
-          kM <- translateToMapping ctx kType k
+          kM <- translateToMapping gc lc kType k
           case xsM of
             ListMapping (LengthMapping (ScalarMapping lT))
              (ValuesMapping (MapMapping (LengthMapping _)
@@ -505,11 +517,13 @@ translate ctx@(TranslationContext
              [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
                <$> ( S11.Mul
                  <$> (mappingToTerm ann
-                       =<< flip (applyMappings ann ctx) kM
-                       =<< applyMappings ann ctx kiM (ScalarMapping (S11.Const i)))
+                       =<< flip (applyMappings ann termType) kM
+                       =<< applyMappings ann termType kiM
+                           (ScalarMapping (S11.Const i)))
                  <*> (mappingToTerm ann
-                       =<< flip (applyMappings ann ctx) kM
-                       =<< applyMappings ann ctx vM (ScalarMapping (S11.Const i))) )
+                       =<< flip (applyMappings ann termType) kM
+                       =<< applyMappings ann termType vM
+                           (ScalarMapping (S11.Const i))) )
              | i <- [0..n-1]
              ]
             _ -> Left (ErrorMessage ann "could not translate sumListLookup application")
@@ -520,39 +534,39 @@ translate ctx@(TranslationContext
       fType <- inferType decls f
       case fType of
         OSL.F _ _ a _ -> do
-          fM <- translateToMapping ctx fType f
-          xM <- translateToMapping ctx a x
-          Mapping <$> applyMappings ann ctx fM xM
+          fM <- translateToMapping gc lc fType f
+          xM <- translateToMapping gc lc a x
+          Mapping <$> applyMappings ann termType fM xM
         _ -> Left (ErrorMessage ann "expected a function")
     OSL.Let _ varName varType varDef body -> do
-      varDefM <- translateToMapping ctx varType varDef
+      varDefM <- translateToMapping gc lc varType varDef
       let decls' = OSL.ValidContext
                      (Map.insert varName (OSL.Defined varType varDef) declsMap)
-          ctx' = TranslationContext decls' (Map.insert varName varDefM mappings)
-      translate ctx' termType body
+          lc' = TranslationContext decls' (Map.insert varName varDefM mappings)
+      translate gc lc' termType body
     OSL.Equal ann x y -> do
       xType <- inferType decls x
-      Formula <$> translateEquality ann ctx xType x y
+      Formula <$> translateEquality ann gc lc xType x y
     OSL.LessOrEqual _ x y -> do
       xType <- inferType decls x
       Formula <$>
         (S11.LessOrEqual
-          <$> translateToTerm ctx xType x
-          <*> translateToTerm ctx xType y)
+          <$> translateToTerm gc lc xType x
+          <*> translateToTerm gc lc xType y)
     OSL.And _ p q ->
       Formula <$>
-        (S11.And <$> translateToFormula ctx p
-                 <*> translateToFormula ctx q)
+        (S11.And <$> translateToFormula gc lc p
+                 <*> translateToFormula gc lc q)
     OSL.Or _ p q ->
       Formula <$>
-        (S11.Or <$> translateToFormula ctx p
-                <*> translateToFormula ctx q)
+        (S11.Or <$> translateToFormula gc lc p
+                <*> translateToFormula gc lc q)
     OSL.Not _ p ->
-      Formula . S11.Not <$> translateToFormula ctx p
+      Formula . S11.Not <$> translateToFormula gc lc p
     OSL.Implies _ p q ->
       Formula <$>
-        (S11.Implies <$> translateToFormula ctx p
-                     <*> translateToFormula ctx q)
+        (S11.Implies <$> translateToFormula gc lc p
+                     <*> translateToFormula gc lc q)
     OSL.ForAll ann varName varType varBound p -> do
       varDim <- getMappingDimensions decls varType
       case varDim of
@@ -561,11 +575,11 @@ translate ctx@(TranslationContext
                 $ Map.insert varName (OSL.FreeVariable varType) declsMap
           TranslationContext _ qCtx <-
             buildTranslationContext' decls' [varName]
-          let ctx' = TranslationContext decls'
-                     (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
-          bounds <- translateBound ctx varType varBound
+          let lc' = TranslationContext decls'
+                    (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
+          bounds <- translateBound gc lc varType varBound
           Formula . foldl (.) id (S11.ForAll <$> bounds)
-            <$> translateToFormula ctx' p
+            <$> translateToFormula gc lc' p
         InfiniteDimensions ->
           Left (ErrorMessage ann "universal quantification over an infinite-dimensional type")
     OSL.ForSome _ varName varType varBound p -> do
@@ -576,25 +590,26 @@ translate ctx@(TranslationContext
        FiniteDimensions n -> do
          TranslationContext _ qCtx <-
            buildTranslationContext' decls' [varName]
-         let ctx' = TranslationContext decls'
-                    (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
-         bounds <- translateBound ctx varType varBound
+         let lc' = TranslationContext decls'
+                   (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
+         bounds <- translateBound gc lc varType varBound
          Formula . foldl (.) id (S11.Exists . S11.ExistsFO <$> bounds)
-           <$> translateToFormula ctx' p
+           <$> translateToFormula gc lc' p
        InfiniteDimensions -> do
          (qs, newMapping) <-
-           getExistentialQuantifierStringAndMapping ctx varType
+           getExistentialQuantifierStringAndMapping gc lc varType
              =<< getExplicitOrInferredBound decls varType varBound
-         let ctx' = TranslationContext decls'
-                    (mergeMappings (Map.singleton varName newMapping) mappings)
+         let lc' = TranslationContext decls'
+                   (mergeMappings (Map.singleton varName newMapping) mappings)
          -- TODO: add additional conditions for map quantification
          Formula . (\f -> foldl' (flip S11.Exists) f qs)
-           <$> translateToFormula ctx' p
-    term -> Left (ErrorMessage (termAnnotation term) "could not translate term")
+           <$> translateToFormula gc lc' p
+    term -> Left . ErrorMessage (termAnnotation term)
+      $ "could not translate term: " <> pack (show term)
 
 
 getExplicitOrInferredBound
-  :: OSL.ValidContext ann
+  :: OSL.ValidContext t ann
   -> OSL.Type ann
   -> Maybe (OSL.Bound ann)
   -> Either (ErrorMessage ann) (OSL.Bound ann)
@@ -604,12 +619,13 @@ getExplicitOrInferredBound ctx t =
 
 getExistentialQuantifierStringAndMapping
   :: Show ann
-  => TranslationContext ann
+  => TranslationContext 'OSL.Global ann
+  -> TranslationContext 'OSL.Local ann
   -> OSL.Type ann
   -> OSL.Bound ann
   -> Either (ErrorMessage ann)
      ([S11.ExistentialQuantifier], Mapping ann S11.Term)
-getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings) varType varBound =
+getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) varType varBound =
   case varType of
     OSL.Prop ann -> Left (ErrorMessage ann "cannot quantify over Prop")
     OSL.N _ -> scalarResult
@@ -620,12 +636,9 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
       case (aDim, varBound) of
         (FiniteDimensions n, OSL.FunctionBound _ (OSL.DomainBound aBound) (OSL.CodomainBound bBound)) -> do
           (bQs, bM) <-
-            getExistentialQuantifierStringAndMapping
-            ctx
-            b
-            bBound
+            getExistentialQuantifierStringAndMapping gc lc b bBound
           let fM = incrementArities n bM
-          aBounds <- translateBound ctx a (Just aBound)
+          aBounds <- translateBound gc lc a (Just aBound)
           let fQs = prependBounds cardinality aBounds <$> bQs
           pure (fQs, fM)
         (FiniteDimensions _, _) ->
@@ -637,8 +650,8 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
     OSL.Product _ a b ->
       case varBound of
         OSL.ProductBound _ (OSL.LeftBound aBound) (OSL.RightBound bBound) -> do
-          (aQs, aM) <- getExistentialQuantifierStringAndMapping ctx a aBound
-          (bQs, bM) <- getExistentialQuantifierStringAndMapping ctx b bBound
+          (aQs, aM) <- getExistentialQuantifierStringAndMapping gc lc a aBound
+          (bQs, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
           pure ( aQs <> bQs
                , mergeMapping
                  (\aM' bM' -> ProductMapping (LeftMapping aM') (RightMapping bM'))
@@ -650,14 +663,14 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
           let cQ = S11.ExistsFO (S11.Const 2)
               cT = S11.Var (S11.Name 0 0)
               cM = ChoiceMapping (ScalarMapping cT)
-              cSym = getFreeOSLName ctx
+              cSym = getFreeOSLName lc
               decls' = addDeclaration cSym (OSL.FreeVariable (OSL.Fin ann 2)) decls
-              ctx' = TranslationContext decls' mappings
+              lc' = TranslationContext decls' mappings
           -- TODO: can this result in overlap between cM and bM/aM?
-          ctx'' <- runIdentity . runExceptT
-            $ execStateT (addFreeVariableMapping cSym) ctx'
-          (aQs, aM) <- getExistentialQuantifierStringAndMapping ctx'' a aBound
-          (bQs, bM) <- getExistentialQuantifierStringAndMapping ctx'' b bBound
+          lc'' <- runIdentity . runExceptT
+            $ execStateT (addFreeVariableMapping cSym) lc'
+          (aQs, aM) <- getExistentialQuantifierStringAndMapping gc lc'' a aBound
+          (bQs, bM) <- getExistentialQuantifierStringAndMapping gc lc'' b bBound
           pure ( [cQ] <> aQs <> bQs
                , mergeMapping
                  (\bM' aM' -> CoproductMapping cM (LeftMapping aM') (RightMapping bM'))
@@ -669,7 +682,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
           if name == name'
           then case getDeclaration decls name of
                  Just (OSL.Data a) ->
-                   getExistentialQuantifierStringAndMapping ctx a aBound
+                   getExistentialQuantifierStringAndMapping gc lc a aBound
                  _ -> Left (ErrorMessage ann "expected the name of a type")
           else Left (ErrorMessage ann "named type mismatch in bound")
         OSL.ScalarBound _ _ -> scalarResult
@@ -679,7 +692,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
         OSL.MaybeBound _ (OSL.ValuesBound aBound) -> do
           let cQ = S11.ExistsFO (S11.Const 2)
               cM = ScalarMapping (S11.Var (S11.Name 0 0))
-          (vQs, vM) <- getExistentialQuantifierStringAndMapping ctx a aBound
+          (vQs, vM) <- getExistentialQuantifierStringAndMapping gc lc a aBound
           pure (cQ : vQs, MaybeMapping (ChoiceMapping cM) (ValuesMapping vM))
         _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a maybe bound")
     OSL.List ann (OSL.Cardinality n) a ->
@@ -687,14 +700,13 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
         OSL.ListBound _ (OSL.ValuesBound aBound) -> do
           let lQ = S11.ExistsFO (S11.Const n)
               lT = S11.Var (S11.Name 0 0)
-              lSym = getFreeOSLName ctx
+              lSym = getFreeOSLName lc
               decls' = addDeclaration lSym (OSL.FreeVariable (OSL.N ann)) decls
-              ctx' = TranslationContext decls' mappings
-          ctx'' <- runIdentity . runExceptT
-            $ execStateT (addFreeVariableMapping lSym) ctx'
+              lc' = TranslationContext decls' mappings
+          lc'' <- runIdentity . runExceptT
+            $ execStateT (addFreeVariableMapping lSym) lc'
           (vQs, vM) <-
-            getExistentialQuantifierStringAndMapping
-            ctx''
+            getExistentialQuantifierStringAndMapping gc lc''
             (OSL.F ann (Just (OSL.Cardinality n)) (OSL.N ann) a)
             (OSL.FunctionBound ann
                (OSL.DomainBound (OSL.ScalarBound ann (OSL.NamedTerm ann lSym)))
@@ -707,12 +719,10 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
     OSL.Map ann (OSL.Cardinality n) a b ->
       case varBound of
         OSL.MapBound _ (OSL.KeysBound aBound) (OSL.ValuesBound bBound) -> do
-          (kQs, kM) <- getExistentialQuantifierStringAndMapping
-            ctx
+          (kQs, kM) <- getExistentialQuantifierStringAndMapping gc lc
             (OSL.List ann (OSL.Cardinality n) a)
             (OSL.ListBound ann (OSL.ValuesBound aBound))
-          (vQs, vM) <- getExistentialQuantifierStringAndMapping
-            ctx
+          (vQs, vM) <- getExistentialQuantifierStringAndMapping gc lc
             (OSL.F ann (Just (OSL.Cardinality n)) a (OSL.Maybe ann b))
             (OSL.FunctionBound ann
               (OSL.DomainBound aBound)
@@ -732,7 +742,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
     scalarResult =
       case varBound of
         OSL.ScalarBound _ _ -> do
-          bTs <- translateBound ctx varType (Just varBound)
+          bTs <- translateBound gc lc varType (Just varBound)
           case bTs of
             [bT] -> 
               pure ( [S11.ExistsFO bT]
@@ -742,7 +752,7 @@ getExistentialQuantifierStringAndMapping ctx@(TranslationContext decls mappings)
 
 
 getMappingDimensions
-  :: OSL.ValidContext ann
+  :: OSL.ValidContext t ann
   -> OSL.Type ann
   -> Either (ErrorMessage ann) MappingDimensions
 getMappingDimensions ctx t =
@@ -770,7 +780,7 @@ getMappingDimensions ctx t =
 
 
 getArbitraryMapping
-  :: OSL.ValidContext ann
+  :: OSL.ValidContext t ann
   -> OSL.Type ann
   -> Either (ErrorMessage ann) (Mapping ann S11.Term)
 getArbitraryMapping ctx =
@@ -816,12 +826,13 @@ getArbitraryMapping ctx =
 
 translateToMapping
   :: Show ann
-  => TranslationContext ann
+  => TranslationContext 'OSL.Global ann
+  -> TranslationContext 'OSL.Local ann
   -> OSL.Type ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) (Mapping ann S11.Term)
-translateToMapping c tType t =
-  case translate c tType t of
+translateToMapping gc lc tType t =
+  case translate gc lc tType t of
     Right (Mapping m) -> pure m
     Right (Term t') -> pure (ScalarMapping t')
     Right (Formula p) -> pure (PropMapping p)
@@ -830,12 +841,13 @@ translateToMapping c tType t =
 
 translateToTerm
   :: Show ann
-  => TranslationContext ann
+  => TranslationContext 'OSL.Global ann
+  -> TranslationContext 'OSL.Local ann
   -> OSL.Type ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Term
-translateToTerm c tType t =
-  case translate c tType t of
+translateToTerm gc lc tType t =
+  case translate gc lc tType t of
     Right (Term t') -> return t'
     Right (Mapping (ScalarMapping t')) -> return t'
     Right _ -> Left (ErrorMessage (termAnnotation t)
@@ -845,21 +857,22 @@ translateToTerm c tType t =
 
 translateToFormula
   :: Show ann
-  => TranslationContext ann
+  => TranslationContext 'OSL.Global ann
+  -> TranslationContext 'OSL.Local ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Formula
-translateToFormula c@(TranslationContext decls mappings) t =
-  case translate c (OSL.Prop (termAnnotation t)) t of
+translateToFormula gc lc@(TranslationContext decls mappings) t =
+  case translate gc lc (OSL.Prop (termAnnotation t)) t of
     Right (Formula f) -> pure f
     Right (Mapping (PropMapping f)) -> pure f
-    Right (Mapping (LambdaMapping _ _ _ _)) ->
+    Right (Mapping (LambdaMapping _ _ _ _ _)) ->
       case t of
         OSL.Lambda _ varName varType body -> do
           let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
-              ctx' = TranslationContext decls' mappings
-          ctx'' <- runIdentity . runExceptT
-            $ execStateT (addFreeVariableMapping varName) ctx'
-          translateToFormula ctx'' body
+              lc' = TranslationContext decls' mappings
+          lc'' <- runIdentity . runExceptT
+            $ execStateT (addFreeVariableMapping varName) lc'
+          translateToFormula gc lc'' body
         _ -> Left (ErrorMessage (termAnnotation t)
               "lambda mapping for a non-lambda (this is a compiler bug)")
     Right _ -> Left (ErrorMessage (termAnnotation t)
@@ -880,84 +893,81 @@ mappingToTerm ann =
 applyMappings
   :: Show ann
   => ann
-  -> TranslationContext ann
+  -> OSL.Type ann
   -> Mapping ann S11.Term
   -> Mapping ann S11.Term
   -> Either (ErrorMessage ann) (Mapping ann S11.Term)
-applyMappings ann ctx f x =
+applyMappings ann goalType f x =
   case (f, x) of
-    (LambdaMapping (TranslationContext decls mappings) v vT t, _) -> do
-      let decls' = addDeclaration v (OSL.FreeVariable vT) decls
-          ctx' = TranslationContext decls' mappings
-      ctx'' <- runIdentity . runExceptT
-               $ execStateT (addTermMapping v x) ctx'
-      tT <- inferType decls' t
-      translateToMapping ctx'' tT t
+    (LambdaMapping gc lc v _ t, _) -> do
+      lc' <- runIdentity . runExceptT
+               $ execStateT (addTermMapping v x) lc
+      translateToMapping gc lc' goalType t
     (ScalarMapping f', ScalarMapping x') ->
       ScalarMapping <$> applyTerms ann f' x'
     (ScalarMapping _, ProductMapping (LeftMapping x') (RightMapping y')) -> do
-      f' <- applyMappings ann ctx f x'
-      applyMappings ann ctx f' y'
+      f' <- rec f x'
+      rec f' y'
     (ListMapping (LengthMapping lM) (ValuesMapping vM), _) ->
       ListMapping (LengthMapping lM) . ValuesMapping
-        <$> applyMappings ann ctx vM x
+        <$> rec vM x
     (MapMapping (LengthMapping lM) (KeysMapping kM)
        (KeyIndicatorMapping kiM) (ValuesMapping vM), _) ->
       MapMapping (LengthMapping lM) (KeysMapping kM)
         (KeyIndicatorMapping kiM) . ValuesMapping
-        <$> applyMappings ann ctx vM x
+        <$> rec vM x
     (CoproductMapping (ChoiceMapping cM)
        (LeftMapping lM) (RightMapping rM), _) ->
       CoproductMapping
-        <$> (ChoiceMapping <$> applyMappings ann ctx cM x)
-        <*> (LeftMapping <$> applyMappings ann ctx lM x)
-        <*> (RightMapping <$> applyMappings ann ctx rM x)
+        <$> (ChoiceMapping <$> rec cM x)
+        <*> (LeftMapping <$> rec lM x)
+        <*> (RightMapping <$> rec rM x)
     (ProductMapping (LeftMapping g) (RightMapping h), x') ->
       ProductMapping
-      <$> (LeftMapping <$> applyMappings ann ctx g x')
-      <*> (RightMapping <$> applyMappings ann ctx h x')
+      <$> (LeftMapping <$> rec g x')
+      <*> (RightMapping <$> rec h x')
     (MaybeMapping (ChoiceMapping g) (ValuesMapping h), x') ->
       MaybeMapping
-      <$> (ChoiceMapping <$> applyMappings ann ctx g x')
-      <*> (ValuesMapping <$> applyMappings ann ctx h x')
+      <$> (ChoiceMapping <$> rec g x')
+      <*> (ValuesMapping <$> rec h x')
     (FunctionCoproductMapping (LeftMapping g) (RightMapping h),
      CoproductMapping (ChoiceMapping a) (LeftMapping b) (RightMapping d)) ->
       CoproductMapping (ChoiceMapping a)
-      <$> (LeftMapping <$> applyMappings ann ctx g b)
-      <*> (RightMapping <$> applyMappings ann ctx h d)
+      <$> (LeftMapping <$> rec g b)
+      <*> (RightMapping <$> rec h d)
     _ -> Left (ErrorMessage ann ("unable to apply mappings:\n" <> pack (show f) <> "\n<---\n" <> pack (show x)))
+  where rec = applyMappings ann goalType
 
 
 mapNth
   :: ann
-  -> TranslationContext ann
   -> Mapping ann S11.Term
   -> S11.Term
   -> Either (ErrorMessage ann) (Mapping ann S11.Term)
-mapNth ann ctx f i =
+mapNth ann f i =
   case f of
     ScalarMapping f' -> ScalarMapping <$> applyTerms ann f' i
     ProductMapping (LeftMapping g) (RightMapping h) ->
-      ProductMapping <$> (LeftMapping <$> mapNth ann ctx g i)
-                     <*> (RightMapping <$> mapNth ann ctx h i)
+      ProductMapping <$> (LeftMapping <$> mapNth ann g i)
+                     <*> (RightMapping <$> mapNth ann h i)
     MaybeMapping (ChoiceMapping g) (ValuesMapping h) ->
-      MaybeMapping <$> (ChoiceMapping <$> mapNth ann ctx g i)
-                   <*> (ValuesMapping <$> mapNth ann ctx h i)
+      MaybeMapping <$> (ChoiceMapping <$> mapNth ann g i)
+                   <*> (ValuesMapping <$> mapNth ann h i)
     CoproductMapping (ChoiceMapping g) (LeftMapping h) (RightMapping j) ->
       CoproductMapping
-      <$> (ChoiceMapping <$> mapNth ann ctx g i)
-      <*> (LeftMapping <$> mapNth ann ctx h i)
-      <*> (RightMapping <$> mapNth ann ctx j i)
+      <$> (ChoiceMapping <$> mapNth ann g i)
+      <*> (LeftMapping <$> mapNth ann h i)
+      <*> (RightMapping <$> mapNth ann j i)
     MapMapping (LengthMapping g) (KeysMapping h) (KeyIndicatorMapping j)
                (ValuesMapping k) ->
       MapMapping
-      <$> (LengthMapping <$> mapNth ann ctx g i)
-      <*> (KeysMapping <$> mapNth ann ctx h i)
-      <*> (KeyIndicatorMapping <$> mapNth ann ctx j i)
-      <*> (ValuesMapping <$> mapNth ann ctx k i)
+      <$> (LengthMapping <$> mapNth ann g i)
+      <*> (KeysMapping <$> mapNth ann h i)
+      <*> (KeyIndicatorMapping <$> mapNth ann j i)
+      <*> (ValuesMapping <$> mapNth ann k i)
     ListMapping (LengthMapping g) (ValuesMapping h) ->
-      ListMapping <$> (LengthMapping <$> mapNth ann ctx g i)
-                  <*> (ValuesMapping <$> mapNth ann ctx h i)
+      ListMapping <$> (LengthMapping <$> mapNth ann g i)
+                  <*> (ValuesMapping <$> mapNth ann h i)
     _ -> Left (ErrorMessage ann "could not apply mappings in mapNth")
 
 
@@ -976,44 +986,45 @@ applyTerms ann f x =
 
 translateBound
   :: Show ann
-  => TranslationContext ann
+  => TranslationContext 'OSL.Global ann
+  -> TranslationContext 'OSL.Local ann
   -> OSL.Type ann
   -> Maybe (OSL.Bound ann)
   -> Either (ErrorMessage ann) [S11.Term]
-translateBound ctx@(TranslationContext decls _) t =
+translateBound gc lc@(TranslationContext decls _) t =
   \case
-    Just (OSL.ScalarBound _ term) -> (:[]) <$> translateToTerm ctx t term
+    Just (OSL.ScalarBound _ term) -> (:[]) <$> translateToTerm gc lc t term
     Just (OSL.ProductBound ann (OSL.LeftBound aBound) (OSL.RightBound bBound)) ->
       case t of
         OSL.Product _ a b ->
-          (<>) <$> translateBound ctx a (Just aBound)
-               <*> translateBound ctx b (Just bBound)
+          (<>) <$> translateBound gc lc a (Just aBound)
+               <*> translateBound gc lc b (Just bBound)
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
     Just (OSL.ToBound ann name bound) ->
       case getDeclaration decls name of
-        Just (OSL.Data a) -> translateBound ctx a (Just bound)
+        Just (OSL.Data a) -> translateBound gc lc a (Just bound)
         Just _ -> Left . ErrorMessage ann $ "expected the name of a type"
         Nothing -> Left . ErrorMessage ann $ "undefined name"
     Just (OSL.CoproductBound ann (OSL.LeftBound aBound) (OSL.RightBound bBound)) ->
       case t of 
         OSL.Coproduct _ a b ->
-          (<>) <$> translateBound ctx a (Just aBound)
-               <*> translateBound ctx b (Just bBound)
+          (<>) <$> translateBound gc lc a (Just aBound)
+               <*> translateBound gc lc b (Just bBound)
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
     Just (OSL.FunctionBound ann
             (OSL.DomainBound aBound)
             (OSL.CodomainBound bBound)) ->
       case t of
         OSL.F _ _ a b ->
-          (<>) <$> translateBound ctx a (Just aBound)
-               <*> translateBound ctx b (Just bBound)
+          (<>) <$> translateBound gc lc a (Just aBound)
+               <*> translateBound gc lc b (Just bBound)
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
     Just (OSL.ListBound ann (OSL.ValuesBound vBound)) ->
       case t of
         OSL.List ann' n'@(OSL.Cardinality n) a ->
           let lBound = OSL.ScalarBound ann' (OSL.ConstN ann n) in
-          (<>) <$> translateBound ctx (OSL.N ann') (Just lBound)
-               <*> translateBound ctx (OSL.F ann' (Just n') (OSL.N ann') a)
+          (<>) <$> translateBound gc lc (OSL.N ann') (Just lBound)
+               <*> translateBound gc lc (OSL.F ann' (Just n') (OSL.N ann') a)
                    (Just
                      (OSL.FunctionBound ann
                        (OSL.DomainBound lBound)
@@ -1022,7 +1033,7 @@ translateBound ctx@(TranslationContext decls _) t =
     Just (OSL.MaybeBound ann (OSL.ValuesBound vBound)) ->
       case t of
         OSL.Maybe _ a ->
-          ((S11.Const 2):) <$> translateBound ctx a (Just vBound)
+          ((S11.Const 2):) <$> translateBound gc lc a (Just vBound)
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
     Just (OSL.MapBound ann
             (OSL.KeysBound kBound)
@@ -1030,25 +1041,25 @@ translateBound ctx@(TranslationContext decls _) t =
       case t of
         OSL.Map ann' n'@(OSL.Cardinality n) k v ->
           mconcatM
-          [ translateBound ctx (OSL.N ann') (Just (OSL.ScalarBound ann' (OSL.ConstN ann' n)))
-          , translateBound ctx (OSL.F ann' (Just n') (OSL.N ann') k)
+          [ translateBound gc lc (OSL.N ann') (Just (OSL.ScalarBound ann' (OSL.ConstN ann' n)))
+          , translateBound gc lc (OSL.F ann' (Just n') (OSL.N ann') k)
               (Just (OSL.FunctionBound ann'
                  (OSL.DomainBound (OSL.ScalarBound ann' (OSL.ConstN ann' n)))
                  (OSL.CodomainBound kBound)))
-          , translateBound ctx (OSL.F ann' (Just n') k (OSL.N ann'))
+          , translateBound gc lc (OSL.F ann' (Just n') k (OSL.N ann'))
               (Just (OSL.FunctionBound ann' (OSL.DomainBound kBound)
                 (OSL.CodomainBound (OSL.ScalarBound ann' (OSL.ConstN ann' 2)))))
-          , translateBound ctx (OSL.F ann' (Just n') k v)
+          , translateBound gc lc (OSL.F ann' (Just n') k v)
               (Just (OSL.FunctionBound ann'
                 (OSL.DomainBound kBound)
                 (OSL.CodomainBound vBound)))
           ]
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
-    Nothing -> translateBound ctx t . Just =<< inferBound decls t
+    Nothing -> translateBound gc lc t . Just =<< inferBound decls t
 
 
 inferBound
-  :: OSL.ValidContext ann
+  :: OSL.ValidContext t ann
   -> OSL.Type ann
   -> Either (ErrorMessage ann) (OSL.Bound ann)
 inferBound ctx =
@@ -1089,21 +1100,22 @@ inferBound ctx =
 translateEquality
   :: Show ann
   => ann
-  -> TranslationContext ann
+  -> TranslationContext 'OSL.Global ann
+  -> TranslationContext 'OSL.Local ann
   -> OSL.Type ann
   -> OSL.Term ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Formula
-translateEquality ann ctx@(TranslationContext decls _) t x y = do
-  xM <- translateToMapping ctx t x
-  yM <- translateToMapping ctx t y
+translateEquality ann gc lc@(TranslationContext decls _) t x y = do
+  xM <- translateToMapping gc lc t x
+  yM <- translateToMapping gc lc t y
   applyEqualityToMappings ann decls t xM yM
 
 
 applyEqualityToMappings
   :: Show ann
   => ann
-  -> OSL.ValidContext ann
+  -> OSL.ValidContext t ann
   -> OSL.Type ann
   -> Mapping ann S11.Term
   -> Mapping ann S11.Term

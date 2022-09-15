@@ -16,12 +16,12 @@ import OSL.Die (die)
 import OSL.Types.OSL (ValidContext (..), Name, Declaration)
 
 
-getDeclaration :: ValidContext ann -> Name -> Maybe (Declaration ann)
+getDeclaration :: ValidContext t ann -> Name -> Maybe (Declaration ann)
 getDeclaration (ValidContext decls) name = Map.lookup name decls
 
 
 getExistingDeclaration
-  :: ValidContext ann
+  :: ValidContext t ann
   -> Name
   -> Declaration ann
 getExistingDeclaration c name =
@@ -33,7 +33,7 @@ getExistingDeclaration c name =
 addDeclaration
   :: Name
   -> Declaration ann
-  -> ValidContext ann
-  -> ValidContext ann 
+  -> ValidContext t ann
+  -> ValidContext t ann 
 addDeclaration name decl (ValidContext c) =
   ValidContext (Map.insert name decl c)

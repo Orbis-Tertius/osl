@@ -1,4 +1,6 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -25,9 +27,9 @@ import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 
 
-data TranslationContext ann =
+data TranslationContext (t :: OSL.ContextType) ann =
   TranslationContext
-  { context :: OSL.ValidContext ann
+  { context :: OSL.ValidContext t ann
   , mappings :: Map OSL.Name (Mapping ann S11.Term)
   }
   deriving (Show, Generic)
@@ -57,7 +59,8 @@ data Mapping ann a =
     (KeyIndicatorMapping ann a)
     (ValuesMapping ann a)
   | LambdaMapping
-    (TranslationContext ann)
+    (TranslationContext 'OSL.Global ann)
+    (TranslationContext 'OSL.Local ann)
     OSL.Name
     (OSL.Type ann)
     (OSL.Term ann)
@@ -98,7 +101,9 @@ instance Functor (Mapping ann) where
         (KeysMapping (f <$> b))
         (KeyIndicatorMapping (f <$> c))
         (ValuesMapping (f <$> d))
-      LambdaMapping ctx v vT t -> LambdaMapping ctx v vT t
+      LambdaMapping gc lc v vT t ->
+        -- TODO: should fmap descend into gc and/or lc?
+        LambdaMapping gc lc v vT t
       PropMapping p -> PropMapping p
 
 
@@ -122,7 +127,7 @@ instance Foldable (Mapping ann) where
                  (ValuesMapping z) ->
         foldMap f w <> foldMap f x
           <> foldMap f y <> foldMap f z
-      LambdaMapping _ _ _ _ -> mempty
+      LambdaMapping _ _ _ _ _ -> mempty
       PropMapping _ -> mempty
 
 

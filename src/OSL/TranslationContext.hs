@@ -1,8 +1,10 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 
 
 module OSL.TranslationContext
-  ( mergeMappings
+  ( toLocalTranslationContext
+  , mergeMappings
   , mergeMapping
   , mappingIndices
   , highestIndicesInMappings
@@ -19,9 +21,16 @@ import qualified Data.Set as Set
 import OSL.Sigma11 (termIndices, unionIndices, incrementDeBruijnIndices)
 import OSL.Types.Arity (Arity)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.OSL (Name)
+import OSL.Types.OSL (Name, ContextType (Global, Local), ValidContext (..))
 import OSL.Types.Sigma11 (Term)
-import OSL.Types.TranslationContext (Mapping (..))
+import OSL.Types.TranslationContext (Mapping (..), TranslationContext (..))
+
+
+toLocalTranslationContext
+  :: TranslationContext 'Global ann
+  -> TranslationContext 'Local ann
+toLocalTranslationContext (TranslationContext (ValidContext decls) mappings) =
+  TranslationContext (ValidContext decls) mappings
 
 
 -- Merges the two given mappings, moving the

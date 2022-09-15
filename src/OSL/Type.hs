@@ -24,7 +24,7 @@ typeAnnotation t =
     Map ann _ _ _ -> ann
 
 
-typeCardinality :: ValidContext ann -> Type ann -> Maybe Cardinality
+typeCardinality :: ValidContext t ann -> Type ann -> Maybe Cardinality
 typeCardinality ctx t =
   case t of
     Prop _ -> Nothing

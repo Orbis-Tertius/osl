@@ -10,6 +10,7 @@ import OSL.BuildTranslationContext (buildTranslationContext)
 import OSL.Parse (parseContext)
 import OSL.Tokenize (tokenize)
 import OSL.Translate (translateToFormula)
+import OSL.TranslationContext (toLocalTranslationContext)
 import OSL.Types.OSL (Declaration (Defined), Name (Sym))
 import OSL.ValidateContext (validateContext)
 import OSL.ValidContext (getDeclaration)
@@ -31,10 +32,11 @@ main = do
                 Left err -> putStrLn $ "Type checking error: " <> show err
                 Right validCtx ->
                   case buildTranslationContext validCtx of
-                    Right transCtx -> do
+                    Right gc -> do
+                      let lc = toLocalTranslationContext gc
                       case getDeclaration validCtx (Sym (pack targetName)) of
                         Just (Defined _ targetTerm) ->
-                          case translateToFormula transCtx targetTerm of
+                          case translateToFormula gc lc targetTerm of
                             Left err -> putStrLn $ "Error translating: " <> show err
                             Right translated -> putStrLn $ "Translated OSL:\n" <> show translated
                         _ -> putStrLn "please provide the name of a defined term"

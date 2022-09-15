@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 
@@ -14,15 +15,20 @@ import Data.Text (pack)
 import OSL.Term (termAnnotation, boundAnnotation)
 import OSL.Type (typeAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..), Bound (..), LeftBound (..), RightBound (..), DomainBound (..), CodomainBound (..), ValuesBound (..), KeysBound (..), Cardinality (..))
+import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..), Bound (..), LeftBound (..), RightBound (..), DomainBound (..), CodomainBound (..), ValuesBound (..), KeysBound (..), Cardinality (..), ContextType (Global))
 import OSL.ValidContext (getDeclaration)
 
 
-validateContext :: Show ann => Context ann -> Either (ErrorMessage ann) (ValidContext ann)
+validateContext :: Show ann
+  => Context ann
+  -> Either (ErrorMessage ann) (ValidContext 'Global ann)
 validateContext = foldM addToContext (ValidContext mempty) . unContext
 
 
-addToContext :: Show ann => ValidContext ann -> (Name, Declaration ann) -> Either (ErrorMessage ann) (ValidContext ann)
+addToContext :: Show ann
+  => ValidContext t ann
+  -> (Name, Declaration ann)
+  -> Either (ErrorMessage ann) (ValidContext t ann)
 addToContext c@(ValidContext decls) (name, decl) = do
   let c' = ValidContext (Map.insert name decl decls)
   case decl of
@@ -34,7 +40,7 @@ addToContext c@(ValidContext decls) (name, decl) = do
   return c'
 
 
-checkType :: ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
+checkType :: ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
 checkType c t =
   case t of
     Prop _ -> return ()
@@ -64,7 +70,7 @@ checkFinType ann n =
   else Left (ErrorMessage ann "Fin type has a negative cardinality")
 
 
-getNamedType :: ValidContext ann -> ann -> Name -> Either (ErrorMessage ann) (Type ann)
+getNamedType :: ValidContext t ann -> ann -> Name -> Either (ErrorMessage ann) (Type ann)
 getNamedType c ann name =
   case getDeclaration c name of
     Just (Data t) -> return t
@@ -73,7 +79,7 @@ getNamedType c ann name =
       $ "reference to undefined name: " <> pack (show name)
 
 
-getNamedTermType :: ValidContext ann -> ann -> Name -> Either (ErrorMessage ann) (Type ann)
+getNamedTermType :: ValidContext t ann -> ann -> Name -> Either (ErrorMessage ann) (Type ann)
 getNamedTermType c ann name =
   case getDeclaration c name of
     Just (FreeVariable t) -> return t
@@ -83,7 +89,7 @@ getNamedTermType c ann name =
       $ "reference to undefined name: " <> pack (show name)
 
 
-checkQuantifiableType :: ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
+checkQuantifiableType :: ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
 checkQuantifiableType c t =
   case t of
     Prop ann -> Left (ErrorMessage ann "expected a quantifiable type but got Prop")
@@ -103,7 +109,7 @@ checkQuantifiableType c t =
       >> checkQuantifiableType c b
 
 
-checkFiniteDimType :: ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
+checkFiniteDimType :: ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
 checkFiniteDimType c t =
   case t of
     Prop ann -> Left (ErrorMessage ann "expected a finite-dimensional type but got Prop")
@@ -123,7 +129,7 @@ checkFiniteDimType c t =
       >> checkFiniteDimType c b
 
 
-checkTypeInclusion :: Show ann => ValidContext ann -> ann -> Type ann -> Type ann -> Either (ErrorMessage ann) ()
+checkTypeInclusion :: Show ann => ValidContext t ann -> ann -> Type ann -> Type ann -> Either (ErrorMessage ann) ()
 checkTypeInclusion _ _ (Prop _) (Prop _) = return ()
 checkTypeInclusion c ann (F _ _ a b) (F _ Nothing a' b') =
   checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
@@ -164,7 +170,7 @@ checkTypeInclusion _ ann t t' =
   Left . ErrorMessage ann $ "type mismatch: " <> pack (show t) <> " and " <> pack (show t')
 
 
-checkTerm :: Show ann => ValidContext ann -> Type ann -> Term ann -> Either (ErrorMessage ann) ()
+checkTerm :: Show ann => ValidContext t ann -> Type ann -> Term ann -> Either (ErrorMessage ann) ()
 checkTerm c t x =
   case x of
     NamedTerm ann name ->
@@ -529,7 +535,7 @@ checkTerm c t x =
 
 checkBound
   :: Show ann
-  => ValidContext ann
+  => ValidContext t ann
   -> Type ann
   -> Bound ann
   -> Either (ErrorMessage ann) ()
@@ -610,7 +616,7 @@ checkBound c t bound =
 
 inferType
   :: Show ann
-  => ValidContext ann
+  => ValidContext t ann
   -> Term ann
   -> Either (ErrorMessage ann) (Type ann)
 inferType c t =
@@ -934,7 +940,7 @@ inferType c t =
        <> pack (show t)
 
 
-checkTypeIsNumeric :: Show ann => ValidContext ann -> Type ann -> Either (ErrorMessage ann) ()
+checkTypeIsNumeric :: Show ann => ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
 checkTypeIsNumeric c t =
   case t of
     N _ -> return ()
