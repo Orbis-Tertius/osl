@@ -141,20 +141,19 @@ addFreeVariableMapping freeVariable = do
                 (ValuesMapping (mapAritiesInMapping (+1) aMap))
           addMapping freeVariable mapping 
           return mapping
-        Map ann _ a b -> do
-          aSym <- addGensym a
-          aMap <- addFreeVariableMapping aSym
-          aDim <- lift . except
-            $ getFiniteDimMappingArity ann aMap
-          bSym <- addGensym b
-          bMap <- addFreeVariableMapping bSym
-          lVar <- ScalarMapping <$> getFreeS11NameM (Arity 0)
-          iVar <- ScalarMapping <$> getFreeS11NameM aDim
+        Map ann n a b -> do
+          vSym <- addGensym (F ann (Just n) a b)
+          vMap <- addFreeVariableMapping vSym
+          lMap <- ScalarMapping <$> getFreeS11NameM (Arity 0)
+          kSym <- addGensym (F ann (Just n) (N ann) a)
+          kMap <- addFreeVariableMapping kSym
+          iSym <- addGensym (F ann (Just n) a (N ann))
+          iMap <- addFreeVariableMapping iSym
           let mapping = MapMapping
-                (LengthMapping lVar)
-                (KeysMapping (mapAritiesInMapping (+1) aMap))
-                (KeyIndicatorMapping iVar)
-                (ValuesMapping (mapAritiesInMapping (+aDim) bMap))
+                (LengthMapping lMap)
+                (KeysMapping kMap)
+                (KeyIndicatorMapping iMap)
+                (ValuesMapping vMap)
           addMapping freeVariable mapping
           return mapping
     _ -> die "logically impossible: free variable is not a free variable"
