@@ -686,3 +686,7 @@ def txIsValid
    & paysEnoughFee(txScriptLimits, feeParams, x, t)
    & txInputsPrecedeTx(x, t)
    & txIsInValidRange(x, t).
+
+
+def leafSignatureExists : LeafOut -> PubKeyHash -> Prop
+  := \o : LeafOut => \h : PubKeyHash => 1N = 1N. -- TODO: replace with free variable
