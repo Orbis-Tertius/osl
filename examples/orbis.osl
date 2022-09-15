@@ -722,3 +722,17 @@ def leavesAreSigned : Rollup -> Prop
      let x : LeafOut := nth(keys(leaves(R)), i);
      let k : PubKeyHash := to(PubKeyHash)(from(Address)(leafOutAddress(R, x)));
      leafSignatureExists(x, k).
+
+
+data Consumer ~= TxId + LeafOut.
+
+
+def txConsumesItsInputs
+   : Map^65536(SpendIn, Consumer)
+  -> TxId -> Tx -> Prop
+  := \consumers : Map^65536(SpendIn, Consumer)
+  => \x : TxId
+  => \t : Tx
+  => all i : N < length(spendingInputs(t)),
+     lookup(nth(spendingInputs(t), i), consumers)
+       = just(to(Consumer)(iota1(x))).
