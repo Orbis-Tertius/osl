@@ -652,3 +652,9 @@ def txReferenceInputsPrecedeTx : TxId -> Tx -> Prop
 def txInputsPrecedeTx : TxId -> Tx -> Prop
   := \x : TxId => \t : Tx
   => txSpendingInputsPrecedeTx(x, t) & txReferenceInputsPrecedeTx(x, t).
+
+
+def txIsInValidRange : TxId -> Tx -> Prop
+  := \x : TxId => \t : Tx
+  => (start(validRange(t)) <= txIdTime(x))
+   & (txIdTime(x) <= end(validRange(t))).
