@@ -748,3 +748,19 @@ def noTxTxDoubleSpend
      let x : TxId := nth(keys(txs(R)), i);
      let t : Tx := exists(lookup(x, txs(R)));
      txConsumesItsInputs(consumers, x, t).
+
+
+def leafToSpendIn : LeafOut -> SpendIn
+  := \x : LeafOut => to(SpendIn)(from(LeafOut)(x)).
+
+
+def noTxLeafDoubleSpend
+   : Map^65536(SpendIn, Consumer)
+  -> Rollup
+  -> Prop
+  := \consumers : Map^65536(SpendIn, Consumer)
+  => \R : Rollup
+  => all i : N < length(keys(leaves(R))),
+     let l : LeafOut := nth(keys(leaves(R)), i);
+     just(to(Consumer)(iota2(l)))
+       = lookup(leafToSpendIn(l), consumers).
