@@ -736,3 +736,15 @@ def txConsumesItsInputs
   => all i : N < length(spendingInputs(t)),
      lookup(nth(spendingInputs(t), i), consumers)
        = just(to(Consumer)(iota1(x))).
+
+
+def noTxTxDoubleSpend
+   : Map^65536(SpendIn, Consumer)
+  -> Rollup
+  -> Prop
+  := \consumers : Map^65536(SpendIn, Consumer)
+  => \R : Rollup
+  => all i : N < length(keys(txs(R))),
+     let x : TxId := nth(keys(txs(R)), i);
+     let t : Tx := exists(lookup(x, txs(R)));
+     txConsumesItsInputs(consumers, x, t).
