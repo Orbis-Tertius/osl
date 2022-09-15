@@ -690,3 +690,10 @@ def txIsValid
 
 def leafSignatureExists : LeafOut -> PubKeyHash -> Prop
   := \o : LeafOut => \h : PubKeyHash => 1N = 1N. -- TODO: replace with free variable
+
+
+def getRootOut : Rollup -> RootOutRef -> RootOut
+  := \R : Rollup => \x : RootOutRef
+  => let t : Time := rootOutRefTime(x);
+     let i : N := fToNat(from(RootOutRefIndex)(rootOutRefIndex(x)));
+     nth(exists(lookup(t, roots(R))), i).
