@@ -658,3 +658,31 @@ def txIsInValidRange : TxId -> Tx -> Prop
   := \x : TxId => \t : Tx
   => (start(validRange(t)) <= txIdTime(x))
    & (txIdTime(x) <= end(validRange(t))).
+
+
+def txIsValid
+   : (Time -> FeeParams)
+  -> (TxId -> List^128(Value))
+  -> List^4096(AssetClass)
+  -> (ScriptAddress -> TxId -> (ScriptSize * Steps))
+  -> (TxId -> List^128(ScriptSize * Steps))
+  -> Rollup
+  -> TxId
+  -> Tx
+  -> Prop
+  := \feeParams : Time -> FeeParams
+  => \inputValues : TxId -> List^128(Value)
+  => \assetClasses : List^4096(AssetClass)
+  => \scriptLimits : ScriptAddress -> TxId -> (ScriptSize * Steps)
+  => \txScriptLimits : TxId -> List^128(ScriptSize * Steps)
+  => \R : Rollup
+  => \x : TxId
+  => \t : Tx
+  => inputsExist(R, t)
+   & inputAddressesAreAuthorized(R, t)
+   & txBalances(inputValues, assetClasses, x, t)
+   & scriptsAcceptTx(scriptLimits, x, t)
+   & isSignedByAllSignatories(x, t)
+   & paysEnoughFee(txScriptLimits, feeParams, x, t)
+   & txInputsPrecedeTx(x, t)
+   & txIsInValidRange(x, t).
