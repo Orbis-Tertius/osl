@@ -98,7 +98,8 @@ translate gc
               <$> (LeftMapping <$> translateToMapping gc lc aType a)
               <*> (RightMapping <$> translateToMapping gc lc bType b))
         _ -> Left (ErrorMessage ann $
-          "expected a " <> pack (show termType))
+          "expected a " <> pack (show termType)
+           <> " but got a pair")
     OSL.Apply ann (OSL.Pi1 _) a -> do
       aT <- inferType decls a
       aM <- translateToMapping gc lc aT a
@@ -143,14 +144,16 @@ translate gc
             <$> (LeftMapping <$> translateToMapping gc lc (OSL.F ann' n a b) f)
             <*> (RightMapping <$> translateToMapping gc lc (OSL.F ann' n a c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
+              <> " but got a function product"
     OSL.FunctionCoproduct ann f g ->
       case termType of
-        OSL.F ann' n a (OSL.Coproduct _ b c) ->
+        OSL.F ann' n (OSL.Coproduct _ a b) c ->
           Mapping
           <$> (FunctionCoproductMapping
-            <$> (LeftMapping <$> translateToMapping gc lc (OSL.F ann' n a b) f)
-            <*> (RightMapping <$> translateToMapping gc lc (OSL.F ann' n a c) g))
+            <$> (LeftMapping <$> translateToMapping gc lc (OSL.F ann' n a c) f)
+            <*> (RightMapping <$> translateToMapping gc lc (OSL.F ann' n b c) g))
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
+               <> " but got a function coproduct"
     OSL.Lambda _ v vT t ->
       pure (Mapping (LambdaMapping gc
                       (TranslationContext
@@ -185,12 +188,14 @@ translate gc
           Mapping . MaybeMapping (ChoiceMapping (ScalarMapping (S11.Const 1)))
             . ValuesMapping <$> translateToMapping gc lc xType x
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
+              <> " but got just(...)"
     OSL.Nothing' ann ->
       case termType of
         OSL.Maybe _ xType ->
           Mapping . MaybeMapping (ChoiceMapping (ScalarMapping (S11.Const 0)))
             . ValuesMapping <$> getArbitraryMapping decls xType
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show termType)
+              <> " but got nothing"
     OSL.Apply ann (OSL.Apply _ (OSL.Maybe' ann' f) b) a -> do
       fType <- inferType decls f
       case fType of
@@ -259,7 +264,7 @@ translate gc
       case xsM of
         ListMapping lM (ValuesMapping (ProductMapping (LeftMapping aM) _)) ->
           pure . Mapping $ ListMapping lM (ValuesMapping aM)
-        _ -> Left . ErrorMessage ann $ "expected a list of pairs"
+        _ -> Left . ErrorMessage ann $ "List(pi1) expected a list of pairs"
     OSL.Apply ann (OSL.ListPi2 _) xs -> do
       xsType <- inferType decls xs
       xsM <- translateToMapping gc lc xsType xs
@@ -849,9 +854,9 @@ translateToTerm
 translateToTerm gc lc tType t =
   case translate gc lc tType t of
     Right (Term t') -> return t'
-    Right (Mapping (ScalarMapping t')) -> return t'
-    Right _ -> Left (ErrorMessage (termAnnotation t)
-                 "expected a term denoting a scalar or a scalar function")
+    Right (Mapping m) -> mappingToTerm (termAnnotation t) m
+    Right m -> Left . ErrorMessage (termAnnotation t) $
+      "expected a term or scalar mapping; got: " <> pack (show m)
     Left err -> Left err
 
 
@@ -887,7 +892,7 @@ mappingToTerm
 mappingToTerm ann =
   \case
     ScalarMapping t -> pure t
-    _ -> Left (ErrorMessage ann "expected a scalar mapping")
+    _ -> Left (ErrorMessage ann "expected a mapping denoting a scalar")
 
 
 applyMappings
@@ -931,10 +936,15 @@ applyMappings ann goalType f x =
       <$> (ChoiceMapping <$> rec g x')
       <*> (ValuesMapping <$> rec h x')
     (FunctionCoproductMapping (LeftMapping g) (RightMapping h),
-     CoproductMapping (ChoiceMapping a) (LeftMapping b) (RightMapping d)) ->
-      CoproductMapping (ChoiceMapping a)
-      <$> (LeftMapping <$> rec g b)
-      <*> (RightMapping <$> rec h d)
+     CoproductMapping (ChoiceMapping a) (LeftMapping b) (RightMapping c)) -> do
+       aT <- mappingToTerm ann a
+       bT <- mappingToTerm ann =<< applyMappings ann goalType g b
+       cT <- mappingToTerm ann =<< applyMappings ann goalType h c
+       pure . ScalarMapping $
+         S11.Add (S11.Mul aT bT)
+                 (S11.Mul (S11.Add (S11.Const 1)
+                                   (S11.Mul (S11.Const (-1)) aT))
+                          cT)
     _ -> Left (ErrorMessage ann ("unable to apply mappings:\n" <> pack (show f) <> "\n<---\n" <> pack (show x)))
   where rec = applyMappings ann goalType
 

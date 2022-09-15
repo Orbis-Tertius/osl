@@ -9,3 +9,4 @@ data Translation ann =
     Formula Formula
   | Term Term
   | Mapping (Mapping ann Term)
+  deriving Show
