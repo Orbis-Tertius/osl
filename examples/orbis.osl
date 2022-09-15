@@ -697,3 +697,20 @@ def getRootOut : Rollup -> RootOutRef -> RootOut
   => let t : Time := rootOutRefTime(x);
      let i : N := fToNat(from(RootOutRefIndex)(rootOutRefIndex(x)));
      nth(exists(lookup(t, roots(R))), i).
+
+
+def leafOutAddress : Rollup -> LeafOut -> Address
+  := \R : Rollup => \o : LeafOut
+  => ((\r : TxOutRef => txOutAddress(getTxOut(R, r)))
+    + (\r : RootOutRef => pi1(from(RootOut)(getRootOut(R, r)))))
+     (from(LeafOut)(o)).
+
+
+def leavesExist : Rollup -> Prop
+  := \R : Rollup
+  => all i : N < length(keys(leaves(R))),
+     let x : LeafOut := nth(keys(leaves(R)), i);
+     (some y : TxOutRef, (x = to(LeafOut)(iota1(y)))
+       & spendingInputExists(R, to(SpendIn)(iota1(y))))
+   | (some y : RootOutRef, (x = to(LeafOut)(iota2(y)))
+       & spendingInputExists(R, to(SpendIn)(iota2(y)))).
