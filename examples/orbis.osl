@@ -869,3 +869,15 @@ def scriptLimitsCohere
         (from(CurrencySymbol)(c));
       some k : N < length(txScriptLimits(x)),
       nth(txScriptLimits(x), k) = scriptLimits(a, x)).
+
+
+def valuesEqual
+   : List^4096(AssetClass)
+  -> Value
+  -> Value
+  -> Prop
+  := \assetClasses : List^4096(AssetClass)
+  => \x : Value => \y : Value
+  => all i : N < length(assetClasses),
+     let a : AssetClass := nth(assetClasses, i);
+     lookup(a, valueMap(x)) = lookup(a, valueMap(y)).
