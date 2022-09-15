@@ -805,3 +805,15 @@ def valueInAssetClasses
      all i : N < length(keys(v')),
      some j : N < length(assetClasses),
      nth(keys(v'), i) = nth(assetClasses, j).
+
+
+def mintInAssetClasses
+   : List^4096(AssetClass)
+  -> Mint
+  -> Prop
+  := \assetClasses : List^4096(AssetClass)
+  => \m : Mint
+  => let v : Map^128(AssetClass, MintQuantity) := mintValue(m);
+     all i : N < length(keys(v)),
+     some j : N < length(assetClasses),
+     nth(keys(v), i) = nth(assetClasses, j).

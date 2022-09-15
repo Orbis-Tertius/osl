@@ -207,4 +207,8 @@ testCases =
   , TestCase "orbis" "valueInAssetClasses"
     [r|Translated OSL:
 (all <6^0, (some <3^0, ((7^1(1^0) = 0^1(0^0)) & (8^1(1^0) = 1^1(0^0)))))|]
+
+  , TestCase "orbis" "mintInAssetClasses"
+    [r|Translated OSL:
+(all <6^0, (some <3^0, ((7^1(1^0) = 0^1(0^0)) & (8^1(1^0) = 1^1(0^0)))))|]
   ]
