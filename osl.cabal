@@ -73,7 +73,7 @@ test-suite spec
   main-is: Spec.hs
 
   other-modules:
-    OSL.Spec
+    OSL.Spec.OSLSpec
 
   build-tools:
     sydtest-discover

@@ -3,7 +3,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 
-module OSL.Spec (spec) where
+module OSL.Spec.OSLSpec (spec) where
 
 
 import Control.Monad (forM_)
@@ -46,6 +46,8 @@ testCases :: [TestCase]
 testCases =
   [ TestCase "false" "false"
     [r|Translated OSL:
-(0 = 1)
-|]
+(0 = 1)|]
+  , TestCase "positive" "isPositive"
+    [r|Translated OSL:
+(1 <= 0^0)|]
   ]
