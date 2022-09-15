@@ -913,6 +913,15 @@ applyMappings ann goalType f x =
     (ScalarMapping _, ProductMapping (LeftMapping x') (RightMapping y')) -> do
       f' <- rec f x'
       rec f' y'
+    (ScalarMapping _, CoproductMapping (ChoiceMapping cM)
+                      (LeftMapping lM) (RightMapping rM)) -> do
+      f' <- rec f cM
+      f'' <- rec f' lM
+      rec f'' rM
+    (ScalarMapping _, MaybeMapping (ChoiceMapping cM)
+                      (ValuesMapping vM)) -> do
+      f' <- rec f cM
+      rec f' vM
     (ListMapping (LengthMapping lM) (ValuesMapping vM), _) ->
       ListMapping (LengthMapping lM) . ValuesMapping
         <$> rec vM x
