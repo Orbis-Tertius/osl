@@ -774,3 +774,21 @@ def noDoubleSpend
   => \R : Rollup
   => noTxTxDoubleSpend(consumers, R)
    & noTxLeafDoubleSpend(consumers, R).
+
+
+def referencesAreUnspent
+   : Map^65536(SpendIn, Consumer)
+  -> Rollup
+  -> Prop
+  := \consumers : Map^65536(SpendIn, Consumer)
+  => \R : Rollup
+  => all i : N < length(keys(txs(R))),
+     let x : TxId := nth(keys(txs(R)), i);
+     let t : Tx := exists(lookup(x, txs(R)));
+     all j : N < length(referenceInputs(t)),
+     let r : RefIn := nth(referenceInputs(t), j);
+     let s : SpendIn := to(SpendIn)(from(RefIn)(r));
+     let c : Maybe(Consumer) := lookup(s, consumers);
+     isNothing(c)
+   | (some y : TxId, (txIdTime(x) <= txIdTime(y))
+       & (c = just(to(Consumer)(iota1(y))))).
