@@ -764,3 +764,13 @@ def noTxLeafDoubleSpend
      let l : LeafOut := nth(keys(leaves(R)), i);
      just(to(Consumer)(iota2(l)))
        = lookup(leafToSpendIn(l), consumers).
+
+
+def noDoubleSpend
+   : Map^65536(SpendIn, Consumer)
+  -> Rollup
+  -> Prop
+  := \consumers : Map^65536(SpendIn, Consumer)
+  => \R : Rollup
+  => noTxTxDoubleSpend(consumers, R)
+   & noTxLeafDoubleSpend(consumers, R).
