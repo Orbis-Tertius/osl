@@ -634,3 +634,16 @@ def txSpendingInputsPrecedeTx : TxId -> Tx -> Prop
   => all i : N < length(spendingInputs(t)),
      (fToNat(from(Time)(spendingInputTime(nth(spendingInputs(t), i)))) +N 1N)
        <= fToNat(from(Time)(txIdTime(x))).
+
+
+def referenceInputTime : RefIn -> Time
+  := \x : RefIn
+  => ((\x : TxOutRef => txIdTime(txOutRefId(x))) + rootOutRefTime)
+       (from(RefIn)(x)).
+
+
+def txReferenceInputsPrecedeTx : TxId -> Tx -> Prop
+  := \x : TxId => \t : Tx
+  => all i : N < length(referenceInputs(t)),
+     (fToNat(from(Time)(referenceInputTime(nth(referenceInputs(t), i)))) +N 1N)
+       <= fToNat(from(Time)(txIdTime(x))).
