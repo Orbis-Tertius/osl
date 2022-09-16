@@ -663,7 +663,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
           pure ( aQs <> bQs
                , mergeMapping
                  (\aM' bM' -> ProductMapping (LeftMapping aM') (RightMapping bM'))
-                 bM aM )
+                 aM bM )
         _ -> Left (ErrorMessage (boundAnnotation varBound) "expected a product bound")
     OSL.Coproduct ann a b ->
       case varBound of
@@ -930,6 +930,7 @@ applyMappings ann goalType f x =
         <$> rec vM x
     (MapMapping (LengthMapping lM) (KeysMapping kM)
        (KeyIndicatorMapping kiM) (ValuesMapping vM), _) ->
+      -- TODO: why this?
       MapMapping (LengthMapping lM) (KeysMapping kM)
         (KeyIndicatorMapping kiM) . ValuesMapping
         <$> rec vM x
@@ -1099,7 +1100,7 @@ translateEquality
 translateEquality ann gc lc@(TranslationContext decls _) t x y = do
   xM <- translateToMapping gc lc t x
   yM <- translateToMapping gc lc t y
-  applyEqualityToMappings ann decls t xM yM
+  applyEqualityToMappings ann decls t x xM y yM
 
 
 applyEqualityToMappings
@@ -1107,16 +1108,17 @@ applyEqualityToMappings
   => ann
   -> OSL.ValidContext t ann
   -> OSL.Type ann
+  -> OSL.Term ann
   -> Mapping ann S11.Term
+  -> OSL.Term ann
   -> Mapping ann S11.Term
   -> Either (ErrorMessage ann) S11.Formula
-applyEqualityToMappings ann ctx t x y =
+applyEqualityToMappings ann ctx t xSrc x ySrc y =
   case (x,y,t) of
     (_, _, OSL.NamedType ann' name) ->
       case getDeclaration ctx name of
         Just (OSL.Data a) -> rec a x y
-        _ ->
-          Left (ErrorMessage ann' "expected the name of a type")
+        _ -> Left (ErrorMessage ann' "expected the name of a type")
     (ScalarMapping xT, ScalarMapping yT, _) ->
       pure (S11.Equal xT yT)
     (ProductMapping (LeftMapping xlM) (RightMapping xrM),
@@ -1150,9 +1152,9 @@ applyEqualityToMappings ann ctx t x y =
        <$> rec a xvM yvM
     _ -> Left . ErrorMessage ann
       $ "cannot compare these things for equality: "
-        <> pack (show (x,y,t))
+        <> pack (show (xSrc,x,ySrc,y,t))
   where
-    rec = applyEqualityToMappings ann ctx
+    rec a x' y' = applyEqualityToMappings ann ctx a xSrc x' ySrc y'
 
 
 mconcatM :: Monad m => Monoid a => [m a] -> m a
