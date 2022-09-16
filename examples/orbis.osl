@@ -934,3 +934,13 @@ def rollupIsValid
    & assetClassesCohere(assetClasses, R)
    & scriptLimitsCohere(scriptLimits, txScriptLimits, R)
    & inputValuesCohere(inputValues, assetClasses, R).
+
+
+def rootOutsEqual
+   : List^4096(AssetClass)
+  -> RootOut -> RootOut -> Prop
+  := \assetClasses : List^4096(AssetClass)
+  => \x : RootOut => \y : RootOut
+  => let x' : Address * Value := from(RootOut)(x);
+     let y' : Address * Value := from(RootOut)(y);
+     (pi1(x') = pi1(y')) & valuesEqual(assetClasses, pi2(x'), pi2(y')).
