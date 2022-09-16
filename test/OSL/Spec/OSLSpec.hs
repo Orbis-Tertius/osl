@@ -235,4 +235,8 @@ testCases =
   , TestCase "orbis" "rootOutsEqual"
     [r|Translated OSL:
 ((3^0 = 13^0) & (all <2^0, ((12^2(0^1(0^0), 1^1(0^0)) = 22^2(0^1(0^0), 1^1(0^0))) & ((12^2(0^1(0^0), 1^1(0^0)) = 0) | (6^2(0^1(0^0), 1^1(0^0)) = 16^2(0^1(0^0), 1^1(0^0)))))))|]
+
+  , TestCase "orbis" "rollupHashUpToTimeIs"
+    [r|Translated OSL:
+(0 = 0)|]
   ]

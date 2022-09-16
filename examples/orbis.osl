@@ -944,3 +944,10 @@ def rootOutsEqual
   => let x' : Address * Value := from(RootOut)(x);
      let y' : Address * Value := from(RootOut)(y);
      (pi1(x') = pi1(y')) & valuesEqual(assetClasses, pi2(x'), pi2(y')).
+
+
+data RollupHash ~= F.
+
+
+def rollupHashUpToTimeIs : Rollup -> Time -> RollupHash -> Prop
+  := \R : Rollup => \t : Time => \h : RollupHash => 0N = 0N. -- TODO: make into a free variable.
