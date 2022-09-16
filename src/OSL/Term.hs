@@ -44,6 +44,7 @@ termAnnotation =
     MaybeFrom ann _ -> ann
     Length ann -> ann
     Nth ann -> ann
+    ListCast ann -> ann
     ListPi1 ann -> ann
     ListPi2 ann -> ann
     ListTo ann _ -> ann

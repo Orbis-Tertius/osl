@@ -253,6 +253,48 @@ checkTerm c t x =
       checkTypeIsNumeric c t
       a <- inferType c y
       checkTypeIsNumeric c a
+    Apply ann (ListCast _) y -> do
+      a <- inferType c y
+      case (a, t) of
+        (List _ n (List _ m (Maybe _ a')), List _ n' (List _ m' (Maybe _ a''))) -> do
+          checkTypeIsNumeric c a'
+          checkTypeIsNumeric c a''
+          checkTypeInclusion c ann a' a''
+          if n == n' && m == m' then pure () else genericErrorMessage
+        (List _ n (List _ m a'), List _ n' (List _ m' a'')) -> do
+          checkTypeIsNumeric c a'
+          checkTypeIsNumeric c a''
+          checkTypeInclusion c ann a' a''
+          if n == n' && m == m' then pure () else genericErrorMessage
+        (List _ n (Maybe _ a'), List _ n' (Maybe _ a'')) -> do
+          checkTypeIsNumeric c a'
+          checkTypeIsNumeric c a''
+          checkTypeInclusion c ann a' a''
+          if n == n' then pure () else genericErrorMessage
+        (List _ n a', List _ n' a'') -> do
+          checkTypeIsNumeric c a'
+          checkTypeIsNumeric c a''
+          checkTypeInclusion c ann a' a''
+          if n == n' then pure () else genericErrorMessage
+        _ -> Left . ErrorMessage ann $
+          "could not apply List(cast) because it was applied to a "
+            <> pack (show a)
+    Apply ann (Sum _) xs -> do
+      xsT <- inferType c xs
+      case xsT of
+        List _ _ (List _ _ (Maybe _ a)) -> do
+          checkTypeIsNumeric c a
+          checkTypeInclusion c ann a t
+        List _ _ (List _ _ a) -> do
+          checkTypeIsNumeric c a
+          checkTypeInclusion c ann a t
+        List _ _ (Maybe _ a) -> do
+          checkTypeIsNumeric c a
+          checkTypeInclusion c ann a t
+        List _ _ a -> do
+          checkTypeIsNumeric c a
+          checkTypeInclusion c ann a t
+        _ -> genericErrorMessage
     Apply ann (Apply _ (Nth _) xs) i -> do
       checkTerm c (N ann) i
       a <- inferType c xs
@@ -336,6 +378,13 @@ checkTerm c t x =
     Nth ann ->
       case t of
         F _ _ (List _ _ a) (F _ _ (N _) a') -> checkTypeInclusion c ann a a'
+        _ -> genericErrorMessage
+    ListCast _ ->
+      case t of
+        F _ _ (List _ n a) (List _ m b) ->
+          if n == m
+          then checkTypeIsNumeric c a >> checkTypeIsNumeric c b
+          else genericErrorMessage
         _ -> genericErrorMessage
     ListPi1 ann ->
       case t of
@@ -630,6 +679,7 @@ inferType c t =
     AddZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
     MulZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
     Cast ann -> Left (ErrorMessage ann "cannot infer the type of cast from context")
+    ListCast ann -> Left (ErrorMessage ann "cannot infer the type of List(cast) from context")
     To ann name -> do
       a <- getNamedType c ann name
       return (F ann Nothing a (NamedType ann name))

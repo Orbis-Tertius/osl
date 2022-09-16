@@ -624,6 +624,7 @@ functorApplication = do
       consumeExact_ T.OpenParen
       g <- consume $
         \case
+          (T.Keyword K.Cast, _) -> pure K.Cast
           (T.Keyword K.Pi1, _) -> pure K.Pi1
           (T.Keyword K.Pi2, _) -> pure K.Pi2 
           (T.Keyword K.To, _) -> pure K.To
@@ -632,6 +633,7 @@ functorApplication = do
           (T.Keyword K.Maybe, _) -> pure K.Maybe
           _ -> Nothing
       h <- case g of
+        K.Cast -> pure (ListCast p)
         K.Pi1 -> pure (ListPi1 p)
         K.Pi2 -> pure (ListPi2 p)
         K.To -> do

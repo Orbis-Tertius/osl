@@ -107,6 +107,7 @@ data Term ann =
   | Exists ann
   | Length ann
   | Nth ann
+  | ListCast ann
   | ListPi1 ann
   | ListPi2 ann
   | ListTo ann Name

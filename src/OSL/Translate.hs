@@ -74,6 +74,9 @@ translate gc
     OSL.Apply _ (OSL.Cast _) a -> do
       aT <- inferType decls a
       translate gc lc aT a
+    OSL.Apply _ (OSL.ListCast _) as -> do
+      asT <- inferType decls as
+      translate gc lc asT as
     OSL.ConstN _ x -> return (Term (S11.Const x))
     OSL.ConstZ _ x -> return (Term (S11.Const x))
     OSL.ConstFin _ x -> return (Term (S11.Const x))
@@ -1152,8 +1155,8 @@ applyEqualityToMappings ann ctx t x y =
      ProductMapping (LeftMapping ylM) (RightMapping yrM),
      OSL.Product _ a b) ->
       S11.And
-      <$> rec a xlM ylM
-      <*> rec b xrM yrM
+        <$> rec a xlM ylM
+        <*> rec b xrM yrM
     (CoproductMapping
       (ChoiceMapping (ScalarMapping xcM))
       (LeftMapping xlM)
@@ -1179,7 +1182,7 @@ applyEqualityToMappings ann ctx t x y =
        <$> rec a xvM yvM
     _ -> Left . ErrorMessage ann
       $ "cannot compare these things for equality: "
-        <> pack (show (x,y))
+        <> pack (show (x,y,t))
   where
     rec = applyEqualityToMappings ann ctx
 

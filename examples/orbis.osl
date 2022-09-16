@@ -1,3 +1,5 @@
+-- Non-recursive Orbis circuit spec
+
 def natToInt : N -> Z := \x : N => cast(x).
 
 data Byte ~= Fin(256).
@@ -227,9 +229,9 @@ def minting : CurrencySymbol -> ScriptPurpose
 def spending : TxOutRef -> ScriptPurpose
   := \r : TxOutRef => to(ScriptPurpose)(iota2(to(Spending)(r))).
 
-data Steps ~= N.
+data Steps ~= F.
 
-data ScriptSize ~= N.
+data ScriptSize ~= F.
 
 def accepts
   : ScriptAddress
@@ -382,14 +384,15 @@ def checkCost : FeeParams -> Tx -> List^128(ScriptSize * Steps) -> Frac -> Prop
   => \t : Tx
   => \s : List^128(ScriptSize * Steps)
   => \x : Frac
-  => let scriptSizeAgg : N := from(ScriptSize)(sum(List(pi1)(s)));
-     let sumSteps : N := sum(List(from(Steps))(List(pi2)(s)));
+  => let scriptSizeAgg : N := fToNat(from(ScriptSize)(sum(List(pi1)(s))));
+     let steps : List^128(N) :=
+       List(cast)(List(from(F))(List(from(Steps))(List(pi2)(s))));
      some d : Frac < maxFrac,
      some e : Frac < maxFrac,
      some f : Frac < maxFrac,
        isProd(a(p), toFrac(txSize(t)), d)
      & isProd(b(p), toFrac(scriptSizeAgg), e)
-     & isProd(c(p), toFrac(sumSteps), f)
+     & isProd(c(p), toFrac(sum(steps)), f)
      & (x = add(d, add(e, f))).
 
 def feeRequirementMet
@@ -735,8 +738,9 @@ def txConsumesItsInputs
   => \x : TxId
   => \t : Tx
   => all i : N < length(spendingInputs(t)),
-     lookup(nth(spendingInputs(t), i), consumers)
-       = just(to(Consumer)(iota1(x))).
+     let c : Maybe(Consumer) := lookup(nth(spendingInputs(t), i), consumers);
+     let x' : Consumer := to(Consumer)(iota1(x));
+     c = just(x').
 
 
 def noTxTxDoubleSpend
@@ -908,3 +912,25 @@ def inputValuesCohere
           valuesEqual(assetClasses,
             pi2(from(RootOut)(r)),
             nth(inputValues(x), k)))).
+
+
+def rollupIsValid
+   : (Time -> FeeParams) -> Rollup -> Prop
+  := \p : Time -> FeeParams
+  => \R : Rollup
+  => some assetClasses : List^4096(AssetClass),
+     some inputValues : TxId -> List^128(Value),
+     some consumers : Map^65536(SpendIn, Consumer),
+     some scriptLimits : ScriptAddress -> TxId -> (ScriptSize * Steps),
+     some txScriptLimits : TxId -> List^128(ScriptSize * Steps),
+     (all i : N < length(keys(txs(R))),
+        let x : TxId := nth(keys(txs(R)), i);
+        let t : Tx := exists(lookup(x, txs(R)));
+        txIsValid(p, inputValues, assetClasses, scriptLimits, txScriptLimits, R, x, t))
+   & leavesExist(R)
+   & leavesAreSigned(R)
+   & noDoubleSpend(consumers, R)
+   & referencesAreUnspent(consumers, R)
+   & assetClassesCohere(assetClasses, R)
+   & scriptLimitsCohere(scriptLimits, txScriptLimits, R)
+   & inputValuesCohere(inputValues, assetClasses, R).
