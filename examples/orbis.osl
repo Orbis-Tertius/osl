@@ -87,6 +87,10 @@ data Rollup ~=
   * Map^4096(Time, List^128(RootOut))
   * Map^4096(LeafOut, Unit).
 
+def toTime : N -> Time := \x : N => to(Time)(to(F)(cast(x))).
+
+def fromTime : Time -> N := \x : Time => fToNat(from(Time)(x)).
+
 def spendingInputs : Tx -> List^128(SpendIn)
   := \t : Tx => pi1(from(Tx)(t)).
 
@@ -951,3 +955,15 @@ data RollupHash ~= F.
 
 def rollupHashUpToTimeIs : Rollup -> Time -> RollupHash -> Prop
   := \R : Rollup => \t : Time => \h : RollupHash => 0N = 0N. -- TODO: make into a free variable.
+
+
+def checkFeeParamUnrolling : Map^4096(Time, FeeParams) -> (Time -> FeeParams) -> Prop
+  := \m : Map^4096(Time, FeeParams)
+  => \f : Time -> FeeParams
+  => let t0 : Time := toTime(0N);
+     (lookup(t0, m) = just(f(t0)))
+   & (all t : Time,
+        let t' : Time := toTime(fromTime(t) +N 1N);
+        (fromTime(t) = maxInt)
+      | (isNothing(lookup(t', m)) & (f(t') = f(t)))
+      | (lookup(t', m) = just(f(t')))).
