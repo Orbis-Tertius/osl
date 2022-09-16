@@ -22,7 +22,7 @@ data Time ~= F.
 
 data ValidRange ~= Time * Time.
 
-data MintQuantity ~= Z.
+data MintQuantity ~= F.
 
 data CurrencySymbol ~= F.
 
@@ -188,7 +188,7 @@ def getQuantity : Quantity -> N
   := \x : Quantity => cast(from(F)(from(Quantity)(x))).
 
 def getMintQuantity : MintQuantity -> Z
-  := from(MintQuantity).
+  := \x : MintQuantity => cast(from(MintQuantity)(x)).
 
 def makeCurrencySymbol : ScriptAddress -> CurrencySymbol
   := \a : ScriptAddress => to(CurrencySymbol)(from(ScriptAddress)(a)).
@@ -249,7 +249,7 @@ def accepts
   => \d : Datum => \r : Redeemer => \c : ScriptContext
   => 0N = 0N. -- TODO: make this a free variable.
 
-data Frac ~= N.
+data Frac ~= Fin(18446743936270598144).
 
 def precision : N := 32N.
 
@@ -262,12 +262,12 @@ def maxFrac : Frac := toFrac(maxInt).
 
 def add : Frac -> Frac -> Frac
   := \x : Frac => \y : Frac
-  => to(Frac)(from(Frac)(x) +N from(Frac)(y)).
+  => to(Frac)(cast(cast(from(Frac)(x)) +N cast(from(Frac)(y)))).
 
 def isProd : Frac -> Frac -> Frac -> Prop
   := \x : Frac => \y : Frac => \z : Frac
-  => (precision *N from(Frac)(z))
-   = (from(Frac)(x) *N from(Frac)(y)).
+  => (precision *N cast(from(Frac)(z)))
+   = (cast(cast(from(Frac)(x)) *N cast(from(Frac)(y)))).
 
 def roundsUpTo : Frac -> N -> Prop
   := \x : Frac => \y : N
@@ -535,7 +535,7 @@ def txBalances
   => all j : N < length(assetClasses),
      let y : AssetClass := nth(assetClasses, j);
      let a : Z := cast(from(Quantity)(totalInput(inputValues, i, y)));
-     let b : Z := maybe((\x : MintQuantity => from(MintQuantity)(x)))
+     let b : Z := maybe((\x : MintQuantity => getMintQuantity(x)))
                     (0Z, lookup(y, mintValue(mint(t))));
      let c : Z := cast(from(Quantity)(totalOutput(t, y)));
      (a +Z b) = c.
@@ -626,7 +626,7 @@ def paysEnoughFee
   => \x : TxId
   => \t : Tx
   => let f : Z :=
-           maybe((\x : MintQuantity => from(MintQuantity)(x)))
+           maybe((\x : MintQuantity => getMintQuantity(x)))
            (0Z, lookup(HALO, mintValue(mint(t))));
      feeRequirementMet(p(txIdTime(x)), t, txScriptLimits(x), f).
 
@@ -919,11 +919,14 @@ def inputValuesCohere
 
 
 def rollupIsValid
-   : (Time -> FeeParams) -> Rollup -> Prop
-  := \p : Time -> FeeParams
+   : List^4096(AssetClass)
+  -> (Time -> FeeParams)
+  -> Rollup
+  -> Prop
+  := \assetClasses : List^4096(AssetClass)
+  => \p : Time -> FeeParams
   => \R : Rollup
-  => some assetClasses : List^4096(AssetClass),
-     some inputValues : TxId -> List^128(Value),
+  => some inputValues : TxId -> List^128(Value),
      some consumers : Map^65536(SpendIn, Consumer),
      some scriptLimits : ScriptAddress -> TxId -> (ScriptSize * Steps),
      some txScriptLimits : TxId -> List^128(ScriptSize * Steps),
@@ -967,3 +970,37 @@ def checkFeeParamUnrolling : Map^4096(Time, FeeParams) -> (Time -> FeeParams) ->
         (fromTime(t) = maxInt)
       | (isNothing(lookup(t', m)) & (f(t') = f(t)))
       | (lookup(t', m) = just(f(t')))).
+
+
+def existsRollupWithIO
+   : Time
+  -> List^4096(RootOut)
+  -> List^4096(LeafOut)
+  -> Map^4096(Time, RollupHash)
+  -> Map^4096(Time, FeeParams)
+  -> Prop
+  := \t : Time
+  => \r : List^4096(RootOut)
+  => \l : List^4096(LeafOut)
+  => \h : Map^4096(Time, RollupHash)
+  => \p : Map^4096(Time, FeeParams)
+  => some f : Time -> FeeParams,
+     some assetClasses : List^4096(AssetClass),
+     some R : Rollup, rollupIsValid(assetClasses, f, R)
+   & (let r' : List^128(RootOut) := exists(lookup(t, roots(R)));
+     (all i : N < length(r),
+      some j : N < length(r'),
+      rootOutsEqual(assetClasses, nth(r, i), nth(r, j)))
+   & (all i : N < length(r'),
+      some j : N < length(r),
+      rootOutsEqual(assetClasses, nth(r, j), nth(r', i)))
+   & (all i : N < length(l),
+      some j : N < length(keys(leaves(R))),
+      nth(l, i) = nth(keys(leaves(R)), i))
+   & (all i : N < length(keys(leaves(R))),
+      some j : N < length(l),
+      nth(l, j) = nth(keys(leaves(R)), i))
+   & (all i : N < length(keys(h)),
+      let t : Time := nth(keys(h), i);
+      let h : RollupHash := exists(lookup(t, h));
+      rollupHashUpToTimeIs(R, t, h))).
