@@ -881,3 +881,30 @@ def valuesEqual
   => all i : N < length(assetClasses),
      let a : AssetClass := nth(assetClasses, i);
      lookup(a, valueMap(x)) = lookup(a, valueMap(y)).
+
+
+def inputValuesCohere
+   : (TxId -> List^128(Value))
+  -> List^4096(AssetClass)
+  -> Rollup
+  -> Prop
+  := \inputValues : TxId -> List^128(Value)
+  => \assetClasses : List^4096(AssetClass)
+  => \R : Rollup
+  => all i : N < length(keys(txs(R))),
+     let x : TxId := nth(keys(txs(R)), i);
+     let t : Tx := exists(lookup(x, txs(R)));
+     all j : N < length(spendingInputs(t)),
+     let n : SpendIn := nth(spendingInputs(t), j);
+     (some y : TxOutRef, (n = to(SpendIn)(iota1(y)))
+       & (let o : TxOut := getTxOut(R, y);
+          some k : N < length(inputValues(x)),
+          valuesEqual(assetClasses,
+            value(getTxOut(R, y)),
+            nth(inputValues(x), k))))
+   | (some y : RootOutRef, (n = to(SpendIn)(iota2(y)))
+       & (some k : N < length(inputValues(x)),
+          let r : RootOut := getRootOut(R, y);
+          valuesEqual(assetClasses,
+            pi2(from(RootOut)(r)),
+            nth(inputValues(x), k)))).
