@@ -4,6 +4,8 @@ def todo : Prop := 0N = 1N.
 
 data Word ~= Fin(65536).
 
+def zero : Word := to(Word)(fin(0)).
+
 data Register ~= Fin(8).
 
 data Opcode ~= Fin(32).
@@ -39,6 +41,9 @@ def opRead   : Opcode := to(Opcode)(fin(30)).
 def opAnswer : Opcode := to(Opcode)(fin(31)).
 
 data Bool ~= Fin(2).
+
+def true  : Bool := to(Bool)(fin(1)).
+def false : Bool := to(Bool)(fin(0)).
 
 data Immediate ~= Word.
 
@@ -115,7 +120,6 @@ data LinkedValue ~= Word.
 data Step ~=
     ProgramCounter
   * Instruction
-  * Immediate
   * RegisterValues
   * Flag
   * Address
@@ -129,30 +133,27 @@ def getProgramCounter : Step -> Address
 def getStepInstruction : Step -> Instruction
   := \s : Step => pi1(pi2(from(Step)(s))).
 
-def getImmediate : Step -> Immediate
-  := \s : Step => pi1(pi2(pi2(from(Step)(s)))).
-
 def getRegisterValues : Step -> RegisterValues
-  := \s : Step => pi1(pi2(pi2(pi2(from(Step)(s))))).
+  := \s : Step => pi1(pi2(pi2(from(Step)(s)))).
 
 def getRegisterValue : Step -> Register -> Word
   := \s : Step => \r : Register
   => (from(RegisterValues)(getRegisterValues(s)))(r).
 
 def getFlag : Step -> Flag
-  := \s : Step => pi1(pi2(pi2(pi2(pi2(from(Step)(s)))))).
+  := \s : Step => pi1(pi2(pi2(pi2(from(Step)(s))))).
 
 def getAddress : Step -> Address
-  := \s : Step => pi1(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))).
+  := \s : Step => pi1(pi2(pi2(pi2(pi2(from(Step)(s)))))).
 
 def getStoredWord : Step -> Word
-  := \s : Step => from(StoredWord)(pi1(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))))).
+  := \s : Step => from(StoredWord)(pi1(pi2(pi2(pi2(pi2(pi2(from(Step)(s)))))))).
 
 def getLinkedTime : Step -> Time
-  := \s : Step => from(LinkedTime)(pi1(pi2(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s)))))))))).
+  := \s : Step => from(LinkedTime)(pi1(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))))).
 
 def getLinkedValue : Step -> Word
-  := \s : Step => from(LinkedValue)(pi2(pi2(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s)))))))))).
+  := \s : Step => from(LinkedValue)(pi2(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))))).
 
 def getArg3Value : Step -> Word
   := \s : Step
@@ -206,11 +207,33 @@ def doesNotAnswerPrematurely : Trace -> Prop
      ((i +N 1N) = length(ss))
    | !(getOpcode(getStepInstruction(s)) = opAnswer).
 
+def transition : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitions : Trace -> Prop
+  := \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     all i1 : N < length(ss),
+     (i1 = 0N)
+   | (some i0 : N < length(ss), ((i0 +N 1N) = i1)
+    & transition(nth(ss, i0), nth(ss, i1))).
+
+def initialConditions : Trace -> Prop
+  := \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     (0N = length(ss))
+   | (let s : Step := nth(ss, 0N);
+      (getProgramCounter(s) = to(Address)(zero))
+    & (getFlag(s) = to(Flag)(false))
+    & (all r : Register, getRegisterValue(s, r) = zero)).
+
 def traceIsValid : Trace -> Prop
   := \T : Trace
   => linksAreOrdered(T)
    & doesNotAnswerPrematurely(T)
-   & todo.
+   & transitions(T)
+   & initialConditions(T).
 
 def traceAccepts : Trace -> Prop
   := \t : Trace
