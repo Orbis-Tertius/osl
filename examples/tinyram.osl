@@ -18,33 +18,79 @@ data Arg3 ~= Register + Immediate.
 
 data Instruction ~= Opcode * Arg1 * Arg2 * Arg3.
 
+def getOpcode : Instruction -> Opcode
+  := \x : Instruction => pi1(from(Instruction)(x)).
+
+def getArg1 : Instruction -> Register
+  := \x : Instruction => from(Arg1)(pi1(pi2(from(Instruction)(x)))).
+
+def getArg2 : Instruction -> Register
+  := \x : Instruction => from(Arg2)(pi1(pi2(pi2(from(Instruction)(x))))).
+
+def getArg3 : Instruction -> (Register + Immediate)
+  := \x : Instruction => from(Arg3)(pi2(pi2(pi2(from(Instruction)(x))))).
+
 data Address ~= Word.
 
 data Memory ~= Address -> Word.
 
+def getMemoryValue : Memory -> Address -> Word
+  := \m : Memory => \a : Address
+  => from(Memory)(m, a).
+
 data Program ~= Address -> Instruction.
 
-data RegisterVals ~= Register -> Word.
+def getInstruction : Program -> Address -> Instruction
+  := \p : Program => \a : Address
+  => from(Program)(p, a).
+
+data RegisterValues ~= Register -> Word.
+
+def getRegisterValue : RegisterValues -> Register -> Word
+  := \rs : RegisterValues => \r : Register
+  => from(RegisterValues)(rs, r).
 
 data Flag ~= Bool.
 
 data ProgramCounter ~= Address.
 
-data State ~= ProgramCounter * Flag * Memory * Program.
+data InitialState ~= Memory * Program.
 
-def getProgramCounter : State -> ProgramCounter
-  := \s : State => pi1(from(State)(s)).
+def getMemory : InitialState -> Memory
+  := \s : InitialState => pi1(from(InitialState)(s)).
 
-def getFlag : State -> Flag
-  := \s : State => pi1(pi2(from(State)(s))).
+def getProgram : InitialState -> Program
+  := \s : InitialState => pi2(from(InitialState)(s)).
 
-def getMemory : State -> Memory
-  := \s : State => pi1(pi2(pi2(from(State)(s)))).
+data Step ~=
+    ProgramCounter
+  * Instruction
+  * Immediate
+  * RegisterValues
+  * Flag
+  * Address
+  * Word.
 
-def getProgram : State -> Program
-  := \s : State => pi2(pi2(pi2(from(State)(s)))).
+def getProgramCounter : Step -> ProgramCounter
+  := \s : Step => pi1(from(Step)(s)).
 
-data Step ~= ProgramCounter * Instruction * Immediate * RegisterVals * Flag * Address * Word.
+def getInstruction : Step -> Instruction
+  := \s : Step => pi1(pi2(from(Step)(s))).
+
+def getImmediate : Step -> Immediate
+  := \s : Step => pi1(pi2(pi2(from(Step)(s)))).
+
+def getRegisterValues : Step -> RegisterValues
+  := \s : Step => pi1(pi2(pi2(pi2(from(Step)(s))))).
+
+def getFlag : Step -> Flag
+  := \s : Step => pi1(pi2(pi2(pi2(pi2(from(Step)(s)))))).
+
+def getAddress : Step -> Address
+  := \s : Step => pi1(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))).
+
+def getWord : Step -> Word
+  := \s : Step => pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))).
 
 data Trace ~= List^4096(Step).
 
@@ -56,16 +102,18 @@ def traceIsValid : Trace -> Prop
 def traceAccepts : Trace -> Prop
   := \t : Trace => todo.
 
-def memoryIsConsistentWithTrace : Trace -> Memory -> Prop
-  := \t : Trace => \m : Memory => todo.
+def memoryIsConsistentWithTrace : Memory -> Trace -> Prop
+  := \m : Memory => \t : Trace => todo.
 
-def programIsConsistentWithTrace : Trace -> Program -> Prop
-  := \t : Trace => \p : Program => todo.
+def programIsConsistentWithTrace : Program -> Trace -> Prop
+  := \p : Program => \t : Trace => todo.
 
-def programAccepts : Program -> Memory -> Prop
-  := \p : Program => \m : Memory
+def programAccepts : InitialState -> Prop
+  := \i : InitialState
   => some t : Trace,
+     let m : Memory := getMemory(i);
+     let p : Program := getProgram(i);
      traceIsValid(t)
    & traceAccepts(t)
-   & memoryIsConsistentWithTrace(t, m)
-   & programIsConsistentWithTrace(t, p).
+   & memoryIsConsistentWithTrace(m, t)
+   & programIsConsistentWithTrace(p, t).
