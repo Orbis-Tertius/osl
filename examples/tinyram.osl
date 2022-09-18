@@ -8,6 +8,36 @@ data Register ~= Fin(8).
 
 data Opcode ~= Fin(32).
 
+def opAnd    : Opcode := to(Opcode)(fin(0)).
+def opOr     : Opcode := to(Opcode)(fin(1)).
+def opXor    : Opcode := to(Opcode)(fin(2)).
+def opNot    : Opcode := to(Opcode)(fin(3)).
+def opAdd    : Opcode := to(Opcode)(fin(4)).
+def opSub    : Opcode := to(Opcode)(fin(5)).
+def opMull   : Opcode := to(Opcode)(fin(6)).
+def opUmulh  : Opcode := to(Opcode)(fin(7)).
+def opSmulh  : Opcode := to(Opcode)(fin(8)).
+def opUdiv   : Opcode := to(Opcode)(fin(9)).
+def opUmod   : Opcode := to(Opcode)(fin(10)).
+def opShl    : Opcode := to(Opcode)(fin(11)).
+def opShr    : Opcode := to(Opcode)(fin(12)).
+def opCmpe   : Opcode := to(Opcode)(fin(13)).
+def opCmpa   : Opcode := to(Opcode)(fin(14)).
+def opCmpae  : Opcode := to(Opcode)(fin(15)).
+def opCmpg   : Opcode := to(Opcode)(fin(16)).
+def opCmpge  : Opcode := to(Opcode)(fin(17)).
+def opMov    : Opcode := to(Opcode)(fin(18)).
+def opCmov   : Opcode := to(Opcode)(fin(19)).
+def opJmp    : Opcode := to(Opcode)(fin(20)).
+def opCjmp   : Opcode := to(Opcode)(fin(21)).
+def opCnjmp  : Opcode := to(Opcode)(fin(22)).
+def opStoreb : Opcode := to(Opcode)(fin(26)).
+def opLoadb  : Opcode := to(Opcode)(fin(27)).
+def opStorew : Opcode := to(Opcode)(fin(28)).
+def opLoadw  : Opcode := to(Opcode)(fin(29)).
+def opRead   : Opcode := to(Opcode)(fin(30)).
+def opAnswer : Opcode := to(Opcode)(fin(31)).
+
 data Bool ~= Fin(2).
 
 data Immediate ~= Word.
@@ -24,7 +54,14 @@ def getOpcode : Instruction -> Opcode
   := \x : Instruction => pi1(from(Instruction)(x)).
 
 def isStore : Instruction -> Prop
-  := \x : Instruction => todo.
+  := \x : Instruction
+  => let o : Opcode := getOpcode(x);
+     (o = opStoreb) | (o = opStorew).
+
+def isLoad : Instruction -> Prop
+  := \x : Instruction
+  => let o : Opcode := getOpcode(x);
+     (o = opLoadb) | (o = opLoadw).
 
 def getArg1 : Instruction -> Register
   := \x : Instruction => from(Arg1)(pi1(pi2(from(Instruction)(x)))).
