@@ -82,7 +82,7 @@ def getMemoryValue : Memory -> Address -> Word
 
 data Program ~= Address -> Instruction.
 
-def getInstruction : Program -> Address -> Instruction
+def getProgramInstruction : Program -> Address -> Instruction
   := \p : Program => \a : Address
   => from(Program)(p, a).
 
@@ -119,10 +119,10 @@ data Step ~=
   * LinkedTime
   * LinkedValue.
 
-def getProgramCounter : Step -> ProgramCounter
-  := \s : Step => pi1(from(Step)(s)).
+def getProgramCounter : Step -> Address
+  := \s : Step => from(ProgramCounter)(pi1(from(Step)(s))).
 
-def getInstruction : Step -> Instruction
+def getStepInstruction : Step -> Instruction
   := \s : Step => pi1(pi2(from(Step)(s))).
 
 def getImmediate : Step -> Immediate
@@ -154,7 +154,7 @@ def getArg3Value : Step -> Word
   := \s : Step
   => ((\r : Register => getRegisterValue(s, r))
        + (\i : Immediate => from(Immediate)(i)))
-       (getArg3(getInstruction(s))).
+       (getArg3(getStepInstruction(s))).
 
 data Trace ~= List^4096(Step).
 
@@ -182,11 +182,16 @@ def memoryIsConsistentWithTrace : Memory -> Trace -> Prop
      all i : N < length(ss),
      let s : Step := nth(ss, i);
      let t : Time := to(Time)(cast(i));
-     (isFirstStepAccessingGivenAddress(t, s) & isStore(getInstruction(s)))
+     (isFirstStepAccessingGivenAddress(t, s) & isStore(getStepInstruction(s)))
      -> (getStoredWord(s) = getMemoryValue(M, getAddress(s))).
 
 def programIsConsistentWithTrace : Program -> Trace -> Prop
-  := \p : Program => \t : Trace => todo.
+  := \P : Program => \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     all i : N < length(ss),
+     let t : Time := to(Time)(cast(i));
+     let s : Step := nth(ss, i);
+     getStepInstruction(s) = getProgramInstruction(P, getProgramCounter(s)).
 
 def programAccepts : InitialState -> Prop
   := \i : InitialState
