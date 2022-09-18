@@ -102,6 +102,10 @@ def getProgram : InitialState -> Program
 
 data Time ~= Fin(4096).
 
+def isBefore : Time -> Time -> Prop
+  := \t0 : Time => \t1 : Time
+  => (cast(from(Time)(t0)) +N 1N) <= cast(from(Time)(t1)).
+
 data StoredWord ~= Word.
 
 data LinkedTime ~= Time.
@@ -159,14 +163,54 @@ def getArg3Value : Step -> Word
 data Trace ~= List^4096(Step).
 
 def getSteps : Trace -> List^4096(Step)
-  := \t : Trace => from(Trace)(t).
+  := \T : Trace => from(Trace)(T).
+
+def getStep : Trace -> Time -> Step
+  := \T : Trace => \t : Time
+  => nth(getSteps(T), cast(from(Time)(t))).
 
 def isFirstStepAccessingGivenAddress : Time -> Step -> Prop
   := \t : Time => \s : Step
-  => getLinkedTime(s) <= t.
+  => t <= getLinkedTime(s).
+
+-- Checks that the given function, assumed to be a function
+-- defined on the times [0,n), is a permutation.
+-- TODO: replace this with a more efficient permutation argument,
+-- by augmenting Sigma^1_1 formulas with a quantifier over permutations.
+def isStepPermutation : N -> (Time -> Time) -> Prop
+  := \n : N => \p : Time -> Time
+  => all i : N < n, some j : N < n,
+     let it : Time := to(Time)(cast(i));
+     let jt : Time := to(Time)(cast(j));
+     p(jt) = it.
+
+def linksAreOrdered : Trace -> Prop
+  := \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     some finalAccesses : Address ->^4096 Time,
+     let p : Time -> Time := \t : Time => getLinkedTime(getStep(T, t));
+     isStepPermutation(length(ss), p)
+   & (all i : N < length(ss),
+      let s : Step := nth(ss, i);
+      let t : Time := to(Time)(cast(i));
+      let t' : Time := getLinkedTime(s);
+      let a : Address := getAddress(s);
+      (t' = finalAccesses(a))
+    | isBefore(t', t)).
+
+def doesNotAnswerPrematurely : Trace -> Prop
+  := \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     all i : N < length(ss),
+     let s : Step := nth(ss, i);
+     ((i +N 1N) = length(ss))
+   | !(getOpcode(getStepInstruction(s)) = opAnswer).
 
 def traceIsValid : Trace -> Prop
-  := \t : Trace => todo.
+  := \T : Trace
+  => linksAreOrdered(T)
+   & doesNotAnswerPrematurely(T)
+   & todo.
 
 def traceAccepts : Trace -> Prop
   := \t : Trace
@@ -174,7 +218,8 @@ def traceAccepts : Trace -> Prop
      some i : N < length(ss),
      ((i +N 1N) = length(ss))
    & (let s : Step := nth(ss, i);
-      getArg3Value(s) = to(Word)(fin(0))).
+      (getOpcode(getStepInstruction(s)) = opAnswer)
+    & (getArg3Value(s) = to(Word)(fin(0)))).
 
 def memoryIsConsistentWithTrace : Memory -> Trace -> Prop
   := \M : Memory => \T : Trace
