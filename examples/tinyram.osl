@@ -1,5 +1,7 @@
 -- 16-bit, 8-register TinyRAM 2.0 VM
 
+def todo : Prop := 0N = 1N.
+
 data Word ~= Fin(65536).
 
 data Register ~= Fin(8).
@@ -20,6 +22,9 @@ data Instruction ~= Opcode * Arg1 * Arg2 * Arg3.
 
 def getOpcode : Instruction -> Opcode
   := \x : Instruction => pi1(from(Instruction)(x)).
+
+def isStore : Instruction -> Prop
+  := \x : Instruction => todo.
 
 def getArg1 : Instruction -> Register
   := \x : Instruction => from(Arg1)(pi1(pi2(from(Instruction)(x)))).
@@ -119,8 +124,6 @@ data Trace ~= List^4096(Step).
 def getSteps : Trace -> List^4096(Step)
   := \t : Trace => from(Trace)(t).
 
-def todo : Prop := 0N = 1N.
-
 def isFirstStepAccessingGivenAddress : Time -> Step -> Prop
   := \t : Time => \s : Step
   => getLinkedTime(s) <= t.
@@ -137,7 +140,13 @@ def traceAccepts : Trace -> Prop
       getArg3Value(s) = to(Word)(fin(0))).
 
 def memoryIsConsistentWithTrace : Memory -> Trace -> Prop
-  := \m : Memory => \t : Trace => todo.
+  := \M : Memory => \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     all i : N < length(ss),
+     let s : Step := nth(ss, i);
+     let t : Time := to(Time)(cast(i));
+     (isFirstStepAccessingGivenAddress(t, s) & isStore(getInstruction(s)))
+     -> (getStoredWord(s) = getMemoryValue(M, getAddress(s))).
 
 def programIsConsistentWithTrace : Program -> Trace -> Prop
   := \p : Program => \t : Trace => todo.
