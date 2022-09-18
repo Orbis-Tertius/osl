@@ -58,6 +58,14 @@ def getMemory : InitialState -> Memory
 def getProgram : InitialState -> Program
   := \s : InitialState => pi2(from(InitialState)(s)).
 
+data Time ~= Fin(4096).
+
+data StoredWord ~= Word.
+
+data LinkedTime ~= Time.
+
+data LinkedValue ~= Word.
+
 data Step ~=
     ProgramCounter
   * Instruction
@@ -65,7 +73,9 @@ data Step ~=
   * RegisterValues
   * Flag
   * Address
-  * Word.
+  * StoredWord
+  * LinkedTime
+  * LinkedValue.
 
 def getProgramCounter : Step -> ProgramCounter
   := \s : Step => pi1(from(Step)(s)).
@@ -89,8 +99,14 @@ def getFlag : Step -> Flag
 def getAddress : Step -> Address
   := \s : Step => pi1(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))).
 
-def getWord : Step -> Word
-  := \s : Step => pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))).
+def getStoredWord : Step -> Word
+  := \s : Step => from(StoredWord)(pi1(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))))).
+
+def getLinkedTime : Step -> Time
+  := \s : Step => from(LinkedTime)(pi1(pi2(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s)))))))))).
+
+def getLinkedValue : Step -> Word
+  := \s : Step => from(LinkedValue)(pi2(pi2(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s)))))))))).
 
 def getArg3Value : Step -> Word
   := \s : Step
@@ -104,6 +120,10 @@ def getSteps : Trace -> List^4096(Step)
   := \t : Trace => from(Trace)(t).
 
 def todo : Prop := 0N = 1N.
+
+def isFirstStepAccessingGivenAddress : Time -> Step -> Prop
+  := \t : Time => \s : Step
+  => getLinkedTime(s) <= t.
 
 def traceIsValid : Trace -> Prop
   := \t : Trace => todo.
