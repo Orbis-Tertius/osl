@@ -46,10 +46,6 @@ def getInstruction : Program -> Address -> Instruction
 
 data RegisterValues ~= Register -> Word.
 
-def getRegisterValue : RegisterValues -> Register -> Word
-  := \rs : RegisterValues => \r : Register
-  => from(RegisterValues)(rs, r).
-
 data Flag ~= Bool.
 
 data ProgramCounter ~= Address.
@@ -83,6 +79,10 @@ def getImmediate : Step -> Immediate
 def getRegisterValues : Step -> RegisterValues
   := \s : Step => pi1(pi2(pi2(pi2(from(Step)(s))))).
 
+def getRegisterValue : Step -> Register -> Word
+  := \s : Step => \r : Register
+  => (from(RegisterValues)(getRegisterValues(s)))(r).
+
 def getFlag : Step -> Flag
   := \s : Step => pi1(pi2(pi2(pi2(pi2(from(Step)(s)))))).
 
@@ -92,7 +92,16 @@ def getAddress : Step -> Address
 def getWord : Step -> Word
   := \s : Step => pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))).
 
+def getArg3Value : Step -> Word
+  := \s : Step
+  => ((\r : Register => getRegisterValue(s, r))
+       + (\i : Immediate => from(Immediate)(i)))
+       (getArg3(getInstruction(s))).
+
 data Trace ~= List^4096(Step).
+
+def getSteps : Trace -> List^4096(Step)
+  := \t : Trace => from(Trace)(t).
 
 def todo : Prop := 0N = 1N.
 
@@ -100,7 +109,12 @@ def traceIsValid : Trace -> Prop
   := \t : Trace => todo.
 
 def traceAccepts : Trace -> Prop
-  := \t : Trace => todo.
+  := \t : Trace
+  => let ss : List^4096(Step) := getSteps(t);
+     some i : N < length(ss),
+     ((i +N 1N) = length(ss))
+   & (let s : Step := nth(ss, i);
+      getArg3Value(s) = to(Word)(fin(0))).
 
 def memoryIsConsistentWithTrace : Memory -> Trace -> Prop
   := \m : Memory => \t : Trace => todo.
