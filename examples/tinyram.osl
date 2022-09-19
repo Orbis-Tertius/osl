@@ -369,6 +369,26 @@ def incrementPC : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => addrToN(getProgramCounter(s1)) = (addrToN(getProgramCounter(s0)) +N 1N).
 
+def getRi : Step -> Word
+  := \s : Step
+  => getRegisterValue(s, getArg1(getStepInstruction(s))).
+
+def getRj : Step -> Word
+  := \s : Step
+  => getRegisterValue(s, getArg2(getStepInstruction(s))).
+
+def getA : Step -> Word
+  := \s : Step
+  => ((\r : Register => getRegisterValue(s, r))
+      + (\i : Immediate => from(Immediate)(i)))
+      (getArg3(getStepInstruction(s))).
+
+def preserveRegisters : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => all r : Register,
+     (getArg1(getStepInstruction(s0)) = r)
+   | (getRegisterValue(s0, r) = getRegisterValue(s1, r)).
+
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => todo.
@@ -479,7 +499,8 @@ def transitionLoadw : Step -> Step -> Prop
 
 def transition : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => let inst : Instruction := getStepInstruction(s0);
+  => preserveRegisters(s0, s1)
+   & (let inst : Instruction := getStepInstruction(s0);
      let op : Opcode := getOpcode(inst);
      ((op = opAnd)    & transitionAnd(s0, s1))
    | ((op = opOr)     & transitionOr(s0, s1))
@@ -504,7 +525,7 @@ def transition : Step -> Step -> Prop
    | ((op = opStoreb) & transitionStoreb(s0, s1))
    | ((op = opLoadb)  & transitionLoadb(s0, s1))
    | ((op = opStorew) & transitionStorew(s0, s1))
-   | ((op = opLoadw)  & transitionLoadw(s0, s1)).
+   | ((op = opLoadw)  & transitionLoadw(s0, s1))).
 
 def transitions : Trace -> Prop
   := \T : Trace
