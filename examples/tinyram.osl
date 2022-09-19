@@ -9,6 +9,9 @@ def zero : Word := to(Word)(fin(0)).
 def toN : Word -> N
   := \w : Word => cast(from(Word)(w)).
 
+def toZ : Word -> Z
+  := \w : Word => cast(from(Word)(w)).
+
 def fromN : N -> Word
   := \x : N => to(Word)(cast(x)).
 
@@ -99,6 +102,12 @@ def getProgramInstruction : Program -> Address -> Instruction
 data RegisterValues ~= Register -> Word.
 
 data Flag ~= Bool.
+
+def flagToN : Flag -> N
+  := \f : Flag => cast(from(Bool)(from(Flag)(f))).
+
+def flagToZ : Flag -> Z
+  := \f : Flag => cast(from(Bool)(from(Flag)(f))).
 
 data ProgramCounter ~= Address.
 
@@ -285,6 +294,11 @@ def add : Word -> Word -> Word -> Flag -> Prop
   := \a : Word => \b : Word => \c : Word => \f : Flag
   => let overflowBit : N := 65536N *N cast(from(Bool)(from(Flag)(f)));
      (toN(c) +N overflowBit) = (toN(a) +N toN(b)).
+
+def sub : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => let carryBit : Z := 65536Z *Z (1Z +Z (-1Z *Z flagToZ(f)));
+     (toZ(b) +Z 65536Z +Z (-1Z *Z toZ(a))) = (toZ(c) +Z carryBit).
 
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
