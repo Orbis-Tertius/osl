@@ -93,6 +93,9 @@ def getArg3 : Instruction -> (Register + Immediate)
 
 data Address ~= Word.
 
+def addrToN : Address -> N
+  := \a : Address => toN(from(Address)(a)).
+
 data Memory ~= Address -> Word.
 
 def getMemoryValue : Memory -> Address -> Word
@@ -361,6 +364,10 @@ def shr : Word -> Word -> Word -> Flag -> Prop
      some aMsbs : Word, (toN(a) = (aLsb +N (2N *N toN(aMsbs))))
    & (some d : Word, some p : Word, power(toN(b), toN(p))
       & (((toN(c) *N toN(p)) +N toN(d)) = toN(a))).
+
+def incrementPC : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => addrToN(getProgramCounter(s1)) = (addrToN(getProgramCounter(s0)) +N 1N).
 
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
