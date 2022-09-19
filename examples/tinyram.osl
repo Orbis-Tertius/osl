@@ -277,6 +277,10 @@ def or : Word -> Word -> Word -> Prop
    & (toN(c) = (((2N *N toN(oo)) +N toN(eo))
              +N ((2N *N toN(oe)) +N toN(ee)))).
 
+def not : Word -> Word -> Prop
+  := \a : Word => \b : Word
+  => xor(a, to(Word)(fin(65535)), b).
+
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => todo.
