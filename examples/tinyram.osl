@@ -369,9 +369,9 @@ def incrementPC : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => addrToN(getProgramCounter(s1)) = (addrToN(getProgramCounter(s0)) +N 1N).
 
-def getRi : Step -> Word
-  := \s : Step
-  => getRegisterValue(s, getArg1(getStepInstruction(s))).
+def getRi : Step -> Step -> Word
+  := \s0 : Step => \s1 : Step
+  => getRegisterValue(s1, getArg1(getStepInstruction(s0))).
 
 def getRj : Step -> Word
   := \s : Step
@@ -391,7 +391,8 @@ def preserveRegisters : Step -> Step -> Prop
 
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => incrementPC(s0, s1)
+   & and(getRj(s0), getA(s0), getRi(s0, s1)).
 
 def transitionOr : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
