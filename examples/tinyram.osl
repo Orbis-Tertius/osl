@@ -552,12 +552,16 @@ def transitionLoadb : Step -> Step -> Prop
 
 def transitionStorew : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => incrementPC(s0, s1)
+   & (getFlag(s1) = getFlag(s0))
+   & (getAddress(s0) = to(Address)(getA(s0)))
+   & (getStoredWord(s0) = getRi(s0, s0)).
 
 def transitionLoadw : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
    & (getFlag(s1) = getFlag(s0))
+   & (getAddress(s0) = to(Address)(getA(s0)))
    & (getRi(s0, s1) = getStoredWord(s0)).
 
 def transition : Step -> Step -> Prop
