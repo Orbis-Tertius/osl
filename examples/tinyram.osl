@@ -350,11 +350,17 @@ def power : N -> N -> Prop
 
 def shl : Word -> Word -> Word -> Flag -> Prop
   := \a : Word => \b : Word => \c : Word => \f : Flag
-  => some aMsbIs1 : Bool,
-     let aMsb : N := flagToN(f) *N 65535N;
+  => let aMsb : N := flagToN(f) *N 65535N;
      some aLsbs : Word, (toN(a) = (toN(aLsbs) +N aMsb))
    & (some d : Word, some p : Word, power(toN(b), toN(p))
       & (((toN(d) *N 65536N) +N toN(c)) = (toN(a) *N toN(p)))).
+
+def shr : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => let aLsb : N := flagToN(f);
+     some aMsbs : Word, (toN(a) = (aLsb +N (2N *N toN(aMsbs))))
+   & (some d : Word, some p : Word, power(toN(b), toN(p))
+      & (((toN(c) *N toN(p)) +N toN(d)) = toN(a))).
 
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
