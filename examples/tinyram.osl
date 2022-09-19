@@ -392,22 +392,26 @@ def preserveRegisters : Step -> Step -> Prop
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
-   & and(getRj(s0), getA(s0), getRi(s0, s1)).
+   & and(getRj(s0), getA(s0), getRi(s0, s1))
+   & (getFlag(s1) = flagZero).
 
 def transitionOr : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
-   & or(getRj(s0), getA(s0), getRi(s0, s1)).
+   & or(getRj(s0), getA(s0), getRi(s0, s1))
+   & (getFlag(s1) = flagZero).
 
 def transitionXor : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
-   & xor(getRj(s0), getA(s0), getRi(s0, s1)).
+   & xor(getRj(s0), getA(s0), getRi(s0, s1))
+   & (getFlag(s1) = flagZero).
 
 def transitionNot : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
-   & not(getA(s0), getRi(s0, s1)).
+   & not(getA(s0), getRi(s0, s1))
+   & (getFlag(s1) = flagZero).
 
 def transitionAdd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
