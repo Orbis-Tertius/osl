@@ -513,10 +513,11 @@ def transitionCmpge : Step -> Step -> Prop
    & (getRi(s0, s0) = getRi(s0, s1))
    & cmpge(getRi(s0, s0), getA(s0), getFlag(s1)).
 
-
 def transitionMov : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => incrementPC(s0, s1)
+   & (getRi(s0, s1) = getA(s0))
+   & (getFlag(s1) = getFlag(s0)).
 
 def transitionCmov : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
