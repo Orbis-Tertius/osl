@@ -77,6 +77,14 @@ translate gc
     OSL.Apply _ (OSL.ListCast _) as -> do
       asT <- inferType decls as
       translate gc lc asT as
+    OSL.Apply ann (OSL.Apply _ (OSL.Inverse _) f) x -> do
+      fType <- inferType decls f
+      fT <- translateToTerm gc lc fType f
+      case (fType, fT) of
+        (OSL.P _ _ _ xType, S11.Var fT') -> do
+          xT <- translateToTerm gc lc xType x
+          pure (Term (S11.AppInverse fT' xT))
+        _ -> Left (ErrorMessage ann "expected a permutation")
     OSL.ConstN _ x -> return (Term (S11.Const x))
     OSL.ConstZ _ x -> return (Term (S11.Const x))
     OSL.ConstFin _ x -> return (Term (S11.Const x))
@@ -545,7 +553,11 @@ translate gc
           fM <- translateToMapping gc lc fType f
           xM <- translateToMapping gc lc a x
           Mapping <$> applyMappings ann termType fM xM
-        _ -> Left (ErrorMessage ann "expected a function")
+        OSL.P _ _ a _ -> do
+          fM <- translateToMapping gc lc fType f
+          xM <- translateToMapping gc lc a x
+          Mapping <$> applyMappings ann termType fM xM
+        _ -> Left (ErrorMessage ann "expected a function or permutation")
     OSL.Let _ varName varType varDef body -> do
       varDefM <- translateToMapping gc lc varType varDef
       let decls' = OSL.ValidContext
@@ -643,8 +655,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
       aDim <- getMappingDimensions decls a
       case (aDim, varBound) of
         (FiniteDimensions n, OSL.FunctionBound _ (OSL.DomainBound aBound) (OSL.CodomainBound bBound)) -> do
-          (bQs, bM) <-
-            getExistentialQuantifierStringAndMapping gc lc b bBound
+          (bQs, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
           let fM = incrementArities n bM
           aBounds <- translateBound gc lc a (Just aBound)
           let fQs = prependBounds cardinality aBounds <$> bQs
@@ -655,6 +666,16 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
         (InfiniteDimensions, _) ->
           Left (ErrorMessage (typeAnnotation a)
                "expected a finite-dimensional type")
+    OSL.P _ cardinality a b ->
+      case varBound of
+        OSL.FunctionBound _ (OSL.DomainBound aBound) (OSL.CodomainBound bBound) -> do
+          (bQs, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
+          let fM = incrementArities 1 bM
+          aBoundT <- translateBound gc lc a (Just aBound)
+          let fQs = prependBounds cardinality aBoundT <$> bQs
+          pure (fQs, fM)
+        _ -> Left (ErrorMessage (boundAnnotation varBound)
+                   "expected a function bound")
     OSL.Product _ a b ->
       case varBound of
         OSL.ProductBound _ (OSL.LeftBound aBound) (OSL.RightBound bBound) -> do
@@ -767,6 +788,7 @@ getMappingDimensions ctx t =
   case t of
     OSL.Prop ann -> Left (ErrorMessage ann "expected a quantifiable type; got Prop")
     OSL.F _ _ _ _ -> pure InfiniteDimensions
+    OSL.P _ _ _ _ -> pure InfiniteDimensions
     OSL.N _ -> pure (FiniteDimensions 1)
     OSL.Z _ -> pure (FiniteDimensions 1)
     OSL.Fin _ _ -> pure (FiniteDimensions 1)
@@ -828,6 +850,7 @@ getArbitraryMapping ctx =
           incrementArities m <$> getArbitraryMapping ctx b
         Right InfiniteDimensions ->
           Left (ErrorMessage ann "expected a finite-dimensional domain type")
+    OSL.P _ _ _ _ -> pure $ ScalarMapping (S11.Var (S11.Name 1 0))
   where
     rec = getArbitraryMapping ctx      
 
@@ -1057,6 +1080,10 @@ inferBound ctx =
   \case
     OSL.Prop ann -> Left (ErrorMessage ann "expected a quantifiable type but got Prop")
     OSL.F ann _ a b ->
+      OSL.FunctionBound ann
+      <$> (OSL.DomainBound <$> inferBound ctx a)
+      <*> (OSL.CodomainBound <$> inferBound ctx b)
+    OSL.P ann _ a b ->
       OSL.FunctionBound ann
       <$> (OSL.DomainBound <$> inferBound ctx a)
       <*> (OSL.CodomainBound <$> inferBound ctx b)

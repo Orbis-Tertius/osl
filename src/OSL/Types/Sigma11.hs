@@ -29,6 +29,7 @@ instance Show Name where
 data Term =
     Var Name
   | App Name (NonEmpty Term)
+  | AppInverse Name Term
   | Add Term Term
   | Mul Term Term
   | IndLess Term Term
@@ -38,6 +39,8 @@ instance Show Term where
   show (Var name) = show name
   show (App f xs) =
     show f <> "(" <> intercalate ", " (show <$> toList xs) <> ")"
+  show (AppInverse f x) =
+    show f <> "^-1(" <> show x <> ")"
   show (Add x y) =
     "(" <> show x <> " + " <> show y <> ")"
   show (Mul x y) =
@@ -78,6 +81,7 @@ instance Show Formula where
 data ExistentialQuantifier =
     ExistsFO Term
   | ExistsSO (Maybe Cardinality) Term (NonEmpty Term)
+  | ExistsP (Maybe Cardinality) Term Term
 
 instance Show ExistentialQuantifier where
   show (ExistsFO b) = "<" <> show b
@@ -90,3 +94,10 @@ instance Show ExistentialQuantifier where
     "<" <> show b <> "("
       <> intercalate ", " (("<" <>) . show <$> toList bs)
       <> ")"
+  show (ExistsP (Just (Cardinality n)) b0 b1) =
+    "^" <> show n <>
+    "<" <> show b0 <>
+    "(<" <> show b1 <> ")"
+  show (ExistsP Nothing b0 b1) =
+    "<" <> show b0 <>
+    "(<" <> show b1 <> ")"

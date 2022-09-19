@@ -512,6 +512,7 @@ term3 =
   , constant
   , parenthesizedTerm
   , builtin K.Cast Cast
+  , builtin K.Inverse Inverse
   , builtin K.Pi1 Pi1
   , builtin K.Pi2 Pi2
   , builtin K.Iota1 Iota1

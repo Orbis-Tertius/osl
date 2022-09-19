@@ -117,6 +117,18 @@ addFreeVariableMapping freeVariable = do
           let mapping = (mapAritiesInMapping (+aDim) bMap)
           addMapping freeVariable mapping
           return mapping
+        P _ _ a b -> do
+          aSym <- addGensym a
+          bSym <- addGensym b
+          aMap <- addFreeVariableMapping aSym
+          bMap <- addFreeVariableMapping bSym
+          aDim <- lift . except $
+                  getFiniteDimMappingArity
+                  (typeAnnotation a) 
+                  aMap
+          let mapping = (mapAritiesInMapping (+aDim) bMap)
+          addMapping freeVariable mapping
+          return mapping
         NamedType ann aName -> do
           a <- getTypeDeclaration ann aName
           aSym <- addGensym a
@@ -235,6 +247,7 @@ getBoundS11NamesInMapping arity =
     f :: S11.Term -> Set S11.Name
     f (S11.Var name) = g name
     f (S11.App h xs) = g h `Set.union` (Set.unions (f <$> xs))
+    f (S11.AppInverse h x) = g h `Set.union` f x
     f (S11.Add x y) = f x `Set.union` f y
     f (S11.Mul x y) = f x `Set.union` f y
     f (S11.IndLess x y) = f x `Set.union` f y

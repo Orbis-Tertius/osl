@@ -138,6 +138,7 @@ keyword =
   , K.Fin <$ string "Fin"
   , K.Cast <$ string "cast"
   , K.Data <$ string "data"
+  , K.Inverse <$ string "inverse"
   , K.To <$ string "to"
   , K.From <$ string "from"
   , K.Def <$ string "def"

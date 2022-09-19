@@ -13,6 +13,7 @@ typeAnnotation t =
   case t of
     Prop ann -> ann
     F ann _ _ _ -> ann
+    P ann _ _ _ -> ann
     N ann -> ann
     Z ann -> ann
     Fin ann _ -> ann
@@ -29,6 +30,7 @@ typeCardinality ctx t =
   case t of
     Prop _ -> Nothing
     F _ n _ _ -> n
+    P _ n _ _ -> n
     N _ -> Just 1
     Z _ -> Just 1
     Fin _ _ -> Just 1

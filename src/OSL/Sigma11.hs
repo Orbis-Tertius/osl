@@ -22,7 +22,7 @@ import qualified Data.Set as Set
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Name (..), Term (Var, App, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Not, And, Or, Implies, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO))
+import OSL.Types.Sigma11 (Name (..), Term (Var, App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Not, And, Or, Implies, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO, ExistsP))
 import OSL.Types.TranslationContext (Mapping (..))
 
 
@@ -37,6 +37,7 @@ instance MapNames Term where
     \case
       Var x -> Var (f x)
       App g xs -> App (f g) (mapNames f xs)
+      AppInverse g x -> AppInverse (f g) (mapNames f x)
       Add x y -> Add (mapNames f x) (mapNames f y)
       Mul x y -> Mul (mapNames f x) (mapNames f y)
       IndLess x y -> IndLess (mapNames f x) (mapNames f y)
@@ -59,6 +60,8 @@ instance MapNames Formula where
         Exists (ExistsFO (mapNames f bound)) (mapNames f p)
       Exists (ExistsSO n outBound inBounds) p ->
         Exists (ExistsSO n (mapNames f outBound) (mapNames f inBounds)) (mapNames f p)
+      Exists (ExistsP n outBound inBound) p ->
+        Exists (ExistsP n (mapNames f outBound) (mapNames f inBound)) (mapNames f p)
 
 
 instance MapNames a => MapNames (Mapping ann a) where
@@ -97,6 +100,9 @@ termIndices =
         `unionIndices`
         (foldl' unionIndices mempty
           (termIndices <$> x))
+    AppInverse (Name fArity fIndex) x ->
+      Map.singleton fArity (Set.singleton fIndex)
+        `unionIndices` termIndices x
     Add x y -> termIndices x `unionIndices` termIndices y
     Mul x y -> termIndices x `unionIndices` termIndices y
     IndLess x y -> termIndices x `unionIndices` termIndices y
@@ -116,3 +122,5 @@ prependBounds _ bs' (ExistsSO n b bs) =
   case NonEmpty.nonEmpty bs' of
     Just bs'' -> ExistsSO n b (bs'' <> bs)
     Nothing -> ExistsSO n b bs
+prependBounds _ _ (ExistsP _ _ _) =
+  error "there has been a mistake; applied prependBounds to ExistsP"
