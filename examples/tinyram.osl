@@ -248,6 +248,20 @@ def and : Word -> Word -> Word -> Prop
    & ((toN(ae) +N toN(be)) = ((2N *N toN(eo)) +N toN(ee)))
    & (toN(c) = ((2N *N toN(oo)) +N toN(eo))).
 
+def xor : Word -> Word -> Word -> Prop
+  := \a : Word => \b : Word => \c : Word
+  => some ae : Word, some ao : Word,
+     some be : Word, some bo : Word,
+     some oe : Word, some oo : Word,
+     some ee : Word, some eo : Word,
+     decomposesAs(ae, to(EvenBits)(ae), to(OddBits)(ao))
+   & decomposesAs(be, to(EvenBits)(be), to(OddBits)(bo))
+   & isEvenBits(oe) & isEvenBits(oo)
+   & isEvenBits(ee) & isEvenBits(eo)
+   & ((toN(ao) +N toN(bo)) = ((2N *N toN(oo)) +N toN(oe)))
+   & ((toN(ae) +N toN(be)) = ((2N *N toN(eo)) +N toN(ee)))
+   & (toN(c) = ((2N *N toN(oe)) +N toN(ee))).
+
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => todo.
