@@ -527,7 +527,8 @@ def transitionCmov : Step -> Step -> Prop
 
 def transitionJmp : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => (getFlag(s1) = getFlag(s0)) & (getRi(s0, s1) = getRi(s0, s0))
+   & (getProgramCounter(s1) = to(Address)(getA(s0))).
 
 def transitionCjmp : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
