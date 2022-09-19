@@ -331,6 +331,12 @@ def smulh : Word -> Word -> Word -> Flag -> Prop
    & toZS(b, (bs *Z -1Z) *Z cast(bu))
    & ((toN(d) +N (65536N *N toN(c))) = (au *N bu)).
 
+def udiv : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => (((a = zero) & (c = zero) & (f = flagOne)))
+   | (!(a = zero) & (f = flagZero)
+      & (some r : N < toN(a), toN(b) = ((toN(a) *N toN(c)) +N r))).
+
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => todo.
