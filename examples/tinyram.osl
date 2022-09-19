@@ -445,7 +445,8 @@ def transitionUdiv : Step -> Step -> Prop
 
 def transitionUmod : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => incrementPC(s0, s1)
+   & umod(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
 
 def transitionShl : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
