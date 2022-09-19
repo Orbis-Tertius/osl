@@ -567,6 +567,12 @@ checkTerm c t x =
           checkTerm c (Prop ann) p
           checkTerm c (Prop ann) q
         _ -> genericErrorMessage
+    Iff ann p q -> do
+      case t of
+        Prop _ -> do
+          checkTerm c (Prop ann) p
+          checkTerm c (Prop ann) q
+        _ -> genericErrorMessage
     ForAll ann varName varType varBound p -> do
       checkType c varType
       maybe (pure ()) (checkBound c varType) varBound
@@ -970,6 +976,10 @@ inferType c t =
       checkTerm c (Prop ann) p
       return (Prop ann)
     Implies ann p q -> do
+      checkTerm c (Prop ann) p
+      checkTerm c (Prop ann) q
+      return (Prop ann)
+    Iff ann p q -> do
       checkTerm c (Prop ann) p
       checkTerm c (Prop ann) q
       return (Prop ann)

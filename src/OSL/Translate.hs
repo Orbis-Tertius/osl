@@ -575,6 +575,10 @@ translate gc
       Formula <$>
         (S11.Implies <$> translateToFormula gc lc p
                      <*> translateToFormula gc lc q)
+    OSL.Iff _ p q ->
+      Formula <$>
+        (S11.Iff <$> translateToFormula gc lc p
+                 <*> translateToFormula gc lc q)
     OSL.ForAll ann varName varType varBound p -> do
       varDim <- getMappingDimensions decls varType
       case varDim of

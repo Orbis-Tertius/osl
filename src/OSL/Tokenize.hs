@@ -67,6 +67,8 @@ token =
     (do tok <- keyword
         _ <- lookAhead (noneOf (['a'..'z'] <> ['A'..'Z'] <> "_" <> ['0'..'9'] <> "_\'"))
         pure tok)
+  , T.LeftRightArrow <$ string "<->"
+  , T.LeftRightArrow <$ string "↔"
   , T.ThinArrow <$ string "->"
   , T.ThinArrow <$ string "→"
   , T.OpenParen <$ string "("

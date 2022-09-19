@@ -54,6 +54,7 @@ data Formula =
   | And Formula Formula
   | Or Formula Formula
   | Implies Formula Formula
+  | Iff Formula Formula
   | ForAll Term Formula
   | Exists ExistentialQuantifier Formula
 
@@ -69,6 +70,8 @@ instance Show Formula where
     "(" <> show p <> " | " <> show q <> ")"
   show (Implies p q) =
     "(" <> show p <> " -> " <> show q <> ")"
+  show (Iff p q) =
+    "(" <> show p <> " <-> " <> show q <> ")"
   show (ForAll b p) =
     "(all <" <> show b <> ", " <> show p <> ")"
   show (Exists q p) =
