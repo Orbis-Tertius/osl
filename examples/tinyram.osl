@@ -1,0 +1,698 @@
+-- 16-bit, 8-register TinyRAM 2.0 VM
+
+def todo : Prop := 0N = 1N.
+
+data Word ~= Fin(65536).
+
+def zero : Word := to(Word)(fin(0)).
+
+def toN : Word -> N
+  := \w : Word => cast(from(Word)(w)).
+
+def toZU : Word -> Z
+  := \w : Word => cast(from(Word)(w)).
+
+def toZS : Word -> Z -> Prop
+  := \w : Word => \z : Z
+  => some u : Z < 32768Z, some s : Z < 2Z,
+     (toZU(w) = (u +Z (32768Z *Z s)))
+   & (z = (u +Z (-32768Z *Z s))).
+
+def fromN : N -> Word
+  := \x : N => to(Word)(cast(x)).
+
+data Register ~= Fin(8).
+
+data Opcode ~= Fin(32).
+
+def opAnd    : Opcode := to(Opcode)(fin(0)).
+def opOr     : Opcode := to(Opcode)(fin(1)).
+def opXor    : Opcode := to(Opcode)(fin(2)).
+def opNot    : Opcode := to(Opcode)(fin(3)).
+def opAdd    : Opcode := to(Opcode)(fin(4)).
+def opSub    : Opcode := to(Opcode)(fin(5)).
+def opMull   : Opcode := to(Opcode)(fin(6)).
+def opUmulh  : Opcode := to(Opcode)(fin(7)).
+def opSmulh  : Opcode := to(Opcode)(fin(8)).
+def opUdiv   : Opcode := to(Opcode)(fin(9)).
+def opUmod   : Opcode := to(Opcode)(fin(10)).
+def opShl    : Opcode := to(Opcode)(fin(11)).
+def opShr    : Opcode := to(Opcode)(fin(12)).
+def opCmpe   : Opcode := to(Opcode)(fin(13)).
+def opCmpa   : Opcode := to(Opcode)(fin(14)).
+def opCmpae  : Opcode := to(Opcode)(fin(15)).
+def opCmpg   : Opcode := to(Opcode)(fin(16)).
+def opCmpge  : Opcode := to(Opcode)(fin(17)).
+def opMov    : Opcode := to(Opcode)(fin(18)).
+def opCmov   : Opcode := to(Opcode)(fin(19)).
+def opJmp    : Opcode := to(Opcode)(fin(20)).
+def opCjmp   : Opcode := to(Opcode)(fin(21)).
+def opCnjmp  : Opcode := to(Opcode)(fin(22)).
+def opStoreb : Opcode := to(Opcode)(fin(26)).
+def opLoadb  : Opcode := to(Opcode)(fin(27)).
+def opStorew : Opcode := to(Opcode)(fin(28)).
+def opLoadw  : Opcode := to(Opcode)(fin(29)).
+def opAnswer : Opcode := to(Opcode)(fin(31)).
+
+data Bool ~= Fin(2).
+
+def true  : Bool := to(Bool)(fin(1)).
+def false : Bool := to(Bool)(fin(0)).
+
+def boolToN : Bool -> N
+  := \x : Bool => cast(from(Bool)(x)).
+
+data Immediate ~= Word.
+
+data Arg1 ~= Register.
+
+data Arg2 ~= Register.
+
+data Arg3 ~= Register + Immediate.
+
+data Instruction ~= Opcode * Arg1 * Arg2 * Arg3.
+
+def getOpcode : Instruction -> Opcode
+  := \x : Instruction => pi1(from(Instruction)(x)).
+
+def isStore : Instruction -> Prop
+  := \x : Instruction
+  => let o : Opcode := getOpcode(x);
+     (o = opStoreb) | (o = opStorew).
+
+def isLoad : Instruction -> Prop
+  := \x : Instruction
+  => let o : Opcode := getOpcode(x);
+     (o = opLoadb) | (o = opLoadw).
+
+def getArg1 : Instruction -> Register
+  := \x : Instruction => from(Arg1)(pi1(pi2(from(Instruction)(x)))).
+
+def getArg2 : Instruction -> Register
+  := \x : Instruction => from(Arg2)(pi1(pi2(pi2(from(Instruction)(x))))).
+
+def getArg3 : Instruction -> (Register + Immediate)
+  := \x : Instruction => from(Arg3)(pi2(pi2(pi2(from(Instruction)(x))))).
+
+data Address ~= Word.
+
+def addrToN : Address -> N
+  := \a : Address => toN(from(Address)(a)).
+
+data Memory ~= Address -> Word.
+
+def getMemoryValue : Memory -> Address -> Word
+  := \m : Memory => \a : Address
+  => from(Memory)(m, a).
+
+data Program ~= Address -> Instruction.
+
+def getProgramInstruction : Program -> Address -> Instruction
+  := \p : Program => \a : Address
+  => from(Program)(p, a).
+
+data RegisterValues ~= Register -> Word.
+
+data Flag ~= Bool.
+
+def flagZero : Flag := to(Flag)(false).
+
+def flagOne : Flag := to(Flag)(true).
+
+def flagToN : Flag -> N
+  := \f : Flag => cast(from(Bool)(from(Flag)(f))).
+
+def flagToZ : Flag -> Z
+  := \f : Flag => cast(from(Bool)(from(Flag)(f))).
+
+data ProgramCounter ~= Address.
+
+data InitialState ~= Memory * Program.
+
+def getMemory : InitialState -> Memory
+  := \s : InitialState => pi1(from(InitialState)(s)).
+
+def getProgram : InitialState -> Program
+  := \s : InitialState => pi2(from(InitialState)(s)).
+
+data Time ~= Fin(4096).
+
+def isBefore : Time -> Time -> Prop
+  := \t0 : Time => \t1 : Time
+  => (cast(from(Time)(t0)) +N 1N) <= cast(from(Time)(t1)).
+
+data StoredWord ~= Word.
+
+data LinkedTime ~= Time.
+
+data LinkedValue ~= Word.
+
+data Step ~=
+    ProgramCounter
+  * Instruction
+  * RegisterValues
+  * Flag
+  * Address
+  * StoredWord
+  * LinkedTime
+  * LinkedValue.
+
+def getProgramCounter : Step -> Address
+  := \s : Step => from(ProgramCounter)(pi1(from(Step)(s))).
+
+def getStepInstruction : Step -> Instruction
+  := \s : Step => pi1(pi2(from(Step)(s))).
+
+def getRegisterValues : Step -> RegisterValues
+  := \s : Step => pi1(pi2(pi2(from(Step)(s)))).
+
+def getRegisterValue : Step -> Register -> Word
+  := \s : Step => \r : Register
+  => (from(RegisterValues)(getRegisterValues(s)))(r).
+
+def getFlag : Step -> Flag
+  := \s : Step => pi1(pi2(pi2(pi2(from(Step)(s))))).
+
+def getAddress : Step -> Address
+  := \s : Step => pi1(pi2(pi2(pi2(pi2(from(Step)(s)))))).
+
+def getStoredWord : Step -> Word
+  := \s : Step => from(StoredWord)(pi1(pi2(pi2(pi2(pi2(pi2(from(Step)(s)))))))).
+
+def getLinkedTime : Step -> Time
+  := \s : Step => from(LinkedTime)(pi1(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))))).
+
+def getLinkedValue : Step -> Word
+  := \s : Step => from(LinkedValue)(pi2(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))))).
+
+def getArg3Value : Step -> Word
+  := \s : Step
+  => ((\r : Register => getRegisterValue(s, r))
+       + (\i : Immediate => from(Immediate)(i)))
+       (getArg3(getStepInstruction(s))).
+
+data Trace ~= List^4096(Step).
+
+def getSteps : Trace -> List^4096(Step)
+  := \T : Trace => from(Trace)(T).
+
+def getStep : Trace -> Time -> Step
+  := \T : Trace => \t : Time
+  => nth(getSteps(T), cast(from(Time)(t))).
+
+def isFirstStepAccessingGivenAddress : Time -> Step -> Prop
+  := \t : Time => \s : Step
+  => t <= getLinkedTime(s).
+
+-- Checks that the given function, assumed to be a function
+-- defined on the times [0,n), is a permutation.
+-- TODO: replace this with a more efficient permutation argument,
+-- by augmenting Sigma^1_1 formulas with a quantifier over permutations.
+def isStepPermutation : N -> (Time -> Time) -> Prop
+  := \n : N => \p : Time -> Time
+  => all i : N < n, some j : N < n,
+     let it : Time := to(Time)(cast(i));
+     let jt : Time := to(Time)(cast(j));
+     p(jt) = it.
+
+def linksAreOrdered : Trace -> Prop
+  := \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     some finalAccesses : Address ->^4096 Time,
+     let p : Time -> Time := \t : Time => getLinkedTime(getStep(T, t));
+     isStepPermutation(length(ss), p)
+   & (all i : N < length(ss),
+      let s : Step := nth(ss, i);
+      let t : Time := to(Time)(cast(i));
+      let t' : Time := getLinkedTime(s);
+      let a : Address := getAddress(s);
+      (t' = finalAccesses(a))
+    | isBefore(t', t)).
+
+def doesNotAnswerPrematurely : Trace -> Prop
+  := \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     all i : N < length(ss),
+     let s : Step := nth(ss, i);
+     ((i +N 1N) = length(ss))
+   | !(getOpcode(getStepInstruction(s)) = opAnswer).
+
+-- NOTE: isEvenBits and isOddBits could be optimized at the Sigma^1_1 formula
+-- level by adding an optimization which recognizes when a subexpression can
+-- be rewritten as a fixed lookup table, such as in these cases.
+
+-- Asserts that the odd bits of the given word are 0.
+def isEvenBits : Word -> Prop
+  := \w : Word
+  => let x : Fin(65536) := from(Word)(w);
+     (x = fin(0)) | (x = fin(1)) | (x = fin(4)) | (x = fin(5)) | (x = fin(16)) | (x = fin(17)) | (x = fin(20)) | (x = fin(21)) | (x = fin(64)) | (x = fin(65)) | (x = fin(68)) | (x = fin(69)) | (x = fin(80)) | (x = fin(81)) | (x = fin(84)) | (x = fin(85)) | (x = fin(256)) | (x = fin(257)) | (x = fin(260)) | (x = fin(261)) | (x = fin(272)) | (x = fin(273)) | (x = fin(276)) | (x = fin(277)) | (x = fin(320)) | (x = fin(321)) | (x = fin(324)) | (x = fin(325)) | (x = fin(336)) | (x = fin(337)) | (x = fin(340)) | (x = fin(341)) | (x = fin(1024)) | (x = fin(1025)) | (x = fin(1028)) | (x = fin(1029)) | (x = fin(1040)) | (x = fin(1041)) | (x = fin(1044)) | (x = fin(1045)) | (x = fin(1088)) | (x = fin(1089)) | (x = fin(1092)) | (x = fin(1093)) | (x = fin(1104)) | (x = fin(1105)) | (x = fin(1108)) | (x = fin(1109)) | (x = fin(1280)) | (x = fin(1281)) | (x = fin(1284)) | (x = fin(1285)) | (x = fin(1296)) | (x = fin(1297)) | (x = fin(1300)) | (x = fin(1301)) | (x = fin(1344)) | (x = fin(1345)) | (x = fin(1348)) | (x = fin(1349)) | (x = fin(1360)) | (x = fin(1361)) | (x = fin(1364)) | (x = fin(1365)) | (x = fin(4096)) | (x = fin(4097)) | (x = fin(4100)) | (x = fin(4101)) | (x = fin(4112)) | (x = fin(4113)) | (x = fin(4116)) | (x = fin(4117)) | (x = fin(4160)) | (x = fin(4161)) | (x = fin(4164)) | (x = fin(4165)) | (x = fin(4176)) | (x = fin(4177)) | (x = fin(4180)) | (x = fin(4181)) | (x = fin(4352)) | (x = fin(4353)) | (x = fin(4356)) | (x = fin(4357)) | (x = fin(4368)) | (x = fin(4369)) | (x = fin(4372)) | (x = fin(4373)) | (x = fin(4416)) | (x = fin(4417)) | (x = fin(4420)) | (x = fin(4421)) | (x = fin(4432)) | (x = fin(4433)) | (x = fin(4436)) | (x = fin(4437)) | (x = fin(5120)) | (x = fin(5121)) | (x = fin(5124)) | (x = fin(5125)) | (x = fin(5136)) | (x = fin(5137)) | (x = fin(5140)) | (x = fin(5141)) | (x = fin(5184)) | (x = fin(5185)) | (x = fin(5188)) | (x = fin(5189)) | (x = fin(5200)) | (x = fin(5201)) | (x = fin(5204)) | (x = fin(5205)) | (x = fin(5376)) | (x = fin(5377)) | (x = fin(5380)) | (x = fin(5381)) | (x = fin(5392)) | (x = fin(5393)) | (x = fin(5396)) | (x = fin(5397)) | (x = fin(5440)) | (x = fin(5441)) | (x = fin(5444)) | (x = fin(5445)) | (x = fin(5456)) | (x = fin(5457)) | (x = fin(5460)) | (x = fin(5461)) | (x = fin(16384)) | (x = fin(16385)) | (x = fin(16388)) | (x = fin(16389)) | (x = fin(16400)) | (x = fin(16401)) | (x = fin(16404)) | (x = fin(16405)) | (x = fin(16448)) | (x = fin(16449)) | (x = fin(16452)) | (x = fin(16453)) | (x = fin(16464)) | (x = fin(16465)) | (x = fin(16468)) | (x = fin(16469)) | (x = fin(16640)) | (x = fin(16641)) | (x = fin(16644)) | (x = fin(16645)) | (x = fin(16656)) | (x = fin(16657)) | (x = fin(16660)) | (x = fin(16661)) | (x = fin(16704)) | (x = fin(16705)) | (x = fin(16708)) | (x = fin(16709)) | (x = fin(16720)) | (x = fin(16721)) | (x = fin(16724)) | (x = fin(16725)) | (x = fin(17408)) | (x = fin(17409)) | (x = fin(17412)) | (x = fin(17413)) | (x = fin(17424)) | (x = fin(17425)) | (x = fin(17428)) | (x = fin(17429)) | (x = fin(17472)) | (x = fin(17473)) | (x = fin(17476)) | (x = fin(17477)) | (x = fin(17488)) | (x = fin(17489)) | (x = fin(17492)) | (x = fin(17493)) | (x = fin(17664)) | (x = fin(17665)) | (x = fin(17668)) | (x = fin(17669)) | (x = fin(17680)) | (x = fin(17681)) | (x = fin(17684)) | (x = fin(17685)) | (x = fin(17728)) | (x = fin(17729)) | (x = fin(17732)) | (x = fin(17733)) | (x = fin(17744)) | (x = fin(17745)) | (x = fin(17748)) | (x = fin(17749)) | (x = fin(20480)) | (x = fin(20481)) | (x = fin(20484)) | (x = fin(20485)) | (x = fin(20496)) | (x = fin(20497)) | (x = fin(20500)) | (x = fin(20501)) | (x = fin(20544)) | (x = fin(20545)) | (x = fin(20548)) | (x = fin(20549)) | (x = fin(20560)) | (x = fin(20561)) | (x = fin(20564)) | (x = fin(20565)) | (x = fin(20736)) | (x = fin(20737)) | (x = fin(20740)) | (x = fin(20741)) | (x = fin(20752)) | (x = fin(20753)) | (x = fin(20756)) | (x = fin(20757)) | (x = fin(20800)) | (x = fin(20801)) | (x = fin(20804)) | (x = fin(20805)) | (x = fin(20816)) | (x = fin(20817)) | (x = fin(20820)) | (x = fin(20821)) | (x = fin(21504)) | (x = fin(21505)) | (x = fin(21508)) | (x = fin(21509)) | (x = fin(21520)) | (x = fin(21521)) | (x = fin(21524)) | (x = fin(21525)) | (x = fin(21568)) | (x = fin(21569)) | (x = fin(21572)) | (x = fin(21573)) | (x = fin(21584)) | (x = fin(21585)) | (x = fin(21588)) | (x = fin(21589)) | (x = fin(21760)) | (x = fin(21761)) | (x = fin(21764)) | (x = fin(21765)) | (x = fin(21776)) | (x = fin(21777)) | (x = fin(21780)) | (x = fin(21781)) | (x = fin(21824)) | (x = fin(21825)) | (x = fin(21828)) | (x = fin(21829)) | (x = fin(21840)) | (x = fin(21841)) | (x = fin(21844)) | (x = fin(21845)).
+
+data EvenBits ~= Word.
+
+data OddBits ~= Word.
+
+def decomposesAs : Word -> EvenBits -> OddBits -> Prop
+  := \w : Word => \e : EvenBits => \o : OddBits
+  => let e' : Word := from(EvenBits)(e);
+     let o' : Word := from(OddBits)(o);
+     isEvenBits(e')
+   & isEvenBits(o')
+   & (toN(w) = ((2N *N toN(o')) +N toN(e'))).
+
+def and : Word -> Word -> Word -> Prop
+  := \a : Word => \b : Word => \c : Word
+  => some ae : Word, some ao : Word,
+     some be : Word, some bo : Word,
+     some oe : Word, some oo : Word,
+     some ee : Word, some eo : Word,
+     decomposesAs(ae, to(EvenBits)(ae), to(OddBits)(ao))
+   & decomposesAs(be, to(EvenBits)(be), to(OddBits)(bo))
+   & isEvenBits(oe) & isEvenBits(oo)
+   & isEvenBits(ee) & isEvenBits(eo)
+   & ((toN(ao) +N toN(bo)) = ((2N *N toN(oo)) +N toN(oe)))
+   & ((toN(ae) +N toN(be)) = ((2N *N toN(eo)) +N toN(ee)))
+   & (toN(c) = ((2N *N toN(oo)) +N toN(eo))).
+
+def xor : Word -> Word -> Word -> Prop
+  := \a : Word => \b : Word => \c : Word
+  => some ae : Word, some ao : Word,
+     some be : Word, some bo : Word,
+     some oe : Word, some oo : Word,
+     some ee : Word, some eo : Word,
+     decomposesAs(ae, to(EvenBits)(ae), to(OddBits)(ao))
+   & decomposesAs(be, to(EvenBits)(be), to(OddBits)(bo))
+   & isEvenBits(oe) & isEvenBits(oo)
+   & isEvenBits(ee) & isEvenBits(eo)
+   & ((toN(ao) +N toN(bo)) = ((2N *N toN(oo)) +N toN(oe)))
+   & ((toN(ae) +N toN(be)) = ((2N *N toN(eo)) +N toN(ee)))
+   & (toN(c) = ((2N *N toN(oe)) +N toN(ee))).
+
+def or : Word -> Word -> Word -> Prop
+  := \a : Word => \b : Word => \c : Word
+  => some ae : Word, some ao : Word,
+     some be : Word, some bo : Word,
+     some oe : Word, some oo : Word,
+     some ee : Word, some eo : Word,
+     decomposesAs(ae, to(EvenBits)(ae), to(OddBits)(ao))
+   & decomposesAs(be, to(EvenBits)(be), to(OddBits)(bo))
+   & isEvenBits(oe) & isEvenBits(oo)
+   & isEvenBits(ee) & isEvenBits(eo)
+   & ((toN(ao) +N toN(bo)) = ((2N *N toN(oo)) +N toN(oe)))
+   & ((toN(ae) +N toN(be)) = ((2N *N toN(eo)) +N toN(ee)))
+   & (toN(c) = (((2N *N toN(oo)) +N toN(eo))
+             +N ((2N *N toN(oe)) +N toN(ee)))).
+
+def not : Word -> Word -> Prop
+  := \a : Word => \b : Word
+  => xor(a, to(Word)(fin(65535)), b).
+
+def add : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => let overflowBit : N := 65536N *N cast(from(Bool)(from(Flag)(f)));
+     (toN(c) +N overflowBit) = (toN(a) +N toN(b)).
+
+def sub : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => let carryBit : Z := 65536Z *Z (1Z +Z (-1Z *Z flagToZ(f)));
+     (toZU(b) +Z 65536Z +Z (-1Z *Z toZU(a))) = (toZU(c) +Z carryBit).
+
+def mull : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => some d : Word,
+     ((toN(a) *N toN(b)) = (toN(c) +N (65536N *N toN(d))))
+   & (((f = flagZero) -> (d = zero)) & ((d = zero) -> (f = flagZero))).
+
+def umulh : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => some d : Word,
+     ((toN(a) *N toN(b)) = (toN(d) +N (65536N *N toN(c))))
+   & ((f = flagZero) -> (c = zero)) & ((c = zero) -> (f = flagZero)).
+
+def smulh : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => some au : N < 32768N, some bu : N < 32768N,
+     some as : Z < 2Z, some bs : Z < 2Z,
+     some d : Word,
+     toZS(a, (as *Z -1Z) *Z cast(au))
+   & toZS(b, (bs *Z -1Z) *Z cast(bu))
+   & ((toN(d) +N (65536N *N toN(c))) = (au *N bu)).
+
+def udiv : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => (((a = zero) & (c = zero) & (f = flagOne)))
+   | (!(a = zero) & (f = flagZero)
+      & (some r : N < toN(a), toN(b) = ((toN(a) *N toN(c)) +N r))).
+
+def umod : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => (((a = zero) & (c = zero) & (f = flagOne)))
+   | (!(a = zero) & (f = flagZero) & ((toN(c) +N 1N) <= toN(a))
+     & (some d : Word, toN(b) = ((toN(a) *N toN(d)) +N toN(c)))).
+
+def cmpg : Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \f : Flag
+  => some au : N < 32768N, some bu : N < 32768N,
+     some as : Z < 2Z, some bs : Z < 2Z,
+     some d : Word,
+     let az : Z := cast(au) *Z (as *Z -1Z);
+     let bz : Z := cast(bu) *Z (bs *Z -1Z);
+     toZS(a, az) & toZS(b, bz)
+   & ( ((f = flagOne) & ((bz +Z 1Z) <= az))
+     | ((f = flagZero) & (az <= bz)) ).
+
+def cmpge : Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \f : Flag
+  => some au : N < 32768N, some bu : N < 32768N,
+     some as : Z < 2Z, some bs : Z < 2Z,
+     some d : Word,
+     let az : Z := cast(au) *Z (as *Z -1Z);
+     let bz : Z := cast(bu) *Z (bs *Z -1Z);
+     toZS(a, az) & toZS(b, bz)
+   & ( ((f = flagOne) & (bz <= az))
+     | ((f = flagZero) & ((az +Z 1Z) <= bz)) ).
+
+-- p = 2^n
+def power : N -> N -> Prop
+  := \n : N => \p : N
+  => ((n = 0N) & (p = 1N)) | ((n = 1N) & (p = 2N)) | ((n = 2N) & (p = 4N)) | ((n = 3N) & (p = 8N)) | ((n = 4N) & (p = 16N)) | ((n = 5N) & (p = 32N)) | ((n = 6N) & (p = 64N)) | ((n = 7N) & (p = 128N)) | ((n = 8N) & (p = 256N)) | ((n = 9N) & (p = 512N)) | ((n = 10N) & (p = 1024N)) | ((n = 11N) & (p = 2048N)) | ((n = 12N) & (p = 4096N)) | ((n = 13N) & (p = 8192N)) | ((n = 14N) & (p = 16384N)).
+
+def shl : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => let aMsb : N := flagToN(f) *N 65535N;
+     some aLsbs : Word, (toN(a) = (toN(aLsbs) +N aMsb))
+   & (some d : Word, some p : Word, power(toN(b), toN(p))
+      & (((toN(d) *N 65536N) +N toN(c)) = (toN(a) *N toN(p)))).
+
+def shr : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => let aLsb : N := flagToN(f);
+     some aMsbs : Word, (toN(a) = (aLsb +N (2N *N toN(aMsbs))))
+   & (some d : Word, some p : Word, power(toN(b), toN(p))
+      & (((toN(c) *N toN(p)) +N toN(d)) = toN(a))).
+
+def incrementPC : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => addrToN(getProgramCounter(s1)) = (addrToN(getProgramCounter(s0)) +N 1N).
+
+def getRi : Step -> Step -> Word
+  := \s0 : Step => \s1 : Step
+  => getRegisterValue(s1, getArg1(getStepInstruction(s0))).
+
+def getRj : Step -> Word
+  := \s : Step
+  => getRegisterValue(s, getArg2(getStepInstruction(s))).
+
+def getA : Step -> Word
+  := \s : Step
+  => ((\r : Register => getRegisterValue(s, r))
+      + (\i : Immediate => from(Immediate)(i)))
+      (getArg3(getStepInstruction(s))).
+
+def preserveRegisters : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => all r : Register,
+     (getArg1(getStepInstruction(s0)) = r)
+   | (getRegisterValue(s0, r) = getRegisterValue(s1, r)).
+
+def transitionAnd : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & and(getRj(s0), getA(s0), getRi(s0, s1))
+   & (getFlag(s1) = flagZero).
+
+def transitionOr : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & or(getRj(s0), getA(s0), getRi(s0, s1))
+   & (getFlag(s1) = flagZero).
+
+def transitionXor : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & xor(getRj(s0), getA(s0), getRi(s0, s1))
+   & (getFlag(s1) = flagZero).
+
+def transitionNot : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & not(getA(s0), getRi(s0, s1))
+   & (getFlag(s1) = flagZero).
+
+def transitionAdd : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & add(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
+
+def transitionSub : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & sub(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
+
+def transitionMull : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & mull(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
+
+def transitionUmulh : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & umulh(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
+
+def transitionSmulh : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & smulh(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
+
+def transitionUdiv : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & udiv(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
+
+def transitionUmod : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & umod(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
+
+def transitionShl : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & shl(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
+
+def transitionShr : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & shr(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
+
+def transitionCmpe : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getRi(s0, s0) = getRi(s0, s1))
+   & ( ((getFlag(s1) = flagOne) & (getRi(s0, s0) = getA(s0)))
+     | ((getFlag(s1) = flagZero) & !(getRi(s0, s0) = getA(s0))) ).
+
+def transitionCmpa : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getRi(s0, s0) = getRi(s0, s1))
+   & ( ((getFlag(s1) = flagOne) & ((toN(getA(s0)) +N 1N) <= toN(getRi(s0, s0))))
+     | ((getFlag(s1) = flagZero) & (toN(getRi(s0, s0)) <= toN(getA(s0)))) ).
+
+def transitionCmpae : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getRi(s0, s0) = getRi(s0, s1))
+   & ( ((getFlag(s1) = flagOne) & (toN(getA(s0)) <= toN(getRi(s0, s0))))
+     | ((getFlag(s1) = flagZero) & ((toN(getRi(s0, s0)) +N 1N) <= toN(getA(s0)))) ).
+
+def transitionCmpg : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getRi(s0, s0) = getRi(s0, s1))
+   & cmpg(getRi(s0, s0), getA(s0), getFlag(s1)).
+
+def transitionCmpge : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getRi(s0, s0) = getRi(s0, s1))
+   & cmpge(getRi(s0, s0), getA(s0), getFlag(s1)).
+
+def transitionMov : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getRi(s0, s1) = getA(s0))
+   & (getFlag(s1) = getFlag(s0)).
+
+def transitionCmov : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & ( ((getFlag(s0) = flagZero) & (getRi(s0, s1) = getRi(s0, s0)))
+     | ((getFlag(s0) = flagOne) & (getRi(s0, s1) = getA(s0))) ).
+
+def transitionJmp : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => (getFlag(s1) = getFlag(s0)) & (getRi(s0, s1) = getRi(s0, s0))
+   & (getProgramCounter(s1) = to(Address)(getA(s0))).
+
+def transitionCjmp : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => (getFlag(s1) = getFlag(s0)) & (getRi(s0, s1) = getRi(s0, s0))
+   & ( ((getFlag(s0) = flagZero) & incrementPC(s0, s1))
+     | ((getFlag(s0) = flagOne) & (getProgramCounter(s1) = to(Address)(getA(s0)))) ).
+
+def transitionCnjmp : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => (getFlag(s1) = getFlag(s0)) & (getRi(s0, s1) = getRi(s0, s0))
+   & ( ((getFlag(s0) = flagOne) & incrementPC(s0, s1))
+     | ((getFlag(s0) = flagZero) & (getProgramCounter(s1) = to(Address)(getA(s0)))) ).
+
+data Byte ~= Fin(256).
+
+def bToN : Byte -> N
+  := \x : Byte => cast(from(Byte)(x)).
+
+def bytes : Word -> Byte -> Byte -> Prop
+  := \w : Word => \b0 : Byte => \b1 : Byte
+  => toN(w) = (bToN(b0) +N (256N *N bToN(b1))).
+
+def transitionStoreb : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getFlag(s1) = getFlag(s0))
+   & (let ri : Word := getRi(s0, s0);
+      let mv : Word := getStoredWord(s0);
+      let mv' : Word := getLinkedValue(s0);
+      let a : Address := getAddress(s0);
+      some aLsbIsOne : Bool, some aMsbs : Word,
+      some ri0 : Byte, some ri1 : Byte,
+      some mv0 : Byte, some mv1 : Byte,
+      ((boolToN(aLsbIsOne) +N (2N *N toN(aMsbs))) = toN(from(Address)(a)))
+    & bytes(ri, ri0, ri1)
+    & bytes(mv', mv0, mv1)
+    & ( ((aLsbIsOne = false) & bytes(mv, ri0, mv1))
+      | ((aLsbIsOne = true) & bytes(mv, mv0, ri0)) )).
+
+def transitionLoadb : Time -> Step -> Step -> Prop
+  := \t : Time => \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getFlag(s1) = getFlag(s0))
+   & (getAddress(s0) = to(Address)(getA(s0)))
+   & (isFirstStepAccessingGivenAddress(t, s0)
+      | (getStoredWord(s0) = getLinkedValue(s0)))
+   & (let ri : Word := getRi(s0, s1);
+      let mv : Word := getStoredWord(s0);
+      let mv' : Word := getLinkedValue(s0);
+      let a : Address := getAddress(s0);
+      some aLsbIsOne : Bool, some aMsbs : Word,
+      some mv0 : Byte, some mv1 : Byte,
+      ((boolToN(aLsbIsOne) +N (2N *N toN(aMsbs))) = toN(from(Address)(a)))
+    & bytes(mv', mv0, mv1) & (mv = mv')
+    & ( ((aLsbIsOne = false) & (ri = to(Word)(cast(from(Byte)(mv0)))))
+      | ((aLsbIsOne = true) & (ri = to(Word)(cast(from(Byte)(mv1))))) )).
+
+def transitionStorew : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getFlag(s1) = getFlag(s0))
+   & (getAddress(s0) = to(Address)(getA(s0)))
+   & (getStoredWord(s0) = getRi(s0, s0)).
+
+def transitionLoadw : Time -> Step -> Step -> Prop
+  := \t : Time => \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getFlag(s1) = getFlag(s0))
+   & (getAddress(s0) = to(Address)(getA(s0)))
+   & (getRi(s0, s1) = getStoredWord(s0))
+   & (isFirstStepAccessingGivenAddress(t, s0)
+      | (getStoredWord(s0) = getLinkedValue(s0))).
+
+def transition : Time -> Step -> Step -> Prop
+  := \t : Time => \s0 : Step => \s1 : Step
+  => preserveRegisters(s0, s1)
+   & (let inst : Instruction := getStepInstruction(s0);
+     let op : Opcode := getOpcode(inst);
+     ((op = opAnd)    & transitionAnd(s0, s1))
+   | ((op = opOr)     & transitionOr(s0, s1))
+   | ((op = opXor)    & transitionXor(s0, s1))
+   | ((op = opNot)    & transitionNot(s0, s1))
+   | ((op = opAdd)    & transitionAdd(s0, s1))
+   | ((op = opSub)    & transitionSub(s0, s1))
+   | ((op = opMull)   & transitionMull(s0, s1))
+   | ((op = opUmulh)  & transitionUmulh(s0, s1))
+   | ((op = opSmulh)  & transitionSmulh(s0, s1))
+   | ((op = opUdiv)   & transitionUdiv(s0, s1))
+   | ((op = opUmod)   & transitionUmod(s0, s1))
+   | ((op = opShl)    & transitionShl(s0, s1))
+   | ((op = opShr)    & transitionShr(s0, s1))
+   | ((op = opCmpe)   & transitionCmpe(s0, s1))
+   | ((op = opCmpg)   & transitionCmpg(s0, s1))
+   | ((op = opCmpge)  & transitionCmpge(s0, s1))
+   | ((op = opMov)    & transitionMov(s0, s1))
+   | ((op = opJmp)    & transitionJmp(s0, s1))
+   | ((op = opCjmp)   & transitionCjmp(s0, s1))
+   | ((op = opCnjmp)  & transitionCnjmp(s0, s1))
+   | ((op = opStoreb) & transitionStoreb(s0, s1))
+   | ((op = opLoadb)  & transitionLoadb(t, s0, s1))
+   | ((op = opStorew) & transitionStorew(s0, s1))
+   | ((op = opLoadw)  & transitionLoadw(t, s0, s1))).
+
+def transitions : Trace -> Prop
+  := \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     all i1 : N < length(ss),
+     (i1 = 0N)
+   | (some i0 : N < length(ss),
+      let t : Time := to(Time)(cast(i0));
+      ((i0 +N 1N) = i1)
+    & transition(t, nth(ss, i0), nth(ss, i1))).
+
+def initialConditions : Trace -> Prop
+  := \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     (0N = length(ss))
+   | (let s : Step := nth(ss, 0N);
+      (getProgramCounter(s) = to(Address)(zero))
+    & (getFlag(s) = to(Flag)(false))
+    & (all r : Register, getRegisterValue(s, r) = zero)).
+
+def traceIsValid : Trace -> Prop
+  := \T : Trace
+  => linksAreOrdered(T)
+   & doesNotAnswerPrematurely(T)
+   & transitions(T)
+   & initialConditions(T).
+
+def traceAccepts : Trace -> Prop
+  := \t : Trace
+  => let ss : List^4096(Step) := getSteps(t);
+     some i : N < length(ss),
+     ((i +N 1N) = length(ss))
+   & (let s : Step := nth(ss, i);
+      (getOpcode(getStepInstruction(s)) = opAnswer)
+    & (getArg3Value(s) = to(Word)(fin(0)))).
+
+def memoryIsConsistentWithTrace : Memory -> Trace -> Prop
+  := \M : Memory => \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     all i : N < length(ss),
+     let s : Step := nth(ss, i);
+     let t : Time := to(Time)(cast(i));
+     (isFirstStepAccessingGivenAddress(t, s) & isLoad(getStepInstruction(s)))
+     -> (getStoredWord(s) = getMemoryValue(M, getAddress(s))).
+
+def programIsConsistentWithTrace : Program -> Trace -> Prop
+  := \P : Program => \T : Trace
+  => let ss : List^4096(Step) := getSteps(T);
+     all i : N < length(ss),
+     let t : Time := to(Time)(cast(i));
+     let s : Step := nth(ss, i);
+     getStepInstruction(s) = getProgramInstruction(P, getProgramCounter(s)).
+
+def programAccepts : InitialState -> Prop
+  := \i : InitialState
+  => some t : Trace,
+     let m : Memory := getMemory(i);
+     let p : Program := getProgram(i);
+     traceIsValid(t)
+   & traceAccepts(t)
+   & memoryIsConsistentWithTrace(m, t)
+   & programIsConsistentWithTrace(p, t).

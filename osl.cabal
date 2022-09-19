@@ -6,6 +6,10 @@ license-files: LICENSE
 author:        Orbis Labs
 maintainer:    morgan.thomas@platonic.systems
 
+data-files:
+  examples/*.osl
+  examples/regressions/*.osl
+
 library
   exposed-modules:
     OSL.Bound
@@ -107,13 +111,6 @@ test-suite spec
     osl
 
   hs-source-dirs: test
-  extra-source-files:
-    examples/false.osl
-    examples/orbis.osl
-    examples/positive.osl
-    examples/sudoku.osl
-    examples/regressions/name-clash-bug-1.osl
-    examples/regressions/name-clash-bug-2.osl
 
   default-language: Haskell2010
   ghc-options:
