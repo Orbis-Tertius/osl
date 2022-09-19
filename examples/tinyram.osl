@@ -59,6 +59,9 @@ data Bool ~= Fin(2).
 def true  : Bool := to(Bool)(fin(1)).
 def false : Bool := to(Bool)(fin(0)).
 
+def boolToN : Bool -> N
+  := \x : Bool => cast(from(Bool)(x)).
+
 data Immediate ~= Word.
 
 data Arg1 ~= Register.
@@ -558,15 +561,33 @@ def transitionStoreb : Step -> Step -> Prop
    & (let ri : Word := getRi(s0, s0);
       let mv : Word := getStoredWord(s0);
       let mv' : Word := getLinkedValue(s0);
+      let a : Address := getAddress(s0);
+      some aLsbIsOne : Bool, some aMsbs : Word,
       some ri0 : Byte, some ri1 : Byte,
       some mv0 : Byte, some mv1 : Byte,
-      bytes(ri, ri0, ri1)
-    & bytes(mv, ri0, mv1)
-    & bytes(mv', mv0, mv1)).
+      ((boolToN(aLsbIsOne) +N (2N *N toN(aMsbs))) = toN(from(Address)(a)))
+    & bytes(ri, ri0, ri1)
+    & bytes(mv', mv0, mv1)
+    & ( ((aLsbIsOne = false) & bytes(mv, ri0, mv1))
+      | ((aLsbIsOne = true) & bytes(mv, mv0, ri0)) )).
 
-def transitionLoadb : Step -> Step -> Prop
-  := \s0 : Step => \s1 : Step
-  => todo.
+def transitionLoadb : Time -> Step -> Step -> Prop
+  := \t : Time => \s0 : Step => \s1 : Step
+  => incrementPC(s0, s1)
+   & (getFlag(s1) = getFlag(s0))
+   & (getAddress(s0) = to(Address)(getA(s0)))
+   & (isFirstStepAccessingGivenAddress(t, s0)
+      | (getStoredWord(s0) = getLinkedValue(s0)))
+   & (let ri : Word := getRi(s0, s1);
+      let mv : Word := getStoredWord(s0);
+      let mv' : Word := getLinkedValue(s0);
+      let a : Address := getAddress(s0);
+      some aLsbIsOne : Bool, some aMsbs : Word,
+      some mv0 : Byte, some mv1 : Byte,
+      ((boolToN(aLsbIsOne) +N (2N *N toN(aMsbs))) = toN(from(Address)(a)))
+    & bytes(mv', mv0, mv1) & (mv = mv')
+    & ( ((aLsbIsOne = false) & (ri = to(Word)(cast(from(Byte)(mv0)))))
+      | ((aLsbIsOne = true) & (ri = to(Word)(cast(from(Byte)(mv1))))) )).
 
 def transitionStorew : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
@@ -610,7 +631,7 @@ def transition : Time -> Step -> Step -> Prop
    | ((op = opCjmp)   & transitionCjmp(s0, s1))
    | ((op = opCnjmp)  & transitionCnjmp(s0, s1))
    | ((op = opStoreb) & transitionStoreb(s0, s1))
-   | ((op = opLoadb)  & transitionLoadb(s0, s1))
+   | ((op = opLoadb)  & transitionLoadb(t, s0, s1))
    | ((op = opStorew) & transitionStorew(s0, s1))
    | ((op = opLoadw)  & transitionLoadw(t, s0, s1))).
 
