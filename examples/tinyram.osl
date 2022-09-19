@@ -357,6 +357,17 @@ def cmpg : Word -> Word -> Flag -> Prop
    & ( ((f = flagOne) & ((bz +Z 1Z) <= az))
      | ((f = flagZero) & (az <= bz)) ).
 
+def cmpge : Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \f : Flag
+  => some au : N < 32768N, some bu : N < 32768N,
+     some as : Z < 2Z, some bs : Z < 2Z,
+     some d : Word,
+     let az : Z := cast(au) *Z (as *Z -1Z);
+     let bz : Z := cast(bu) *Z (bs *Z -1Z);
+     toZS(a, az) & toZS(b, bz)
+   & ( ((f = flagOne) & (bz <= az))
+     | ((f = flagZero) & ((az +Z 1Z) <= bz)) ).
+
 -- p = 2^n
 def power : N -> N -> Prop
   := \n : N => \p : N
@@ -498,7 +509,10 @@ def transitionCmpg : Step -> Step -> Prop
 
 def transitionCmpge : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => incrementPC(s0, s1)
+   & (getRi(s0, s0) = getRi(s0, s1))
+   & cmpge(getRi(s0, s0), getA(s0), getFlag(s1)).
+
 
 def transitionMov : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
