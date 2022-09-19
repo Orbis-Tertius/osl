@@ -396,7 +396,8 @@ def transitionAnd : Step -> Step -> Prop
 
 def transitionOr : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => incrementPC(s0, s1)
+   & or(getRj(s0), getA(s0), getRi(s0, s1)).
 
 def transitionXor : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
