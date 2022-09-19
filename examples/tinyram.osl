@@ -521,7 +521,9 @@ def transitionMov : Step -> Step -> Prop
 
 def transitionCmov : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => incrementPC(s0, s1)
+   & ( ((getFlag(s0) = flagZero) & (getRi(s0, s1) = getRi(s0, s0)))
+     | ((getFlag(s0) = flagOne) & (getRi(s0, s1) = getA(s0))) ).
 
 def transitionJmp : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
