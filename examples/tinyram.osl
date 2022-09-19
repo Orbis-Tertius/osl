@@ -310,6 +310,12 @@ def mull : Word -> Word -> Word -> Flag -> Prop
      ((toN(a) *N toN(b)) = (toN(c) +N (65536N *N toN(d))))
    & (((f = flagZero) -> (d = zero)) & ((d = zero) -> (f = flagZero))).
 
+def umulh : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => some d : Word,
+     ((toN(a) *N toN(b)) = (toN(d) +N (65536N *N toN(c))))
+   & ((f = flagZero) -> (c = zero)) & ((c = zero) -> (f = flagZero)).
+
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => todo.
