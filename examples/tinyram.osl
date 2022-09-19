@@ -337,6 +337,12 @@ def udiv : Word -> Word -> Word -> Flag -> Prop
    | (!(a = zero) & (f = flagZero)
       & (some r : N < toN(a), toN(b) = ((toN(a) *N toN(c)) +N r))).
 
+def umod : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => (((a = zero) & (c = zero) & (f = flagOne)))
+   | (!(a = zero) & (f = flagZero) & ((toN(c) +N 1N) <= toN(a))
+     & (some d : Word, toN(b) = ((toN(a) *N toN(d)) +N toN(c)))).
+
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => todo.
