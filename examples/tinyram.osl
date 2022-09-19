@@ -207,9 +207,20 @@ def doesNotAnswerPrematurely : Trace -> Prop
      ((i +N 1N) = length(ss))
    | !(getOpcode(getStepInstruction(s)) = opAnswer).
 
-def transition : Step -> Step -> Prop
+def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => todo.
+
+def transitionOr : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transition : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => let inst : Instruction := getStepInstruction(s0);
+     let op : Opcode := getOpcode(inst);
+     ((op = opAnd) & transitionAnd(s0, s1))
+   | ((op = opOr) & transitionOr(s0, s1)).
 
 def transitions : Trace -> Prop
   := \T : Trace
@@ -250,7 +261,7 @@ def memoryIsConsistentWithTrace : Memory -> Trace -> Prop
      all i : N < length(ss),
      let s : Step := nth(ss, i);
      let t : Time := to(Time)(cast(i));
-     (isFirstStepAccessingGivenAddress(t, s) & isStore(getStepInstruction(s)))
+     (isFirstStepAccessingGivenAddress(t, s) & isLoad(getStepInstruction(s)))
      -> (getStoredWord(s) = getMemoryValue(M, getAddress(s))).
 
 def programIsConsistentWithTrace : Program -> Trace -> Prop
