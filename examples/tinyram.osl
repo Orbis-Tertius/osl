@@ -9,8 +9,14 @@ def zero : Word := to(Word)(fin(0)).
 def toN : Word -> N
   := \w : Word => cast(from(Word)(w)).
 
-def toZ : Word -> Z
+def toZU : Word -> Z
   := \w : Word => cast(from(Word)(w)).
+
+def toZS : Word -> Z -> Prop
+  := \w : Word => \z : Z
+  => some u : Z < 32768Z, some s : Z < 2Z,
+     (toZU(w) = (u +Z (32768Z *Z s)))
+   & (z = (u +Z (-32768Z *Z s))).
 
 def fromN : N -> Word
   := \x : N => to(Word)(cast(x)).
@@ -302,7 +308,7 @@ def add : Word -> Word -> Word -> Flag -> Prop
 def sub : Word -> Word -> Word -> Flag -> Prop
   := \a : Word => \b : Word => \c : Word => \f : Flag
   => let carryBit : Z := 65536Z *Z (1Z +Z (-1Z *Z flagToZ(f)));
-     (toZ(b) +Z 65536Z +Z (-1Z *Z toZ(a))) = (toZ(c) +Z carryBit).
+     (toZU(b) +Z 65536Z +Z (-1Z *Z toZU(a))) = (toZU(c) +Z carryBit).
 
 def mull : Word -> Word -> Word -> Flag -> Prop
   := \a : Word => \b : Word => \c : Word => \f : Flag
@@ -315,6 +321,15 @@ def umulh : Word -> Word -> Word -> Flag -> Prop
   => some d : Word,
      ((toN(a) *N toN(b)) = (toN(d) +N (65536N *N toN(c))))
    & ((f = flagZero) -> (c = zero)) & ((c = zero) -> (f = flagZero)).
+
+def smulh : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => some au : N < 65536N, some bu : N < 65536N,
+     some as : Z < 2Z, some bs : Z < 2Z,
+     some d : Word,
+     toZS(a, (as *Z -1Z) *Z cast(au))
+   & toZS(b, (bs *Z -1Z) *Z cast(bu))
+   & ((toN(d) +N (65536N *N toN(c))) = (au *N bu)).
 
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
