@@ -37,7 +37,6 @@ def opStoreb : Opcode := to(Opcode)(fin(26)).
 def opLoadb  : Opcode := to(Opcode)(fin(27)).
 def opStorew : Opcode := to(Opcode)(fin(28)).
 def opLoadw  : Opcode := to(Opcode)(fin(29)).
-def opRead   : Opcode := to(Opcode)(fin(30)).
 def opAnswer : Opcode := to(Opcode)(fin(31)).
 
 data Bool ~= Fin(2).
@@ -215,12 +214,134 @@ def transitionOr : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => todo.
 
+def transitionXor : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionNot : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionAdd : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionSub : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionMull : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionUmulh : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionSmulh : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionUdiv : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionUmod : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionShl : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionShr : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionCmpe : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionCmpa : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionCmpae : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionCmpg : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionCmpge : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionMov : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionCmov : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionJmp : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionCjmp : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionCnjmp : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionStoreb : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionLoadb : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionStorew : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
+def transitionLoadw : Step -> Step -> Prop
+  := \s0 : Step => \s1 : Step
+  => todo.
+
 def transition : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => let inst : Instruction := getStepInstruction(s0);
      let op : Opcode := getOpcode(inst);
-     ((op = opAnd) & transitionAnd(s0, s1))
-   | ((op = opOr) & transitionOr(s0, s1)).
+     ((op = opAnd)    & transitionAnd(s0, s1))
+   | ((op = opOr)     & transitionOr(s0, s1))
+   | ((op = opXor)    & transitionXor(s0, s1))
+   | ((op = opNot)    & transitionNot(s0, s1))
+   | ((op = opAdd)    & transitionAdd(s0, s1))
+   | ((op = opSub)    & transitionSub(s0, s1))
+   | ((op = opMull)   & transitionMull(s0, s1))
+   | ((op = opUmulh)  & transitionUmulh(s0, s1))
+   | ((op = opSmulh)  & transitionSmulh(s0, s1))
+   | ((op = opUdiv)   & transitionUdiv(s0, s1))
+   | ((op = opUmod)   & transitionUmod(s0, s1))
+   | ((op = opShl)    & transitionShl(s0, s1))
+   | ((op = opShr)    & transitionShr(s0, s1))
+   | ((op = opCmpe)   & transitionCmpe(s0, s1))
+   | ((op = opCmpg)   & transitionCmpg(s0, s1))
+   | ((op = opCmpge)  & transitionCmpge(s0, s1))
+   | ((op = opMov)    & transitionMov(s0, s1))
+   | ((op = opJmp)    & transitionJmp(s0, s1))
+   | ((op = opCjmp)   & transitionCjmp(s0, s1))
+   | ((op = opCnjmp)  & transitionCnjmp(s0, s1))
+   | ((op = opStoreb) & transitionStoreb(s0, s1))
+   | ((op = opLoadb)  & transitionLoadb(s0, s1))
+   | ((op = opStorew) & transitionStorew(s0, s1))
+   | ((op = opLoadw)  & transitionLoadw(s0, s1)).
 
 def transitions : Trace -> Prop
   := \T : Trace
