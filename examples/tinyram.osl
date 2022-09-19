@@ -455,7 +455,8 @@ def transitionShl : Step -> Step -> Prop
 
 def transitionShr : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => incrementPC(s0, s1)
+   & shr(getRj(s0), getA(s0), getRi(s0, s1), getFlag(s1)).
 
 def transitionCmpe : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
