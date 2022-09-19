@@ -542,8 +542,6 @@ def transitionCnjmp : Step -> Step -> Prop
    & ( ((getFlag(s0) = flagOne) & incrementPC(s0, s1))
      | ((getFlag(s0) = flagZero) & (getProgramCounter(s1) = to(Address)(getA(s0)))) ).
 
-
-
 def transitionStoreb : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => todo.
@@ -558,7 +556,9 @@ def transitionStorew : Step -> Step -> Prop
 
 def transitionLoadw : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => incrementPC(s0, s1)
+   & (getFlag(s1) = getFlag(s0))
+   & (getRi(s0, s1) = getStoredWord(s0)).
 
 def transition : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
