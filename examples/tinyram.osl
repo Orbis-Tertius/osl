@@ -474,7 +474,10 @@ def transitionCmpa : Step -> Step -> Prop
 
 def transitionCmpae : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
-  => todo.
+  => incrementPC(s0, s1)
+   & (getRi(s0, s0) = getRi(s0, s1))
+   & ( ((getFlag(s1) = flagOne) & (toN(getA(s0)) <= toN(getRi(s0, s0))))
+     | ((getFlag(s1) = flagZero) & ((toN(getRi(s0, s0)) +N 1N) <= toN(getA(s0)))) ).
 
 def transitionCmpg : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
