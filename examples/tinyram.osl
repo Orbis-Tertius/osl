@@ -281,6 +281,11 @@ def not : Word -> Word -> Prop
   := \a : Word => \b : Word
   => xor(a, to(Word)(fin(65535)), b).
 
+def add : Word -> Word -> Word -> Flag -> Prop
+  := \a : Word => \b : Word => \c : Word => \f : Flag
+  => let overflowBit : N := 65536N *N cast(from(Bool)(from(Flag)(f)));
+     (toN(c) +N overflowBit) = (toN(a) +N toN(b)).
+
 def transitionAnd : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => todo.
