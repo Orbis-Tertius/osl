@@ -575,15 +575,17 @@ def transitionStorew : Step -> Step -> Prop
    & (getAddress(s0) = to(Address)(getA(s0)))
    & (getStoredWord(s0) = getRi(s0, s0)).
 
-def transitionLoadw : Step -> Step -> Prop
-  := \s0 : Step => \s1 : Step
+def transitionLoadw : Time -> Step -> Step -> Prop
+  := \t : Time => \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
    & (getFlag(s1) = getFlag(s0))
    & (getAddress(s0) = to(Address)(getA(s0)))
-   & (getRi(s0, s1) = getStoredWord(s0)).
+   & (getRi(s0, s1) = getStoredWord(s0))
+   & (isFirstStepAccessingGivenAddress(t, s0)
+      | (getStoredWord(s0) = getLinkedValue(s0))).
 
-def transition : Step -> Step -> Prop
-  := \s0 : Step => \s1 : Step
+def transition : Time -> Step -> Step -> Prop
+  := \t : Time => \s0 : Step => \s1 : Step
   => preserveRegisters(s0, s1)
    & (let inst : Instruction := getStepInstruction(s0);
      let op : Opcode := getOpcode(inst);
@@ -610,15 +612,17 @@ def transition : Step -> Step -> Prop
    | ((op = opStoreb) & transitionStoreb(s0, s1))
    | ((op = opLoadb)  & transitionLoadb(s0, s1))
    | ((op = opStorew) & transitionStorew(s0, s1))
-   | ((op = opLoadw)  & transitionLoadw(s0, s1))).
+   | ((op = opLoadw)  & transitionLoadw(t, s0, s1))).
 
 def transitions : Trace -> Prop
   := \T : Trace
   => let ss : List^4096(Step) := getSteps(T);
      all i1 : N < length(ss),
      (i1 = 0N)
-   | (some i0 : N < length(ss), ((i0 +N 1N) = i1)
-    & transition(nth(ss, i0), nth(ss, i1))).
+   | (some i0 : N < length(ss),
+      let t : Time := to(Time)(cast(i0));
+      ((i0 +N 1N) = i1)
+    & transition(t, nth(ss, i0), nth(ss, i1))).
 
 def initialConditions : Trace -> Prop
   := \T : Trace
