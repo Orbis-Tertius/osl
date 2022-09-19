@@ -429,6 +429,7 @@ operatorOn x = do
       (T.ProductOp, _) -> pure T.ProductOp
       (T.CoproductOp, _) -> pure T.CoproductOp
       (T.ThinArrow, _) -> pure T.ThinArrow
+      (T.LeftRightArrow, _) -> pure T.LeftRightArrow
       (T.Equal, _) -> pure T.Equal
       (T.LessOrEqual, _) -> pure T.LessOrEqual
       _ -> Nothing
@@ -452,6 +453,7 @@ operatorOn x = do
         T.ProductOp -> FunctionProduct
         T.CoproductOp -> FunctionCoproduct
         T.ThinArrow -> Implies
+        T.LeftRightArrow -> Iff
         T.Equal -> Equal
         T.LessOrEqual -> LessOrEqual
         _ -> error "opCtor called outside defined domain"
@@ -467,6 +469,7 @@ operatorOn x = do
         T.ProductOp -> True
         T.CoproductOp -> True
         T.ThinArrow -> False
+        T.LeftRightArrow -> False
         T.Equal -> False
         T.LessOrEqual -> False
         _ -> error "isAssociative called outside defined domain"
