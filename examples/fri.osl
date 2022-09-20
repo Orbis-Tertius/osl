@@ -606,3 +606,60 @@ def fft256 : (Fin(256) -> F) -> (Fin(256) -> F) -> Prop
    & combine(omega126, (ys0(fin(126)), ys1(fin(126))), (ys(fin(126)), ys(fin(254))))
    & combine(omega127, (ys0(fin(127)), ys1(fin(127))), (ys(fin(127)), ys(fin(255)))).
 
+def offset : F := to(F)(fin(85408008396924667383611388730472331217)).
+
+def omega : F := to(F)(fin(178902808384765167578311106676137348214)).
+
+def domainLength : N := 256N.
+
+def expansionFactor : N := 2N.
+
+def numColinearityTests : N := 4N.
+
+def numRounds : N := 4N.
+
+data MerkleHash ~= F.
+
+data Commitment ~= MerkleHash.
+
+data Commitments ~= Fin(4) -> Commitment.
+
+data A ~= F.
+
+data B ~= F.
+
+data C ~= F.
+
+data Query ~= A * B * C.
+
+data QueryRound ~= Fin(2).
+
+data IndexNumber ~= Fin(4).
+
+data Queries ~= QueryRound -> IndexNumber -> Query.
+
+data Index ~= Fin(256).
+
+data Codeword ~= Index -> F.
+
+data DepthIndex ~= Fin(8).
+
+data AuthPath ~= DepthIndex -> MerkleHash.
+
+data AAuthPath ~= AuthPath.
+
+data BAuthPath ~= AuthPath.
+
+data CAuthPath ~= AuthPath.
+
+data AOpening ~= A * AAuthPath.
+
+data BOpening ~= B * BAuthPath.
+
+data COpening ~= C * CAuthPath.
+
+data IndexOpenings ~= AOpening * BOpening * COpening.
+
+data Openings ~= QueryRound -> IndexNumber -> IndexOpenings.
+
+data Proof ~= Commitments * Codeword * Openings.
