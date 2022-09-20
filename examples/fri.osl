@@ -4,6 +4,9 @@ def codewordLength : N := 256N.
 
 data F ~= Fin(270497897142230380135924736767050121217).
 
+def zero : F := to(F)(fin(0)).
+def one : F := to(F)(fin(1)).
+
 def cardinality : N := 270497897142230380135924736767050121217N.
 
 def generator : F := to(F)(fin(85408008396924667383611388730472331217)).
@@ -47,3 +50,26 @@ def isPrimitiveNthRoot : Fin(664613997892457936451903530140172289) -> F -> Prop
        let x' : F := pi2(mx');
        ((n = m) & (m = m'))
      | (!(n = m) & ((2N *N m') = m) & mul(x, x, x')))).
+
+-- def log2 : Fin(257) -> Fin(9) -> Prop
+--   := \x : Fin(256) -> \y : Fin(256)
+--   => ((x = fin(1)) & (y = fin(0))) | ((x = fin(2)) & (y = fin(1))) | ((x = fin(4)) & (y = fin(2))) | ((x = fin(8)) & (y = fin(3))) | ((x = fin(16)) & (y = fin(4))) | ((x = fin(32)) & (y = fin(5))) | ((x = fin(64)) & (y = fin(6))) | ((x = fin(128)) & (y = fin(7))) | ((x = fin(256)) & (y = fin(8))).
+-- 
+-- def split : Fin(257) -> (Fin(256) ->^256 F)
+
+def fft : Fin(257) -> (Fin(256) ->^256 F) -> (Fin(256) ->^256 F) -> Prop
+  := \n : Fin(257) => \xs : Fin(256) ->^256 F => \ys : Fin(256) ->^256 F
+  => ((n = fin(1)) & (xs(fin(0)) = ys(fin(0))))
+   | (some nPred : Fin(257), some nHalf : Fin(257),
+      ((cast(nPred) +N 1N) = cast(n))
+    & ((cast(nHalf) *N 2N) = cast(n))
+    & isPowerOfTwo(n)
+    & (some m : Fin(9), log2(n, m)
+     & (some p : F, isPrimitiveNthRoot(cast(n), p)
+      & (some omegas : Fin(257) -> F, (omegas(fin(0)) = one)
+       & (all i : Fin(257) < nPred, omegas(cast(cast(i) +N 1N)) = omegas(i) * p)
+       & (some xs0 : Fin(256) ->^128 F, some xs1 : Fin(256)^128 F,
+          some ys0 : Fin(256) ->^128 F, some ys1 : Fin(256)^128 F,
+          split(xs, xs0, xs1) & split(ys, ys0, ys1)
+        & fft(nHalf, xs0, ys0) & fft(nHalf, xs1, ys1)
+        & combine(n, ys, ys0, ys1)))))).
