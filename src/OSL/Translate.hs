@@ -99,6 +99,10 @@ translate gc
           fM <- translateToMapping gc lc fType (OSL.NamedTerm ann' fName)
           xM <- translateToMapping gc lc a x
           Mapping <$> applyMappings ann termType fM xM
+        Just (OSL.FreeVariable fType@(OSL.P _ _ a _)) -> do
+          fM <- translateToMapping gc lc fType (OSL.NamedTerm ann' fName)
+          xM <- translateToMapping gc lc a x
+          Mapping <$> applyMappings ann termType fM xM
         Just _ -> Left (ErrorMessage ann' "expected the name of a function")
         Nothing -> Left (ErrorMessage ann' "undefined name")
     OSL.Apply ann (OSL.Apply _ (OSL.Pair _) a) b ->

@@ -972,6 +972,9 @@ inferType c t =
         F _ _ b d -> do
           checkTerm c b x
           return d
+        P _ _ b d -> do
+          checkTerm c b x
+          return d
         _ -> Left (ErrorMessage ann "function application head does not contain a function")
     Lambda ann varName domain def -> do
       checkType c domain
