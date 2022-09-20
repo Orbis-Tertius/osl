@@ -1158,7 +1158,9 @@ def todo : Prop := 0N = 1N.
 
 def rescueHash : Plaintext -> Hash -> Prop
   := \p : Plaintext => \h : Hash
-  => todo.
+  => let p' : Fin(12) -> F := from(Plaintext)(p);
+     let h' : Fin(12) -> F := from(Hash)(h);
+     todo.
 
 -- Merkle commitments
 
