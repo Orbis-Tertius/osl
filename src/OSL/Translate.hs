@@ -670,14 +670,17 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
         (InfiniteDimensions, _) ->
           Left (ErrorMessage (typeAnnotation a)
                "expected a finite-dimensional type")
-    OSL.P _ cardinality a b ->
+    OSL.P ann cardinality a b ->
       case varBound of
         OSL.FunctionBound _ (OSL.DomainBound aBound) (OSL.CodomainBound bBound) -> do
-          (bQs, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
+          bBoundTs <- translateBound gc lc a (Just bBound)
+          (_, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
           let fM = incrementArities 1 bM
-          aBoundT <- translateBound gc lc a (Just aBound)
-          let fQs = prependBounds cardinality aBoundT <$> bQs
-          pure (fQs, fM)
+          aBoundTs <- translateBound gc lc a (Just aBound)
+          case (aBoundTs, bBoundTs) of
+            ([aBoundT], [bBoundT]) ->
+              pure ([S11.ExistsP cardinality bBoundT aBoundT], fM)
+            _ -> Left (ErrorMessage ann "non-scalar bounds for a permutation; this is a compiler bug")
         _ -> Left (ErrorMessage (boundAnnotation varBound)
                    "expected a function bound")
     OSL.Product _ a b ->
