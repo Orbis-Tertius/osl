@@ -28,11 +28,32 @@ def negate : F -> F -> Prop
   := \a : F => \b : F
   => add(a, b, zero).
 
+def combine1 : (F * F) -> (F * F) -> Prop
+  := \x : (F * F) => \y : (F * F)
+  => some negX2 : F,
+     negate(pi2(x), negX2)
+   & add(pi1(x), pi2(x), pi1(y))
+   & add(pi1(x), negX2, pi2(y)).
+
+def combine : F -> (F * F) -> (F * F) -> Prop
+  := \omega : F => \x : (F * F) => \y : (F * F)
+  => some x2Omega : F, some negX2Omega : F,
+     mul(omega, pi2(x), x2Omega)
+   & negate(x2Omega, negX2Omega)
+   & add(pi1(x), x2Omega, pi1(y))
+   & add(pi1(x), negX2Omega, pi2(y)).
+
 def fft2 : (Fin(2) -> F) -> (Fin(2) -> F) -> Prop
   := \xs : Fin(2) -> F => \ys : Fin(2) -> F
-  => let omega : F := to(F)(fin(270497897142230380135924736767050121216));
-     some a : F, some b : F,
-     mul(xs(fin(1)), omega, a)
-   & negate(a, b)
-   & add(a, xs(fin(0)), ys(fin(0)))
-   & add(b, xs(fin(0)), ys(fin(1))).
+  => combine1((xs(fin(0)), xs(fin(1))), (ys(fin(0)), ys(fin(1)))).
+
+def fft4 : (Fin(4) -> F) -> (Fin(4) -> F) -> Prop
+  := \xs : Fin(4) -> F => \ys : Fin(4) -> F
+  => let omega : F := to(F)(fin(259052015163170058651980223774986375587));
+     some ys0 : Fin(2) ->^2 F,
+     some ys1 : Fin(2) ->^2 F,
+     let xs0 : Fin(2) -> F := \i : Fin(2) => xs(cast(2N *N cast(i)));
+     let xs1 : Fin(2) -> F := \i : Fin(2) => xs(cast((2N *N cast(i)) +N 1N));
+     fft2(xs0, ys0) & fft2(xs1, ys1)
+   & combine1((ys0(fin(0)), ys1(fin(0))), (ys(fin(0)), ys(fin(2))))
+   & combine1((ys0(fin(1)), ys1(fin(1))), (ys(fin(1)), ys(fin(3)))).

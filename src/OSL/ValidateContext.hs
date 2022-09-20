@@ -196,8 +196,8 @@ checkTerm c t x =
   case x of
     NamedTerm ann name ->
       case getDeclaration c name of
-        Just (Defined t' _) -> checkTypeInclusion c ann t t'
-        Just (FreeVariable t') -> checkTypeInclusion c ann t t'
+        Just (Defined t' _) -> checkTypeInclusion c ann t' t
+        Just (FreeVariable t') -> checkTypeInclusion c ann t' t
         Just (Data _) -> Left (ErrorMessage ann "expected a term but got a type")
         Nothing -> Left . ErrorMessage ann
           $ "reference to undefined name: " <> pack (show name)
@@ -336,10 +336,10 @@ checkTerm c t x =
           checkTerm c (F ann Nothing a t) f
         Right (F _ _ a b) -> do
           checkTerm c a y
-          checkTypeInclusion c ann t b
+          checkTypeInclusion c ann b t
         Right (P _ _ a b) -> do
           checkTerm c a y
-          checkTypeInclusion c ann t b
+          checkTypeInclusion c ann b t
         Right _ -> Left (ErrorMessage ann "function application head is not a function")
     To ann name -> do
       a <- getNamedType c ann name
@@ -405,7 +405,8 @@ checkTerm c t x =
         _ -> genericErrorMessage
     Nth ann ->
       case t of
-        F _ _ (List _ _ a) (F _ _ (N _) a') -> checkTypeInclusion c ann a a'
+        F _ _ (List _ _ a) (F _ _ (N _) a') ->
+          checkTypeInclusion c ann a a'
         _ -> genericErrorMessage
     ListCast _ ->
       case t of
@@ -428,7 +429,7 @@ checkTerm c t x =
       a <- getNamedType c ann name
       case t of
         F _ _ (List _ _ a') (List _ _ (NamedType _ name')) -> do
-          checkTypeInclusion c ann a a'
+          checkTypeInclusion c ann a' a
           if name == name'
             then return ()
             else genericErrorMessage
@@ -446,7 +447,7 @@ checkTerm c t x =
       a <- getNamedType c ann name
       case t of
         F _ _ (List _ _ (Maybe _ a')) (List _ _ (Maybe _ (NamedType _ name'))) -> do
-          checkTypeInclusion c ann a a'
+          checkTypeInclusion c ann a' a
           if name == name'
             then return ()
             else genericErrorMessage
@@ -523,7 +524,7 @@ checkTerm c t x =
       a <- getNamedType c ann name
       case t of
         F _ _ (Map _ _ a' b) (Map _ _ (NamedType _ name') b') -> do
-          checkTypeInclusion c ann a a'
+          checkTypeInclusion c ann a' a
           checkTypeInclusion c ann b b'
           if name' == name
             then return ()
@@ -738,6 +739,7 @@ inferType c t =
       case (a, b) of
         (F _ n d e, F _ n' d' e') -> do
           checkTypeInclusion c ann d d'
+          checkTypeInclusion c ann d' d
           return (F ann (min <$> n <*> n') d (Product ann e e'))
         _ -> Left (ErrorMessage ann "ill-typed function product; one of the arguments is not a function")
     FunctionCoproduct ann f g -> do
@@ -746,6 +748,7 @@ inferType c t =
       case (a, b) of
         (F _ n d e, F _ m d' e') -> do
           checkTypeInclusion c ann e e'
+          checkTypeInclusion c ann e' e
           return (F ann (min <$> n <*> m) (Coproduct ann d d') e)
         _ -> Left (ErrorMessage ann "ill-typed function coproduct; one of the arguments is not a function")
     Maybe' ann f -> do
@@ -811,6 +814,7 @@ inferType c t =
       case b of
         Maybe _ a' -> do
           checkTypeInclusion c ann a' a
+          checkTypeInclusion c ann a a'
           pure (Maybe ann (NamedType ann name))
         _ -> Left . ErrorMessage ann
               $ "expected a Maybe(" <> pack (show a)
@@ -863,7 +867,7 @@ inferType c t =
       xsT <- inferType c xs
       case xsT of
         List _ n a' -> do
-          checkTypeInclusion c ann a a'
+          checkTypeInclusion c ann a' a
           pure (List ann n (NamedType ann name))
         _ -> Left (ErrorMessage ann "expected a list")
     Apply ann (ListMaybeTo _ name) xs -> do
@@ -871,7 +875,7 @@ inferType c t =
       xsT <- inferType c xs
       case xsT of
         List _ n (Maybe _ a') -> do
-          checkTypeInclusion c ann a a'
+          checkTypeInclusion c ann a' a
           pure (List ann n (Maybe ann (NamedType ann name)))
         _ -> Left (ErrorMessage ann "expected a list")
     Apply ann (ListMaybeFrom _ name) xs -> do
