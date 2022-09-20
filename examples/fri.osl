@@ -1,0 +1,18 @@
+-- A verifier for a simple version of FRI.
+
+data F ~= Fin(270497897142230380135924736767050121217).
+
+def cardinality : N := 270497897142230380135924736767050121217N.
+
+def toN : F -> N
+  := \x : F => cast(from(F)(x)).
+
+def add : F -> F -> F -> Prop
+  := \a : F => \b : F => \c : F
+  => some d : N < cardinality,
+     (toN(a) +N toN(b)) = (toN(c) +N (cardinality *N d)).
+
+def mul : F -> F -> F -> Prop
+  := \a : F => \b : F => \c : F
+  => some d : N < cardinality,
+     (toN(a) *N toN(b)) = (toN(c) +N (cardinality *N d)).
