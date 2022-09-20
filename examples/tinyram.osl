@@ -154,7 +154,6 @@ data Step ~=
   * Flag
   * Address
   * StoredWord
-  * LinkedTime
   * LinkedValue.
 
 def getProgramCounter : Step -> Address
@@ -179,11 +178,8 @@ def getAddress : Step -> Address
 def getStoredWord : Step -> Word
   := \s : Step => from(StoredWord)(pi1(pi2(pi2(pi2(pi2(pi2(from(Step)(s)))))))).
 
-def getLinkedTime : Step -> Time
-  := \s : Step => from(LinkedTime)(pi1(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))))).
-
 def getLinkedValue : Step -> Word
-  := \s : Step => from(LinkedValue)(pi2(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s))))))))).
+  := \s : Step => from(LinkedValue)(pi2(pi2(pi2(pi2(pi2(pi2(from(Step)(s)))))))).
 
 def getArg3Value : Step -> Word
   := \s : Step
@@ -191,14 +187,24 @@ def getArg3Value : Step -> Word
        + (\i : Immediate => from(Immediate)(i)))
        (getArg3(getStepInstruction(s))).
 
-data Trace ~= List^4096(Step).
+data Trace ~= Steps * Links.
+
+data Steps ~= List^4096(Step).
+
+data Links ~= Time <->^4096 Time.
 
 def getSteps : Trace -> List^4096(Step)
-  := \T : Trace => from(Trace)(T).
+  := \T : Trace => pi1(from(Trace)(T)).
+
+def getLinks : Trace -> (Time <->^4096 Time)
+  := \T : Trace => pi2(from(Trace)(T)).
 
 def getStep : Trace -> Time -> Step
   := \T : Trace => \t : Time
   => nth(getSteps(T), cast(from(Time)(t))).
+
+def getLinkedTime : Trace -> Time -> Time
+  := \T : Trace => \t : Time => getLinks(T)(t).
 
 def isFirstStepAccessingGivenAddress : Time -> Step -> Prop
   := \t : Time => \s : Step
