@@ -100,7 +100,7 @@ instance Show ExistentialQuantifier where
   show (ExistsP (Just (Cardinality n)) b0 b1) =
     "^" <> show n <>
     "<" <> show b0 <>
-    "(<" <> show b1 <> ")"
+    "(!<" <> show b1 <> ")"
   show (ExistsP Nothing b0 b1) =
     "<" <> show b0 <>
-    "(<" <> show b1 <> ")"
+    "(!<" <> show b1 <> ")"
