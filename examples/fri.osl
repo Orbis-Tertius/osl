@@ -1,6 +1,6 @@
 -- A verifier for a simple version of FRI.
 
-# Finite field
+-- Finite field
 
 data F ~= Fin(270497897142230380135924736767050121217).
 
@@ -8,8 +8,6 @@ def zero : F := to(F)(fin(0)).
 def one : F := to(F)(fin(1)).
 
 def cardinality : N := 270497897142230380135924736767050121217N.
-
-def generator : F := to(F)(fin(85408008396924667383611388730472331217)).
 
 def toN : F -> N
   := \x : F => cast(from(F)(x)).
@@ -28,7 +26,7 @@ def negate : F -> F -> Prop
   := \a : F => \b : F
   => add(a, b, zero).
 
-# FFT
+-- FFT
 
 def combine1 : (F * F) -> (F * F) -> Prop
   := \x : (F * F) => \y : (F * F)
@@ -608,13 +606,15 @@ def fft256 : (Fin(256) -> F) -> (Fin(256) -> F) -> Prop
    & combine(omega126, (ys0(fin(126)), ys1(fin(126))), (ys(fin(126)), ys(fin(254))))
    & combine(omega127, (ys0(fin(127)), ys1(fin(127))), (ys(fin(127)), ys(fin(255)))).
 
-# Rescue hash
+-- Rescue hash
 
-# Merkle commitments
+data RescueHash ~= Fin(12) -> F.
+
+-- Merkle commitments
 
 data MerkleHash ~= RescueHash.
 
-# FRI
+-- FRI
 
 def codewordLength : N := 256N.
 
