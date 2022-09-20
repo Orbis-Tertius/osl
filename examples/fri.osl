@@ -1,6 +1,6 @@
 -- A verifier for a simple version of FRI.
 
-def codewordLength : N := 256N.
+# Finite field
 
 data F ~= Fin(270497897142230380135924736767050121217).
 
@@ -27,6 +27,8 @@ def mul : F -> F -> F -> Prop
 def negate : F -> F -> Prop
   := \a : F => \b : F
   => add(a, b, zero).
+
+# FFT
 
 def combine1 : (F * F) -> (F * F) -> Prop
   := \x : (F * F) => \y : (F * F)
@@ -606,6 +608,16 @@ def fft256 : (Fin(256) -> F) -> (Fin(256) -> F) -> Prop
    & combine(omega126, (ys0(fin(126)), ys1(fin(126))), (ys(fin(126)), ys(fin(254))))
    & combine(omega127, (ys0(fin(127)), ys1(fin(127))), (ys(fin(127)), ys(fin(255)))).
 
+# Rescue hash
+
+# Merkle commitments
+
+data MerkleHash ~= RescueHash.
+
+# FRI
+
+def codewordLength : N := 256N.
+
 def offset : F := to(F)(fin(85408008396924667383611388730472331217)).
 
 def omega : F := to(F)(fin(178902808384765167578311106676137348214)).
@@ -617,8 +629,6 @@ def expansionFactor : N := 2N.
 def numColinearityTests : N := 4N.
 
 def numRounds : N := 4N.
-
-data MerkleHash ~= F.
 
 data Commitment ~= MerkleHash.
 
