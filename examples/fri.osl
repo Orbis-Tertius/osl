@@ -56,4 +56,19 @@ def fft4 : (Fin(4) -> F) -> (Fin(4) -> F) -> Prop
      let xs1 : Fin(2) -> F := \i : Fin(2) => xs(cast((2N *N cast(i)) +N 1N));
      fft2(xs0, ys0) & fft2(xs1, ys1)
    & combine1((ys0(fin(0)), ys1(fin(0))), (ys(fin(0)), ys(fin(2))))
-   & combine1((ys0(fin(1)), ys1(fin(1))), (ys(fin(1)), ys(fin(3)))).
+   & combine(omega, (ys0(fin(1)), ys1(fin(1))), (ys(fin(1)), ys(fin(3)))).
+
+def fft8 : (Fin(8) -> F) -> (Fin(8) -> F) -> Prop
+  := \xs : Fin(8) -> F => \ys : Fin(8) -> F
+  => let omega : F := to(F)(fin(131076302407280330469229082343774091404));
+     let omega2 : F := to(F)(fin(259052015163170058651980223774986375587));
+     let omega3 : F := to(F)(fin(94118632892422173191291920064315934488));
+     some ys0 : Fin(4) ->^4 F,
+     some ys1 : Fin(4) ->^4 F,
+     let xs0 : Fin(4) -> F := \i : Fin(4) => xs(cast(2N *N cast(i)));
+     let xs1 : Fin(4) -> F := \i : Fin(4) => xs(cast((2N *N cast(i)) +N 1N));
+     fft4(xs0, ys0) & fft4(xs1, ys1)
+   & combine1((ys0(fin(0)), ys1(fin(0))), (ys(fin(0)), ys(fin(4))))
+   & combine(omega, (ys0(fin(1)), ys1(fin(1))), (ys(fin(1)), ys(fin(5))))
+   & combine(omega2, (ys0(fin(2)), ys1(fin(2))), (ys(fin(2)), ys(fin(6))))
+   & combine(omega3, (ys0(fin(3)), ys1(fin(3))), (ys(fin(3)), ys(fin(7)))).
