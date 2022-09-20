@@ -187,28 +187,25 @@ def getArg3Value : Step -> Word
        + (\i : Immediate => from(Immediate)(i)))
        (getArg3(getStepInstruction(s))).
 
-data Trace ~= Steps * Links.
-
 data Steps ~= List^4096(Step).
 
 data Links ~= Time <->^4096 Time.
 
+data Trace ~= Steps * Links.
+
 def getSteps : Trace -> List^4096(Step)
-  := \T : Trace => pi1(from(Trace)(T)).
+  := \T : Trace => from(Steps)(pi1(from(Trace)(T))).
 
 def getLinks : Trace -> (Time <->^4096 Time)
-  := \T : Trace => pi2(from(Trace)(T)).
+  := \T : Trace => from(Links)(pi2(from(Trace)(T))).
 
 def getStep : Trace -> Time -> Step
   := \T : Trace => \t : Time
   => nth(getSteps(T), cast(from(Time)(t))).
 
-def getLinkedTime : Trace -> Time -> Time
-  := \T : Trace => \t : Time => getLinks(T)(t).
-
-def isFirstStepAccessingGivenAddress : Time -> Step -> Prop
-  := \t : Time => \s : Step
-  => t <= getLinkedTime(s).
+def isFirstStepAccessingGivenAddress : Trace -> Time -> Prop
+  := \T : Trace => \t : Time
+  => t <= getLinks(T, t).
 
 -- Checks that the given function, assumed to be a function
 -- defined on the times [0,n), is a permutation.
@@ -225,15 +222,13 @@ def linksAreOrdered : Trace -> Prop
   := \T : Trace
   => let ss : List^4096(Step) := getSteps(T);
      some finalAccesses : Address ->^4096 Time,
-     let p : Time -> Time := \t : Time => getLinkedTime(getStep(T, t));
-     isStepPermutation(length(ss), p)
-   & (all i : N < length(ss),
-      let s : Step := nth(ss, i);
-      let t : Time := to(Time)(cast(i));
-      let t' : Time := getLinkedTime(s);
-      let a : Address := getAddress(s);
-      (t' = finalAccesses(a))
-    | isBefore(t', t)).
+     all i : N < length(ss),
+     let s : Step := nth(ss, i);
+     let t : Time := to(Time)(cast(i));
+     let t' : Time := getLinks(T, t);
+     let a : Address := getAddress(s);
+     (t' = finalAccesses(a))
+       | isBefore(t', t).
 
 def doesNotAnswerPrematurely : Trace -> Prop
   := \T : Trace
@@ -326,13 +321,13 @@ def mull : Word -> Word -> Word -> Flag -> Prop
   := \a : Word => \b : Word => \c : Word => \f : Flag
   => some d : Word,
      ((toN(a) *N toN(b)) = (toN(c) +N (65536N *N toN(d))))
-   & (((f = flagZero) -> (d = zero)) & ((d = zero) -> (f = flagZero))).
+   & ((f = flagZero) <-> (d = zero)).
 
 def umulh : Word -> Word -> Word -> Flag -> Prop
   := \a : Word => \b : Word => \c : Word => \f : Flag
   => some d : Word,
      ((toN(a) *N toN(b)) = (toN(d) +N (65536N *N toN(c))))
-   & ((f = flagZero) -> (c = zero)) & ((c = zero) -> (f = flagZero)).
+   & ((f = flagZero) <-> (c = zero)).
 
 def smulh : Word -> Word -> Word -> Flag -> Prop
   := \a : Word => \b : Word => \c : Word => \f : Flag
@@ -363,8 +358,7 @@ def cmpg : Word -> Word -> Flag -> Prop
      let az : Z := cast(au) *Z (as *Z -1Z);
      let bz : Z := cast(bu) *Z (bs *Z -1Z);
      toZS(a, az) & toZS(b, bz)
-   & ( ((f = flagOne) & ((bz +Z 1Z) <= az))
-     | ((f = flagZero) & (az <= bz)) ).
+   & ((f = flagOne) <-> ((bz +Z 1Z) <= az)).
 
 def cmpge : Word -> Word -> Flag -> Prop
   := \a : Word => \b : Word => \f : Flag
@@ -374,8 +368,7 @@ def cmpge : Word -> Word -> Flag -> Prop
      let az : Z := cast(au) *Z (as *Z -1Z);
      let bz : Z := cast(bu) *Z (bs *Z -1Z);
      toZS(a, az) & toZS(b, bz)
-   & ( ((f = flagOne) & (bz <= az))
-     | ((f = flagZero) & ((az +Z 1Z) <= bz)) ).
+   & ((f = flagOne) <-> (bz <= az)).
 
 -- p = 2^n
 def power : N -> N -> Prop
@@ -493,22 +486,19 @@ def transitionCmpe : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
    & (getRi(s0, s0) = getRi(s0, s1))
-   & ( ((getFlag(s1) = flagOne) & (getRi(s0, s0) = getA(s0)))
-     | ((getFlag(s1) = flagZero) & !(getRi(s0, s0) = getA(s0))) ).
+   & ((getFlag(s1) = flagOne) <-> (getRi(s0, s0) = getA(s0))).
 
 def transitionCmpa : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
    & (getRi(s0, s0) = getRi(s0, s1))
-   & ( ((getFlag(s1) = flagOne) & ((toN(getA(s0)) +N 1N) <= toN(getRi(s0, s0))))
-     | ((getFlag(s1) = flagZero) & (toN(getRi(s0, s0)) <= toN(getA(s0)))) ).
+   & ((getFlag(s1) = flagOne) <-> ((toN(getA(s0)) +N 1N) <= toN(getRi(s0, s0)))).
 
 def transitionCmpae : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
    & (getRi(s0, s0) = getRi(s0, s1))
-   & ( ((getFlag(s1) = flagOne) & (toN(getA(s0)) <= toN(getRi(s0, s0))))
-     | ((getFlag(s1) = flagZero) & ((toN(getRi(s0, s0)) +N 1N) <= toN(getA(s0)))) ).
+   & ((getFlag(s1) = flagOne) <-> (toN(getA(s0)) <= toN(getRi(s0, s0)))).
 
 def transitionCmpg : Step -> Step -> Prop
   := \s0 : Step => \s1 : Step
@@ -577,12 +567,12 @@ def transitionStoreb : Step -> Step -> Prop
     & ( ((aLsbIsOne = false) & bytes(mv, ri0, mv1))
       | ((aLsbIsOne = true) & bytes(mv, mv0, ri0)) )).
 
-def transitionLoadb : Time -> Step -> Step -> Prop
-  := \t : Time => \s0 : Step => \s1 : Step
+def transitionLoadb : Trace -> Time -> Step -> Step -> Prop
+  := \T : Trace => \t : Time => \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
    & (getFlag(s1) = getFlag(s0))
    & (getAddress(s0) = to(Address)(getA(s0)))
-   & (isFirstStepAccessingGivenAddress(t, s0)
+   & (isFirstStepAccessingGivenAddress(T, t)
       | (getStoredWord(s0) = getLinkedValue(s0)))
    & (let ri : Word := getRi(s0, s1);
       let mv : Word := getStoredWord(s0);
@@ -602,17 +592,17 @@ def transitionStorew : Step -> Step -> Prop
    & (getAddress(s0) = to(Address)(getA(s0)))
    & (getStoredWord(s0) = getRi(s0, s0)).
 
-def transitionLoadw : Time -> Step -> Step -> Prop
-  := \t : Time => \s0 : Step => \s1 : Step
+def transitionLoadw : Trace -> Time -> Step -> Step -> Prop
+  := \T : Trace => \t : Time => \s0 : Step => \s1 : Step
   => incrementPC(s0, s1)
    & (getFlag(s1) = getFlag(s0))
    & (getAddress(s0) = to(Address)(getA(s0)))
    & (getRi(s0, s1) = getStoredWord(s0))
-   & (isFirstStepAccessingGivenAddress(t, s0)
+   & (isFirstStepAccessingGivenAddress(T, t)
       | (getStoredWord(s0) = getLinkedValue(s0))).
 
-def transition : Time -> Step -> Step -> Prop
-  := \t : Time => \s0 : Step => \s1 : Step
+def transition : Trace -> Time -> Step -> Step -> Prop
+  := \T : Trace => \t : Time => \s0 : Step => \s1 : Step
   => preserveRegisters(s0, s1)
    & (let inst : Instruction := getStepInstruction(s0);
      let op : Opcode := getOpcode(inst);
@@ -637,9 +627,9 @@ def transition : Time -> Step -> Step -> Prop
    | ((op = opCjmp)   & transitionCjmp(s0, s1))
    | ((op = opCnjmp)  & transitionCnjmp(s0, s1))
    | ((op = opStoreb) & transitionStoreb(s0, s1))
-   | ((op = opLoadb)  & transitionLoadb(t, s0, s1))
+   | ((op = opLoadb)  & transitionLoadb(T, t, s0, s1))
    | ((op = opStorew) & transitionStorew(s0, s1))
-   | ((op = opLoadw)  & transitionLoadw(t, s0, s1))).
+   | ((op = opLoadw)  & transitionLoadw(T, t, s0, s1))).
 
 def transitions : Trace -> Prop
   := \T : Trace
@@ -649,7 +639,7 @@ def transitions : Trace -> Prop
    | (some i0 : N < length(ss),
       let t : Time := to(Time)(cast(i0));
       ((i0 +N 1N) = i1)
-    & transition(t, nth(ss, i0), nth(ss, i1))).
+    & transition(T, t, nth(ss, i0), nth(ss, i1))).
 
 def initialConditions : Trace -> Prop
   := \T : Trace
@@ -682,7 +672,7 @@ def memoryIsConsistentWithTrace : Memory -> Trace -> Prop
      all i : N < length(ss),
      let s : Step := nth(ss, i);
      let t : Time := to(Time)(cast(i));
-     (isFirstStepAccessingGivenAddress(t, s) & isLoad(getStepInstruction(s)))
+     (isFirstStepAccessingGivenAddress(T, t) & isLoad(getStepInstruction(s)))
      -> (getStoredWord(s) = getMemoryValue(M, getAddress(s))).
 
 def programIsConsistentWithTrace : Program -> Trace -> Prop

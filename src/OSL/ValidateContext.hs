@@ -144,6 +144,18 @@ checkTypeInclusion c ann (F _ _ a b) (F _ Nothing a' b') =
   checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
 checkTypeInclusion _ ann (F _ Nothing _ _) (F _ (Just _) _ _) =
   Left (ErrorMessage ann "function type cardinality mismatch")
+checkTypeInclusion c ann (P _ _ a b) (P _ Nothing a' b') =
+  checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
+checkTypeInclusion c ann (P _ (Just n) a b) (P _ (Just n') a' b') =
+  if n <= n'
+  then checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
+  else Left (ErrorMessage ann "permutation type cardinality mismatch")
+checkTypeInclusion c ann (P _ _ a b) (F _ Nothing a' b') =
+  checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
+checkTypeInclusion c ann (P _ (Just n) a b) (F _ (Just n') a' b') =
+  if n <= n'
+  then checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
+  else Left (ErrorMessage ann "permutation / function type cardinality mismatch")
 checkTypeInclusion c ann (F _ (Just n) a b) (F _ (Just n') a' b') =
   if n <= n'
   then checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
@@ -323,6 +335,9 @@ checkTerm c t x =
           a <- inferType c y
           checkTerm c (F ann Nothing a t) f
         Right (F _ _ a b) -> do
+          checkTerm c a y
+          checkTypeInclusion c ann t b
+        Right (P _ _ a b) -> do
           checkTerm c a y
           checkTypeInclusion c ann t b
         Right _ -> Left (ErrorMessage ann "function application head is not a function")
@@ -575,6 +590,12 @@ checkTerm c t x =
         Prop _ -> checkTerm c (Prop ann) p
         _ -> genericErrorMessage
     Implies ann p q -> do
+      case t of
+        Prop _ -> do
+          checkTerm c (Prop ann) p
+          checkTerm c (Prop ann) q
+        _ -> genericErrorMessage
+    Iff ann p q -> do
       case t of
         Prop _ -> do
           checkTerm c (Prop ann) p
@@ -995,6 +1016,10 @@ inferType c t =
       checkTerm c (Prop ann) p
       return (Prop ann)
     Implies ann p q -> do
+      checkTerm c (Prop ann) p
+      checkTerm c (Prop ann) q
+      return (Prop ann)
+    Iff ann p q -> do
       checkTerm c (Prop ann) p
       checkTerm c (Prop ann) q
       return (Prop ann)

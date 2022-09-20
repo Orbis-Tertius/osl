@@ -22,7 +22,7 @@ import qualified Data.Set as Set
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Name (..), Term (Var, App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Not, And, Or, Implies, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO, ExistsP))
+import OSL.Types.Sigma11 (Name (..), Term (Var, App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Not, And, Or, Implies, Iff, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO, ExistsP))
 import OSL.Types.TranslationContext (Mapping (..))
 
 
@@ -55,6 +55,7 @@ instance MapNames Formula where
       Or p q -> Or (mapNames f p) (mapNames f q)
       Not p -> Not (mapNames f p)
       Implies p q -> Implies (mapNames f p) (mapNames f q)
+      Iff p q -> Iff (mapNames f p) (mapNames f q)
       ForAll bound p -> ForAll (mapNames f bound) (mapNames f p)
       Exists (ExistsFO bound) p ->
         Exists (ExistsFO (mapNames f bound)) (mapNames f p)

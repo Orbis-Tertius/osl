@@ -137,6 +137,7 @@ data Term ann =
   | Or ann (Term ann) (Term ann)
   | Not ann (Term ann)
   | Implies ann (Term ann) (Term ann)
+  | Iff ann (Term ann) (Term ann)
   | ForAll ann Name (Type ann) (Maybe (Bound ann)) (Term ann)
   | ForSome ann Name (Type ann) (Maybe (Bound ann)) (Term ann)
   deriving Show
