@@ -21,6 +21,7 @@ termAnnotation =
     ConstZ ann _ -> ann
     Cast ann -> ann
     ConstFin ann _ -> ann
+    Inverse ann -> ann
     Pair ann -> ann
     Pi1 ann -> ann
     Pi2 ann -> ann

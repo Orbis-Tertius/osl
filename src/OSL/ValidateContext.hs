@@ -40,11 +40,12 @@ addToContext c@(ValidContext decls) (name, decl) = do
   return c'
 
 
-checkType :: ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
+checkType :: Show ann => ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
 checkType c t =
   case t of
     Prop _ -> return ()
     F ann n a b -> checkMaybeCardinality ann n >> checkType c a >> checkType c b
+    P ann n a b -> checkMaybeCardinality ann n >> checkType c a >> checkType c b
     N _ -> return ()
     Z _ -> return ()
     (Fin ann n) -> checkFinType ann n
@@ -89,13 +90,17 @@ getNamedTermType c ann name =
       $ "reference to undefined name: " <> pack (show name)
 
 
-checkQuantifiableType :: ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
+checkQuantifiableType :: Show ann
+  => ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
 checkQuantifiableType c t =
   case t of
     Prop ann -> Left (ErrorMessage ann "expected a quantifiable type but got Prop")
     F ann n a b -> checkFiniteDimType c a
       >> checkMaybeCardinality ann n
       >> checkQuantifiableType c b
+    P ann n a b -> checkMaybeCardinality ann n
+      >> checkTypeIsNumeric c a
+      >> checkTypeIsNumeric c b
     N _ -> return ()
     Z _ -> return ()
     Fin ann n -> checkFinType ann n
@@ -109,13 +114,17 @@ checkQuantifiableType c t =
       >> checkQuantifiableType c b
 
 
-checkFiniteDimType :: ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
+checkFiniteDimType :: Show ann 
+  => ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
 checkFiniteDimType c t =
   case t of
     Prop ann -> Left (ErrorMessage ann "expected a finite-dimensional type but got Prop")
     F ann n a b -> checkMaybeCardinality ann n
       >> checkFiniteDimType c a
       >> checkFiniteDimType c b
+    P ann n a b -> checkMaybeCardinality ann n
+      >> checkTypeIsNumeric c a
+      >> checkTypeIsNumeric c b
     N _ -> return ()
     Z _ -> return ()
     Fin ann n -> checkFinType ann n
@@ -135,6 +144,18 @@ checkTypeInclusion c ann (F _ _ a b) (F _ Nothing a' b') =
   checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
 checkTypeInclusion _ ann (F _ Nothing _ _) (F _ (Just _) _ _) =
   Left (ErrorMessage ann "function type cardinality mismatch")
+checkTypeInclusion c ann (P _ _ a b) (P _ Nothing a' b') =
+  checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
+checkTypeInclusion c ann (P _ (Just n) a b) (P _ (Just n') a' b') =
+  if n <= n'
+  then checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
+  else Left (ErrorMessage ann "permutation type cardinality mismatch")
+checkTypeInclusion c ann (P _ _ a b) (F _ Nothing a' b') =
+  checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
+checkTypeInclusion c ann (P _ (Just n) a b) (F _ (Just n') a' b') =
+  if n <= n'
+  then checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
+  else Left (ErrorMessage ann "permutation / function type cardinality mismatch")
 checkTypeInclusion c ann (F _ (Just n) a b) (F _ (Just n') a' b') =
   if n <= n'
   then checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
@@ -207,6 +228,10 @@ checkTerm c t x =
           then Left . ErrorMessage ann $ "expected an element of Fin(" <> pack (show m) <> ") but got " <> pack (show n)
           else return ()
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t) <> " but got a constant of a finite type"
+    Inverse ann ->
+      case t of
+        F _ _ a b -> checkTypeIsNumeric c a >> checkTypeIsNumeric c b
+        a -> Left . ErrorMessage ann $ "expected a " <> pack (show a) <> " but got inverse"
     Pair ann0 ->
       case t of
         F ann1 _ a (F ann2 _ b (Product _ a' b')) -> do
@@ -310,6 +335,9 @@ checkTerm c t x =
           a <- inferType c y
           checkTerm c (F ann Nothing a t) f
         Right (F _ _ a b) -> do
+          checkTerm c a y
+          checkTypeInclusion c ann t b
+        Right (P _ _ a b) -> do
           checkTerm c a y
           checkTypeInclusion c ann t b
         Right _ -> Left (ErrorMessage ann "function application head is not a function")
@@ -604,6 +632,13 @@ checkBound c t bound =
           checkBound c b bBound
         _ -> Left (ErrorMessage (boundAnnotation bound)
                      "expected a function bound")
+    P _ _ a b ->
+      case bound of
+        FunctionBound _ (DomainBound aBound) (CodomainBound bBound) -> do
+          checkBound c a aBound
+          checkBound c b bBound
+        _ -> Left (ErrorMessage (boundAnnotation bound)
+                     "expected a function bound")
     N ann' ->
       case bound of
         ScalarBound _ boundTerm -> checkTerm c (N ann') boundTerm
@@ -692,6 +727,11 @@ inferType c t =
     From ann name -> do
       a <- getNamedType c ann name
       return (F ann Nothing (NamedType ann name) a)
+    Apply ann (Inverse _) f -> do
+      a <- inferType c f
+      case a of
+        P _ n b d -> pure (P ann n b d)
+        _ -> Left (ErrorMessage ann "expected a permutation")
     FunctionProduct ann f g -> do
       a <- inferType c f
       b <- inferType c g
@@ -930,6 +970,9 @@ inferType c t =
       a <- inferType c f
       case a of
         F _ _ b d -> do
+          checkTerm c b x
+          return d
+        P _ _ b d -> do
           checkTerm c b x
           return d
         _ -> Left (ErrorMessage ann "function application head does not contain a function")

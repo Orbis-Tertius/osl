@@ -47,6 +47,7 @@ instance Ord Name where
 data Type ann =
     Prop ann
   | F ann (Maybe Cardinality) (Type ann) (Type ann) -- functions
+  | P ann (Maybe Cardinality) (Type ann) (Type ann) -- permutations
   | N ann -- natural numbers
   | Z ann -- integers
   | Fin ann Integer
@@ -62,6 +63,8 @@ instance Show (Type ann) where
   show (Prop _) = "Prop"
   show (F _ (Just n) a b) = "(" <> show a <> " ->^" <> show n <> " " <> show b <> ")"
   show (F _ Nothing a b) = "(" <> show a <> " -> " <> show b <> ")"
+  show (P _ (Just n) a b) = "(" <> show a <> " <->^" <> show n <> " " <> show b <> ")"
+  show (P _ Nothing a b) = "(" <> show a <> " <-> " <> show b <> ")"
   show (N _) = "N"
   show (Z _) = "Z"
   show (Fin _ n) = "Fin(" <> show n <> ")"
@@ -84,6 +87,7 @@ data Term ann =
   | ConstZ ann Integer
   | Cast ann
   | ConstFin ann Integer
+  | Inverse ann
   | Pair ann
   | Pi1 ann -- Product projections
   | Pi2 ann

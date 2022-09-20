@@ -109,12 +109,24 @@ type0 = do
   p <- getPosition
   t <- type1
   rest <- option Nothing $ do
-    consumeExact_ T.ThinArrow
-    n <- optionMaybe cardinality
-    Just . (n,) <$> type0
+    op <- consume $
+      \case
+        (T.ThinArrow, _) -> pure T.ThinArrow
+        (T.LeftRightArrow, _) -> pure T.LeftRightArrow
+        _ -> mzero
+    case op of
+      T.ThinArrow -> do
+        n <- optionMaybe cardinality
+        t' <- type0
+        pure (Just (F p n t t'))
+      T.LeftRightArrow -> do
+        n <- optionMaybe cardinality
+        t' <- type1
+        pure (Just (P p n t t'))
+      _ -> mzero
   case rest of
     Nothing -> pure t
-    Just (n, t') -> pure (F p n t t')
+    Just t' -> pure t'
 
 
 type1 :: Parser (Type SourcePos)
@@ -515,6 +527,7 @@ term3 =
   , constant
   , parenthesizedTerm
   , builtin K.Cast Cast
+  , builtin K.Inverse Inverse
   , builtin K.Pi1 Pi1
   , builtin K.Pi2 Pi2
   , builtin K.Iota1 Iota1
