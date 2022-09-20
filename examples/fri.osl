@@ -1156,11 +1156,46 @@ def rescueBox1 : F -> F -> Prop
 
 def todo : Prop := 0N = 1N.
 
+def sumJ : (J -> F) -> F -> Prop
+  := \f : J -> F => \y : F
+  => some s1 : F, some s2 : F, some s3 : F, some s4 : F,
+     some s5 : F, some s6 : F, some s7 : F, some s8 : F,
+     some s9 : F, some s10 : F,
+     add(f(to(J)(fin(0))), f(to(J)(fin(1))), s1)
+   & add(s1,  f(to(J)(fin(2))), s2)
+   & add(s2,  f(to(J)(fin(3))), s3)
+   & add(s3,  f(to(J)(fin(4))), s4)
+   & add(s4,  f(to(J)(fin(5))), s5)
+   & add(s5,  f(to(J)(fin(6))), s6)
+   & add(s6,  f(to(J)(fin(7))), s7)
+   & add(s7,  f(to(J)(fin(8))), s8)
+   & add(s8,  f(to(J)(fin(9))), s9)
+   & add(s9,  f(to(J)(fin(10))), s10)
+   & add(s10, f(to(J)(fin(11))), y).
+
 def rescueHash : Plaintext -> Hash -> Prop
   := \p : Plaintext => \h : Hash
   => let p' : Fin(12) -> F := from(Plaintext)(p);
      let h' : Fin(12) -> F := from(Hash)(h);
-     todo.
+     some s0 : Fin(12) ->^12 F,
+     some s0box : Fin(12) ->^12 F,
+     some ms0box : I ->^12 (J ->^12 F),
+     some sms0box : I ->^12 F,
+     some inter0 : Fin(12) ->^12 F,
+     some inter0box : Fin(12) ->^12 F,
+     some minter0box : I ->^12 (J ->^12 F),
+     some sminter0box : I ->^12 F,
+     some s1 : Fin(12) ->^12 F,
+     addK0(p', s0)
+   & (all i : Fin(12), rescueBox0(s0(i), s0box(i)))
+   & (all i : I, all j : J, mulM(i, j, s0box(from(J)(j)), ms0box(i, j)))
+   & (all i : I, sumJ(ms0box(i), sms0box(i)))
+   & addK1((\x : Fin(12) => sms0box(to(I)(x))), inter0)
+   & (all i : Fin(12), rescueBox1(inter0(i), inter0box(i)))
+   & (all i : I, all j : J, mulM(i, j, inter0box(from(J)(j)), minter0box(i, j)))
+   & (all i : I, sumJ(minter0box(i), sminter0box(i)))
+   & addK2((\x : Fin(12) => sminter0box(to(I)(x))), s1)
+   & todo.
 
 -- Merkle commitments
 
