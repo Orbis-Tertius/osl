@@ -96,3 +96,41 @@ def fft16 : (Fin(16) -> F) -> (Fin(16) -> F) -> Prop
    & combine(omega6, (ys0(fin(6)), ys1(fin(6))), (ys(fin(6)), ys(fin(14))))
    & combine(omega7, (ys0(fin(7)), ys1(fin(7))), (ys(fin(7)), ys(fin(15)))).
 
+def fft32 : (Fin(32) -> F) -> (Fin(32) -> F) -> Prop
+  := \xs : Fin(32) -> F => \ys : Fin(32) -> F
+  => let omega1 : F := to(F)(fin(16698199167658661640320272194027702370));
+     let omega2 : F := to(F)(fin(22186728119017901039385635608201850931));
+     let omega3 : F := to(F)(fin(34350062198098277421132970135534305821));
+     let omega4 : F := to(F)(fin(131076302407280330469229082343774091404));
+     let omega5 : F := to(F)(fin(107125704632455286753154574269440354274));
+     let omega6 : F := to(F)(fin(73231901677283077325882091713770153990));
+     let omega7 : F := to(F)(fin(90374378160636663023428487766167913148));
+     let omega8 : F := to(F)(fin(259052015163170058651980223774986375587));
+     let omega9 : F := to(F)(fin(162806147425635384733525067434736806136));
+     let omega10 : F := to(F)(fin(266437655688779403589114768359918648781));
+     let omega11 : F := to(F)(fin(144022985169312756131804347043517484647));
+     let omega12 : F := to(F)(fin(94118632892422173191291920064315934488));
+     let omega13 : F := to(F)(fin(90666895636146090046074637791036353677));
+     let omega14 : F := to(F)(fin(196366951967922674545239204167809605584));
+     let omega15 : F := to(F)(fin(227466907842111639850817356847064975718));
+     some ys0 : Fin(16) ->^16 F,
+     some ys1 : Fin(16) ->^16 F,
+     let xs0 : Fin(16) -> F := \i : Fin(16) => xs(cast(2N *N cast(i)));
+     let xs1 : Fin(16) -> F := \i : Fin(16) => xs(cast((2N *N cast(i)) +N 1N));
+     fft16(xs0, ys) & fft16(xs1, ys1)
+   & combine1((ys0(fin(0)), ys1(fin(0))), (ys(fin(0)), ys(fin(16))))
+   & combine(omega1, (ys0(fin(1)), ys1(fin(1))), (ys(fin(1)), ys(fin(17))))
+   & combine(omega2, (ys0(fin(2)), ys1(fin(2))), (ys(fin(2)), ys(fin(18))))
+   & combine(omega3, (ys0(fin(3)), ys1(fin(3))), (ys(fin(3)), ys(fin(19))))
+   & combine(omega4, (ys0(fin(4)), ys1(fin(4))), (ys(fin(4)), ys(fin(20))))
+   & combine(omega5, (ys0(fin(5)), ys1(fin(5))), (ys(fin(5)), ys(fin(21))))
+   & combine(omega6, (ys0(fin(6)), ys1(fin(6))), (ys(fin(6)), ys(fin(22))))
+   & combine(omega7, (ys0(fin(7)), ys1(fin(7))), (ys(fin(7)), ys(fin(23))))
+   & combine(omega8, (ys0(fin(8)), ys1(fin(8))), (ys(fin(8)), ys(fin(24))))
+   & combine(omega9, (ys0(fin(9)), ys1(fin(9))), (ys(fin(9)), ys(fin(25))))
+   & combine(omega10, (ys0(fin(10)), ys1(fin(10))), (ys(fin(10)), ys(fin(26))))
+   & combine(omega11, (ys0(fin(11)), ys1(fin(11))), (ys(fin(11)), ys(fin(27))))
+   & combine(omega12, (ys0(fin(12)), ys1(fin(12))), (ys(fin(12)), ys(fin(28))))
+   & combine(omega13, (ys0(fin(13)), ys1(fin(13))), (ys(fin(13)), ys(fin(29))))
+   & combine(omega14, (ys0(fin(14)), ys1(fin(14))), (ys(fin(14)), ys(fin(30))))
+   & combine(omega15, (ys0(fin(15)), ys1(fin(15))), (ys(fin(15)), ys(fin(31)))).
