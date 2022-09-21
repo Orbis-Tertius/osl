@@ -1203,9 +1203,26 @@ def rescueHash : Plaintext -> Hash -> Prop
      let h' : Fin(12) -> F := from(Hash)(h);
      some s0 : Fin(12) ->^12 F,
      some s1 : Fin(12) ->^12 F,
+     some s2 : Fin(12) ->^12 F,
+     some s3 : Fin(12) ->^12 F,
+     some s4 : Fin(12) ->^12 F,
+     some s5 : Fin(12) ->^12 F,
+     some s6 : Fin(12) ->^12 F,
+     some s7 : Fin(12) ->^12 F,
+     some s8 : Fin(12) ->^12 F,
+     some s9 : Fin(12) ->^12 F,
+     some s10 : Fin(12) ->^12 F,
      addK0(p', s0)
-   & rescueHashRound(addK2, s0, s1)
-   & todo.
+   & rescueHashRound(addK1, s0, s1)
+   & rescueHashRound(addK2, s1, s2)
+   & rescueHashRound(addK3, s2, s3)
+   & rescueHashRound(addK4, s3, s4)
+   & rescueHashRound(addK5, s4, s5)
+   & rescueHashRound(addK6, s5, s6)
+   & rescueHashRound(addK7, s6, s7)
+   & rescueHashRound(addK8, s7, s8)
+   & rescueHashRound(addK9, s8, s9)
+   & rescueHashRound(addK10, s9, h').
 
 -- Merkle commitments
 
