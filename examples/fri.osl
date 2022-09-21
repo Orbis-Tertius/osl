@@ -910,21 +910,58 @@ def codeword : Proof -> Codeword
 
 data TopLevelIndices ~= IndexNumber -> Index.
 
-data Challenge ~= F.
+def getTopLevelIndex : TopLevelIndices -> IndexNumber -> Index
+  := \is : TopLevelIndices => \i : IndexNumber
+  => (from(TopLevelIndices)(is))(i).
+
+data Challenge ~= F * Hash.
 
 data Alphas ~= Fin(4) -> Challenge.
+
+def getAlpha : Alphas -> Fin(4) -> F
+  := \as : Alphas => \x : Fin(4) => pi1(from(Challenge)((from(Alphas)(as))(x))).
+
+def getLastChallenge : Alphas -> Challenge
+  := \as : Alphas => (from(Alphas)(as))(fin(3)).
+
+def getAlphaHash : Alphas -> Fin(4) -> Hash
+  := \as : Alphas => \x : Fin(4) => pi2(from(Challenge)((from(Alphas)(as))(x))).
 
 def checkAlphas : Proof -> Alphas -> Prop
   := \p : Proof => \a : Alphas
   => let f : Fin(4) -> Hash := \x : Fin(4) => from(Commitment)(commitments(p, x));
      let f' : Fin(4) -> F := \x : Fin(4) => (from(Hash)(f(x)))(fin(0));
-     let g : Fin(4) -> F := \x : Fin(4) => from(Challenge)(from(Alphas)(a, x));
-     some h : Fin(4) -> Hash,
+     let g : Fin(4) -> F := \x : Fin(4) => getAlpha(a, x);
+     let h : Fin(4) -> Hash := \x : Fin(4) => getAlphaHash(a, x);
      (all x : Fin(4), rescueHash(to(Plaintext)((\i : Fin(12) => g(x))), h(x)))
    & rescueHash(to(Plaintext)(from(Hash)(f(fin(0)))), h(fin(0)))
    & mergeHashes(h(fin(0)), f(fin(1)), h(fin(1)))
    & mergeHashes(h(fin(1)), f(fin(2)), h(fin(2)))
    & mergeHashes(h(fin(2)), f(fin(3)), h(fin(3))).
+
+def sampleIndex : Hash -> Index -> Prop
+  := \h : Hash => \i : Index
+  => let x : N := toN((from(Hash)(h))(fin(0)));
+     let i' : N := cast(from(Index)(i));
+     some y : N < 67624474285557595033981184191762530305N,
+     x = ((4N *N y) +N i').
+
+def checkTopLevelIndices : Proof -> Challenge -> TopLevelIndices -> Prop
+  := \p : Proof => \c : Challenge => \is : TopLevelIndices
+  => some s : Hash, some c' : Commitment,
+     commitsTo(codeword(p), c')
+   & mergeHashes(pi2(from(Challenge)(c)), from(Commitment)(c'), s)
+     -- TODO: doesn't the finiteness of the steps break completeness?
+   & (some steps : List^128(Hash * Index),
+      (all i : N < length(steps),
+         let h : Hash := pi1(nth(steps, i));
+         let j : Index := pi2(nth(steps, i));
+         some h' : Hash,
+         commitsTo1(to(F)(cast(i)), to(Commitment)(h'))
+       & mergeHashes(s, h', h)
+       & sampleIndex(h, j))
+    & (all i : IndexNumber, some j : N < 128N,
+         getTopLevelIndex(is, i) = pi2(nth(steps, cast(from(IndexNumber)(i)))))).
 
 -- The given codeword is the codeword of a low degree polynomial.
 def isLowDegree : Codeword -> Prop
@@ -939,7 +976,9 @@ def isLowDegree : Codeword -> Prop
 def isValid : Proof -> Prop
   := \p : Proof
   => some as : Alphas,
+     some is : TopLevelIndices,
      isLowDegree(codeword(p))
    & commitsTo(codeword(p), commitments(p, fin(3)))
    & checkAlphas(p, as)
+   & checkTopLevelIndices(p, getLastChallenge(as), is)
    & todo.
