@@ -874,6 +874,15 @@ data COpening ~= C * CAuthPath.
 
 data IndexOpenings ~= AOpening * BOpening * COpening.
 
+def aOpening : IndexOpenings -> AOpening
+  := \qs : IndexOpenings => pi1(from(IndexOpenings)(qs)).
+
+def bOpening : IndexOpenings -> BOpening
+  := \qs : IndexOpenings => pi1(pi2(from(IndexOpenings)(qs))).
+
+def cOpening : IndexOpenings -> COpening
+  := \qs : IndexOpenings => pi2(pi2(from(IndexOpenings)(qs))).
+
 data Openings ~= QueryRound -> IndexNumber -> IndexOpenings.
 
 data Proof ~= Commitments * Codeword * Openings.
@@ -1000,8 +1009,10 @@ def checkReducedDomainLength : QueryRound -> ReducedDomainLength -> Prop
    | ((r' = fin(1)) & (dl' = fin(64)))
    | ((r' = fin(2)) & (dl' = fin(32))). -- TODO: shouldn't this go to 16?
 
-def checkColinearity : A -> B -> C -> Prop
-  := \a : A => \b : B => \c : C
+data Point ~= Index * F.
+
+def areColinear : Omega -> Offset -> Point -> Point -> Point -> Prop
+  := \omega : Omega => \offset : Offset => \a : Point => \b : Point => \c : Point
   => todo.
 
 def verifyRoundOpenings
@@ -1039,7 +1050,14 @@ def friRound
      checkReducedDomainLength(r, dl')
    & reduceIndices(dl', topLevelIndices, aIndices, bIndices)
    & verifyRoundOpenings(qs, aIndices, bIndices, cIndices)
-   & todo.
+   & (all i : IndexNumber,
+       let a : A := pi1(from(AOpening)(aOpening(qs(i))));
+       let b : B := pi1(from(BOpening)(bOpening(qs(i))));
+       let c : C := pi1(from(COpening)(cOpening(qs(i))));
+       let p0 : Point := to(Point)(((from(AIndices)(aIndices))(i), from(A)(a)));
+       let p1 : Point := to(Point)(((from(BIndices)(bIndices))(i), from(B)(b)));
+       let p2 : Point := to(Point)(((from(CIndices)(cIndices))(i), from(C)(c)));
+       areColinear(omega, offset, p0, p1, p2)).
 
 def fri : Proof -> Prop
   := \p : Proof
