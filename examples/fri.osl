@@ -1031,14 +1031,32 @@ def areColinear : Omega -> Offset -> Point -> Point -> Point -> Prop
       f(x0, y0) & f(x1, y1) & f(x2, y2).
 
 def verifyRoundOpenings
-   : (IndexNumber -> IndexOpenings)
+   : Commitment
+  -> Commitment
+  -> (IndexNumber -> IndexOpenings)
   -> AIndices
   -> BIndices
   -> CIndices
   -> Prop
-  := \qs : IndexNumber -> IndexOpenings
+  := \root : Commitment => \nextRoot : Commitment
+  => \qs : IndexNumber -> IndexOpenings
   => \aIndices : AIndices => \bIndices : BIndices => \cIndices : CIndices
-  => todo.
+  => all i : IndexNumber,
+     let ai : Index := (from(AIndices)(aIndices))(i);
+     let bi : Index := (from(BIndices)(bIndices))(i);
+     let ci : Index := (from(CIndices)(cIndices))(i);
+     let aq : AOpening := aOpening(qs(i));
+     let bq : BOpening := bOpening(qs(i));
+     let cq : COpening := cOpening(qs(i));
+     let ay : F := from(A)(pi1(from(AOpening)(aq)));
+     let by : F := from(B)(pi1(from(BOpening)(bq)));
+     let cy : F := from(C)(pi1(from(COpening)(cq)));
+     let ap : AuthPath := from(AAuthPath)(pi2(from(AOpening)(aq)));
+     let bp : AuthPath := from(BAuthPath)(pi2(from(BOpening)(bq)));
+     let cp : AuthPath := from(CAuthPath)(pi2(from(COpening)(cq)));
+     verifyOpening(root, ai, ay, ap)
+   & verifyOpening(root, bi, by, bp)
+   & verifyOpening(nextRoot, ci, cy, cp).
 
 def friRound
    : Proof
@@ -1064,7 +1082,7 @@ def friRound
      some dl' : ReducedDomainLength,
      checkReducedDomainLength(r, dl')
    & reduceIndices(dl', topLevelIndices, aIndices, bIndices)
-   & verifyRoundOpenings(qs, aIndices, bIndices, cIndices)
+   & verifyRoundOpenings(root, nextRoot, qs, aIndices, bIndices, cIndices)
    & (all i : IndexNumber,
        some x0 : F, some x1 : F,
        let a : A := pi1(from(AOpening)(aOpening(qs(i))));
