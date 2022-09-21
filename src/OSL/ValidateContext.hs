@@ -969,7 +969,8 @@ inferType c t =
           checkTypeInclusion c ann a a'
           return d
         _ -> Left (ErrorMessage ann "sum.List(lookup(_)) applied to a non-List-of-Maps")
-    -- generic application inference for those cases not covered above
+    -- NOTICE: generic application inference for those cases not covered above;
+    -- must come last among all apply cases
     Apply ann f x -> do
       a <- inferType c f
       case a of

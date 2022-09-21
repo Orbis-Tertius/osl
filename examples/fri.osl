@@ -1323,6 +1323,27 @@ data Openings ~= QueryRound -> IndexNumber -> IndexOpenings.
 
 data Proof ~= Commitments * Codeword * Openings.
 
+def commitments : Proof -> Fin(4) -> Commitment
+  := \p : Proof => from(Commitments)(pi1(from(Proof)(p))).
+
+data TopLevelIndices ~= IndexNumber -> Index.
+
+data Challenge ~= F.
+
+data Alphas ~= Fin(4) -> Challenge.
+
+def checkAlphas : Proof -> Alphas -> Prop
+  := \p : Proof => \a : Alphas
+  => let f : Fin(4) -> Hash := \x : Fin(4) => from(Commitment)(commitments(p, x));
+     let f' : Fin(4) -> F := \x : Fin(4) => (from(Hash)(f(x)))(fin(0));
+     let g : Fin(4) -> F := \x : Fin(4) => from(Challenge)(from(Alphas)(a, x));
+     some h : Fin(4) -> Hash,
+     (all x : Fin(4), rescueHash(to(Plaintext)((\i : Fin(12) => g(x))), h(x)))
+   & rescueHash(to(Plaintext)(from(Hash)(f(fin(0)))), h(fin(0)))
+   & mergeHashes(h(fin(0)), f(fin(1)), h(fin(1)))
+   & mergeHashes(h(fin(1)), f(fin(2)), h(fin(2)))
+   & mergeHashes(h(fin(2)), f(fin(3)), h(fin(3))).
+
 -- The given codeword is the codeword of a low degree polynomial.
 def isLowDegree : Codeword -> Prop
   := \c : Codeword

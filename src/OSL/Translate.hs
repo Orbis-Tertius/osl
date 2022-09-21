@@ -90,10 +90,9 @@ translate gc
     OSL.ConstFin _ x -> return (Term (S11.Const x))
     OSL.Apply ann (OSL.NamedTerm ann' fName) x ->
       case getDeclaration decls fName of
-        Just (OSL.Defined fType f) -> do
+        Just (OSL.Defined fType@(OSL.F _ _ a _) f) -> do
           fM <- translateToMapping gc lc fType f
-          xType <- inferType decls x
-          xM <- translateToMapping gc lc xType x
+          xM <- translateToMapping gc lc a x
           Mapping <$> applyMappings ann termType fM xM
         Just (OSL.FreeVariable fType@(OSL.F _ _ a _)) -> do
           fM <- translateToMapping gc lc fType (OSL.NamedTerm ann' fName)
