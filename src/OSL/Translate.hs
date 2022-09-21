@@ -45,7 +45,7 @@ translate
   -> OSL.Term ann
   -> Either (ErrorMessage ann) (Translation ann)
 translate gc
-          lc@(TranslationContext decls@(OSL.ValidContext declsMap) mappings)
+          lc@(TranslationContext decls@(OSL.ValidContext declsMap) mappings auxTables)
           termType =
   \case
     OSL.NamedTerm ann name ->
@@ -55,7 +55,7 @@ translate gc
         Nothing ->
           case Map.lookup name declsMap of
             Just (OSL.Defined defType def) -> do
-              translate gc (TranslationContext decls mempty) defType def
+              translate gc (TranslationContext decls mempty mempty) defType def
             _ ->
               Left . ErrorMessage ann
               $ "un-mapped name: " <> pack (show name)
@@ -175,13 +175,14 @@ translate gc
                         (addDeclaration v (OSL.FreeVariable vT)
                           -- convert context of unknown type to local context
                           (OSL.ValidContext (OSL.unValidContext decls)))
-                        mappings)
+                        mappings
+                        auxTables)
                       v vT t))
     OSL.Apply _ (OSL.Lambda _ varName varType body) x -> do
       xM <- translateToMapping gc lc varType x
       let decls' = OSL.ValidContext
                      (Map.insert varName (OSL.FreeVariable varType) declsMap)
-          lc' = TranslationContext decls' (Map.insert varName xM mappings)
+          lc' = TranslationContext decls' (Map.insert varName xM mappings) auxTables
       translate gc lc' termType body
     OSL.Apply _ (OSL.To ann typeName) x ->
       case getDeclaration decls typeName of
@@ -566,7 +567,7 @@ translate gc
       varDefM <- translateToMapping gc lc varType varDef
       let decls' = OSL.ValidContext
                      (Map.insert varName (OSL.Defined varType varDef) declsMap)
-          lc' = TranslationContext decls' (Map.insert varName varDefM mappings)
+          lc' = TranslationContext decls' (Map.insert varName varDefM mappings) auxTables
       translate gc lc' termType body
     OSL.Equal ann x y -> do
       xType <- inferType decls x
@@ -601,10 +602,11 @@ translate gc
         FiniteDimensions n -> do
           let decls' = OSL.ValidContext
                 $ Map.insert varName (OSL.FreeVariable varType) declsMap
-          TranslationContext _ qCtx <-
+          TranslationContext _ qCtx _ <-
             buildTranslationContext' decls' [varName]
           let lc' = TranslationContext decls'
                     (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
+                    auxTables
           bounds <- translateBound gc lc varType varBound
           Formula . foldl (.) id (S11.ForAll <$> bounds)
             <$> translateToFormula gc lc' p
@@ -616,10 +618,11 @@ translate gc
      varDim <- getMappingDimensions decls varType
      case varDim of
        FiniteDimensions n -> do
-         TranslationContext _ qCtx <-
+         TranslationContext _ qCtx _ <-
            buildTranslationContext' decls' [varName]
          let lc' = TranslationContext decls'
                    (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
+                   auxTables
          bounds <- translateBound gc lc varType varBound
          Formula . foldl (.) id (S11.Exists . S11.ExistsFO <$> bounds)
            <$> translateToFormula gc lc' p
@@ -629,6 +632,7 @@ translate gc
              =<< getExplicitOrInferredBound decls varType varBound
          let lc' = TranslationContext decls'
                    (mergeMappings (Map.singleton varName newMapping) mappings)
+                   auxTables
          -- TODO: add additional conditions for map quantification
          Formula . (\f -> foldl' (flip S11.Exists) f qs)
            <$> translateToFormula gc lc' p
@@ -653,7 +657,7 @@ getExistentialQuantifierStringAndMapping
   -> OSL.Bound ann
   -> Either (ErrorMessage ann)
      ([S11.ExistentialQuantifier], Mapping ann S11.Term)
-getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) varType varBound =
+getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mappings auxTables) varType varBound =
   case varType of
     OSL.Prop ann -> Left (ErrorMessage ann "cannot quantify over Prop")
     OSL.N _ -> scalarResult
@@ -705,7 +709,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
               cM = ChoiceMapping (ScalarMapping cT)
               cSym = getFreeOSLName lc
               decls' = addDeclaration cSym (OSL.FreeVariable (OSL.Fin ann 2)) decls
-              lc' = TranslationContext decls' mappings
+              lc' = TranslationContext decls' mappings auxTables
           -- TODO: can this result in overlap between cM and bM/aM?
           lc'' <- runIdentity . runExceptT
             $ execStateT (addFreeVariableMapping cSym) lc'
@@ -742,7 +746,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
               lT = S11.Var (S11.Name 0 0)
               lSym = getFreeOSLName lc
               decls' = addDeclaration lSym (OSL.FreeVariable (OSL.N ann)) decls
-              lc' = TranslationContext decls' mappings
+              lc' = TranslationContext decls' mappings auxTables
           lc'' <- runIdentity . runExceptT
             $ execStateT (addFreeVariableMapping lSym) lc'
           (vQs, vM) <-
@@ -903,7 +907,7 @@ translateToFormula
   -> TranslationContext 'OSL.Local ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Formula
-translateToFormula gc lc@(TranslationContext decls mappings) t =
+translateToFormula gc lc@(TranslationContext decls mappings auxTables) t =
   case translate gc lc (OSL.Prop (termAnnotation t)) t of
     Right (Formula f) -> pure f
     Right (Mapping (PropMapping f)) -> pure f
@@ -911,7 +915,7 @@ translateToFormula gc lc@(TranslationContext decls mappings) t =
       case t of
         OSL.Lambda _ varName varType body -> do
           let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
-              lc' = TranslationContext decls' mappings
+              lc' = TranslationContext decls' mappings auxTables
           lc'' <- runIdentity . runExceptT
             $ execStateT (addFreeVariableMapping varName) lc'
           translateToFormula gc lc'' body
@@ -1016,7 +1020,7 @@ translateBound
   -> OSL.Type ann
   -> Maybe (OSL.Bound ann)
   -> Either (ErrorMessage ann) [S11.Term]
-translateBound gc lc@(TranslationContext decls _) t =
+translateBound gc lc@(TranslationContext decls _ _) t =
   \case
     Just (OSL.ScalarBound _ term) -> (:[]) <$> translateToTerm gc lc t term
     Just (OSL.ProductBound ann (OSL.LeftBound aBound) (OSL.RightBound bBound)) ->
@@ -1135,7 +1139,7 @@ translateEquality
   -> OSL.Term ann
   -> OSL.Term ann
   -> Either (ErrorMessage ann) S11.Formula
-translateEquality ann gc lc@(TranslationContext decls _) t x y = do
+translateEquality ann gc lc@(TranslationContext decls _ _) t x y = do
   xM <- translateToMapping gc lc t x
   yM <- translateToMapping gc lc t y
   applyEqualityToMappings ann decls t x xM y yM

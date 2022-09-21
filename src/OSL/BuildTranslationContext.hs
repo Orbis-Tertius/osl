@@ -54,7 +54,7 @@ buildTranslationContext' c freeVariables =
     runExceptT
       (execStateT
         (forM_ freeVariables addFreeVariableMapping)
-        (TranslationContext c mempty))
+        (TranslationContext c mempty mempty))
 
 
 -- builds a translation context providing mappings
@@ -72,7 +72,7 @@ addFreeVariableMapping
   -> StateT (TranslationContext t ann)
        (ExceptT (ErrorMessage ann) m) (Mapping ann S11.Name)
 addFreeVariableMapping freeVariable = do
-  TranslationContext c _ <- get
+  TranslationContext c _ _ <- get
   let decl = getExistingDeclaration c freeVariable
   case decl of
     FreeVariable t ->
@@ -215,9 +215,11 @@ getBoundS11NamesInContext
   :: Arity
   -> TranslationContext t ann
   -> Set S11.Name
-getBoundS11NamesInContext arity (TranslationContext _ ctx) =
-  Map.foldl' Set.union Set.empty
-    $ getBoundS11NamesInMapping arity <$> ctx
+getBoundS11NamesInContext arity (TranslationContext _ ctx aux) =
+  Map.keysSet (S11.functionTables aux)
+    `Set.union`
+      Map.foldl' Set.union Set.empty
+        (getBoundS11NamesInMapping arity <$> ctx)
 
 
 getBoundS11NamesInMapping
@@ -293,7 +295,7 @@ addGensym t = do
 getFreeOSLName
   :: TranslationContext t ann
   -> OSL.Name
-getFreeOSLName (TranslationContext (ValidContext c) _) =
+getFreeOSLName (TranslationContext (ValidContext c) _ _) =
   case fst <$> Map.lookupMax c of
     Nothing -> GenSym 0
     Just (Sym _) -> GenSym 0
@@ -370,7 +372,7 @@ getTypeDeclaration
        (ExceptT (ErrorMessage ann) m)
        (Type ann)
 getTypeDeclaration ann name = do
-  TranslationContext (ValidContext c) _ <- get
+  TranslationContext (ValidContext c) _ _ <- get
   case Map.lookup name c of
     Just (Data a) -> return a
     -- these errors should be logically impossible:

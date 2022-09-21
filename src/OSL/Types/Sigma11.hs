@@ -7,11 +7,14 @@ module OSL.Types.Sigma11
   , Term (..)
   , Formula (..)
   , ExistentialQuantifier (..)
+  , AuxTables (..)
   ) where
 
 
 import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty, toList)
+import Data.Map (Map)
+import Data.Set (Set)
 import Data.Generics.Labels ()
 import GHC.Generics (Generic)
 
@@ -116,3 +119,17 @@ instance Show ExistentialQuantifier where
   show (ExistsP Nothing b0 b1) =
     "<" <> show b0 <>
     "(!<" <> show b1 <> ")"
+
+
+data AuxTables =
+  AuxTables
+  { functionTables :: Map Name (Map [Integer] Integer)
+  , predicateTables :: Map PredicateName (Set [Integer])
+  }
+  deriving (Show, Generic)
+
+instance Semigroup AuxTables where
+  (AuxTables ft0 pt0) <> (AuxTables ft1 pt1) = AuxTables (ft0 <> ft1) (pt0 <> pt1)
+
+instance Monoid AuxTables where
+  mempty = AuxTables mempty mempty

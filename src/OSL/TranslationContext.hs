@@ -29,8 +29,8 @@ import OSL.Types.TranslationContext (Mapping (..), TranslationContext (..))
 toLocalTranslationContext
   :: TranslationContext 'Global ann
   -> TranslationContext 'Local ann
-toLocalTranslationContext (TranslationContext (ValidContext decls) mappings) =
-  TranslationContext (ValidContext decls) mappings
+toLocalTranslationContext (TranslationContext (ValidContext decls) mappings aux) =
+  TranslationContext (ValidContext decls) mappings aux
 
 
 -- Merges the two given mappings, moving the

@@ -31,6 +31,7 @@ data TranslationContext (t :: OSL.ContextType) ann =
   TranslationContext
   { context :: OSL.ValidContext t ann
   , mappings :: Map OSL.Name (Mapping ann S11.Term)
+  , auxTables :: S11.AuxTables
   }
   deriving (Show, Generic)
 
