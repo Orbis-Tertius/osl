@@ -1173,28 +1173,38 @@ def sumJ : (J -> F) -> F -> Prop
    & add(s9,  f(to(J)(fin(10))), s10)
    & add(s10, f(to(J)(fin(11))), y).
 
+def rescueHashRound
+   : ((Fin(12) -> F) -> (Fin(12) -> F) -> Prop)
+  -> (Fin(12) -> F)
+  -> (Fin(12) -> F)
+  -> Prop
+  := \addK : (Fin(12) -> F) -> (Fin(12) -> F) -> Prop
+  => \xs : Fin(12) -> F
+  => \ys : Fin(12) -> F
+  => some xsBox : Fin(12) ->^12 F,
+     some mxsBox : I ->^12 (J ->^12 F),
+     some smxsBox : I ->^12 F,
+     some inter : Fin(12) ->^12 F,
+     some interBox : Fin(12) ->^12 F,
+     some minterBox : I ->^12 (J ->^12 F),
+     some sminterBox : I ->^12 F,
+     (all i : Fin(12), rescueBox0(xs(i), xsBox(i)))
+   & (all i : I, all j : J, mulM(i, j, xsBox(from(J)(j)), mxsBox(i, j)))
+   & (all i : I, sumJ(mxsBox(i), smxsBox(i)))
+   & addK((\x : Fin(12) => smxsBox(to(I)(x))), inter)
+   & (all i : Fin(12), rescueBox1(inter(i), interBox(i)))
+   & (all i : I, all j : J, mulM(i, j, interBox(from(J)(j)), minterBox(i, j)))
+   & (all i : I, sumJ(minterBox(i), sminterBox(i)))
+   & addK2((\x : Fin(12) => sminterBox(to(I)(x))), ys).
+
 def rescueHash : Plaintext -> Hash -> Prop
   := \p : Plaintext => \h : Hash
   => let p' : Fin(12) -> F := from(Plaintext)(p);
      let h' : Fin(12) -> F := from(Hash)(h);
      some s0 : Fin(12) ->^12 F,
-     some s0box : Fin(12) ->^12 F,
-     some ms0box : I ->^12 (J ->^12 F),
-     some sms0box : I ->^12 F,
-     some inter0 : Fin(12) ->^12 F,
-     some inter0box : Fin(12) ->^12 F,
-     some minter0box : I ->^12 (J ->^12 F),
-     some sminter0box : I ->^12 F,
      some s1 : Fin(12) ->^12 F,
      addK0(p', s0)
-   & (all i : Fin(12), rescueBox0(s0(i), s0box(i)))
-   & (all i : I, all j : J, mulM(i, j, s0box(from(J)(j)), ms0box(i, j)))
-   & (all i : I, sumJ(ms0box(i), sms0box(i)))
-   & addK1((\x : Fin(12) => sms0box(to(I)(x))), inter0)
-   & (all i : Fin(12), rescueBox1(inter0(i), inter0box(i)))
-   & (all i : I, all j : J, mulM(i, j, inter0box(from(J)(j)), minter0box(i, j)))
-   & (all i : I, sumJ(minter0box(i), sminter0box(i)))
-   & addK2((\x : Fin(12) => sminter0box(to(I)(x))), s1)
+   & rescueHashRound(addK2, s0, s1)
    & todo.
 
 -- Merkle commitments
