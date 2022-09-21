@@ -1277,15 +1277,24 @@ def mergeCommitments : Commitment -> Commitment -> Commitment -> Prop
   := \a : Commitment => \b : Commitment => \c : Commitment
   => mergeHashes(from(Commitment)(a), from(Commitment)(b), from(Commitment)(c)).
 
+def commitsTo64 : (Fin(64) -> F) -> Commitment -> Prop
+  := \f : Fin(64) -> F => \c : Commitment
+  => todo.
+
 def commitsTo128 : (Fin(128) -> F) -> Commitment -> Prop
   := \f : Fin(128) -> F => \c : Commitment
-  => todo.
+  => let f0 : Fin(64) -> F := \x : Fin(64) => f(cast(x));
+     let f1 : Fin(64) -> F := \x : Fin(64) => f(cast(cast(x) +N 64N));
+     some c0 : Commitment, some c1 : Commitment,
+     mergeCommitments(c0, c1, c)
+   & commitsTo64(f0, c0)
+   & commitsTo64(f1, c1).
 
 def commitsTo : Codeword -> Commitment -> Prop
   := \w : Codeword => \c : Commitment
   => let w' : Fin(256) -> F := \x : Fin(256) => from(Codeword)(w, to(Index)(x));
      let w0 : Fin(128) -> F := \x : Fin(128) => w'(cast(x));
-     let w1 : Fin(128) -> F := \x : Fin(128) => w'(cast(cast(x) +N 1N));
+     let w1 : Fin(128) -> F := \x : Fin(128) => w'(cast(cast(x) +N 128N));
      some c0 : Commitment, some c1 : Commitment,
      mergeCommitments(c0, c1, c)
    & commitsTo128(w0, c0)
