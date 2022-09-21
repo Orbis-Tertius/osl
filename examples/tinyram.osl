@@ -207,17 +207,6 @@ def isFirstStepAccessingGivenAddress : Trace -> Time -> Prop
   := \T : Trace => \t : Time
   => t <= getLinks(T, t).
 
--- Checks that the given function, assumed to be a function
--- defined on the times [0,n), is a permutation.
--- TODO: replace this with a more efficient permutation argument,
--- by augmenting Sigma^1_1 formulas with a quantifier over permutations.
-def isStepPermutation : N -> (Time -> Time) -> Prop
-  := \n : N => \p : Time -> Time
-  => all i : N < n, some j : N < n,
-     let it : Time := to(Time)(cast(i));
-     let jt : Time := to(Time)(cast(j));
-     p(jt) = it.
-
 def linksAreOrdered : Trace -> Prop
   := \T : Trace
   => let ss : List^4096(Step) := getSteps(T);
