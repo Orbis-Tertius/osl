@@ -1228,6 +1228,15 @@ def rescueHash : Plaintext -> Hash -> Prop
 
 data MerkleHash ~= Hash.
 
+-- TODO: is this secure?
+def mergeHashes : Hash -> Hash -> Hash -> Prop
+  := \x0 : Hash => \x1 : Hash => \y : Hash
+  => let x0' : Fin(12) -> F := from(Hash)(x0);
+     let x1' : Fin(12) -> F := from(Hash)(x1);
+     some x' : Fin(12) -> F,
+     (all i : Fin(12), toN(x'(i)) = (toN(x0'(i)) +N toN(x1'(i))))
+   & rescueHash(to(Plaintext)(x'), y).
+
 -- FRI
 
 def codewordLength : N := 256N.
