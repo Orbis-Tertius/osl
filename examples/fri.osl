@@ -1,5 +1,14 @@
 -- A verifier for a simple version of FRI.
 
+-- Basic arithmetic
+
+-- a = c mod b
+def modulus : N -> N -> N -> Prop
+  := \a : N => \b : N => \c : N
+  => some d : N < a,
+     ((c +N 1N) <= b)
+   & (a = ((d *N b) +N c)).
+
 -- Finite field
 
 data F ~= Fin(270497897142230380135924736767050121217).
@@ -959,12 +968,45 @@ def checkOffset : QueryRound -> Offset -> Prop
    & ((r = to(QueryRound)(fin(1))) & (o = offset2))
    & ((r = to(QueryRound)(fin(2))) & (o = offset4)).
 
+data AIndices ~= IndexNumber -> Index.
+
+data BIndices ~= IndexNumber -> Index.
+
+data CIndices ~= IndexNumber -> Index.
+
+data ReducedDomainLength ~= Fin(129).
+
+def reduceIndices : ReducedDomainLength -> TopLevelIndices -> AIndices -> BIndices -> Prop
+  := \l : ReducedDomainLength
+  => \t : TopLevelIndices
+  => \a : AIndices
+  => \b : BIndices
+  => let l' : N := cast(from(ReducedDomainLength)(l));
+     let t' : IndexNumber -> N := \i : IndexNumber
+       => cast(from(Index)((from(TopLevelIndices)(t))(i)));
+     let a' : IndexNumber -> N := \i : IndexNumber
+       => cast(from(Index)((from(AIndices)(a))(i)));
+     let b' : IndexNumber -> N := \i : IndexNumber
+       => cast(from(Index)((from(BIndices)(b))(i)));
+     all i : IndexNumber,
+     modulus(t'(i), l', a'(i))
+   & (b'(i) = (a'(i) +N l')).
+
+def checkReducedDomainLength : QueryRound -> ReducedDomainLength -> Prop
+  := \r : QueryRound => \dl : ReducedDomainLength
+  => let r' : Fin(3) := from(QueryRound)(r);
+     let dl' : Fin(129) := from(ReducedDomainLength)(dl);
+     ((r' = fin(0)) & (dl' = fin(128)))
+   | ((r' = fin(1)) & (dl' = fin(64)))
+   | ((r' = fin(2)) & (dl' = fin(32))). -- TODO: shouldn't this go to 16?
+
 def friRound
    : Proof
   -> QueryRound
   -> Omega
   -> Offset
   -> Alpha
+  -> TopLevelIndices
   -> Commitment -> Commitment
   -> (IndexNumber -> IndexOpenings)
   -> Prop
@@ -973,9 +1015,15 @@ def friRound
   => \omega : Omega
   => \offset : Offset
   => \alpha : Alpha
+  => \topLevelIndices : TopLevelIndices
   => \root : Commitment => \nextRoot : Commitment
   => \qs : IndexNumber -> IndexOpenings
-  => todo.
+  => some aIndices : AIndices,
+     some bIndices : BIndices,
+     some dl' : ReducedDomainLength,
+     checkReducedDomainLength(r, dl')
+   & reduceIndices(dl', topLevelIndices, aIndices, bIndices)
+   & todo.
 
 def fri : Proof -> Prop
   := \p : Proof
@@ -993,4 +1041,4 @@ def fri : Proof -> Prop
       let qs : IndexNumber -> IndexOpenings := openings(p, r);
       some omega : Omega, some offset : Offset,
       checkOmega(r, omega) & checkOffset(r, offset)
-    & friRound(p, r, omega, offset, alpha, root, nextRoot, qs)).
+    & friRound(p, r, omega, offset, alpha, is, root, nextRoot, qs)).
