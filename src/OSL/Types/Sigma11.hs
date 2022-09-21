@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 
 module OSL.Types.Sigma11
@@ -24,6 +25,13 @@ data Name = Name { arity :: Arity, deBruijnIndex :: DeBruijnIndex }
 
 instance Show Name where
   show (Name a i) = show i <> "^" <> show a
+
+
+data PredicateName = PredicateName { arity :: Arity, deBruijnIndex :: DeBruijnIndex }
+  deriving (Eq, Ord, Generic)
+
+instance Show PredicateName where
+  show (PredicateName a i) = "P" <> show i <> "^" <> show a
 
 
 data Term =
@@ -53,6 +61,7 @@ instance Show Term where
 data Formula =
     Equal Term Term
   | LessOrEqual Term Term
+  | Predicate PredicateName (NonEmpty Term)
   | Not Formula
   | And Formula Formula
   | Or Formula Formula
@@ -79,12 +88,15 @@ instance Show Formula where
     "(all <" <> show b <> ", " <> show p <> ")"
   show (Exists q p) =
     "(some " <> show q <> ", " <> show p <> ")"
+  show (Predicate p qs) =
+     show p <> "(" <> intercalate ", " (toList (show <$> qs)) <> ")"
 
 
 data ExistentialQuantifier =
     ExistsFO Term
+    -- TODO: not Maybe Cardinality
   | ExistsSO (Maybe Cardinality) Term (NonEmpty Term)
-  | ExistsP (Maybe Cardinality) Term Term
+  | ExistsP (Maybe Cardinality) Term Term -- TODO: one bound
 
 instance Show ExistentialQuantifier where
   show (ExistsFO b) = "<" <> show b
