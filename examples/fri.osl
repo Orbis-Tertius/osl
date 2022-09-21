@@ -815,9 +815,17 @@ def commitsTo : Codeword -> Commitment -> Prop
 
 -- FRI
 
-def offset : F := to(F)(fin(85408008396924667383611388730472331217)).
+data Offset ~= F.
 
-def omega : F := to(F)(fin(178902808384765167578311106676137348214)).
+def offset1 : Offset := to(Offset)(to(F)(fin(85408008396924667383611388730472331217))).
+def offset2 : Offset := to(Offset)(to(F)(fin(149224634558074809886965749048363504499))).
+def offset4 : Offset := to(Offset)(to(F)(fin(196162427740603549034094478475071502895))).
+
+data Omega ~= F.
+
+def omega1 : Omega := to(Omega)(to(F)(fin(178902808384765167578311106676137348214))).
+def omega2 : Omega := to(Omega)(to(F)(fin(65907963977709178563567092354521124432))).
+def omega4 : Omega := to(Omega)(to(F)(fin(59478736836296470922896375673044043947))).
 
 def domainLength : N := 256N.
 
@@ -876,11 +884,13 @@ def getTopLevelIndex : TopLevelIndices -> IndexNumber -> Index
   := \is : TopLevelIndices => \i : IndexNumber
   => (from(TopLevelIndices)(is))(i).
 
-data Challenge ~= F * Hash.
+data Alpha ~= F.
+
+data Challenge ~= Alpha * Hash.
 
 data Alphas ~= Fin(4) -> Challenge.
 
-def getAlpha : Alphas -> Fin(4) -> F
+def getAlpha : Alphas -> Fin(4) -> Alpha
   := \as : Alphas => \x : Fin(4) => pi1(from(Challenge)((from(Alphas)(as))(x))).
 
 def getLastChallenge : Alphas -> Challenge
@@ -893,7 +903,7 @@ def checkAlphas : Proof -> Alphas -> Prop
   := \p : Proof => \a : Alphas
   => let f : Fin(4) -> Hash := \x : Fin(4) => from(Commitment)(commitments(p, x));
      let f' : Fin(4) -> F := \x : Fin(4) => (from(Hash)(f(x)))(fin(0));
-     let g : Fin(4) -> F := \x : Fin(4) => getAlpha(a, x);
+     let g : Fin(4) -> F := \x : Fin(4) => from(Alpha)(getAlpha(a, x));
      let h : Fin(4) -> Hash := \x : Fin(4) => getAlphaHash(a, x);
      (all x : Fin(4), rescueHash(to(Plaintext)((\i : Fin(12) => g(x))), h(x)))
    & rescueHash(to(Plaintext)(from(Hash)(f(fin(0)))), h(fin(0)))
@@ -935,9 +945,34 @@ def isLowDegree : Codeword -> Prop
       let i' : N := cast(i);
       (i' <= 7N) | (f(i) = zero)).
 
-def friRound : Proof -> QueryRound -> F -> Commitment -> Commitment
-  -> (IndexNumber -> IndexOpenings) -> Prop
-  := \p : Proof => \r : QueryRound => \alpha : F
+def checkOmega : QueryRound -> Omega -> Prop
+  := \r : QueryRound
+  => \o : Omega
+  => ((r = to(QueryRound)(fin(0))) & (o = omega1))
+   | ((r = to(QueryRound)(fin(1))) & (o = omega2))
+   | ((r = to(QueryRound)(fin(2))) & (o = omega4)).
+
+def checkOffset : QueryRound -> Offset -> Prop
+  := \r : QueryRound
+  => \o : Offset
+  => ((r = to(QueryRound)(fin(0))) & (o = offset1))
+   & ((r = to(QueryRound)(fin(1))) & (o = offset2))
+   & ((r = to(QueryRound)(fin(2))) & (o = offset4)).
+
+def friRound
+   : Proof
+  -> QueryRound
+  -> Omega
+  -> Offset
+  -> Alpha
+  -> Commitment -> Commitment
+  -> (IndexNumber -> IndexOpenings)
+  -> Prop
+  := \p : Proof
+  => \r : QueryRound
+  => \omega : Omega
+  => \offset : Offset
+  => \alpha : Alpha
   => \root : Commitment => \nextRoot : Commitment
   => \qs : IndexNumber -> IndexOpenings
   => todo.
@@ -952,8 +987,10 @@ def fri : Proof -> Prop
    & checkTopLevelIndices(p, getLastChallenge(as), is)
    & (all r : QueryRound,
       let r' : Fin(3) := from(QueryRound)(r);
-      let alpha : F := getAlpha(as, r');
+      let alpha : Alpha := getAlpha(as, r');
       let root : Commitment := commitments(p, cast(r'));
       let nextRoot : Commitment := commitments(p, cast(cast(r') +N 1N));
       let qs : IndexNumber -> IndexOpenings := openings(p, r);
-      friRound(p, r, alpha, root, nextRoot, qs)).
+      some omega : Omega, some offset : Offset,
+      checkOmega(r, omega) & checkOffset(r, offset)
+    & friRound(p, r, omega, offset, alpha, root, nextRoot, qs)).
