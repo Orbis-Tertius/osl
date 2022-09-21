@@ -1277,9 +1277,63 @@ def mergeCommitments : Commitment -> Commitment -> Commitment -> Prop
   := \a : Commitment => \b : Commitment => \c : Commitment
   => mergeHashes(from(Commitment)(a), from(Commitment)(b), from(Commitment)(c)).
 
+def commitsTo1 : F -> Commitment -> Prop
+  := \x : F => \c : Commitment
+  => let h : Hash := from(Commitment)(c);
+     let p : Plaintext := to(Plaintext)((\i : Fin(12) => x));
+     rescueHash(p, h).
+
+def commitsTo2 : (Fin(2) -> F) -> Commitment -> Prop
+  := \f : Fin(2) -> F => \c : Commitment
+  => some c0 : Commitment, some c1 : Commitment,
+     mergeCommitments(c0, c1, c)
+   & commitsTo1(f(fin(0)), c0)
+   & commitsTo1(f(fin(1)), c1).
+
+def commitsTo4 : (Fin(4) -> F) -> Commitment -> Prop
+  := \f : Fin(4) -> F => \c : Commitment
+  => let f0 : Fin(2) -> F := \x : Fin(2) => f(cast(x));
+     let f1 : Fin(2) -> F := \x : Fin(2) => f(cast(cast(x) +N 2N));
+     some c0 : Commitment, some c1 : Commitment,
+     mergeCommitments(c0, c1, c)
+   & commitsTo2(f0, c0)
+   & commitsTo2(f1, c1).
+
+def commitsTo8 : (Fin(8) -> F) -> Commitment -> Prop
+  := \f : Fin(8) -> F => \c : Commitment
+  => let f0 : Fin(4) -> F := \x : Fin(4) => f(cast(x));
+     let f1 : Fin(4) -> F := \x : Fin(4) => f(cast(cast(x) +N 4N));
+     some c0 : Commitment, some c1 : Commitment,
+     mergeCommitments(c0, c1, c)
+   & commitsTo4(f0, c0)
+   & commitsTo4(f1, c1).
+
+def commitsTo16 : (Fin(16) -> F) -> Commitment -> Prop
+  := \f : Fin(16) -> F => \c : Commitment
+  => let f0 : Fin(8) -> F := \x : Fin(8) => f(cast(x));
+     let f1 : Fin(8) -> F := \x : Fin(8) => f(cast(cast(x) +N 8N));
+     some c0 : Commitment, some c1 : Commitment,
+     mergeCommitments(c0, c1, c)
+   & commitsTo8(f0, c0)
+   & commitsTo8(f1, c1).
+
+def commitsTo32 : (Fin(32) -> F) -> Commitment -> Prop
+  := \f : Fin(32) -> F => \c : Commitment
+  => let f0 : Fin(16) -> F := \x : Fin(16) => f(cast(x));
+     let f1 : Fin(16) -> F := \x : Fin(16) => f(cast(cast(x) +N 16N));
+     some c0 : Commitment, some c1 : Commitment,
+     mergeCommitments(c0, c1, c)
+   & commitsTo16(f0, c0)
+   & commitsTo16(f1, c1).
+
 def commitsTo64 : (Fin(64) -> F) -> Commitment -> Prop
   := \f : Fin(64) -> F => \c : Commitment
-  => todo.
+  => let f0 : Fin(32) -> F := \x : Fin(32) => f(cast(x));
+     let f1 : Fin(32) -> F := \x : Fin(32) => f(cast(cast(x) +N 32N));
+     some c0 : Commitment, some c1 : Commitment,
+     mergeCommitments(c0, c1, c)
+   & commitsTo32(f0, c0)
+   & commitsTo32(f1, c1).
 
 def commitsTo128 : (Fin(128) -> F) -> Commitment -> Prop
   := \f : Fin(128) -> F => \c : Commitment
