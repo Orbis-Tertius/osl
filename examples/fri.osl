@@ -839,11 +839,9 @@ data C ~= F.
 
 data Query ~= A * B * C.
 
-data QueryRound ~= Fin(2).
+data QueryRound ~= Fin(3).
 
 data IndexNumber ~= Fin(4).
-
-data Queries ~= QueryRound -> IndexNumber -> Query.
 
 data AAuthPath ~= AuthPath.
 
@@ -868,6 +866,9 @@ def commitments : Proof -> Fin(4) -> Commitment
 
 def codeword : Proof -> Codeword
   := \p : Proof => pi1(pi2(from(Proof)(p))).
+
+def openings : Proof -> QueryRound -> IndexNumber -> IndexOpenings
+  := \p : Proof => from(Openings)(pi2(pi2(from(Proof)(p)))).
 
 data TopLevelIndices ~= IndexNumber -> Index.
 
@@ -934,7 +935,14 @@ def isLowDegree : Codeword -> Prop
       let i' : N := cast(i);
       (i' <= 7N) | (f(i) = zero)).
 
-def isValid : Proof -> Prop
+def friRound : Proof -> QueryRound -> F -> Commitment -> Commitment
+  -> (IndexNumber -> IndexOpenings) -> Prop
+  := \p : Proof => \r : QueryRound => \alpha : F
+  => \root : Commitment => \nextRoot : Commitment
+  => \qs : IndexNumber -> IndexOpenings
+  => todo.
+
+def fri : Proof -> Prop
   := \p : Proof
   => some as : Alphas,
      some is : TopLevelIndices,
@@ -942,4 +950,10 @@ def isValid : Proof -> Prop
    & commitsTo(codeword(p), commitments(p, fin(3)))
    & checkAlphas(p, as)
    & checkTopLevelIndices(p, getLastChallenge(as), is)
-   & todo.
+   & (all r : QueryRound,
+      let r' : Fin(3) := from(QueryRound)(r);
+      let alpha : F := getAlpha(as, r');
+      let root : Commitment := commitments(p, cast(r'));
+      let nextRoot : Commitment := commitments(p, cast(cast(r') +N 1N));
+      let qs : IndexNumber -> IndexOpenings := openings(p, r);
+      friRound(p, r, alpha, root, nextRoot, qs)).
