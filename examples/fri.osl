@@ -1224,9 +1224,19 @@ def rescueHash : Plaintext -> Hash -> Prop
    & rescueHashRound(addK9, s8, s9)
    & rescueHashRound(addK10, s9, h').
 
+def hashesAreEqual : Hash -> Hash -> Prop
+  := \x0 : Hash => \x1 : Hash
+  => all i : Fin(12), from(Hash)(x0, i) = from(Hash)(x1, i).
+
 -- Merkle commitments
 
-data MerkleHash ~= Hash.
+data Commitment ~= Hash.
+
+data Index ~= Fin(256).
+
+data DepthIndex ~= Fin(8).
+
+data AuthPath ~= DepthIndex -> Hash.
 
 -- TODO: is this secure?
 def mergeHashes : Hash -> Hash -> Hash -> Prop
@@ -1236,6 +1246,28 @@ def mergeHashes : Hash -> Hash -> Hash -> Prop
      some x' : Fin(12) -> F,
      (all i : Fin(12), toN(x'(i)) = (toN(x0'(i)) +N toN(x1'(i))))
    & rescueHash(to(Plaintext)(x'), y).
+
+def depthIndexIsEven : DepthIndex -> Prop
+  := \x' : DepthIndex
+  => let x : Fin(12) := from(DepthIndex)(x');
+     (x = fin(0)) | (x = fin(2)) | (x = fin(4)) | (x = fin(6))
+   | (x = fin(8)) | (x = fin(10)).
+
+def verifyOpening : Commitment -> Index -> F -> AuthPath -> Prop
+  := \c : Commitment => \i : Index => \x : F => \p : AuthPath
+  => some f : DepthIndex ->^8 Hash,
+     some h : Hash,
+     let p' : Plaintext := to(Plaintext)((\j : Fin(12) => x));
+     rescueHash(p', h)
+   & hashesAreEqual(f(to(DepthIndex)(fin(0))), h)
+   & (all j : Fin(7),
+      let j' : DepthIndex := to(DepthIndex)(cast(j));
+      let j'' : DepthIndex := to(DepthIndex)(cast(cast(j) +N 1N));
+      let h' : Hash := f(j');
+      let h'' : Hash := f(j'');
+      let k : Hash := from(AuthPath)(p, j');
+      (depthIndexIsEven(j') & mergeHashes(h', k, h''))
+    | (!(depthIndexIsEven(j')) & mergeHashes(k, h', h''))).
 
 -- FRI
 
@@ -1253,8 +1285,6 @@ def numColinearityTests : N := 4N.
 
 def numRounds : N := 4N.
 
-data Commitment ~= MerkleHash.
-
 data Commitments ~= Fin(4) -> Commitment.
 
 data A ~= F.
@@ -1271,13 +1301,7 @@ data IndexNumber ~= Fin(4).
 
 data Queries ~= QueryRound -> IndexNumber -> Query.
 
-data Index ~= Fin(256).
-
 data Codeword ~= Index -> F.
-
-data DepthIndex ~= Fin(8).
-
-data AuthPath ~= DepthIndex -> MerkleHash.
 
 data AAuthPath ~= AuthPath.
 
