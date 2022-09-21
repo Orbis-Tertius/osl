@@ -1009,11 +1009,26 @@ def checkReducedDomainLength : QueryRound -> ReducedDomainLength -> Prop
    | ((r' = fin(1)) & (dl' = fin(64)))
    | ((r' = fin(2)) & (dl' = fin(32))). -- TODO: shouldn't this go to 16?
 
-data Point ~= Index * F.
+def isDomainElement : Omega -> Offset -> Index -> F -> Prop
+  := \omega : Omega => \offset : Offset => \i : Index => \x : F
+  => todo. -- TODO: implement with a table
+
+data Point ~= F * F.
 
 def areColinear : Omega -> Offset -> Point -> Point -> Point -> Prop
   := \omega : Omega => \offset : Offset => \a : Point => \b : Point => \c : Point
-  => todo.
+  => let x0 : F := pi1(from(Point)(a));
+     let x1 : F := pi1(from(Point)(b));
+     let x2 : F := pi1(from(Point)(c));
+     let y0 : F := pi2(from(Point)(a));
+     let y1 : F := pi2(from(Point)(b));
+     let y2 : F := pi2(from(Point)(c));
+     some m : F, some b : F,
+      let f : F -> F -> Prop
+        := \x : F => \y : F
+        => some mx : F,
+           mul(m, x, mx) & add(mx, b, y);
+      f(x0, y0) & f(x1, y1) & f(x2, y2).
 
 def verifyRoundOpenings
    : (IndexNumber -> IndexOpenings)
@@ -1051,13 +1066,16 @@ def friRound
    & reduceIndices(dl', topLevelIndices, aIndices, bIndices)
    & verifyRoundOpenings(qs, aIndices, bIndices, cIndices)
    & (all i : IndexNumber,
+       some x0 : F, some x1 : F,
        let a : A := pi1(from(AOpening)(aOpening(qs(i))));
        let b : B := pi1(from(BOpening)(bOpening(qs(i))));
        let c : C := pi1(from(COpening)(cOpening(qs(i))));
-       let p0 : Point := to(Point)(((from(AIndices)(aIndices))(i), from(A)(a)));
-       let p1 : Point := to(Point)(((from(BIndices)(bIndices))(i), from(B)(b)));
-       let p2 : Point := to(Point)(((from(CIndices)(cIndices))(i), from(C)(c)));
-       areColinear(omega, offset, p0, p1, p2)).
+       let p0 : Point := to(Point)((x0, from(A)(a)));
+       let p1 : Point := to(Point)((x1, from(B)(b)));
+       let p2 : Point := to(Point)((from(Alpha)(alpha), from(C)(c)));
+       isDomainElement(omega, offset, (from(AIndices)(aIndices))(i), x0)
+     & isDomainElement(omega, offset, (from(BIndices)(bIndices))(i), x1)
+     & areColinear(omega, offset, p0, p1, p2)).
 
 def fri : Proof -> Prop
   := \p : Proof
