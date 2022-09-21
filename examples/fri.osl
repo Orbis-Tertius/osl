@@ -1285,6 +1285,8 @@ def numColinearityTests : N := 4N.
 
 def numRounds : N := 4N.
 
+def maxDegree : N := 8N.
+
 data Commitments ~= Fin(4) -> Commitment.
 
 data A ~= F.
@@ -1320,3 +1322,13 @@ data IndexOpenings ~= AOpening * BOpening * COpening.
 data Openings ~= QueryRound -> IndexNumber -> IndexOpenings.
 
 data Proof ~= Commitments * Codeword * Openings.
+
+-- The given codeword is the codeword of a low degree polynomial.
+def isLowDegree : Codeword -> Prop
+  := \c : Codeword
+  => let f : Fin(256) -> F := \x : Fin(256) => from(Codeword)(c, to(Index)(x));
+     some p : Fin(256) ->^256 F,
+     fft256(f, p)
+   & (all i : Fin(256),
+      let i' : N := cast(i);
+      (i' <= 7N) | (f(i) = zero)).
