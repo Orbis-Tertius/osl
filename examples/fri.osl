@@ -1000,6 +1000,20 @@ def checkReducedDomainLength : QueryRound -> ReducedDomainLength -> Prop
    | ((r' = fin(1)) & (dl' = fin(64)))
    | ((r' = fin(2)) & (dl' = fin(32))). -- TODO: shouldn't this go to 16?
 
+def checkColinearity : A -> B -> C -> Prop
+  := \a : A => \b : B => \c : C
+  => todo.
+
+def verifyRoundOpenings
+   : (IndexNumber -> IndexOpenings)
+  -> AIndices
+  -> BIndices
+  -> CIndices
+  -> Prop
+  := \qs : IndexNumber -> IndexOpenings
+  => \aIndices : AIndices => \bIndices : BIndices => \cIndices : CIndices
+  => todo.
+
 def friRound
    : Proof
   -> QueryRound
@@ -1020,9 +1034,11 @@ def friRound
   => \qs : IndexNumber -> IndexOpenings
   => some aIndices : AIndices,
      some bIndices : BIndices,
+     let cIndices : CIndices := to(CIndices)(from(AIndices)(aIndices));
      some dl' : ReducedDomainLength,
      checkReducedDomainLength(r, dl')
    & reduceIndices(dl', topLevelIndices, aIndices, bIndices)
+   & verifyRoundOpenings(qs, aIndices, bIndices, cIndices)
    & todo.
 
 def fri : Proof -> Prop
