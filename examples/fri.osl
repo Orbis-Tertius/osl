@@ -1039,7 +1039,7 @@ def friRound
   => \r : QueryRound
   => \omega : Omega
   => \offset : Offset
-  => \alpha : Alpha
+  => \alpha : Alpha -- TODO: use alpha
   => \topLevelIndices : TopLevelIndices
   => \root : Commitment => \nextRoot : Commitment
   => \qs : IndexNumber -> IndexOpenings
