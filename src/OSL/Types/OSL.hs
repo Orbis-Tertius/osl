@@ -87,6 +87,8 @@ data Term ann =
   | ConstZ ann Integer
   | Cast ann
   | ConstFin ann Integer
+  | ConstF ann [(Term ann, Term ann)]
+  | ConstSet ann [Term ann]
   | Inverse ann
   | Pair ann
   | Pi1 ann -- Product projections

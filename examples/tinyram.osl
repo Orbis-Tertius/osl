@@ -236,10 +236,6 @@ def doesNotAnswerPrematurely : Trace -> Prop
      ((i +N 1N) = length(ss))
    | !(getOpcode(getStepInstruction(s)) = opAnswer).
 
--- NOTE: isEvenBits and isOddBits could be optimized at the Sigma^1_1 formula
--- level by adding an optimization which recognizes when a subexpression can
--- be rewritten as a fixed lookup table, such as in these cases.
-
 -- Asserts that the odd bits of the given word are 0.
 def isEvenBits : Word -> Prop
   := \w : Word

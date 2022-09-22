@@ -1,16 +1,21 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 
 module OSL.Types.Sigma11
   ( Name (Name)
+  , PredicateName (PredicateName)
   , Term (..)
   , Formula (..)
   , ExistentialQuantifier (..)
+  , AuxTables (..)
   ) where
 
 
 import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty, toList)
+import Data.Map (Map)
+import Data.Set (Set)
 import Data.Generics.Labels ()
 import GHC.Generics (Generic)
 
@@ -24,6 +29,13 @@ data Name = Name { arity :: Arity, deBruijnIndex :: DeBruijnIndex }
 
 instance Show Name where
   show (Name a i) = show i <> "^" <> show a
+
+
+data PredicateName = PredicateName { arity :: Arity, deBruijnIndex :: DeBruijnIndex }
+  deriving (Eq, Ord, Generic)
+
+instance Show PredicateName where
+  show (PredicateName a i) = "P" <> show i <> "^" <> show a
 
 
 data Term =
@@ -53,6 +65,7 @@ instance Show Term where
 data Formula =
     Equal Term Term
   | LessOrEqual Term Term
+  | Predicate PredicateName (NonEmpty Term)
   | Not Formula
   | And Formula Formula
   | Or Formula Formula
@@ -79,12 +92,15 @@ instance Show Formula where
     "(all <" <> show b <> ", " <> show p <> ")"
   show (Exists q p) =
     "(some " <> show q <> ", " <> show p <> ")"
+  show (Predicate p qs) =
+     show p <> "(" <> intercalate ", " (toList (show <$> qs)) <> ")"
 
 
 data ExistentialQuantifier =
     ExistsFO Term
+    -- TODO: not Maybe Cardinality
   | ExistsSO (Maybe Cardinality) Term (NonEmpty Term)
-  | ExistsP (Maybe Cardinality) Term Term
+  | ExistsP (Maybe Cardinality) Term Term -- TODO: one bound
 
 instance Show ExistentialQuantifier where
   show (ExistsFO b) = "<" <> show b
@@ -104,3 +120,17 @@ instance Show ExistentialQuantifier where
   show (ExistsP Nothing b0 b1) =
     "<" <> show b0 <>
     "(!<" <> show b1 <> ")"
+
+
+data AuxTables =
+  AuxTables
+  { functionTables :: Map Name (Map [Integer] Integer)
+  , predicateTables :: Map PredicateName (Set [Integer])
+  }
+  deriving (Eq, Show, Generic)
+
+instance Semigroup AuxTables where
+  (AuxTables ft0 pt0) <> (AuxTables ft1 pt1) = AuxTables (ft0 <> ft1) (pt0 <> pt1)
+
+instance Monoid AuxTables where
+  mempty = AuxTables mempty mempty
