@@ -98,12 +98,12 @@ def fft16 : (Fin(16) -> F) -> (Fin(16) -> F) -> Prop
        , fin(6) => to(F)(fin(94118632892422173191291920064315934488))
        , fin(7) => to(F)(fin(196366951967922674545239204167809605584))
        ];
-     some ys0 : Fin(8) ->^8 F,
-     some ys1 : Fin(8) ->^8 F,
-     let xs0 : Fin(8) -> F := \i : Fin(8) => xs(cast(2N *N cast(i)));
-     let xs1 : Fin(8) -> F := \i : Fin(8) => xs(cast((2N *N cast(i)) +N 1N));
-     fft8(xs0, ys0) & fft8(xs1, ys1)
-   & (all i : Fin(8), combine(omega(i), (ys0(i), ys1(i)),
+     some ys' : Fin(2) -> Fin(8) ->^8 F,
+     let xs' : Fin(2) -> Fin(8) -> F
+       := \o : Fin(2) => \i : Fin(8)
+       => xs(cast((2N *N cast(i)) +N cast(o)));
+     (all i : Fin(2), fft8(xs'(i), ys'(i)))
+   & (all i : Fin(8), combine(omega(i), (ys'(fin(0), i), ys'(fin(1), i)),
                                         (ys(cast(i)), ys(cast(cast(i) +N 8N))))).
 
 -- Rescue hash
