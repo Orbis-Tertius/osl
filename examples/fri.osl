@@ -172,8 +172,6 @@ def rescueBox1 : F -> F -> Prop
   := \x : F => \y : F
   => powerOfAlpha(x, y).
 
-def todo : Prop := 0N = 1N.
-
 def sumJ : (J -> F) -> F -> Prop
   := \f : J -> F => \y : F
   => some s : Fin(10) -> F,
