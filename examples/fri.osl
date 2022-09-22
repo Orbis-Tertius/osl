@@ -58,29 +58,33 @@ def fft2 : (Fin(2) -> F) -> (Fin(2) -> F) -> Prop
 
 def fft4 : (Fin(4) -> F) -> (Fin(4) -> F) -> Prop
   := \xs : Fin(4) -> F => \ys : Fin(4) -> F
-  => let omega : F := to(F)(fin(259052015163170058651980223774986375587));
+  => let omega : Fin(2) -> F :=
+       [ fin(0) => to(F)(fin(1))
+       , fin(1) => to(F)(fin(259052015163170058651980223774986375587))
+       ];
      some ys0 : Fin(2) ->^2 F,
      some ys1 : Fin(2) ->^2 F,
      let xs0 : Fin(2) -> F := \i : Fin(2) => xs(cast(2N *N cast(i)));
      let xs1 : Fin(2) -> F := \i : Fin(2) => xs(cast((2N *N cast(i)) +N 1N));
      fft2(xs0, ys0) & fft2(xs1, ys1)
-   & combine1((ys0(fin(0)), ys1(fin(0))), (ys(fin(0)), ys(fin(2))))
-   & combine(omega, (ys0(fin(1)), ys1(fin(1))), (ys(fin(1)), ys(fin(3)))).
+   & (all i : Fin(2), combine(omega(i), (ys0(i), ys1(i)),
+                                        (ys(cast(i)), ys(cast(cast(i) +N 8N))))).
 
 def fft8 : (Fin(8) -> F) -> (Fin(8) -> F) -> Prop
   := \xs : Fin(8) -> F => \ys : Fin(8) -> F
-  => let omega : F := to(F)(fin(131076302407280330469229082343774091404));
-     let omega2 : F := to(F)(fin(259052015163170058651980223774986375587));
-     let omega3 : F := to(F)(fin(94118632892422173191291920064315934488));
+  => let omega : Fin(4) -> F :=
+       [ fin(0) => to(F)(fin(1))
+       , fin(1) => to(F)(fin(131076302407280330469229082343774091404))
+       , fin(2) => to(F)(fin(259052015163170058651980223774986375587))
+       , fin(3) => to(F)(fin(94118632892422173191291920064315934488))
+       ];
      some ys0 : Fin(4) ->^4 F,
      some ys1 : Fin(4) ->^4 F,
      let xs0 : Fin(4) -> F := \i : Fin(4) => xs(cast(2N *N cast(i)));
      let xs1 : Fin(4) -> F := \i : Fin(4) => xs(cast((2N *N cast(i)) +N 1N));
      fft4(xs0, ys0) & fft4(xs1, ys1)
-   & combine1((ys0(fin(0)), ys1(fin(0))), (ys(fin(0)), ys(fin(4))))
-   & combine(omega, (ys0(fin(1)), ys1(fin(1))), (ys(fin(1)), ys(fin(5))))
-   & combine(omega2, (ys0(fin(2)), ys1(fin(2))), (ys(fin(2)), ys(fin(6))))
-   & combine(omega3, (ys0(fin(3)), ys1(fin(3))), (ys(fin(3)), ys(fin(7)))).
+   & (all i : Fin(4), combine(omega(i), (ys0(i), ys1(i)),
+                                        (ys(cast(i)), ys(cast(cast(i) +N 8N))))).
 
 def fft16 : (Fin(16) -> F) -> (Fin(16) -> F) -> Prop
   := \xs : Fin(16) -> F => \ys : Fin(16) -> F
