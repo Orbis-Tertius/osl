@@ -1320,6 +1320,14 @@ translateToConstant gc lc@(OSL.ValidContext decls) termType =
       case xT of
         ProductMapping _ (RightMapping a) -> pure a
         _ -> Left (ErrorMessage ann "translating pi2 did not result in a product mapping; this is a compiler bug")
+    OSL.Apply _ (OSL.To ann' name) x -> do
+      case Map.lookup name decls of
+        Just (OSL.Data a) -> translateToConstant gc lc a x
+        _ -> Left (ErrorMessage ann' "expected the name of a type")
+    OSL.Apply _ (OSL.From ann' name) x -> do
+      case Map.lookup name decls of
+        Just (OSL.Data _) -> translateToConstant gc lc (OSL.NamedType ann' name) x
+        _ -> Left (ErrorMessage ann' "expected the name of a type")
     t -> Left $ ErrorMessage (termAnnotation t) "sorry, I was not taught how to translate this term to a constant"
 
 
