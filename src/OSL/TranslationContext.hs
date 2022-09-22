@@ -8,6 +8,7 @@ module OSL.TranslationContext
   , mergeMapping
   , mappingIndices
   , highestIndicesInMappings
+  , linearizeMapping
   ) where
 
 
@@ -29,8 +30,8 @@ import OSL.Types.TranslationContext (Mapping (..), TranslationContext (..))
 toLocalTranslationContext
   :: TranslationContext 'Global ann
   -> TranslationContext 'Local ann
-toLocalTranslationContext (TranslationContext (ValidContext decls) mappings aux) =
-  TranslationContext (ValidContext decls) mappings aux
+toLocalTranslationContext (TranslationContext (ValidContext decls) mappings) =
+  TranslationContext (ValidContext decls) mappings
 
 
 -- Merges the two given mappings, moving the
@@ -81,3 +82,7 @@ highestIndicesInMapping
   -> Map Arity DeBruijnIndex
 highestIndicesInMapping =
   compact . fmap Set.lookupMax . mappingIndices
+
+
+linearizeMapping :: Mapping ann a -> [a]
+linearizeMapping = foldl' (flip (:)) []

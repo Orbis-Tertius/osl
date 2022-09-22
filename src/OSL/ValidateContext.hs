@@ -8,7 +8,7 @@ module OSL.ValidateContext
   ) where
 
 
-import Control.Monad (foldM)
+import Control.Monad (foldM, forM_)
 import qualified Data.Map as Map
 import Data.Text (pack)
 
@@ -210,6 +210,21 @@ checkTerm c t x =
       if n >= 0
         then return ()
         else Left (ErrorMessage ann "expected a natural number but got a negative integer")
+    ConstF ann f ->
+      case t of
+        F _ n a b -> do
+          case n of
+            Just (Cardinality n') -> if n' >= fromIntegral (length f) then pure ()
+              else Left (ErrorMessage ann "too many mappings in function literal")
+            Nothing -> pure ()
+          forM_ f $ \(x',y) -> do
+            checkTerm c a x'
+            checkTerm c b y
+        _ -> genericErrorMessage
+    ConstSet _ p ->
+      case t of
+        F _ _ a (Prop _) -> forM_ p (checkTerm c a)
+        _ -> genericErrorMessage
     AddZ ann -> checkTypeInclusion c ann t
       (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
     MulZ ann -> checkTypeInclusion c ann t
@@ -715,6 +730,15 @@ inferType c t =
     ConstN ann _ -> return (N ann)
     ConstZ ann _ -> return (Z ann)
     ConstFin ann _ -> Left (ErrorMessage ann "cannot infer cardinality of type of finite constant")
+    ConstSet ann (x:xs) -> do
+      xType <- inferType c x
+      forM_ xs (checkTerm c xType)
+      pure (F ann Nothing xType (Prop ann))
+    ConstF ann ((x,y):fs) -> do
+      xType <- inferType c x
+      yType <- inferType c y
+      forM_ fs (\(x',y') -> checkTerm c xType x' >> checkTerm c yType y')
+      pure (F ann (Just (Cardinality (fromIntegral (length fs)))) xType yType)
     AddN ann -> pure (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
     MulN ann -> pure (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
     AddZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))

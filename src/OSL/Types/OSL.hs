@@ -82,6 +82,8 @@ data Term ann =
   | AddN ann
   | MulN ann
   | ConstN ann Integer
+  | ConstF ann [(Term ann, Term ann)]
+  | ConstSet ann [Term ann]
   | AddZ ann
   | MulZ ann
   | ConstZ ann Integer

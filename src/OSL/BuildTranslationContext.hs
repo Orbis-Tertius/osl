@@ -54,7 +54,7 @@ buildTranslationContext' c freeVariables =
     runExceptT
       (execStateT
         (forM_ freeVariables addFreeVariableMapping)
-        (TranslationContext c mempty mempty))
+        (TranslationContext c mempty))
 
 
 -- builds a translation context providing mappings
@@ -72,7 +72,7 @@ addFreeVariableMapping
   -> StateT (TranslationContext t ann)
        (ExceptT (ErrorMessage ann) m) (Mapping ann S11.Name)
 addFreeVariableMapping freeVariable = do
-  TranslationContext c _ _ <- get
+  TranslationContext c _ <- get
   let decl = getExistingDeclaration c freeVariable
   case decl of
     FreeVariable t ->
@@ -215,11 +215,9 @@ getBoundS11NamesInContext
   :: Arity
   -> TranslationContext t ann
   -> Set S11.Name
-getBoundS11NamesInContext arity (TranslationContext _ ctx aux) =
-  Map.keysSet (S11.functionTables aux)
-    `Set.union`
-      Map.foldl' Set.union Set.empty
-        (getBoundS11NamesInMapping arity <$> ctx)
+getBoundS11NamesInContext arity (TranslationContext _ ctx) =
+   Map.foldl' Set.union Set.empty
+     (getBoundS11NamesInMapping arity <$> ctx)
 
 
 getBoundS11NamesInMapping
@@ -245,6 +243,7 @@ getBoundS11NamesInMapping arity =
       rec a `Set.union` (rec b `Set.union` (rec c `Set.union` rec d))
     LambdaMapping _ _ _ _ _ -> mempty
     PropMapping _ -> mempty
+    PredicateMapping _ -> mempty
   where
     f :: S11.Term -> Set S11.Name
     f (S11.Var name) = g name
@@ -295,7 +294,7 @@ addGensym t = do
 getFreeOSLName
   :: TranslationContext t ann
   -> OSL.Name
-getFreeOSLName (TranslationContext (ValidContext c) _ _) =
+getFreeOSLName (TranslationContext (ValidContext c) _) =
   case fst <$> Map.lookupMax c of
     Nothing -> GenSym 0
     Just (Sym _) -> GenSym 0
@@ -343,6 +342,7 @@ mapAritiesInMapping f =
       -- TODO: should recurse into gc and/or lc?
       LambdaMapping gc lc v vT t
     PropMapping p -> PropMapping p
+    PredicateMapping p -> PredicateMapping p
   where
     g (S11.Name arity i) = S11.Name (f arity) i
     rec = mapAritiesInMapping f
@@ -372,7 +372,7 @@ getTypeDeclaration
        (ExceptT (ErrorMessage ann) m)
        (Type ann)
 getTypeDeclaration ann name = do
-  TranslationContext (ValidContext c) _ _ <- get
+  TranslationContext (ValidContext c) _ <- get
   case Map.lookup name c of
     Just (Data a) -> return a
     -- these errors should be logically impossible:

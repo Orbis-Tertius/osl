@@ -4,6 +4,7 @@
 
 module OSL.Types.Sigma11
   ( Name (Name)
+  , PredicateName (PredicateName)
   , Term (..)
   , Formula (..)
   , ExistentialQuantifier (..)
