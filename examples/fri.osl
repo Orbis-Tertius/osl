@@ -517,13 +517,11 @@ def reduceIndices : ReducedDomainLength -> TopLevelIndices -> AIndices -> BIndic
      modulus(t'(i), l', a'(i))
    & (b'(i) = (a'(i) +N l')).
 
-def checkReducedDomainLength : QueryRound -> ReducedDomainLength -> Prop
-  := \r : QueryRound => \dl : ReducedDomainLength
-  => let r' : Fin(3) := from(QueryRound)(r);
-     let dl' : Fin(129) := from(ReducedDomainLength)(dl);
-     ((r' = fin(0)) & (dl' = fin(128)))
-   | ((r' = fin(1)) & (dl' = fin(64)))
-   | ((r' = fin(2)) & (dl' = fin(32))). -- TODO: shouldn't this go to 16?
+def reducedDomainLength : QueryRound -> ReducedDomainLength
+  := [ to(QueryRound)(fin(0)) => to(ReducedDomainLength)(fin(128))
+     , to(QueryRound)(fin(1)) => to(ReducedDomainLength)(fin(64))
+     , to(QueryRound)(fin(2)) => to(ReducedDomainLength)(fin(32))
+     ].
 
 def isDomainElement : Omega -> Offset -> Index -> F -> Prop
   := \omega : Omega => \offset : Offset => \i : Index => \x : F
@@ -599,9 +597,8 @@ def friRound
   => some aIndices : AIndices,
      some bIndices : BIndices,
      let cIndices : CIndices := to(CIndices)(from(AIndices)(aIndices));
-     some dl' : ReducedDomainLength,
-     checkReducedDomainLength(r, dl')
-   & reduceIndices(dl', topLevelIndices, aIndices, bIndices)
+     let dl' : ReducedDomainLength := reducedDomainLength(r);
+     reduceIndices(dl', topLevelIndices, aIndices, bIndices)
    & verifyRoundOpenings(H, root, nextRoot, qs, aIndices, bIndices, cIndices)
    & (all i : IndexNumber,
        some x0 : F, some x1 : F,
