@@ -295,43 +295,42 @@ def commitsTo2 : Map^4096(PlaintextKey, Hash)
   -> (Fin(2) -> F) -> Commitment -> Prop
   := \H : Map^4096(PlaintextKey, Hash)
   => \f : Fin(2) -> F => \c : Commitment
-  => some c0 : Commitment, some c1 : Commitment,
-     mergeCommitments(H, c0, c1, c)
-   & commitsTo1(H, f(fin(0)), c0)
-   & commitsTo1(H, f(fin(1)), c1).
+  => some c' : Fin(2) -> Commitment,
+     mergeCommitments(H, c'(fin(0)), c'(fin(1)), c)
+   & (all o : Fin(2), commitsTo1(H, f(o), c'(o))).
 
 def commitsTo4 : Map^4096(PlaintextKey, Hash)
   -> (Fin(4) -> F) -> Commitment -> Prop
   := \H : Map^4096(PlaintextKey, Hash)
   => \f : Fin(4) -> F => \c : Commitment
-  => let f0 : Fin(2) -> F := \x : Fin(2) => f(cast(x));
-     let f1 : Fin(2) -> F := \x : Fin(2) => f(cast(cast(x) +N 2N));
-     some c0 : Commitment, some c1 : Commitment,
-     mergeCommitments(H, c0, c1, c)
-   & commitsTo2(H, f0, c0)
-   & commitsTo2(H, f1, c1).
+  => let f' : Fin(2) -> Fin(2) -> F
+       := \o : Fin(2) => \x : Fin(2)
+       => f(cast(cast(x) +N (2N *N cast(o))));
+     some c' : Fin(2) -> Commitment,
+     mergeCommitments(H, c'(fin(0)), c'(fin(1)), c)
+   & (all o : Fin(2), commitsTo2(H, f'(o), c'(o))).
 
 def commitsTo8 : Map^4096(PlaintextKey, Hash)
   -> (Fin(8) -> F) -> Commitment -> Prop
   := \H : Map^4096(PlaintextKey, Hash)
   => \f : Fin(8) -> F => \c : Commitment
-  => let f0 : Fin(4) -> F := \x : Fin(4) => f(cast(x));
-     let f1 : Fin(4) -> F := \x : Fin(4) => f(cast(cast(x) +N 4N));
-     some c0 : Commitment, some c1 : Commitment,
-     mergeCommitments(H, c0, c1, c)
-   & commitsTo4(H, f0, c0)
-   & commitsTo4(H, f1, c1).
+  => let f' : Fin(2) -> Fin(4) -> F
+       := \o : Fin(2) => \x : Fin(4)
+       => f(cast(cast(x) +N (cast(o) *N 4N)));
+     some c' : Fin(2) ->^2 Commitment,
+     mergeCommitments(H, c'(fin(0)), c'(fin(1)), c)
+   & (all o : Fin(2), commitsTo4(H, f'(o), c'(o))).
 
 def commitsTo16 : Map^4096(PlaintextKey, Hash)
   -> (Fin(16) -> F) -> Commitment -> Prop
   := \H : Map^4096(PlaintextKey, Hash)
   => \f : Fin(16) -> F => \c : Commitment
-  => let f0 : Fin(8) -> F := \x : Fin(8) => f(cast(x));
-     let f1 : Fin(8) -> F := \x : Fin(8) => f(cast(cast(x) +N 8N));
-     some c0 : Commitment, some c1 : Commitment,
-     mergeCommitments(H, c0, c1, c)
-   & commitsTo8(H, f0, c0)
-   & commitsTo8(H, f1, c1).
+  => let f' : Fin(2) -> Fin(8) -> F
+       := \o : Fin(2) => \x : Fin(8)
+       => f(cast(cast(x) +N (cast(o) *N 8N)));
+     some c' : Fin(2) ->^2 Commitment,
+     mergeCommitments(H, c'(fin(0)), c'(fin(1)), c)
+   & (all o : Fin(2), commitsTo8(H, f'(o), c'(o))).
 
 def commitsTo : Map^4096(PlaintextKey, Hash)
   -> Codeword -> Commitment -> Prop
