@@ -84,26 +84,23 @@ def fft8 : (Fin(8) -> F) -> (Fin(8) -> F) -> Prop
 
 def fft16 : (Fin(16) -> F) -> (Fin(16) -> F) -> Prop
   := \xs : Fin(16) -> F => \ys : Fin(16) -> F
-  => let omega : F := to(F)(fin(22186728119017901039385635608201850931));
-     let omega2 : F := to(F)(fin(131076302407280330469229082343774091404));
-     let omega3 : F := to(F)(fin(73231901677283077325882091713770153990));
-     let omega4 : F := to(F)(fin(259052015163170058651980223774986375587));
-     let omega5 : F := to(F)(fin(266437655688779403589114768359918648781));
-     let omega6 : F := to(F)(fin(94118632892422173191291920064315934488));
-     let omega7 : F := to(F)(fin(196366951967922674545239204167809605584));
+  => let omega : Fin(8) -> F :=
+       [ fin(0) => to(F)(fin(1))
+       , fin(1) => to(F)(fin(22186728119017901039385635608201850931))
+       , fin(2) => to(F)(fin(131076302407280330469229082343774091404))
+       , fin(3) => to(F)(fin(73231901677283077325882091713770153990))
+       , fin(4) => to(F)(fin(259052015163170058651980223774986375587))
+       , fin(5) => to(F)(fin(266437655688779403589114768359918648781))
+       , fin(6) => to(F)(fin(94118632892422173191291920064315934488))
+       , fin(7) => to(F)(fin(196366951967922674545239204167809605584))
+       ];
      some ys0 : Fin(8) ->^8 F,
      some ys1 : Fin(8) ->^8 F,
      let xs0 : Fin(8) -> F := \i : Fin(8) => xs(cast(2N *N cast(i)));
      let xs1 : Fin(8) -> F := \i : Fin(8) => xs(cast((2N *N cast(i)) +N 1N));
      fft8(xs0, ys0) & fft8(xs1, ys1)
-   & combine1((ys0(fin(0)), ys1(fin(0))), (ys(fin(0)), ys(fin(8))))
-   & combine(omega, (ys0(fin(1)), ys1(fin(1))), (ys(fin(1)), ys(fin(9))))
-   & combine(omega2, (ys0(fin(2)), ys1(fin(2))), (ys(fin(2)), ys(fin(10))))
-   & combine(omega3, (ys0(fin(3)), ys1(fin(3))), (ys(fin(3)), ys(fin(11))))
-   & combine(omega4, (ys0(fin(4)), ys1(fin(4))), (ys(fin(4)), ys(fin(12))))
-   & combine(omega5, (ys0(fin(5)), ys1(fin(5))), (ys(fin(5)), ys(fin(13))))
-   & combine(omega6, (ys0(fin(6)), ys1(fin(6))), (ys(fin(6)), ys(fin(14))))
-   & combine(omega7, (ys0(fin(7)), ys1(fin(7))), (ys(fin(7)), ys(fin(15)))).
+   & (all i : Fin(8), combine(omega(i), (ys0(i), ys1(i)),
+                                        (ys(cast(i)), ys(cast(cast(i) +N 8N))))).
 
 -- Rescue hash
 -- https://eprint.iacr.org/2019/426.pdf
