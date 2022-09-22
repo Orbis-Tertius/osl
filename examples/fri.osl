@@ -253,10 +253,7 @@ def mergeHashes : Map^4096(PlaintextKey, Hash)
    & rescueHashLookup(H, to(Plaintext)(x'), y).
 
 def depthIndexIsEven : DepthIndex -> Prop
-  := \x' : DepthIndex
-  => let x : Fin(12) := from(DepthIndex)(x');
-     (x = fin(0)) | (x = fin(2)) | (x = fin(4)) | (x = fin(6))
-   | (x = fin(8)) | (x = fin(10)).
+  := {to(DepthIndex)(fin(0)), to(DepthIndex)(fin(2)), to(DepthIndex)(fin(4)), to(DepthIndex)(fin(6))}.
 
 def verifyOpening
    : Map^4096(PlaintextKey, Hash)
