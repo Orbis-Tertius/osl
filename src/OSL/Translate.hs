@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,23 +14,27 @@ module OSL.Translate
 
 
 import Control.Applicative (liftA2)
+import Control.Lens ((^.))
 import Control.Monad (forM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.State.Strict (StateT, execStateT, get, put)
 import Data.Functor.Identity (runIdentity)
 import Data.List (foldl')
+import qualified Data.List.NonEmpty as NonEmpty
+import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (pack)
 
-import OSL.BuildTranslationContext (buildTranslationContext', getFreeOSLName, addFreeVariableMapping, addTermMapping)
+import OSL.BuildTranslationContext (buildTranslationContext', getFreeOSLName, addFreeVariableMapping, addTermMapping, getFreeS11Name, getBoundS11NamesInContext)
 import OSL.Die (die)
 import OSL.Sigma11 (incrementDeBruijnIndices, incrementArities, prependBounds)
 import OSL.Term (termAnnotation, boundAnnotation)
 import OSL.TranslationContext (mergeMappings, mergeMapping, linearizeMapping)
 import OSL.Type (typeAnnotation)
 import OSL.Types.Arity (Arity (..))
+import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
@@ -95,16 +100,23 @@ translate gc@(TranslationContext gDecls _)
     OSL.ConstSet ann xs ->
       case termType of
         OSL.F _ _ xType (OSL.Prop _) -> do
-          S11.AuxTables fTables pTables <- get
-          cs <- forM xs
-            $ lift . translateToConstant gDecls decls xType
-          nm <- getFreeS11PredicateNameM
-          put $ S11.AuxTables fTables
-            (Map.insert nm
-              (Set.fromList (linearizeMapping <$> cs))
-              pTables)
-          pure (Mapping (PredicateMapping nm))
-        _ -> lift . Left $ ErrorMessage ann "unexpected set literal"
+          xDim <- lift $ getMappingDimensions decls xType
+          case xDim of
+            FiniteDimensions n -> do
+              S11.AuxTables fTables pTables <- get
+              cs <- forM xs
+                $ lift . translateToConstant gDecls decls xType
+              nm <- getFreeS11PredicateNameM (Arity n)
+              put $ S11.AuxTables fTables
+                (Map.insert nm
+                  (Set.fromList (linearizeMapping <$> cs))
+                  pTables)
+              pure (Mapping (PredicateMapping nm))
+            InfiniteDimensions ->
+              lift . Left . ErrorMessage ann $
+                "set literals must range over a finite-dimensional type but the contextual element type is " <> pack (show xType)
+        _ -> lift . Left . ErrorMessage ann $
+          "unexpected set literal; expected a " <> pack (show termType)
     OSL.ConstF ann fs ->
       case termType of
         OSL.F _ _ xType yType -> do
@@ -114,7 +126,7 @@ translate gc@(TranslationContext gDecls _)
               lift . Left $ ErrorMessage ann "domain type of a function table literal must be finite-dimensional"
             FiniteDimensions n -> do
               aux@(S11.AuxTables fTables pTables) <- get
-              nm <- lift $ getFreeS11NameM (Arity n) lc aux
+              let nm = getFreeS11NameM (Arity n) lc aux
               xs :: [[Integer]] <- fmap linearizeMapping <$>
                 (forM (fst <$> fs)
                   (lift . translateToConstant gDecls decls xType))
@@ -1032,6 +1044,11 @@ applyMappings ann goalType f x =
                  (S11.Mul (S11.Add (S11.Const 1)
                                    (S11.Mul (S11.Const (-1)) aT))
                           cT)
+    (PredicateMapping p, xM) -> do
+      case NonEmpty.nonEmpty (linearizeMapping xM) of
+        Just args' -> pure . PropMapping $ S11.Predicate p args'
+        Nothing -> lift . Left . ErrorMessage ann 
+          $ "predicate argument is empty; this is a compiler bug"
     _ -> lift . Left $ ErrorMessage ann ("unable to apply mappings:\n" <> pack (show f) <> "\n<---\n" <> pack (show x))
   where rec = applyMappings ann goalType
 
@@ -1307,20 +1324,24 @@ translateToConstant gc lc@(OSL.ValidContext decls) termType =
 
 
 getFreeS11PredicateNameM
-  :: StateT S11.AuxTables (Either (ErrorMessage ann)) S11.PredicateName
-getFreeS11PredicateNameM = todo
+  :: Arity
+  -> StateT S11.AuxTables (Either (ErrorMessage ann)) S11.PredicateName
+getFreeS11PredicateNameM arity = do
+  S11.AuxTables _ ps <- get
+  pure . fromMaybe (S11.PredicateName arity (DeBruijnIndex 0))
+    . fmap (S11.PredicateName arity . (+1) . (^. #deBruijnIndex))
+    . Set.lookupMax $ Map.keysSet ps
 
 
 getFreeS11NameM
   :: Arity
   -> TranslationContext 'OSL.Local ann
   -> S11.AuxTables
-  -> Either (ErrorMessage ann) S11.Name
-getFreeS11NameM = todo
-
-
-todo :: a
-todo = todo
+  -> S11.Name
+getFreeS11NameM arity ctx (S11.AuxTables fs _) = do
+  getFreeS11Name arity 
+    (getBoundS11NamesInContext arity ctx
+      `Set.union` Map.keysSet fs)
 
 
 mconcatM :: Monad m => Monoid a => [m a] -> m a

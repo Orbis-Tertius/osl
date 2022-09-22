@@ -265,12 +265,12 @@ getBoundS11NamesInMapping arity =
 
 getFreeS11Name
   :: Arity
-  -> TranslationContext t ann
+  -> Set S11.Name
   -> S11.Name
-getFreeS11Name arity ctx =
+getFreeS11Name arity =
   fromMaybe (S11.Name arity (DeBruijnIndex 0))
     . fmap (S11.Name arity . (+1) . (^. #deBruijnIndex))
-    $ Set.lookupMax (getBoundS11NamesInContext arity ctx)
+    . Set.lookupMax
 
 
 getFreeS11NameM
@@ -278,7 +278,7 @@ getFreeS11NameM
   => Arity
   -> StateT (TranslationContext t ann) m S11.Name
 getFreeS11NameM arity =
-  getFreeS11Name arity <$> get
+  getFreeS11Name arity . getBoundS11NamesInContext arity <$> get
 
 
 addGensym

@@ -127,7 +127,7 @@ data AuxTables =
   { functionTables :: Map Name (Map [Integer] Integer)
   , predicateTables :: Map PredicateName (Set [Integer])
   }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance Semigroup AuxTables where
   (AuxTables ft0 pt0) <> (AuxTables ft1 pt1) = AuxTables (ft0 <> ft1) (pt0 <> pt1)

@@ -44,6 +44,8 @@ runMain fileName targetName = do
                     Just (Defined _ targetTerm) ->
                       case runStateT (translateToFormula gc lc targetTerm) mempty of
                         Left err -> pure $ "Error translating: " <> show err
-                        Right (translated, aux) -> pure $ "Translated OSL:\n" <> show translated <> "\n\nAux Data:\n" <> show aux
+                        Right (translated, aux) ->
+                          pure $ "Translated OSL:\n" <> show translated <>
+                            (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
                     _ -> pure "please provide the name of a defined term"
                 Left err -> pure $ "Error building context: " <> show err
