@@ -116,9 +116,28 @@ def fft16 : (Fin(16) -> F) -> (Fin(16) -> F) -> Prop
 --
 -- Number of rounds: 10
 
+data PlaintextKey ~= ((F * F) * (F * F)) * ((F * F) * (F * F)) * ((F * F) * (F * F)).
+
 data Plaintext ~= Fin(12) -> F.
 
+def plaintextToKey : Plaintext -> PlaintextKey
+  := \p : Plaintext
+  => let f : Fin(12) -> F := from(Plaintext)(p);
+     to(PlaintextKey)(
+       ( ((f(fin(0)), f(fin(1))), (f(fin(2)), f(fin(3))))
+       , ((f(fin(4)), f(fin(5))), (f(fin(6)), f(fin(7))))
+       , ((f(fin(8)), f(fin(9))), (f(fin(10)), f(fin(11)))) )
+     ).
+
+def plaintextEq : Plaintext -> Plaintext -> Prop
+  := \x : Plaintext => \y : Plaintext
+  => all i : Fin(12), from(Plaintext)(x, i) = from(Plaintext)(y, i).
+
 data Hash ~= Fin(12) -> F.
+
+def hashEq : Hash -> Hash -> Prop
+  := \x : Hash => \y : Hash
+  => all i : Fin(12), from(Hash)(x, i) = from(Hash)(y, i).
 
 data I ~= Fin(12).
 
@@ -198,9 +217,14 @@ def rescueHash : Plaintext -> Hash -> Prop
       rescueHashRound(addK(i'), s(cast(i)), s(cast(i'))))
    & (all j : Fin(12), s(fin(1), j) = h'(j)).
 
-def hashesAreEqual : Hash -> Hash -> Prop
-  := \x0 : Hash => \x1 : Hash
-  => all i : Fin(12), from(Hash)(x0, i) = from(Hash)(x1, i).
+def rescueHashLookup
+   : (Map^4096(PlaintextKey, Hash))
+  -> Plaintext -> Hash -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \p : Plaintext => \h : Hash
+  => let k : PlaintextKey := plaintextToKey(p);
+     !(isNothing(lookup(k, H)))
+   & (hashEq(h, exists(lookup(k, H)))).
 
 -- Merkle commitments
 
@@ -218,13 +242,15 @@ data DepthIndex ~= Fin(8).
 data AuthPath ~= DepthIndex -> Hash.
 
 -- TODO: is this secure?
-def mergeHashes : Hash -> Hash -> Hash -> Prop
-  := \x0 : Hash => \x1 : Hash => \y : Hash
+def mergeHashes : Map^4096(PlaintextKey, Hash)
+  -> Hash -> Hash -> Hash -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \x0 : Hash => \x1 : Hash => \y : Hash
   => let x0' : Fin(12) -> F := from(Hash)(x0);
      let x1' : Fin(12) -> F := from(Hash)(x1);
      some x' : Fin(12) -> F,
      (all i : Fin(12), toN(x'(i)) = (toN(x0'(i)) +N toN(x1'(i))))
-   & rescueHash(to(Plaintext)(x'), y).
+   & rescueHashLookup(H, to(Plaintext)(x'), y).
 
 def depthIndexIsEven : DepthIndex -> Prop
   := \x' : DepthIndex
@@ -232,70 +258,87 @@ def depthIndexIsEven : DepthIndex -> Prop
      (x = fin(0)) | (x = fin(2)) | (x = fin(4)) | (x = fin(6))
    | (x = fin(8)) | (x = fin(10)).
 
-def verifyOpening : Commitment -> Index -> F -> AuthPath -> Prop
-  := \c : Commitment => \i : Index => \x : F => \p : AuthPath
+def verifyOpening
+   : Map^4096(PlaintextKey, Hash)
+  -> Commitment -> Index -> F -> AuthPath -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \c : Commitment => \i : Index => \x : F => \p : AuthPath
   => some f : DepthIndex ->^8 Hash,
      some h : Hash,
      let p' : Plaintext := to(Plaintext)((\j : Fin(12) => x));
-     rescueHash(p', h)
-   & hashesAreEqual(f(to(DepthIndex)(fin(0))), h)
+     rescueHashLookup(H, p', h)
+   & hashEq(f(to(DepthIndex)(fin(0))), h)
    & (all j : Fin(7),
       let j' : DepthIndex := to(DepthIndex)(cast(j));
       let j'' : DepthIndex := to(DepthIndex)(cast(cast(j) +N 1N));
       let h' : Hash := f(j');
       let h'' : Hash := f(j'');
       let k : Hash := from(AuthPath)(p, j');
-      (depthIndexIsEven(j') & mergeHashes(h', k, h''))
-    | (!(depthIndexIsEven(j')) & mergeHashes(k, h', h''))).
+      (depthIndexIsEven(j') & mergeHashes(H, h', k, h''))
+    | (!(depthIndexIsEven(j')) & mergeHashes(H, k, h', h''))).
 
-def mergeCommitments : Commitment -> Commitment -> Commitment -> Prop
-  := \a : Commitment => \b : Commitment => \c : Commitment
-  => mergeHashes(from(Commitment)(a), from(Commitment)(b), from(Commitment)(c)).
+def mergeCommitments : Map^4096(PlaintextKey, Hash)
+  -> Commitment -> Commitment -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \a : Commitment => \b : Commitment => \c : Commitment
+  => mergeHashes(H, from(Commitment)(a), from(Commitment)(b), from(Commitment)(c)).
 
-def commitsTo1 : F -> Commitment -> Prop
-  := \x : F => \c : Commitment
+def commitsTo1 : Map^4096(PlaintextKey, Hash)
+  -> F -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \x : F => \c : Commitment
   => let h : Hash := from(Commitment)(c);
      let p : Plaintext := to(Plaintext)((\i : Fin(12) => x));
-     rescueHash(p, h).
+     rescueHashLookup(H, p, h).
 
-def commitsTo2 : (Fin(2) -> F) -> Commitment -> Prop
-  := \f : Fin(2) -> F => \c : Commitment
+def commitsTo2 : Map^4096(PlaintextKey, Hash)
+  -> (Fin(2) -> F) -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \f : Fin(2) -> F => \c : Commitment
   => some c0 : Commitment, some c1 : Commitment,
-     mergeCommitments(c0, c1, c)
-   & commitsTo1(f(fin(0)), c0)
-   & commitsTo1(f(fin(1)), c1).
+     mergeCommitments(H, c0, c1, c)
+   & commitsTo1(H, f(fin(0)), c0)
+   & commitsTo1(H, f(fin(1)), c1).
 
-def commitsTo4 : (Fin(4) -> F) -> Commitment -> Prop
-  := \f : Fin(4) -> F => \c : Commitment
+def commitsTo4 : Map^4096(PlaintextKey, Hash)
+  -> (Fin(4) -> F) -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \f : Fin(4) -> F => \c : Commitment
   => let f0 : Fin(2) -> F := \x : Fin(2) => f(cast(x));
      let f1 : Fin(2) -> F := \x : Fin(2) => f(cast(cast(x) +N 2N));
      some c0 : Commitment, some c1 : Commitment,
-     mergeCommitments(c0, c1, c)
-   & commitsTo2(f0, c0)
-   & commitsTo2(f1, c1).
+     mergeCommitments(H, c0, c1, c)
+   & commitsTo2(H, f0, c0)
+   & commitsTo2(H, f1, c1).
 
-def commitsTo8 : (Fin(8) -> F) -> Commitment -> Prop
-  := \f : Fin(8) -> F => \c : Commitment
+def commitsTo8 : Map^4096(PlaintextKey, Hash)
+  -> (Fin(8) -> F) -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \f : Fin(8) -> F => \c : Commitment
   => let f0 : Fin(4) -> F := \x : Fin(4) => f(cast(x));
      let f1 : Fin(4) -> F := \x : Fin(4) => f(cast(cast(x) +N 4N));
      some c0 : Commitment, some c1 : Commitment,
-     mergeCommitments(c0, c1, c)
-   & commitsTo4(f0, c0)
-   & commitsTo4(f1, c1).
+     mergeCommitments(H, c0, c1, c)
+   & commitsTo4(H, f0, c0)
+   & commitsTo4(H, f1, c1).
 
-def commitsTo16 : (Fin(16) -> F) -> Commitment -> Prop
-  := \f : Fin(16) -> F => \c : Commitment
+def commitsTo16 : Map^4096(PlaintextKey, Hash)
+  -> (Fin(16) -> F) -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \f : Fin(16) -> F => \c : Commitment
   => let f0 : Fin(8) -> F := \x : Fin(8) => f(cast(x));
      let f1 : Fin(8) -> F := \x : Fin(8) => f(cast(cast(x) +N 8N));
      some c0 : Commitment, some c1 : Commitment,
-     mergeCommitments(c0, c1, c)
-   & commitsTo8(f0, c0)
-   & commitsTo8(f1, c1).
+     mergeCommitments(H, c0, c1, c)
+   & commitsTo8(H, f0, c0)
+   & commitsTo8(H, f1, c1).
 
-def commitsTo : Codeword -> Commitment -> Prop
-  := \w : Codeword => \c : Commitment
+def commitsTo : Map^4096(PlaintextKey, Hash)
+  -> Codeword -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \w : Codeword => \c : Commitment
   => let w' : Fin(16) -> F := \x : Fin(16) => from(Codeword)(w, to(Index)(x));
-     commitsTo16(w', c).
+     commitsTo16(H, w', c).
 
 -- FRI
 
@@ -392,17 +435,19 @@ def getLastChallenge : Alphas -> Challenge
 def getAlphaHash : Alphas -> Fin(4) -> Hash
   := \as : Alphas => \x : Fin(4) => pi2(from(Challenge)((from(Alphas)(as))(x))).
 
-def checkAlphas : Proof -> Alphas -> Prop
-  := \p : Proof => \a : Alphas
+def checkAlphas : Map^4096(PlaintextKey, Hash)
+  -> Proof -> Alphas -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \p : Proof => \a : Alphas
   => let f : Fin(4) -> Hash := \x : Fin(4) => from(Commitment)(commitments(p, x));
      let f' : Fin(4) -> F := \x : Fin(4) => (from(Hash)(f(x)))(fin(0));
      let g : Fin(4) -> F := \x : Fin(4) => from(Alpha)(getAlpha(a, x));
      let h : Fin(4) -> Hash := \x : Fin(4) => getAlphaHash(a, x);
-     (all x : Fin(4), rescueHash(to(Plaintext)((\i : Fin(12) => g(x))), h(x)))
-   & rescueHash(to(Plaintext)(from(Hash)(f(fin(0)))), h(fin(0)))
-   & mergeHashes(h(fin(0)), f(fin(1)), h(fin(1)))
-   & mergeHashes(h(fin(1)), f(fin(2)), h(fin(2)))
-   & mergeHashes(h(fin(2)), f(fin(3)), h(fin(3))).
+     (all x : Fin(4), rescueHashLookup(H, to(Plaintext)((\i : Fin(12) => g(x))), h(x)))
+   & rescueHashLookup(H, to(Plaintext)(from(Hash)(f(fin(0)))), h(fin(0)))
+   & mergeHashes(H, h(fin(0)), f(fin(1)), h(fin(1)))
+   & mergeHashes(H, h(fin(1)), f(fin(2)), h(fin(2)))
+   & mergeHashes(H, h(fin(2)), f(fin(3)), h(fin(3))).
 
 def sampleIndex : Hash -> Index -> Prop
   := \h : Hash => \i : Index
@@ -411,19 +456,21 @@ def sampleIndex : Hash -> Index -> Prop
      some y : N < 67624474285557595033981184191762530305N,
      x = ((4N *N y) +N i').
 
-def checkTopLevelIndices : Proof -> Challenge -> TopLevelIndices -> Prop
-  := \p : Proof => \c : Challenge => \is : TopLevelIndices
+def checkTopLevelIndices : Map^4096(PlaintextKey, Hash)
+  -> Proof -> Challenge -> TopLevelIndices -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \p : Proof => \c : Challenge => \is : TopLevelIndices
   => some s : Hash, some c' : Commitment,
-     commitsTo(codeword(p), c')
-   & mergeHashes(pi2(from(Challenge)(c)), from(Commitment)(c'), s)
+     commitsTo(H, codeword(p), c')
+   & mergeHashes(H, pi2(from(Challenge)(c)), from(Commitment)(c'), s)
      -- TODO: doesn't the finiteness of the steps break completeness?
    & (some steps : List^128(Hash * Index),
       (all i : N < length(steps),
          let h : Hash := pi1(nth(steps, i));
          let j : Index := pi2(nth(steps, i));
          some h' : Hash,
-         commitsTo1(to(F)(cast(i)), to(Commitment)(h'))
-       & mergeHashes(s, h', h)
+         commitsTo1(H, to(F)(cast(i)), to(Commitment)(h'))
+       & mergeHashes(H, s, h', h)
        & sampleIndex(h, j))
     & (all i : IndexNumber, some j : N < 128N,
          getTopLevelIndex(is, i) = pi2(nth(steps, cast(from(IndexNumber)(i)))))).
@@ -506,14 +553,16 @@ def areColinear : Omega -> Offset -> Point -> Point -> Point -> Prop
       f(x0, y0) & f(x1, y1) & f(x2, y2).
 
 def verifyRoundOpenings
-   : Commitment
+   : Map^4096(PlaintextKey, Hash)
+  -> Commitment
   -> Commitment
   -> (IndexNumber -> IndexOpenings)
   -> AIndices
   -> BIndices
   -> CIndices
   -> Prop
-  := \root : Commitment => \nextRoot : Commitment
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \root : Commitment => \nextRoot : Commitment
   => \qs : IndexNumber -> IndexOpenings
   => \aIndices : AIndices => \bIndices : BIndices => \cIndices : CIndices
   => all i : IndexNumber,
@@ -529,12 +578,13 @@ def verifyRoundOpenings
      let ap : AuthPath := from(AAuthPath)(pi2(from(AOpening)(aq)));
      let bp : AuthPath := from(BAuthPath)(pi2(from(BOpening)(bq)));
      let cp : AuthPath := from(CAuthPath)(pi2(from(COpening)(cq)));
-     verifyOpening(root, ai, ay, ap)
-   & verifyOpening(root, bi, by, bp)
-   & verifyOpening(nextRoot, ci, cy, cp).
+     verifyOpening(H, root, ai, ay, ap)
+   & verifyOpening(H, root, bi, by, bp)
+   & verifyOpening(H, nextRoot, ci, cy, cp).
 
 def friRound
-   : Proof
+   : Map^4096(PlaintextKey, Hash)
+  -> Proof
   -> QueryRound
   -> Omega
   -> Offset
@@ -543,7 +593,8 @@ def friRound
   -> Commitment -> Commitment
   -> (IndexNumber -> IndexOpenings)
   -> Prop
-  := \p : Proof
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \p : Proof
   => \r : QueryRound
   => \omega : Omega
   => \offset : Offset
@@ -557,7 +608,7 @@ def friRound
      some dl' : ReducedDomainLength,
      checkReducedDomainLength(r, dl')
    & reduceIndices(dl', topLevelIndices, aIndices, bIndices)
-   & verifyRoundOpenings(root, nextRoot, qs, aIndices, bIndices, cIndices)
+   & verifyRoundOpenings(H, root, nextRoot, qs, aIndices, bIndices, cIndices)
    & (all i : IndexNumber,
        some x0 : F, some x1 : F,
        let a : A := pi1(from(AOpening)(aOpening(qs(i))));
@@ -574,10 +625,15 @@ def fri : Proof -> Prop
   := \p : Proof
   => some as : Alphas,
      some is : TopLevelIndices,
+     some H : Map^4096(PlaintextKey, Hash), -- TODO: what is enough hashes?
      isLowDegree(codeword(p))
-   & commitsTo(codeword(p), commitments(p, fin(3)))
-   & checkAlphas(p, as)
-   & checkTopLevelIndices(p, getLastChallenge(as), is)
+   & (all i : N < length(keys(H)),
+      let k : PlaintextKey := nth(keys(H), i);
+      some p : Plaintext, (plaintextToKey(p) = k)
+    & rescueHash(p, exists(lookup(k, H))))
+   & commitsTo(H, codeword(p), commitments(p, fin(3)))
+   & checkAlphas(H, p, as)
+   & checkTopLevelIndices(H, p, getLastChallenge(as), is)
    & (all r : QueryRound,
       let r' : Fin(3) := from(QueryRound)(r);
       let alpha : Alpha := getAlpha(as, r');
@@ -586,4 +642,4 @@ def fri : Proof -> Prop
       let qs : IndexNumber -> IndexOpenings := openings(p, r);
       some omega : Omega, some offset : Offset,
       checkOmega(r, omega) & checkOffset(r, offset)
-    & friRound(p, r, omega, offset, alpha, is, root, nextRoot, qs)).
+    & friRound(H, p, r, omega, offset, alpha, is, root, nextRoot, qs)).
