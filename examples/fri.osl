@@ -523,9 +523,8 @@ def reducedDomainLength : QueryRound -> ReducedDomainLength
      , to(QueryRound)(fin(2)) => to(ReducedDomainLength)(fin(32))
      ].
 
-def isDomainElement : Omega -> Offset -> Index -> F -> Prop
-  := \omega : Omega => \offset : Offset => \i : Index => \x : F
-  => todo. -- TODO: implement with a table
+def isDomainElement : ((Omega * Offset) * (Index * F)) -> Prop
+  := { ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(0)), to(F)(fin(85408008396924667383611388730472331217)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(1)), to(F)(fin(51144784859582089584462234561948554025)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(2)), to(F)(fin(71334065370616283744252270554501990943)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(3)), to(F)(fin(217679179221747608588914807707245087230)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(4)), to(F)(fin(220590221626292988249169078292535595153)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(5)), to(F)(fin(116485245483325733815567215775171867374)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(6)), to(F)(fin(127354967976243969281398022365271876114)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(7)), to(F)(fin(15503294082427025966872377041803782269)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(8)), to(F)(fin(179633666799132255334608231127847355778)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(9)), to(F)(fin(178976893840981914107200041119045207769)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(10)), to(F)(fin(28505087566162518053762001097894196199)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(11)), to(F)(fin(169876515157291737972298314737018166475)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(12)), to(F)(fin(195776437544668294288461062718167208081)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(13)), to(F)(fin(138041925632975159762676217998982216051)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(14)), to(F)(fin(77478973729182240298998009979436278052)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(15)), to(F)(fin(167856517892203268353771233778549571582)))) }.
 
 data Point ~= F * F.
 
@@ -608,8 +607,8 @@ def friRound
        let p0 : Point := to(Point)((x0, from(A)(a)));
        let p1 : Point := to(Point)((x1, from(B)(b)));
        let p2 : Point := to(Point)((from(Alpha)(alpha), from(C)(c)));
-       isDomainElement(omega, offset, (from(AIndices)(aIndices))(i), x0)
-     & isDomainElement(omega, offset, (from(BIndices)(bIndices))(i), x1)
+       isDomainElement(((omega, offset), ((from(AIndices)(aIndices))(i), x0)))
+     & isDomainElement(((omega, offset), ((from(BIndices)(bIndices))(i), x1)))
      & areColinear(omega, offset, p0, p1, p2)).
 
 def fri : Proof -> Prop
