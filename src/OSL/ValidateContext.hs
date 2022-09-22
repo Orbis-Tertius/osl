@@ -289,6 +289,12 @@ checkTerm c t x =
           checkTerm c' b def
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t)
               <> " but got a lambda"
+    Apply _ (Apply _ (Pair _) y) z -> do
+      case t of
+        Product _ a b -> do
+          checkTerm c a y
+          checkTerm c b z
+        _ -> genericErrorMessage
     Apply _ (Cast _) y -> do
       checkTypeIsNumeric c t
       a <- inferType c y
