@@ -157,21 +157,12 @@ def todo : Prop := 0N = 1N.
 
 def sumJ : (J -> F) -> F -> Prop
   := \f : J -> F => \y : F
-  => some s1 : F, some s2 : F, some s3 : F, some s4 : F,
-     some s5 : F, some s6 : F, some s7 : F, some s8 : F,
-     some s9 : F, some s10 : F,
-     add(f(to(J)(fin(0))), f(to(J)(fin(1))), s1)
-   & add(s1,  f(to(J)(fin(2))), s2)
-   & add(s2,  f(to(J)(fin(3))), s3)
-   & add(s3,  f(to(J)(fin(4))), s4)
-   & add(s4,  f(to(J)(fin(5))), s5)
-   & add(s5,  f(to(J)(fin(6))), s6)
-   & add(s6,  f(to(J)(fin(7))), s7)
-   & add(s7,  f(to(J)(fin(8))), s8)
-   & add(s8,  f(to(J)(fin(9))), s9)
-   & add(s9,  f(to(J)(fin(10))), s10)
-   & add(s10, f(to(J)(fin(11))), y).
-
+  => some s : Fin(10) -> F,
+     add(f(to(J)(fin(0))), f(to(J)(fin(1))), s(fin(0)))
+   & add(s(fin(9)), f(to(J)(fin(11))), y)
+   & (all i : Fin(9), let i' : Fin(10) := cast(cast(i) +N 1N);
+      add(s(i), f(to(J)(i')), s(i'))).
+ 
 def rescueHashRound
    : ((Fin(12) -> F) -> (Fin(12) -> F) -> Prop)
   -> (Fin(12) -> F)
