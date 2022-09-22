@@ -481,19 +481,17 @@ def isLowDegree : Codeword -> Prop
       let i' : N := cast(i);
       (i' <= 7N) | (f(i) = zero)).
 
-def checkOmega : QueryRound -> Omega -> Prop
-  := \r : QueryRound
-  => \o : Omega
-  => ((r = to(QueryRound)(fin(0))) & (o = omega1))
-   | ((r = to(QueryRound)(fin(1))) & (o = omega2))
-   | ((r = to(QueryRound)(fin(2))) & (o = omega4)).
+def roundOmega : QueryRound -> Omega
+  := [ to(QueryRound)(fin(0)) => omega1
+     , to(QueryRound)(fin(1)) => omega2
+     , to(QueryRound)(fin(2)) => omega4
+     ].
 
-def checkOffset : QueryRound -> Offset -> Prop
-  := \r : QueryRound
-  => \o : Offset
-  => ((r = to(QueryRound)(fin(0))) & (o = offset1))
-   & ((r = to(QueryRound)(fin(1))) & (o = offset2))
-   & ((r = to(QueryRound)(fin(2))) & (o = offset4)).
+def roundOffset : QueryRound -> Offset
+  := [ to(QueryRound)(fin(0)) => offset1
+     , to(QueryRound)(fin(1)) => offset2
+     , to(QueryRound)(fin(2)) => offset4
+     ].
 
 data AIndices ~= IndexNumber -> Index.
 
@@ -636,6 +634,6 @@ def fri : Proof -> Prop
       let root : Commitment := commitments(p, cast(r'));
       let nextRoot : Commitment := commitments(p, cast(cast(r') +N 1N));
       let qs : IndexNumber -> IndexOpenings := openings(p, r);
-      some omega : Omega, some offset : Offset,
-      checkOmega(r, omega) & checkOffset(r, offset)
-    & friRound(H, p, r, omega, offset, alpha, is, root, nextRoot, qs)).
+      let omega : Omega := roundOmega(r);
+      let offset : Offset := roundOffset(r);
+      friRound(H, p, r, omega, offset, alpha, is, root, nextRoot, qs)).
