@@ -1,6 +1,7 @@
 module OSL.EntryPoint (main, runMain) where
 
 
+import Control.Monad.Trans.State.Strict (runStateT)
 import Data.Text (pack)
 import Data.Text.IO (readFile)
 import Prelude hiding (readFile)
@@ -41,8 +42,10 @@ runMain fileName targetName = do
                   let lc = toLocalTranslationContext gc
                   case getDeclaration validCtx (Sym (pack targetName)) of
                     Just (Defined _ targetTerm) ->
-                      case translateToFormula gc lc targetTerm of
+                      case runStateT (translateToFormula gc lc targetTerm) mempty of
                         Left err -> pure $ "Error translating: " <> show err
-                        Right translated -> pure $ "Translated OSL:\n" <> show translated
+                        Right (translated, aux) ->
+                          pure $ "Translated OSL:\n" <> show translated <>
+                            (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
                     _ -> pure "please provide the name of a defined term"
                 Left err -> pure $ "Error building context: " <> show err

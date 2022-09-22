@@ -11,5 +11,5 @@ data Token = Var Name | Keyword Keyword | ThinArrow | Colon
   | ProductOp | Comma | CoproductOp | AddNOp | MulNOp | AddZOp | MulZOp
   | Equal | Less | LessOrEqual | And | Or | Not | ForAll | ForSome
   | Lambda | ThickArrow | Congruent | DefEquals | Semicolon | Period
-  | Caret
+  | Caret | OpenBracket | CloseBracket | OpenBrace | CloseBrace
   deriving (Eq, Show)

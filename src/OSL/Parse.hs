@@ -519,6 +519,44 @@ parenthesizedTerm = do
   pure x
 
 
+functionTableLiteral :: Parser (Term SourcePos)
+functionTableLiteral = do
+  p <- getPosition
+  consumeExact_ T.OpenBracket
+  t <- ConstF p <$> functionTableBody
+  consumeExact_ T.CloseBracket
+  pure t
+
+
+functionTableBody :: Parser [(Term SourcePos, Term SourcePos)]
+functionTableBody = do
+  mr0 <- optionMaybe functionTableRow
+  case mr0 of
+    Nothing -> pure []
+    Just r0 -> (r0:) <$> many (consumeExact_ T.Comma >> functionTableRow)
+
+
+functionTableRow :: Parser (Term SourcePos, Term SourcePos)
+functionTableRow = (,) <$> term1 <*> (consumeExact_ T.ThickArrow >> term1)
+
+
+setLiteral :: Parser (Term SourcePos)
+setLiteral = do
+  p <- getPosition
+  consumeExact_ T.OpenBrace
+  t <- ConstSet p <$> setElements
+  consumeExact_ T.CloseBrace
+  pure t
+
+
+setElements :: Parser [Term SourcePos]
+setElements = do
+  mx0 <- optionMaybe term1
+  case mx0 of
+    Nothing -> pure []
+    Just x0 -> (x0:) <$> many (consumeExact_ T.Comma >> term1)
+
+
 term3 :: Parser (Term SourcePos)
 term3 =
   choice
@@ -526,6 +564,8 @@ term3 =
   [ namedTerm
   , constant
   , parenthesizedTerm
+  , functionTableLiteral
+  , setLiteral
   , builtin K.Cast Cast
   , builtin K.Inverse Inverse
   , builtin K.Pi1 Pi1

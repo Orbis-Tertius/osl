@@ -216,8 +216,8 @@ getBoundS11NamesInContext
   -> TranslationContext t ann
   -> Set S11.Name
 getBoundS11NamesInContext arity (TranslationContext _ ctx) =
-  Map.foldl' Set.union Set.empty
-    $ getBoundS11NamesInMapping arity <$> ctx
+   Map.foldl' Set.union Set.empty
+     (getBoundS11NamesInMapping arity <$> ctx)
 
 
 getBoundS11NamesInMapping
@@ -243,6 +243,7 @@ getBoundS11NamesInMapping arity =
       rec a `Set.union` (rec b `Set.union` (rec c `Set.union` rec d))
     LambdaMapping _ _ _ _ _ -> mempty
     PropMapping _ -> mempty
+    PredicateMapping _ -> mempty
   where
     f :: S11.Term -> Set S11.Name
     f (S11.Var name) = g name
@@ -264,12 +265,12 @@ getBoundS11NamesInMapping arity =
 
 getFreeS11Name
   :: Arity
-  -> TranslationContext t ann
+  -> Set S11.Name
   -> S11.Name
-getFreeS11Name arity ctx =
+getFreeS11Name arity =
   fromMaybe (S11.Name arity (DeBruijnIndex 0))
     . fmap (S11.Name arity . (+1) . (^. #deBruijnIndex))
-    $ Set.lookupMax (getBoundS11NamesInContext arity ctx)
+    . Set.lookupMax
 
 
 getFreeS11NameM
@@ -277,7 +278,7 @@ getFreeS11NameM
   => Arity
   -> StateT (TranslationContext t ann) m S11.Name
 getFreeS11NameM arity =
-  getFreeS11Name arity <$> get
+  getFreeS11Name arity . getBoundS11NamesInContext arity <$> get
 
 
 addGensym
@@ -341,6 +342,7 @@ mapAritiesInMapping f =
       -- TODO: should recurse into gc and/or lc?
       LambdaMapping gc lc v vT t
     PropMapping p -> PropMapping p
+    PredicateMapping p -> PredicateMapping p
   where
     g (S11.Name arity i) = S11.Name (f arity) i
     rec = mapAritiesInMapping f

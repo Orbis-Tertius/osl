@@ -65,6 +65,7 @@ data Mapping ann a =
     (OSL.Type ann)
     (OSL.Term ann)
   | PropMapping S11.Formula
+  | PredicateMapping S11.PredicateName
   deriving Show
 
 
@@ -105,6 +106,7 @@ instance Functor (Mapping ann) where
         -- TODO: should fmap descend into gc and/or lc?
         LambdaMapping gc lc v vT t
       PropMapping p -> PropMapping p
+      PredicateMapping p -> PredicateMapping p
 
 
 instance Foldable (Mapping ann) where
@@ -129,6 +131,7 @@ instance Foldable (Mapping ann) where
           <> foldMap f y <> foldMap f z
       LambdaMapping _ _ _ _ _ -> mempty
       PropMapping _ -> mempty
+      PredicateMapping _ -> mempty
 
 
 newtype LeftMapping ann a

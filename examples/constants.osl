@@ -1,0 +1,11 @@
+def exampleSet : N -> Prop
+  := {1N, 5N, 10N}.
+
+def inExampleSet : N -> Prop
+  := \x : N => exampleSet(x).
+
+def exampleFunction : N -> N
+  := [1N => 10N, 10N => 100N].
+
+def foo : Prop
+  := exampleSet(exampleFunction(1N)).

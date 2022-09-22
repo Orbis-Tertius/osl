@@ -8,6 +8,7 @@ module OSL.TranslationContext
   , mergeMapping
   , mappingIndices
   , highestIndicesInMappings
+  , linearizeMapping
   ) where
 
 
@@ -81,3 +82,7 @@ highestIndicesInMapping
   -> Map Arity DeBruijnIndex
 highestIndicesInMapping =
   compact . fmap Set.lookupMax . mappingIndices
+
+
+linearizeMapping :: Mapping ann a -> [a]
+linearizeMapping = foldl' (flip (:)) []
