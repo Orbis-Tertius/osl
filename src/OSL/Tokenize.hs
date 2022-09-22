@@ -73,6 +73,10 @@ token =
   , T.ThinArrow <$ string "→"
   , T.OpenParen <$ string "("
   , T.CloseParen <$ string ")"
+  , T.OpenBracket <$ string "["
+  , T.CloseBracket <$ string "]"
+  , T.OpenBrace <$ string "{"
+  , T.CloseBrace <$ string "}"
   , constantNatural
   , constantInteger
   , constantFinite

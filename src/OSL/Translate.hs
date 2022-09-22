@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 
 module OSL.Translate
@@ -104,6 +105,32 @@ translate gc@(TranslationContext gDecls _)
               pTables)
           pure (Mapping (PredicateMapping nm))
         _ -> lift . Left $ ErrorMessage ann "unexpected set literal"
+    OSL.ConstF ann fs ->
+      case termType of
+        OSL.F _ _ xType yType -> do
+          dim <- lift $ getMappingDimensions decls xType
+          case dim of
+            InfiniteDimensions ->
+              lift . Left $ ErrorMessage ann "domain type of a function table literal must be finite-dimensional"
+            FiniteDimensions n -> do
+              aux@(S11.AuxTables fTables pTables) <- get
+              nm <- lift $ getFreeS11NameM (Arity n) lc aux
+              xs :: [[Integer]] <- fmap linearizeMapping <$>
+                (forM (fst <$> fs)
+                  (lift . translateToConstant gDecls decls xType))
+              ys :: [[Integer]] <- fmap linearizeMapping <$>
+                forM (snd <$> fs)
+                  (lift . translateToConstant gDecls decls yType)
+              ys' :: [Integer] <- forM ys
+                $ \case
+                    [x] -> pure x
+                    _ -> lift . Left $ ErrorMessage ann "expected function codomain to be scalar"
+              put $ S11.AuxTables
+                (Map.insert nm (Map.fromList (zip xs ys')) fTables)
+                pTables
+              pure (Mapping (ScalarMapping (S11.Var nm)))
+        _ -> lift . Left . ErrorMessage ann $ "expected a "
+          <> pack (show termType) <> " but got a function table literal"
     OSL.Apply ann (OSL.NamedTerm ann' fName) x ->
       case getDeclaration decls fName of
         Just (OSL.Defined fType f) -> do
@@ -1220,7 +1247,7 @@ translateToConstant gc lc@(OSL.ValidContext decls) termType =
     OSL.NamedTerm ann name ->
       case Map.lookup name decls of
         Just (OSL.Defined defType def) ->
-          -- TODO: this is not quite right; a local context switch occurs
+          -- TODO: this is not quite right; a local context switch should occur
           translateToConstant gc lc defType def
         _ -> Left (ErrorMessage ann "expected the name of a constant")
     OSL.ConstN _ i -> pure (ScalarMapping i)
@@ -1257,11 +1284,13 @@ translateToConstant gc lc@(OSL.ValidContext decls) termType =
     OSL.Apply _ (OSL.Cast _) x -> do
       xType <- inferType lc x
       translateToConstant gc lc xType x
-    OSL.Apply _ (OSL.Apply _ (OSL.Pair _) x) y -> do
+    OSL.Apply ann (OSL.Apply _ (OSL.Pair _) x) y -> do
       case termType of
         OSL.Product _ a b ->
           ProductMapping <$> (LeftMapping <$> translateToConstant gc lc a x)
                          <*> (RightMapping <$> translateToConstant gc lc b y)
+        _ -> Left . ErrorMessage ann $ "unexpected pair; expected a "
+               <> pack (show termType)
     OSL.Apply ann (OSL.Pi1 _) x -> do
       xType <- inferType lc x
       xT <- translateToConstant gc lc xType x
@@ -1274,11 +1303,20 @@ translateToConstant gc lc@(OSL.ValidContext decls) termType =
       case xT of
         ProductMapping _ (RightMapping a) -> pure a
         _ -> Left (ErrorMessage ann "translating pi2 did not result in a product mapping; this is a compiler bug")
+    t -> Left $ ErrorMessage (termAnnotation t) "sorry, I was not taught how to translate this term to a constant"
 
 
 getFreeS11PredicateNameM
   :: StateT S11.AuxTables (Either (ErrorMessage ann)) S11.PredicateName
 getFreeS11PredicateNameM = todo
+
+
+getFreeS11NameM
+  :: Arity
+  -> TranslationContext 'OSL.Local ann
+  -> S11.AuxTables
+  -> Either (ErrorMessage ann) S11.Name
+getFreeS11NameM = todo
 
 
 todo :: a

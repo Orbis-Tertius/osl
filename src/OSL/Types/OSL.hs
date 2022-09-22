@@ -82,13 +82,13 @@ data Term ann =
   | AddN ann
   | MulN ann
   | ConstN ann Integer
-  | ConstF ann [(Term ann, Term ann)]
-  | ConstSet ann [Term ann]
   | AddZ ann
   | MulZ ann
   | ConstZ ann Integer
   | Cast ann
   | ConstFin ann Integer
+  | ConstF ann [(Term ann, Term ann)]
+  | ConstSet ann [Term ann]
   | Inverse ann
   | Pair ann
   | Pi1 ann -- Product projections
