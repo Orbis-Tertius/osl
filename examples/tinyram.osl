@@ -1,6 +1,4 @@
--- 16-bit, 8-register TinyRAM 2.0 VM
-
-def todo : Prop := 0N = 1N.
+-- 16-bit word, 8-register TinyRAM 2.0 VM
 
 data Word ~= Fin(65536).
 

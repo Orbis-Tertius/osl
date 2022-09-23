@@ -254,7 +254,10 @@ data Frac ~= Fin(18446743936270598144).
 def precision : N := 32N.
 
 def toFrac : N -> Frac
-  := \x : N => to(Frac)(precision *N cast(x)).
+  := \x : N => to(Frac)(cast(precision *N x)).
+
+def unboxFrac : Frac -> N
+  := \x : Frac => cast(from(Frac)(x)).
 
 def maxInt : N := 576460748008456192N.
 
@@ -266,12 +269,12 @@ def add : Frac -> Frac -> Frac
 
 def isProd : Frac -> Frac -> Frac -> Prop
   := \x : Frac => \y : Frac => \z : Frac
-  => (precision *N cast(from(Frac)(z)))
-   = (cast(cast(from(Frac)(x)) *N cast(from(Frac)(y)))).
+  => (precision *N unboxFrac(z))
+   = (cast(unboxFrac(x) *N unboxFrac(y))).
 
 def roundsUpTo : Frac -> N -> Prop
   := \x : Frac => \y : N
-  => (from(Frac)(x) <= (precision *N y))
+  => (unboxFrac(x) <= (precision *N y))
    & ((cast(precision *N y) +Z ((-1Z) *Z cast(from(Frac)(x))))
       <= (cast(precision) +Z (-1Z))).
 
@@ -410,7 +413,7 @@ def feeRequirementMet
   => \s : List^128(ScriptSize * Steps)
   => \x : Z
   => paysFeeToCorrectAddress(p, t)
-   & (f0(p) <= toFrac(x))
+   & (f0(p) <= toFrac(cast(x)))
    & (some c' : Frac < maxFrac,
       some d : Frac < maxFrac,
       some e : N < maxInt,

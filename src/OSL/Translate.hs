@@ -104,13 +104,17 @@ translate gc@(TranslationContext gDecls _)
           case xDim of
             FiniteDimensions n -> do
               S11.AuxTables fTables pTables <- get
-              cs <- forM xs
-                $ lift . translateToConstant gDecls decls xType
-              nm <- getFreeS11PredicateNameM (Arity n)
-              put $ S11.AuxTables fTables
-                (Map.insert nm
-                  (Set.fromList (linearizeMapping <$> cs))
-                  pTables)
+              cs <- forM xs $ lift . translateToConstant gDecls decls xType
+              let s = Set.fromList (linearizeMapping <$> cs)
+              nm <- case Map.toList (Map.filter (== s) pTables) of
+                ((nm, _) : _) -> pure nm
+                _ -> do
+                  nm <- getFreeS11PredicateNameM (Arity n)
+                  put $ S11.AuxTables fTables
+                    (Map.insert nm
+                      (Set.fromList (linearizeMapping <$> cs))
+                      pTables)
+                  pure nm
               pure (Mapping (PredicateMapping nm))
             InfiniteDimensions ->
               lift . Left . ErrorMessage ann $
@@ -126,7 +130,6 @@ translate gc@(TranslationContext gDecls _)
               lift . Left $ ErrorMessage ann "domain type of a function table literal must be finite-dimensional"
             FiniteDimensions n -> do
               aux@(S11.AuxTables fTables pTables) <- get
-              let nm = getFreeS11NameM (Arity n) lc aux
               xs :: [[Integer]] <- fmap linearizeMapping <$>
                 (forM (fst <$> fs)
                   (lift . translateToConstant gDecls decls xType))
@@ -137,18 +140,23 @@ translate gc@(TranslationContext gDecls _)
                 $ \case
                     [x] -> pure x
                     _ -> lift . Left $ ErrorMessage ann "expected function codomain to be scalar"
-              put $ S11.AuxTables
-                (Map.insert nm (Map.fromList (zip xs ys')) fTables)
-                pTables
+              let f = Map.fromList (zip xs ys')
+              nm <- case Map.toList (Map.filter (== f) fTables) of
+                ((nm, _) : _) -> pure nm
+                _ -> do
+                  let nm = getFreeS11NameM (Arity n) lc aux
+                  put $ S11.AuxTables
+                    (Map.insert nm f fTables)
+                    pTables
+                  pure nm
               pure (Mapping (ScalarMapping (S11.Var nm)))
         _ -> lift . Left . ErrorMessage ann $ "expected a "
           <> pack (show termType) <> " but got a function table literal"
     OSL.Apply ann (OSL.NamedTerm ann' fName) x ->
       case getDeclaration decls fName of
-        Just (OSL.Defined fType f) -> do
+        Just (OSL.Defined fType@(OSL.F _ _ a _) f) -> do
           fM <- translateToMapping gc lc fType f
-          xType <- lift $ inferType decls x
-          xM <- translateToMapping gc lc xType x
+          xM <- translateToMapping gc lc a x
           Mapping <$> applyMappings ann termType fM xM
         Just (OSL.FreeVariable fType@(OSL.F _ _ a _)) -> do
           fM <- translateToMapping gc lc fType (OSL.NamedTerm ann' fName)

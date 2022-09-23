@@ -1,0 +1,633 @@
+-- A verifier for a simple version of FRI.
+
+-- Basic arithmetic
+
+-- a = c mod b
+def modulus : N -> N -> N -> Prop
+  := \a : N => \b : N => \c : N
+  => some d : N < a,
+     ((c +N 1N) <= b)
+   & (a = ((d *N b) +N c)).
+
+-- Finite field
+
+data F ~= Fin(270497897142230380135924736767050121217).
+
+def zero : F := to(F)(fin(0)).
+def one : F := to(F)(fin(1)).
+
+def cardinality : N := 270497897142230380135924736767050121217N.
+
+def toN : F -> N
+  := \x : F => cast(from(F)(x)).
+
+def add : F -> F -> F -> Prop
+  := \a : F => \b : F => \c : F
+  => some d : N < cardinality,
+     (toN(a) +N toN(b)) = (toN(c) +N (cardinality *N d)).
+
+def mul : F -> F -> F -> Prop
+  := \a : F => \b : F => \c : F
+  => some d : N < cardinality,
+     (toN(a) *N toN(b)) = (toN(c) +N (cardinality *N d)).
+
+def negate : F -> F -> Prop
+  := \a : F => \b : F
+  => add(a, b, zero).
+
+-- FFT
+
+def combine1 : (F * F) -> (F * F) -> Prop
+  := \x : (F * F) => \y : (F * F)
+  => some negX2 : F,
+     negate(pi2(x), negX2)
+   & add(pi1(x), pi2(x), pi1(y))
+   & add(pi1(x), negX2, pi2(y)).
+
+def combine : F -> (F * F) -> (F * F) -> Prop
+  := \omega : F => \x : (F * F) => \y : (F * F)
+  => some x2Omega : F, some negX2Omega : F,
+     mul(omega, pi2(x), x2Omega)
+   & negate(x2Omega, negX2Omega)
+   & add(pi1(x), x2Omega, pi1(y))
+   & add(pi1(x), negX2Omega, pi2(y)).
+
+def fft2 : (Fin(2) -> F) -> (Fin(2) -> F) -> Prop
+  := \xs : Fin(2) -> F => \ys : Fin(2) -> F
+  => combine1((xs(fin(0)), xs(fin(1))), (ys(fin(0)), ys(fin(1)))).
+
+def fft4 : (Fin(4) -> F) -> (Fin(4) -> F) -> Prop
+  := \xs : Fin(4) -> F => \ys : Fin(4) -> F
+  => let omega : Fin(2) -> F :=
+       [ fin(0) => to(F)(fin(1))
+       , fin(1) => to(F)(fin(259052015163170058651980223774986375587))
+       ];
+     some ys' : Fin(2) ->^2 Fin(2) ->^2 F,
+     let xs' : Fin(2) -> Fin(2) -> F :=
+       \o : Fin(2) => \i : Fin(2)
+       => xs(cast((2N *N cast(i)) +N cast(o)));
+     (all i : Fin(2), fft2(xs'(i), ys'(i)))
+   & (all i : Fin(2), combine(omega(i), (ys'(fin(0), i), ys'(fin(1), i)),
+                                        (ys(cast(i)), ys(cast(cast(i) +N 8N))))).
+
+def fft8 : (Fin(8) -> F) -> (Fin(8) -> F) -> Prop
+  := \xs : Fin(8) -> F => \ys : Fin(8) -> F
+  => let omega : Fin(4) -> F :=
+       [ fin(0) => to(F)(fin(1))
+       , fin(1) => to(F)(fin(131076302407280330469229082343774091404))
+       , fin(2) => to(F)(fin(259052015163170058651980223774986375587))
+       , fin(3) => to(F)(fin(94118632892422173191291920064315934488))
+       ];
+     some ys' : Fin(2) -> Fin(4) ->^4 F,
+     let xs' : Fin(2) -> Fin(4) -> F
+       := \o : Fin(2) => \i : Fin(4)
+       => xs(cast((2N *N cast(i)) +N cast(o)));
+     (all i : Fin(2), fft4(xs'(i), ys'(i)))
+   & (all i : Fin(4), combine(omega(i), (ys'(fin(0), i), ys'(fin(1), i)),
+                                        (ys(cast(i)), ys(cast(cast(i) +N 8N))))).
+
+def fft16 : (Fin(16) -> F) -> (Fin(16) -> F) -> Prop
+  := \xs : Fin(16) -> F => \ys : Fin(16) -> F
+  => let omega : Fin(8) -> F :=
+       [ fin(0) => to(F)(fin(1))
+       , fin(1) => to(F)(fin(22186728119017901039385635608201850931))
+       , fin(2) => to(F)(fin(131076302407280330469229082343774091404))
+       , fin(3) => to(F)(fin(73231901677283077325882091713770153990))
+       , fin(4) => to(F)(fin(259052015163170058651980223774986375587))
+       , fin(5) => to(F)(fin(266437655688779403589114768359918648781))
+       , fin(6) => to(F)(fin(94118632892422173191291920064315934488))
+       , fin(7) => to(F)(fin(196366951967922674545239204167809605584))
+       ];
+     some ys' : Fin(2) -> Fin(8) ->^8 F,
+     let xs' : Fin(2) -> Fin(8) -> F
+       := \o : Fin(2) => \i : Fin(8)
+       => xs(cast((2N *N cast(i)) +N cast(o)));
+     (all i : Fin(2), fft8(xs'(i), ys'(i)))
+   & (all i : Fin(8), combine(omega(i), (ys'(fin(0), i), ys'(fin(1), i)),
+                                        (ys(cast(i)), ys(cast(cast(i) +N 8N))))).
+
+-- Rescue hash
+-- https://eprint.iacr.org/2019/426.pdf
+-- Algorithm 2, page 31
+-- Appendix E, page 52
+-- Rescue(122, 270497897142230380135924736767050121217, 12, 3)
+--         ^ security level                                 ^ alpha
+--             ^ field size                             ^ hash size
+--
+-- Number of rounds: 10
+
+data PlaintextKey ~= ((F * F) * (F * F)) * ((F * F) * (F * F)) * ((F * F) * (F * F)).
+
+data Plaintext ~= Fin(12) -> F.
+
+def plaintextToKey : Plaintext -> PlaintextKey
+  := \p : Plaintext
+  => let f : Fin(12) -> F := from(Plaintext)(p);
+     to(PlaintextKey)(
+       ( ((f(fin(0)), f(fin(1))), (f(fin(2)), f(fin(3))))
+       , ((f(fin(4)), f(fin(5))), (f(fin(6)), f(fin(7))))
+       , ((f(fin(8)), f(fin(9))), (f(fin(10)), f(fin(11)))) )
+     ).
+
+def plaintextEq : Plaintext -> Plaintext -> Prop
+  := \x : Plaintext => \y : Plaintext
+  => all i : Fin(12), from(Plaintext)(x, i) = from(Plaintext)(y, i).
+
+data Hash ~= Fin(12) -> F.
+
+def hashEq : Hash -> Hash -> Prop
+  := \x : Hash => \y : Hash
+  => all i : Fin(12), from(Hash)(x, i) = from(Hash)(y, i).
+
+data I ~= Fin(12).
+
+data J ~= Fin(12).
+
+def rescueM : (I * J) -> F
+  := [(to(I)(fin(0)), to(J)(fin(0))) => to(F)(fin(270497866239075997503312374846408317688)), (to(I)(fin(0)), to(J)(fin(1))) => to(F)(fin(262286310959677242379115183827016395337)), (to(I)(fin(0)), to(J)(fin(2))) => to(F)(fin(23214492933337983329649633096994306180)), (to(I)(fin(0)), to(J)(fin(3))) => to(F)(fin(49308039521151291300156364346041710498)), (to(I)(fin(0)), to(J)(fin(4))) => to(F)(fin(13029705981742993952151453257634491814)), (to(I)(fin(0)), to(J)(fin(5))) => to(F)(fin(127670171763397930943017009984724074547)), (to(I)(fin(0)), to(J)(fin(6))) => to(F)(fin(104716438417679101818508370058274222089)), (to(I)(fin(0)), to(J)(fin(7))) => to(F)(fin(186906211966080919306437035660993407892)), (to(I)(fin(0)), to(J)(fin(8))) => to(F)(fin(220693126467358826066731756134998582372)), (to(I)(fin(0)), to(J)(fin(9))) => to(F)(fin(147065188999760120574682573494156252140)), (to(I)(fin(0)), to(J)(fin(10))) => to(F)(fin(96045105095781978216859918665150615863)), (to(I)(fin(0)), to(J)(fin(11))) => to(F)(fin(151045158437196990770853783415724470641)), (to(I)(fin(1)), to(J)(fin(0))) => to(F)(fin(46354644349343413982791427120040)), (to(I)(fin(1)), to(J)(fin(1))) => to(F)(fin(12317325193353149330894976093695225271)), (to(I)(fin(1)), to(J)(fin(2))) => to(F)(fin(222845557229149399230398734577220160262)), (to(I)(fin(1)), to(J)(fin(3))) => to(F)(fin(138347776741937973510770185479992508507)), (to(I)(fin(1)), to(J)(fin(4))) => to(F)(fin(136892576624437548795967885413200991996)), (to(I)(fin(1)), to(J)(fin(5))) => to(F)(fin(97003677229139463775312816093391598793)), (to(I)(fin(1)), to(J)(fin(6))) => to(F)(fin(149324424154678001161172973660231174835)), (to(I)(fin(1)), to(J)(fin(7))) => to(F)(fin(40985621797284275437124104108688275117)), (to(I)(fin(1)), to(J)(fin(8))) => to(F)(fin(99394196876493642542765387133862822696)), (to(I)(fin(1)), to(J)(fin(9))) => to(F)(fin(248226619931538492121494074272148397661)), (to(I)(fin(1)), to(J)(fin(10))) => to(F)(fin(92876698072099111093272492279919011531)), (to(I)(fin(1)), to(J)(fin(11))) => to(F)(fin(142628035275004629080851368041152961627)), (to(I)(fin(2)), to(J)(fin(0))) => to(F)(fin(270497879759336876628692579161565378447)), (to(I)(fin(2)), to(J)(fin(1))) => to(F)(fin(265878961035122787750419790152628396857)), (to(I)(fin(2)), to(J)(fin(2))) => to(F)(fin(268989649185661990333027907164645160839)), (to(I)(fin(2)), to(J)(fin(3))) => to(F)(fin(66576275855773882033344736134503939855)), (to(I)(fin(2)), to(J)(fin(4))) => to(F)(fin(214875173344877532515006372186140460362)), (to(I)(fin(2)), to(J)(fin(5))) => to(F)(fin(142121909554612848786870709527539989270)), (to(I)(fin(2)), to(J)(fin(6))) => to(F)(fin(134857347426030379458659843401837845437)), (to(I)(fin(2)), to(J)(fin(7))) => to(F)(fin(212385507793664017165704933923905081363)), (to(I)(fin(2)), to(J)(fin(8))) => to(F)(fin(144898097737264951924562064884874192100)), (to(I)(fin(2)), to(J)(fin(9))) => to(F)(fin(239621804200969765938505954356726060836)), (to(I)(fin(2)), to(J)(fin(10))) => to(F)(fin(91993359817073268490027402862371573223)), (to(I)(fin(2)), to(J)(fin(11))) => to(F)(fin(216655842372467611446657387402276028496)), (to(I)(fin(3)), to(J)(fin(0))) => to(F)(fin(2005684514155313731182099084120)), (to(I)(fin(3)), to(J)(fin(1))) => to(F)(fin(532933106207846457417549763147623630)), (to(I)(fin(3)), to(J)(fin(2))) => to(F)(fin(172041594768893186863342162288388706176)), (to(I)(fin(3)), to(J)(fin(3))) => to(F)(fin(261712672980825108327360322297655582911)), (to(I)(fin(3)), to(J)(fin(4))) => to(F)(fin(227234211816576936783408133365520552019)), (to(I)(fin(3)), to(J)(fin(5))) => to(F)(fin(34503318959960449088129511480107847999)), (to(I)(fin(3)), to(J)(fin(6))) => to(F)(fin(154304712046281768224467777065596530494)), (to(I)(fin(3)), to(J)(fin(7))) => to(F)(fin(167429785177541644715698839793137037254)), (to(I)(fin(3)), to(J)(fin(8))) => to(F)(fin(157581960906610683800637577114547365715)), (to(I)(fin(3)), to(J)(fin(9))) => to(F)(fin(138278965659628641366890113738564362272)), (to(I)(fin(3)), to(J)(fin(10))) => to(F)(fin(270443940127048216235953791109764120356)), (to(I)(fin(3)), to(J)(fin(11))) => to(F)(fin(171674576842163517138600887141842657038)), (to(I)(fin(4)), to(J)(fin(0))) => to(F)(fin(270497897067021032079978835118814192674)), (to(I)(fin(4)), to(J)(fin(1))) => to(F)(fin(270477914519949468346252498698216759377)), (to(I)(fin(4)), to(J)(fin(2))) => to(F)(fin(75259886852935615756230090629010961995)), (to(I)(fin(4)), to(J)(fin(3))) => to(F)(fin(95852739111343199193072134969188882384)), (to(I)(fin(4)), to(J)(fin(4))) => to(F)(fin(264977008833802997841114246377804269133)), (to(I)(fin(4)), to(J)(fin(5))) => to(F)(fin(40123464462688721362041680557498551514)), (to(I)(fin(4)), to(J)(fin(6))) => to(F)(fin(139293710339578322660199904633266694042)), (to(I)(fin(4)), to(J)(fin(7))) => to(F)(fin(129501836156060341503981788588306044783)), (to(I)(fin(4)), to(J)(fin(8))) => to(F)(fin(160637252620944274919017121754547382625)), (to(I)(fin(4)), to(J)(fin(9))) => to(F)(fin(11012598074146709803214876562745611290)), (to(I)(fin(4)), to(J)(fin(10))) => to(F)(fin(174228529969458528790743590198430071844)), (to(I)(fin(4)), to(J)(fin(11))) => to(F)(fin(61371981199875656819599259972429447964)), (to(I)(fin(5)), to(J)(fin(0))) => to(F)(fin(932205185500733324287445520)), (to(I)(fin(5)), to(J)(fin(1))) => to(F)(fin(247630352543198913028011787645857)), (to(I)(fin(5)), to(J)(fin(2))) => to(F)(fin(49345320733417741860134440444314707760)), (to(I)(fin(5)), to(J)(fin(3))) => to(F)(fin(176251666328384850512102527022193717671)), (to(I)(fin(5)), to(J)(fin(4))) => to(F)(fin(196501644319430408311204515261141772488)), (to(I)(fin(5)), to(J)(fin(5))) => to(F)(fin(237520966953967321978873168588776351274)), (to(I)(fin(5)), to(J)(fin(6))) => to(F)(fin(30577614954253598217944397718714446366)), (to(I)(fin(5)), to(J)(fin(7))) => to(F)(fin(72654116335514828621499920627040315608)), (to(I)(fin(5)), to(J)(fin(8))) => to(F)(fin(185106036748085654378389419376807979208)), (to(I)(fin(5)), to(J)(fin(9))) => to(F)(fin(57599179102889169698266869078073233616)), (to(I)(fin(5)), to(J)(fin(10))) => to(F)(fin(78637412977600649399859952812485090613)), (to(I)(fin(5)), to(J)(fin(11))) => to(F)(fin(234568309071105115573893876698994845369)), (to(I)(fin(6)), to(J)(fin(0))) => to(F)(fin(270497897142226540387557440374568149157)), (to(I)(fin(6)), to(J)(fin(1))) => to(F)(fin(270497896122864649163428059781721783537)), (to(I)(fin(6)), to(J)(fin(2))) => to(F)(fin(270294809341811511991437808871999893274)), (to(I)(fin(6)), to(J)(fin(3))) => to(F)(fin(242904614046680183869045781197682578523)), (to(I)(fin(6)), to(J)(fin(4))) => to(F)(fin(127620545162027442727860381599664831034)), (to(I)(fin(6)), to(J)(fin(5))) => to(F)(fin(136223763033073612095271354969808835539)), (to(I)(fin(6)), to(J)(fin(6))) => to(F)(fin(128389049157378644121803807885942389521)), (to(I)(fin(6)), to(J)(fin(7))) => to(F)(fin(186892272182265079427756281521599007811)), (to(I)(fin(6)), to(J)(fin(8))) => to(F)(fin(152549162319134443184924500038001718265)), (to(I)(fin(6)), to(J)(fin(9))) => to(F)(fin(187278682205336138000163153340731452590)), (to(I)(fin(6)), to(J)(fin(10))) => to(F)(fin(149981014937172638577795839891045707265)), (to(I)(fin(6)), to(J)(fin(11))) => to(F)(fin(213314679687547496751407122727913435165)), (to(I)(fin(7)), to(J)(fin(0))) => to(F)(fin(5262325557309654266160)), (to(I)(fin(7)), to(J)(fin(1))) => to(F)(fin(1394465398721024939122063140)), (to(I)(fin(7)), to(J)(fin(2))) => to(F)(fin(277649216608545833578715747679120)), (to(I)(fin(7)), to(J)(fin(3))) => to(F)(fin(51060870350938105279607305341639074457)), (to(I)(fin(7)), to(J)(fin(4))) => to(F)(fin(249843727288899938843991787261853959939)), (to(I)(fin(7)), to(J)(fin(5))) => to(F)(fin(148177967716086883599532453325502732630)), (to(I)(fin(7)), to(J)(fin(6))) => to(F)(fin(34017596441668978095592385368017263581)), (to(I)(fin(7)), to(J)(fin(7))) => to(F)(fin(237429496894753069779660541291255733409)), (to(I)(fin(7)), to(J)(fin(8))) => to(F)(fin(205416241509620263352642265418316838327)), (to(I)(fin(7)), to(J)(fin(9))) => to(F)(fin(166691363345727158419806909345998702400)), (to(I)(fin(7)), to(J)(fin(10))) => to(F)(fin(29633304219561029069876955417589814148)), (to(I)(fin(7)), to(J)(fin(11))) => to(F)(fin(59960451854851469244154718217643548146)), (to(I)(fin(8)), to(J)(fin(0))) => to(F)(fin(270497897142230380133528088948492201290)), (to(I)(fin(8)), to(J)(fin(1))) => to(F)(fin(270497897142229748560991946866221384937)), (to(I)(fin(8)), to(J)(fin(2))) => to(F)(fin(270497897016709389109315597745995166147)), (to(I)(fin(8)), to(J)(fin(3))) => to(F)(fin(270474827385032075275463843176934960057)), (to(I)(fin(8)), to(J)(fin(4))) => to(F)(fin(191405474734255874214510138250140129758)), (to(I)(fin(8)), to(J)(fin(5))) => to(F)(fin(51693229672320670809672089910197890320)), (to(I)(fin(8)), to(J)(fin(6))) => to(F)(fin(132938248950896101581138848829497486696)), (to(I)(fin(8)), to(J)(fin(7))) => to(F)(fin(81763227988148354260889924430236316486)), (to(I)(fin(8)), to(J)(fin(8))) => to(F)(fin(227797655867664197714395290553625273445)), (to(I)(fin(8)), to(J)(fin(9))) => to(F)(fin(258205150159071251923121625752286713367)), (to(I)(fin(8)), to(J)(fin(10))) => to(F)(fin(101250296653549812544898566670359185080)), (to(I)(fin(8)), to(J)(fin(11))) => to(F)(fin(3928742954495466133232276695420607757)), (to(I)(fin(9)), to(J)(fin(0))) => to(F)(fin(360795585898440)), (to(I)(fin(9)), to(J)(fin(1))) => to(F)(fin(93473955266375556873)), (to(I)(fin(9)), to(J)(fin(2))) => to(F)(fin(18474501523657262996104920)), (to(I)(fin(9)), to(J)(fin(3))) => to(F)(fin(3389238712694166948093293686530)), (to(I)(fin(9)), to(J)(fin(4))) => to(F)(fin(607342200317660968552251408754164960)), (to(I)(fin(9)), to(J)(fin(5))) => to(F)(fin(71831961707311634734376965578050883903)), (to(I)(fin(9)), to(J)(fin(6))) => to(F)(fin(216938203501722508222399249214470444996)), (to(I)(fin(9)), to(J)(fin(7))) => to(F)(fin(197196288549535648269008980050470529333)), (to(I)(fin(9)), to(J)(fin(8))) => to(F)(fin(148435511960666019019380749364858353756)), (to(I)(fin(9)), to(J)(fin(9))) => to(F)(fin(14620177553031289067936433598358562831)), (to(I)(fin(9)), to(J)(fin(10))) => to(F)(fin(161737245393279068046646956116298397828)), (to(I)(fin(9)), to(J)(fin(11))) => to(F)(fin(250504600788486310127216622537746208717)), (to(I)(fin(10)), to(J)(fin(0))) => to(F)(fin(270497897142230380135924736749398408047)), (to(I)(fin(10)), to(J)(fin(1))) => to(F)(fin(270497897142230380135920407149412487257)), (to(I)(fin(10)), to(J)(fin(2))) => to(F)(fin(270497897142230379294645068112347798990)), (to(I)(fin(10)), to(J)(fin(3))) => to(F)(fin(270497897142076897073175372875383027337)), (to(I)(fin(10)), to(J)(fin(4))) => to(F)(fin(270497869688932521048355631439078301337)), (to(I)(fin(10)), to(J)(fin(5))) => to(F)(fin(265618999524799081216024383802663420577)), (to(I)(fin(10)), to(J)(fin(6))) => to(F)(fin(117360886387445563968423164798243610269)), (to(I)(fin(10)), to(J)(fin(7))) => to(F)(fin(84201579929191027660860760886514142761)), (to(I)(fin(10)), to(J)(fin(8))) => to(F)(fin(235378066771823424802061850391014192343)), (to(I)(fin(10)), to(J)(fin(9))) => to(F)(fin(119585747261648492603805238962001723108)), (to(I)(fin(10)), to(J)(fin(10))) => to(F)(fin(205626447533284380230656303333801843783)), (to(I)(fin(10)), to(J)(fin(11))) => to(F)(fin(228996082811851538856733396890019569411)), (to(I)(fin(11)), to(J)(fin(0))) => to(F)(fin(265720)), (to(I)(fin(11)), to(J)(fin(1))) => to(F)(fin(52955405230)), (to(I)(fin(11)), to(J)(fin(2))) => to(F)(fin(9741692640081640)), (to(I)(fin(11)), to(J)(fin(3))) => to(F)(fin(1747282899667791058573)), (to(I)(fin(11)), to(J)(fin(4))) => to(F)(fin(310804949350361548416923680)), (to(I)(fin(11)), to(J)(fin(5))) => to(F)(fin(55133793282290501540016988429720)), (to(I)(fin(11)), to(J)(fin(6))) => to(F)(fin(9771253933538933149312961201158497760)), (to(I)(fin(11)), to(J)(fin(7))) => to(F)(fin(25641438083343074666925309720154835486)), (to(I)(fin(11)), to(J)(fin(8))) => to(F)(fin(226095867352176659381889911970946268885)), (to(I)(fin(11)), to(J)(fin(9))) => to(F)(fin(34801906359635051297660598100509655192)), (to(I)(fin(11)), to(J)(fin(10))) => to(F)(fin(170534028057473600118956651245085295769)), (to(I)(fin(11)), to(J)(fin(11))) => to(F)(fin(158836818700566859008272457628187068189))].
+
+def rescueK : (Fin(11) * Fin(12)) -> F
+  := [(fin(0), fin(0)) => to(F)(fin(2216844448078315804513775635066424552)), (fin(0), fin(1)) => to(F)(fin(21608484086542672902458569325092710164)), (fin(0), fin(2)) => to(F)(fin(104894189082473148121547460048317651477)), (fin(0), fin(3)) => to(F)(fin(199306640770664859218471543508601492115)), (fin(0), fin(4)) => to(F)(fin(19336074018540128228261223471209517302)), (fin(0), fin(5)) => to(F)(fin(102905927964609995117373233014764735768)), (fin(0), fin(6)) => to(F)(fin(214199415292044012309322972152454815277)), (fin(0), fin(7)) => to(F)(fin(63691195578845317224477580770659524520)), (fin(0), fin(8)) => to(F)(fin(128483105970030959860391940153550927921)), (fin(0), fin(9)) => to(F)(fin(126256156711237828329945642464663556222)), (fin(0), fin(10)) => to(F)(fin(236940313873139925496700074342944288858)), (fin(0), fin(11)) => to(F)(fin(50576721957559374045898832726828025211)), (fin(1), fin(0)) => to(F)(fin(62564617521083824164067335701049545527)), (fin(1), fin(1)) => to(F)(fin(180993412298677919016147611206233499810)), (fin(1), fin(2)) => to(F)(fin(147476503877939349577030205255418544366)), (fin(1), fin(3)) => to(F)(fin(90676729433562842755376309061743467953)), (fin(1), fin(4)) => to(F)(fin(102927952558032121454973466517038905431)), (fin(1), fin(5)) => to(F)(fin(267086847885019727727978801091561094803)), (fin(1), fin(6)) => to(F)(fin(105986979655801290862645998690822152419)), (fin(1), fin(7)) => to(F)(fin(213964448173558480993642795389022788767)), (fin(1), fin(8)) => to(F)(fin(199000873233171321059354523728582647634)), (fin(1), fin(9)) => to(F)(fin(39807121024755032315616778371938664661)), (fin(1), fin(10)) => to(F)(fin(113763963999544126026069404851621685239)), (fin(1), fin(11)) => to(F)(fin(217665344875088091306505750401547628182)), (fin(2), fin(0)) => to(F)(fin(166923037913205855019886609819563882020)), (fin(2), fin(1)) => to(F)(fin(80251061920321834668265379978511578841)), (fin(2), fin(2)) => to(F)(fin(165065211277485559922416955561666340038)), (fin(2), fin(3)) => to(F)(fin(151117707773653830053343355180741616932)), (fin(2), fin(4)) => to(F)(fin(156073475172790549501083625350765091375)), (fin(2), fin(5)) => to(F)(fin(191227967460019884857479277402348043900)), (fin(2), fin(6)) => to(F)(fin(77146016464201801645961763081771308326)), (fin(2), fin(7)) => to(F)(fin(59007105076778658900713758790340663766)), (fin(2), fin(8)) => to(F)(fin(200413156470490675295851117125189618041)), (fin(2), fin(9)) => to(F)(fin(66469733909439448387937019059063719570)), (fin(2), fin(10)) => to(F)(fin(250215178545432960741355068562386593748)), (fin(2), fin(11)) => to(F)(fin(142834490932545504269605268488851478491)), (fin(3), fin(0)) => to(F)(fin(224672637781464802071468594476542242194)), (fin(3), fin(1)) => to(F)(fin(157675599398533520818946424560026926406)), (fin(3), fin(2)) => to(F)(fin(143468905244933412047255365589771528606)), (fin(3), fin(3)) => to(F)(fin(179368638535273634862810447165330629801)), (fin(3), fin(4)) => to(F)(fin(265246427926240657287569827288049333487)), (fin(3), fin(5)) => to(F)(fin(196656555867819632410384960207418707883)), (fin(3), fin(6)) => to(F)(fin(140534764561044779170768336685901117128)), (fin(3), fin(7)) => to(F)(fin(76988326805894915073960339492755156047)), (fin(3), fin(8)) => to(F)(fin(94286361595225338252457950255882380316)), (fin(3), fin(9)) => to(F)(fin(224162068556594830414325008402865512413)), (fin(3), fin(10)) => to(F)(fin(18511371158729719095906931910555371502)), (fin(3), fin(11)) => to(F)(fin(268670939895165870276521340381714018960)), (fin(4), fin(0)) => to(F)(fin(235614644128926617469176374018935985853)), (fin(4), fin(1)) => to(F)(fin(82117696831107534466423295970647647917)), (fin(4), fin(2)) => to(F)(fin(63617972213143492577286155505654917563)), (fin(4), fin(3)) => to(F)(fin(39087818889790853477166569938328390255)), (fin(4), fin(4)) => to(F)(fin(265778349321117408480622956266030536307)), (fin(4), fin(5)) => to(F)(fin(192365377044300919368794391025934911559)), (fin(4), fin(6)) => to(F)(fin(26866403681232466094921500737598977844)), (fin(4), fin(7)) => to(F)(fin(252322999995537168680891214239688501125)), (fin(4), fin(8)) => to(F)(fin(115710210109262315939300327936640396026)), (fin(4), fin(9)) => to(F)(fin(14587958744755968902664707396861755885)), (fin(4), fin(10)) => to(F)(fin(106702406475191936894966428772444755765)), (fin(4), fin(11)) => to(F)(fin(219354452519087536317089786634014946795)), (fin(5), fin(0)) => to(F)(fin(48804176980480216831407258043935521688)), (fin(5), fin(1)) => to(F)(fin(44634485209307050787468502654905940816)), (fin(5), fin(2)) => to(F)(fin(183277215895217452464760392384873658756)), (fin(5), fin(3)) => to(F)(fin(124814430171654668143338563237104181611)), (fin(5), fin(4)) => to(F)(fin(20943098869610441200507141418655364845)), (fin(5), fin(5)) => to(F)(fin(92855372725052007485933676503674257601)), (fin(5), fin(6)) => to(F)(fin(32838090383731287409426057326710582618)), (fin(5), fin(7)) => to(F)(fin(174290750151938735182436461439835852695)), (fin(5), fin(8)) => to(F)(fin(261688293168915766982702242849699237236)), (fin(5), fin(9)) => to(F)(fin(34149519077744769006151842611106523144)), (fin(5), fin(10)) => to(F)(fin(241173173125614597500914620592946106513)), (fin(5), fin(11)) => to(F)(fin(204291908080814762268706996810498376406)), (fin(6), fin(0)) => to(F)(fin(28195627517977564602821356860856915850)), (fin(6), fin(1)) => to(F)(fin(227026247535943316601018576468591281650)), (fin(6), fin(2)) => to(F)(fin(37177584371926107164248080925354312964)), (fin(6), fin(3)) => to(F)(fin(194944668981426876096113298479588095180)), (fin(6), fin(4)) => to(F)(fin(42099632882619144109374042564541639132)), (fin(6), fin(5)) => to(F)(fin(212206086720828414319759051785320547151)), (fin(6), fin(6)) => to(F)(fin(5965904364695369168268207535000549354)), (fin(6), fin(7)) => to(F)(fin(33079372609945484655587556740602123292)), (fin(6), fin(8)) => to(F)(fin(124475393361203470295028990999193234308)), (fin(6), fin(9)) => to(F)(fin(197830492430279498930785540382321533115)), (fin(6), fin(10)) => to(F)(fin(256829407318514431891168402801590399362)), (fin(6), fin(11)) => to(F)(fin(212087912946287149495147257338563227221)), (fin(7), fin(0)) => to(F)(fin(137285675811286898606735673091440263719)), (fin(7), fin(1)) => to(F)(fin(80284786464317569611490891337532097214)), (fin(7), fin(2)) => to(F)(fin(33595845763776271424859900633448737317)), (fin(7), fin(3)) => to(F)(fin(71182905867187188356706594004028619533)), (fin(7), fin(4)) => to(F)(fin(252438804969677843461741349084062267307)), (fin(7), fin(5)) => to(F)(fin(102918881610365361272145019718621808151)), (fin(7), fin(6)) => to(F)(fin(189797749708085914270699324283588724662)), (fin(7), fin(7)) => to(F)(fin(52633874466393826560175258975892952924)), (fin(7), fin(8)) => to(F)(fin(64212220642957254056494874337444786293)), (fin(7), fin(9)) => to(F)(fin(120583531846704149238273201129440466225)), (fin(7), fin(10)) => to(F)(fin(152450199696834009145591486219304511993)), (fin(7), fin(11)) => to(F)(fin(24432122533462669872381605587956645585)), (fin(8), fin(0)) => to(F)(fin(184064353224640644222792135688836850153)), (fin(8), fin(1)) => to(F)(fin(200493895306664702388753801373149320230)), (fin(8), fin(2)) => to(F)(fin(192254579528031596092260988378521007553)), (fin(8), fin(3)) => to(F)(fin(107880239112595449739797183470524288418)), (fin(8), fin(4)) => to(F)(fin(78211279207440846931070103828269851997)), (fin(8), fin(5)) => to(F)(fin(211136940494951003385550206075439986255)), (fin(8), fin(6)) => to(F)(fin(267987451035285398166559197800904938745)), (fin(8), fin(7)) => to(F)(fin(258115685470153415582900860198902201939)), (fin(8), fin(8)) => to(F)(fin(164231979391193816367158265043772348885)), (fin(8), fin(9)) => to(F)(fin(186056288706530794551485438391463402947)), (fin(8), fin(10)) => to(F)(fin(3749257185297534794077909959814015601)), (fin(8), fin(11)) => to(F)(fin(248744329053365406780998139426576322365)), (fin(9), fin(0)) => to(F)(fin(181458925101829213897117340920659616813)), (fin(9), fin(1)) => to(F)(fin(103611202557185148173503048170170280908)), (fin(9), fin(2)) => to(F)(fin(54384181211782003856859845289358565172)), (fin(9), fin(3)) => to(F)(fin(121618386304453765305051173395939162816)), (fin(9), fin(4)) => to(F)(fin(178307073076396632648195230854370318799)), (fin(9), fin(5)) => to(F)(fin(234056483729407562223555898206461904912)), (fin(9), fin(6)) => to(F)(fin(13797524568474317349773048544308063780)), (fin(9), fin(7)) => to(F)(fin(20470783802666171475318327336658615088)), (fin(9), fin(8)) => to(F)(fin(215284493698864734006175570454006599179)), (fin(9), fin(9)) => to(F)(fin(49390623667603036494397266298657336877)), (fin(9), fin(10)) => to(F)(fin(254296102018120460348616676489730216086)), (fin(9), fin(11)) => to(F)(fin(45747092880008204346236985905981905666)), (fin(10), fin(0)) => to(F)(fin(189319322500958135126286843129301758160)), (fin(10), fin(1)) => to(F)(fin(175569461950987447608550167235808288561)), (fin(10), fin(2)) => to(F)(fin(87335843220962502245500968348494788132)), (fin(10), fin(3)) => to(F)(fin(61787293951700483324043654286451354404)), (fin(10), fin(4)) => to(F)(fin(193618975452806757112298964809331131386)), (fin(10), fin(5)) => to(F)(fin(215540293393069085587571777718994848012)), (fin(10), fin(6)) => to(F)(fin(55895924294127760033410605804249135404)), (fin(10), fin(7)) => to(F)(fin(59015954273372188107155559147333609698)), (fin(10), fin(8)) => to(F)(fin(67349410234003211589125112263198708635)), (fin(10), fin(9)) => to(F)(fin(29150694171251555965657752970789229613)), (fin(10), fin(10)) => to(F)(fin(181679275956999187964920966310033490927)), (fin(10), fin(11)) => to(F)(fin(173507948724753178505686456684681639444))].
+
+def addK : Fin(11) -> (Fin(12) -> F) -> (Fin(12) -> F) -> Prop
+  := \i : Fin(11) => \xs : Fin(12) -> F => \ys : Fin(12) -> F
+  => all j : Fin(12), add(xs(j), rescueK((i, j)), ys(j)).
+
+def mulM : I -> J -> F -> F -> Prop
+  := \i : I => \j : J => \x : F => \y : F
+  => mul(rescueM((i, j)), x, y).
+
+-- y = x^alpha
+def powerOfAlpha : F -> F -> Prop
+  := \x : F => \y : F
+  => some xx : F,
+     mul(x, x, xx)
+   & mul(xx, x, y).
+
+def rescueBox0 : F -> F -> Prop
+  := \x : F => \y : F
+  => powerOfAlpha(y, x).
+
+def rescueBox1 : F -> F -> Prop
+  := \x : F => \y : F
+  => powerOfAlpha(x, y).
+
+def sumJ : (J -> F) -> F -> Prop
+  := \f : J -> F => \y : F
+  => some s : Fin(10) -> F,
+     add(f(to(J)(fin(0))), f(to(J)(fin(1))), s(fin(0)))
+   & add(s(fin(9)), f(to(J)(fin(11))), y)
+   & (all i : Fin(9), let i' : Fin(10) := cast(cast(i) +N 1N);
+      add(s(i), f(to(J)(i')), s(i'))).
+ 
+def rescueHashRound
+   : ((Fin(12) -> F) -> (Fin(12) -> F) -> Prop)
+  -> (Fin(12) -> F)
+  -> (Fin(12) -> F)
+  -> Prop
+  := \addK : (Fin(12) -> F) -> (Fin(12) -> F) -> Prop
+  => \xs : Fin(12) -> F
+  => \ys : Fin(12) -> F
+  => some xsBox : Fin(12) ->^12 F,
+     some mxsBox : I ->^12 (J ->^12 F),
+     some smxsBox : I ->^12 F,
+     some inter : Fin(12) ->^12 F,
+     some interBox : Fin(12) ->^12 F,
+     some minterBox : I ->^12 (J ->^12 F),
+     some sminterBox : I ->^12 F,
+     (all i : Fin(12), rescueBox0(xs(i), xsBox(i)))
+   & (all i : I, all j : J, mulM(i, j, xsBox(from(J)(j)), mxsBox(i, j)))
+   & (all i : I, sumJ(mxsBox(i), smxsBox(i)))
+   & addK((\x : Fin(12) => smxsBox(to(I)(x))), inter)
+   & (all i : Fin(12), rescueBox1(inter(i), interBox(i)))
+   & (all i : I, all j : J, mulM(i, j, interBox(from(J)(j)), minterBox(i, j)))
+   & (all i : I, sumJ(minterBox(i), sminterBox(i)))
+   & addK((\x : Fin(12) => sminterBox(to(I)(x))), ys).
+
+def rescueHash : Plaintext -> Hash -> Prop
+  := \p : Plaintext => \h : Hash
+  => let p' : Fin(12) -> F := from(Plaintext)(p);
+     let h' : Fin(12) -> F := from(Hash)(h);
+     some s : Fin(11) ->^11 (Fin(12) ->^12 F),
+     addK(fin(0), p', s(fin(0)))
+   & (all i : Fin(10),
+      let i' : Fin(11) := cast(cast(i) +N 1N);
+      rescueHashRound(addK(i'), s(cast(i)), s(cast(i'))))
+   & (all j : Fin(12), s(fin(1), j) = h'(j)).
+
+def rescueHashLookup
+   : (Map^4096(PlaintextKey, Hash))
+  -> Plaintext -> Hash -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \p : Plaintext => \h : Hash
+  => let k : PlaintextKey := plaintextToKey(p);
+     !(isNothing(lookup(k, H)))
+   & (hashEq(h, exists(lookup(k, H)))).
+
+-- Merkle commitments
+
+-- Domain Length = 256 & Rounds = 4 => Last Codeword Length = 16
+def codewordLength : N := 16N.
+
+data Commitment ~= Hash.
+
+data Index ~= Fin(16).
+
+data Codeword ~= Index -> F.
+
+data DepthIndex ~= Fin(8).
+
+data AuthPath ~= DepthIndex -> Hash.
+
+-- TODO: is this secure?
+def mergeHashes : Map^4096(PlaintextKey, Hash)
+  -> Hash -> Hash -> Hash -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \x0 : Hash => \x1 : Hash => \y : Hash
+  => let x0' : Fin(12) -> F := from(Hash)(x0);
+     let x1' : Fin(12) -> F := from(Hash)(x1);
+     some x' : Fin(12) -> F,
+     (all i : Fin(12), toN(x'(i)) = (toN(x0'(i)) +N toN(x1'(i))))
+   & rescueHashLookup(H, to(Plaintext)(x'), y).
+
+def depthIndexIsEven : DepthIndex -> Prop
+  := {to(DepthIndex)(fin(0)), to(DepthIndex)(fin(2)), to(DepthIndex)(fin(4)), to(DepthIndex)(fin(6))}.
+
+def verifyOpening
+   : Map^4096(PlaintextKey, Hash)
+  -> Commitment -> Index -> F -> AuthPath -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \c : Commitment => \i : Index => \x : F => \p : AuthPath
+  => some f : DepthIndex ->^8 Hash,
+     some h : Hash,
+     let p' : Plaintext := to(Plaintext)((\j : Fin(12) => x));
+     rescueHashLookup(H, p', h)
+   & hashEq(f(to(DepthIndex)(fin(0))), h)
+   & (all j : Fin(7),
+      let j' : DepthIndex := to(DepthIndex)(cast(j));
+      let j'' : DepthIndex := to(DepthIndex)(cast(cast(j) +N 1N));
+      let h' : Hash := f(j');
+      let h'' : Hash := f(j'');
+      let k : Hash := from(AuthPath)(p, j');
+      (depthIndexIsEven(j') & mergeHashes(H, h', k, h''))
+    | (!(depthIndexIsEven(j')) & mergeHashes(H, k, h', h''))).
+
+def mergeCommitments : Map^4096(PlaintextKey, Hash)
+  -> Commitment -> Commitment -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \a : Commitment => \b : Commitment => \c : Commitment
+  => mergeHashes(H, from(Commitment)(a), from(Commitment)(b), from(Commitment)(c)).
+
+def commitsTo1 : Map^4096(PlaintextKey, Hash)
+  -> F -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \x : F => \c : Commitment
+  => let h : Hash := from(Commitment)(c);
+     let p : Plaintext := to(Plaintext)((\i : Fin(12) => x));
+     rescueHashLookup(H, p, h).
+
+def commitsTo2 : Map^4096(PlaintextKey, Hash)
+  -> (Fin(2) -> F) -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \f : Fin(2) -> F => \c : Commitment
+  => some c' : Fin(2) -> Commitment,
+     mergeCommitments(H, c'(fin(0)), c'(fin(1)), c)
+   & (all o : Fin(2), commitsTo1(H, f(o), c'(o))).
+
+def commitsTo4 : Map^4096(PlaintextKey, Hash)
+  -> (Fin(4) -> F) -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \f : Fin(4) -> F => \c : Commitment
+  => let f' : Fin(2) -> Fin(2) -> F
+       := \o : Fin(2) => \x : Fin(2)
+       => f(cast(cast(x) +N (2N *N cast(o))));
+     some c' : Fin(2) -> Commitment,
+     mergeCommitments(H, c'(fin(0)), c'(fin(1)), c)
+   & (all o : Fin(2), commitsTo2(H, f'(o), c'(o))).
+
+def commitsTo8 : Map^4096(PlaintextKey, Hash)
+  -> (Fin(8) -> F) -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \f : Fin(8) -> F => \c : Commitment
+  => let f' : Fin(2) -> Fin(4) -> F
+       := \o : Fin(2) => \x : Fin(4)
+       => f(cast(cast(x) +N (cast(o) *N 4N)));
+     some c' : Fin(2) ->^2 Commitment,
+     mergeCommitments(H, c'(fin(0)), c'(fin(1)), c)
+   & (all o : Fin(2), commitsTo4(H, f'(o), c'(o))).
+
+def commitsTo16 : Map^4096(PlaintextKey, Hash)
+  -> (Fin(16) -> F) -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \f : Fin(16) -> F => \c : Commitment
+  => let f' : Fin(2) -> Fin(8) -> F
+       := \o : Fin(2) => \x : Fin(8)
+       => f(cast(cast(x) +N (cast(o) *N 8N)));
+     some c' : Fin(2) ->^2 Commitment,
+     mergeCommitments(H, c'(fin(0)), c'(fin(1)), c)
+   & (all o : Fin(2), commitsTo8(H, f'(o), c'(o))).
+
+def commitsTo : Map^4096(PlaintextKey, Hash)
+  -> Codeword -> Commitment -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \w : Codeword => \c : Commitment
+  => let w' : Fin(16) -> F := \x : Fin(16) => from(Codeword)(w, to(Index)(x));
+     commitsTo16(H, w', c).
+
+-- FRI
+
+data Offset ~= F.
+
+def offset1 : Offset := to(Offset)(to(F)(fin(85408008396924667383611388730472331217))).
+def offset2 : Offset := to(Offset)(to(F)(fin(149224634558074809886965749048363504499))).
+def offset4 : Offset := to(Offset)(to(F)(fin(196162427740603549034094478475071502895))).
+
+data Omega ~= F.
+
+def omega1 : Omega := to(Omega)(to(F)(fin(178902808384765167578311106676137348214))).
+def omega2 : Omega := to(Omega)(to(F)(fin(65907963977709178563567092354521124432))).
+def omega4 : Omega := to(Omega)(to(F)(fin(59478736836296470922896375673044043947))).
+
+def domainLength : N := 256N.
+
+def expansionFactor : N := 2N.
+
+def numColinearityTests : N := 4N.
+
+def numRounds : N := 4N.
+
+def maxDegree : N := 8N.
+
+data Commitments ~= Fin(4) -> Commitment.
+
+data A ~= F.
+
+data B ~= F.
+
+data C ~= F.
+
+data Query ~= A * B * C.
+
+data QueryRound ~= Fin(3).
+
+data IndexNumber ~= Fin(4).
+
+data AAuthPath ~= AuthPath.
+
+data BAuthPath ~= AuthPath.
+
+data CAuthPath ~= AuthPath.
+
+data AOpening ~= A * AAuthPath.
+
+data BOpening ~= B * BAuthPath.
+
+data COpening ~= C * CAuthPath.
+
+data IndexOpenings ~= AOpening * BOpening * COpening.
+
+def aOpening : IndexOpenings -> AOpening
+  := \qs : IndexOpenings => pi1(from(IndexOpenings)(qs)).
+
+def bOpening : IndexOpenings -> BOpening
+  := \qs : IndexOpenings => pi1(pi2(from(IndexOpenings)(qs))).
+
+def cOpening : IndexOpenings -> COpening
+  := \qs : IndexOpenings => pi2(pi2(from(IndexOpenings)(qs))).
+
+data Openings ~= QueryRound -> IndexNumber -> IndexOpenings.
+
+data Proof ~= Commitments * Codeword * Openings.
+
+def commitments : Proof -> Fin(4) -> Commitment
+  := \p : Proof => from(Commitments)(pi1(from(Proof)(p))).
+
+def codeword : Proof -> Codeword
+  := \p : Proof => pi1(pi2(from(Proof)(p))).
+
+def openings : Proof -> QueryRound -> IndexNumber -> IndexOpenings
+  := \p : Proof => from(Openings)(pi2(pi2(from(Proof)(p)))).
+
+data TopLevelIndices ~= IndexNumber -> Index.
+
+def getTopLevelIndex : TopLevelIndices -> IndexNumber -> Index
+  := \is : TopLevelIndices => \i : IndexNumber
+  => (from(TopLevelIndices)(is))(i).
+
+data Alpha ~= F.
+
+data Challenge ~= Alpha * Hash.
+
+data Alphas ~= Fin(4) -> Challenge.
+
+def getAlpha : Alphas -> Fin(4) -> Alpha
+  := \as : Alphas => \x : Fin(4) => pi1(from(Challenge)((from(Alphas)(as))(x))).
+
+def getLastChallenge : Alphas -> Challenge
+  := \as : Alphas => (from(Alphas)(as))(fin(3)).
+
+def getAlphaHash : Alphas -> Fin(4) -> Hash
+  := \as : Alphas => \x : Fin(4) => pi2(from(Challenge)((from(Alphas)(as))(x))).
+
+def checkAlphas : Map^4096(PlaintextKey, Hash)
+  -> Proof -> Alphas -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \p : Proof => \a : Alphas
+  => let f : Fin(4) -> Hash := \x : Fin(4) => from(Commitment)(commitments(p, x));
+     let f' : Fin(4) -> F := \x : Fin(4) => (from(Hash)(f(x)))(fin(0));
+     let g : Fin(4) -> F := \x : Fin(4) => from(Alpha)(getAlpha(a, x));
+     let h : Fin(4) -> Hash := \x : Fin(4) => getAlphaHash(a, x);
+     (all x : Fin(4), rescueHashLookup(H, to(Plaintext)((\i : Fin(12) => g(x))), h(x)))
+   & rescueHashLookup(H, to(Plaintext)(from(Hash)(f(fin(0)))), h(fin(0)))
+   & mergeHashes(H, h(fin(0)), f(fin(1)), h(fin(1)))
+   & mergeHashes(H, h(fin(1)), f(fin(2)), h(fin(2)))
+   & mergeHashes(H, h(fin(2)), f(fin(3)), h(fin(3))).
+
+def sampleIndex : Hash -> Index -> Prop
+  := \h : Hash => \i : Index
+  => let x : N := toN((from(Hash)(h))(fin(0)));
+     let i' : N := cast(from(Index)(i));
+     some y : N < 67624474285557595033981184191762530305N,
+     x = ((4N *N y) +N i').
+
+def checkTopLevelIndices : Map^4096(PlaintextKey, Hash)
+  -> Proof -> Challenge -> TopLevelIndices -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \p : Proof => \c : Challenge => \is : TopLevelIndices
+  => some s : Hash, some c' : Commitment,
+     commitsTo(H, codeword(p), c')
+   & mergeHashes(H, pi2(from(Challenge)(c)), from(Commitment)(c'), s)
+     -- TODO: doesn't the finiteness of the steps break completeness?
+   & (some steps : List^128(Hash * Index),
+      (all i : N < length(steps),
+         let h : Hash := pi1(nth(steps, i));
+         let j : Index := pi2(nth(steps, i));
+         some h' : Hash,
+         commitsTo1(H, to(F)(cast(i)), to(Commitment)(h'))
+       & mergeHashes(H, s, h', h)
+       & sampleIndex(h, j))
+    & (all i : IndexNumber, some j : N < 128N,
+         getTopLevelIndex(is, i) = pi2(nth(steps, cast(from(IndexNumber)(i)))))).
+
+-- The given codeword is the codeword of a low degree polynomial.
+def isLowDegree : Codeword -> Prop
+  := \c : Codeword
+  => let f : Fin(16) -> F := \x : Fin(16) => from(Codeword)(c, to(Index)(x));
+     some p : Fin(16) ->^16 F,
+     fft16(f, p)
+   & (all i : Fin(16),
+      let i' : N := cast(i);
+      (i' <= 7N) | (f(i) = zero)).
+
+def roundOmega : QueryRound -> Omega
+  := [ to(QueryRound)(fin(0)) => omega1
+     , to(QueryRound)(fin(1)) => omega2
+     , to(QueryRound)(fin(2)) => omega4
+     ].
+
+def roundOffset : QueryRound -> Offset
+  := [ to(QueryRound)(fin(0)) => offset1
+     , to(QueryRound)(fin(1)) => offset2
+     , to(QueryRound)(fin(2)) => offset4
+     ].
+
+data AIndices ~= IndexNumber -> Index.
+
+data BIndices ~= IndexNumber -> Index.
+
+data CIndices ~= IndexNumber -> Index.
+
+data ReducedDomainLength ~= Fin(129).
+
+def reduceIndices : ReducedDomainLength -> TopLevelIndices -> AIndices -> BIndices -> Prop
+  := \l : ReducedDomainLength
+  => \t : TopLevelIndices
+  => \a : AIndices
+  => \b : BIndices
+  => let l' : N := cast(from(ReducedDomainLength)(l));
+     let t' : IndexNumber -> N := \i : IndexNumber
+       => cast(from(Index)((from(TopLevelIndices)(t))(i)));
+     let a' : IndexNumber -> N := \i : IndexNumber
+       => cast(from(Index)((from(AIndices)(a))(i)));
+     let b' : IndexNumber -> N := \i : IndexNumber
+       => cast(from(Index)((from(BIndices)(b))(i)));
+     all i : IndexNumber,
+     modulus(t'(i), l', a'(i))
+   & (b'(i) = (a'(i) +N l')).
+
+def reducedDomainLength : QueryRound -> ReducedDomainLength
+  := [ to(QueryRound)(fin(0)) => to(ReducedDomainLength)(fin(128))
+     , to(QueryRound)(fin(1)) => to(ReducedDomainLength)(fin(64))
+     , to(QueryRound)(fin(2)) => to(ReducedDomainLength)(fin(32))
+     ].
+
+def isDomainElement : ((Omega * Offset) * (Index * F)) -> Prop
+  := { ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(0)), to(F)(fin(85408008396924667383611388730472331217)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(1)), to(F)(fin(51144784859582089584462234561948554025)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(2)), to(F)(fin(71334065370616283744252270554501990943)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(3)), to(F)(fin(217679179221747608588914807707245087230)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(4)), to(F)(fin(220590221626292988249169078292535595153)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(5)), to(F)(fin(116485245483325733815567215775171867374)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(6)), to(F)(fin(127354967976243969281398022365271876114)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(7)), to(F)(fin(15503294082427025966872377041803782269)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(8)), to(F)(fin(179633666799132255334608231127847355778)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(9)), to(F)(fin(178976893840981914107200041119045207769)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(10)), to(F)(fin(28505087566162518053762001097894196199)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(11)), to(F)(fin(169876515157291737972298314737018166475)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(12)), to(F)(fin(195776437544668294288461062718167208081)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(13)), to(F)(fin(138041925632975159762676217998982216051)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(14)), to(F)(fin(77478973729182240298998009979436278052)))), ((to(Omega)(to(F)(fin(178902808384765167578311106676137348214))), to(Offset)(to(F)(fin(85408008396924667383611388730472331217)))), (to(Index)(fin(15)), to(F)(fin(167856517892203268353771233778549571582)))) }.
+
+data Point ~= F * F.
+
+def areColinear : Omega -> Offset -> Point -> Point -> Point -> Prop
+  := \omega : Omega => \offset : Offset => \a : Point => \b : Point => \c : Point
+  => let x0 : F := pi1(from(Point)(a));
+     let x1 : F := pi1(from(Point)(b));
+     let x2 : F := pi1(from(Point)(c));
+     let y0 : F := pi2(from(Point)(a));
+     let y1 : F := pi2(from(Point)(b));
+     let y2 : F := pi2(from(Point)(c));
+     some m : F, some b : F,
+      let f : F -> F -> Prop
+        := \x : F => \y : F
+        => some mx : F,
+           mul(m, x, mx) & add(mx, b, y);
+      f(x0, y0) & f(x1, y1) & f(x2, y2).
+
+def verifyRoundOpenings
+   : Map^4096(PlaintextKey, Hash)
+  -> Commitment
+  -> Commitment
+  -> (IndexNumber -> IndexOpenings)
+  -> AIndices
+  -> BIndices
+  -> CIndices
+  -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \root : Commitment => \nextRoot : Commitment
+  => \qs : IndexNumber -> IndexOpenings
+  => \aIndices : AIndices => \bIndices : BIndices => \cIndices : CIndices
+  => all i : IndexNumber,
+     let ai : Index := (from(AIndices)(aIndices))(i);
+     let bi : Index := (from(BIndices)(bIndices))(i);
+     let ci : Index := (from(CIndices)(cIndices))(i);
+     let aq : AOpening := aOpening(qs(i));
+     let bq : BOpening := bOpening(qs(i));
+     let cq : COpening := cOpening(qs(i));
+     let ay : F := from(A)(pi1(from(AOpening)(aq)));
+     let by : F := from(B)(pi1(from(BOpening)(bq)));
+     let cy : F := from(C)(pi1(from(COpening)(cq)));
+     let ap : AuthPath := from(AAuthPath)(pi2(from(AOpening)(aq)));
+     let bp : AuthPath := from(BAuthPath)(pi2(from(BOpening)(bq)));
+     let cp : AuthPath := from(CAuthPath)(pi2(from(COpening)(cq)));
+     verifyOpening(H, root, ai, ay, ap)
+   & verifyOpening(H, root, bi, by, bp)
+   & verifyOpening(H, nextRoot, ci, cy, cp).
+
+def friRound
+   : Map^4096(PlaintextKey, Hash)
+  -> Proof
+  -> QueryRound
+  -> Omega
+  -> Offset
+  -> Alpha
+  -> TopLevelIndices
+  -> Commitment -> Commitment
+  -> (IndexNumber -> IndexOpenings)
+  -> Prop
+  := \H : Map^4096(PlaintextKey, Hash)
+  => \p : Proof
+  => \r : QueryRound
+  => \omega : Omega
+  => \offset : Offset
+  => \alpha : Alpha -- TODO: use alpha
+  => \topLevelIndices : TopLevelIndices
+  => \root : Commitment => \nextRoot : Commitment
+  => \qs : IndexNumber -> IndexOpenings
+  => some aIndices : AIndices,
+     some bIndices : BIndices,
+     let cIndices : CIndices := to(CIndices)(from(AIndices)(aIndices));
+     let dl' : ReducedDomainLength := reducedDomainLength(r);
+     reduceIndices(dl', topLevelIndices, aIndices, bIndices)
+   & verifyRoundOpenings(H, root, nextRoot, qs, aIndices, bIndices, cIndices)
+   & (all i : IndexNumber,
+       some x0 : F, some x1 : F,
+       let a : A := pi1(from(AOpening)(aOpening(qs(i))));
+       let b : B := pi1(from(BOpening)(bOpening(qs(i))));
+       let c : C := pi1(from(COpening)(cOpening(qs(i))));
+       let p0 : Point := to(Point)((x0, from(A)(a)));
+       let p1 : Point := to(Point)((x1, from(B)(b)));
+       let p2 : Point := to(Point)((from(Alpha)(alpha), from(C)(c)));
+       isDomainElement(((omega, offset), ((from(AIndices)(aIndices))(i), x0)))
+     & isDomainElement(((omega, offset), ((from(BIndices)(bIndices))(i), x1)))
+     & areColinear(omega, offset, p0, p1, p2)).
+
+def fri : Proof -> Prop
+  := \p : Proof
+  => some as : Alphas,
+     some is : TopLevelIndices,
+     some H : Map^4096(PlaintextKey, Hash), -- TODO: what is enough hashes?
+     isLowDegree(codeword(p))
+   & (all i : N < length(keys(H)),
+      let k : PlaintextKey := nth(keys(H), i);
+      some p : Plaintext, (plaintextToKey(p) = k)
+    & rescueHash(p, exists(lookup(k, H))))
+   & commitsTo(H, codeword(p), commitments(p, fin(3)))
+   & checkAlphas(H, p, as)
+   & checkTopLevelIndices(H, p, getLastChallenge(as), is)
+   & (all r : QueryRound,
+      let r' : Fin(3) := from(QueryRound)(r);
+      let alpha : Alpha := getAlpha(as, r');
+      let root : Commitment := commitments(p, cast(r'));
+      let nextRoot : Commitment := commitments(p, cast(cast(r') +N 1N));
+      let qs : IndexNumber -> IndexOpenings := openings(p, r);
+      let omega : Omega := roundOmega(r);
+      let offset : Offset := roundOffset(r);
+      friRound(H, p, r, omega, offset, alpha, is, root, nextRoot, qs)).
