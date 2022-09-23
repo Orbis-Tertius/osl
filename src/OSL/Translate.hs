@@ -81,6 +81,12 @@ translate gc@(TranslationContext gDecls _)
     OSL.Apply ann (OSL.Apply _ (OSL.MulZ _) a) b ->
       Term <$> (S11.Mul <$> translateToTerm gc lc (OSL.Z ann) a
                         <*> translateToTerm gc lc (OSL.Z ann) b)
+    OSL.Apply ann (OSL.Apply _ (OSL.AddFp _) a) b ->
+      Term <$> (S11.Add <$> translateToTerm gc lc (OSL.Fp ann) a
+                        <*> translateToTerm gc lc (OSL.Fp ann) b)
+    OSL.Apply ann (OSL.Apply _ (OSL.MulFp _) a) b ->
+      Term <$> (S11.Add <$> translateToTerm gc lc (OSL.Fp ann) a
+                        <*> translateToTerm gc lc (OSL.Fp ann) b)
     OSL.Apply _ (OSL.Cast _) a -> do
       aT <- lift $ inferType decls a
       translate gc lc aT a
@@ -859,8 +865,13 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
             [bT] -> 
               pure ( [S11.ExistsFO bT]
                    , ScalarMapping (S11.Var (S11.Name 0 0)) )
-            _ -> lift . Left $ ErrorMessage (boundAnnotation varBound) "expected a scalar bound"
-        _ -> lift . Left $ ErrorMessage (boundAnnotation varBound) "expected a scalar bound"
+            _ -> lift . Left . ErrorMessage (boundAnnotation varBound)
+              $ "expected a scalar bound but got " <> pack (show bTs)
+        OSL.FieldMaxBound _ ->
+          pure ( [S11.ExistsFO S11.FieldMaxBound]
+               , ScalarMapping (S11.Var (S11.Name 0 0)) )
+        _ -> lift . Left . ErrorMessage (boundAnnotation varBound)
+          $ "expected a scalar bound but got " <> pack (show varBound)
 
 
 getMappingDimensions

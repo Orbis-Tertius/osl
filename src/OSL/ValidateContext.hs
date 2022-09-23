@@ -219,6 +219,10 @@ checkTerm c t x =
         else Left (ErrorMessage ann "expected a natural number but got a negative integer")
     ConstFp ann _ ->
       checkTypeInclusion c ann (Fp ann) t
+    AddFp ann -> checkTypeInclusion c ann t
+      (F ann Nothing (Fp ann) (F ann Nothing (Fp ann) (Fp ann)))
+    MulFp ann -> checkTypeInclusion c ann t
+      (F ann Nothing (Fp ann) (F ann Nothing (Fp ann) (Fp ann)))
     ConstF ann f ->
       case t of
         F _ n a b -> do
@@ -764,6 +768,8 @@ inferType c t =
     MulN ann -> pure (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
     AddZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
     MulZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
+    AddFp ann -> pure (F ann Nothing (Fp ann) (F ann Nothing (Fp ann) (Fp ann)))
+    MulFp ann -> pure (F ann Nothing (Fp ann) (F ann Nothing (Fp ann) (Fp ann)))
     Cast ann -> Left (ErrorMessage ann "cannot infer the type of cast from context")
     ListCast ann -> Left (ErrorMessage ann "cannot infer the type of List(cast) from context")
     To ann name -> do
@@ -1098,6 +1104,7 @@ checkTypeIsNumeric c t =
     N _ -> return ()
     Z _ -> return ()
     Fin _ _ -> return ()
+    Fp _ -> return ()
     NamedType ann name -> getNamedType c ann name >>= checkTypeIsNumeric c
     _ -> Left . ErrorMessage (typeAnnotation t) $ "expected a numeric type but got " <> pack (show t)
 

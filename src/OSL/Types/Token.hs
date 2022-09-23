@@ -6,9 +6,9 @@ import OSL.Types.OSL (Name (..))
 
 
 data Token = Var Name | Keyword Keyword | ThinArrow | Colon
-  | OpenParen | CloseParen | Const Integer | LeftRightArrow
+  | Comma |  OpenParen | CloseParen | Const Integer | LeftRightArrow
   | ConstN Integer | ConstZ Integer | ConstF Integer | ConstFin Integer
-  | ProductOp | Comma | CoproductOp | AddNOp | MulNOp | AddZOp | MulZOp
+  | ProductOp | CoproductOp | AddNOp | MulNOp | AddZOp | MulZOp | AddFpOp | MulFpOp
   | Equal | Less | LessOrEqual | And | Or | Not | ForAll | ForSome
   | Lambda | ThickArrow | Congruent | DefEquals | Semicolon | Period
   | Caret | OpenBracket | CloseBracket | OpenBrace | CloseBrace

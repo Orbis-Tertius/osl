@@ -14,6 +14,8 @@ termAnnotation =
     MulN ann -> ann
     ConstN ann _ -> ann
     ConstFp ann _ -> ann
+    AddFp ann -> ann
+    MulFp ann -> ann
     ConstF ann _ -> ann
     ConstSet ann _ -> ann
     AddZ ann -> ann

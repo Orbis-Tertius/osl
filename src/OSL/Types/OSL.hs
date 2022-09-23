@@ -88,6 +88,8 @@ data Term ann =
   | MulZ ann
   | ConstZ ann Integer
   | ConstFp ann Integer
+  | AddFp ann
+  | MulFp ann
   | Cast ann
   | ConstFin ann Integer
   | ConstF ann [(Term ann, Term ann)]

@@ -439,6 +439,8 @@ operatorOn x = do
       (T.MulNOp, _) -> pure T.MulNOp
       (T.AddZOp, _) -> pure T.AddZOp
       (T.MulZOp, _) -> pure T.MulZOp
+      (T.AddFpOp, _) -> pure T.AddFpOp
+      (T.MulFpOp, _) -> pure T.MulFpOp
       (T.ProductOp, _) -> pure T.ProductOp
       (T.CoproductOp, _) -> pure T.CoproductOp
       (T.ThinArrow, _) -> pure T.ThinArrow
@@ -463,6 +465,8 @@ operatorOn x = do
         T.MulNOp -> applyBinaryOp MulN
         T.AddZOp -> applyBinaryOp AddZ
         T.MulZOp -> applyBinaryOp MulZ
+        T.AddFpOp -> applyBinaryOp AddFp
+        T.MulFpOp -> applyBinaryOp MulFp
         T.ProductOp -> FunctionProduct
         T.CoproductOp -> FunctionCoproduct
         T.ThinArrow -> Implies
@@ -479,6 +483,8 @@ operatorOn x = do
         T.MulNOp -> True
         T.AddZOp -> True
         T.MulZOp -> True
+        T.AddFpOp -> True
+        T.MulFpOp -> True
         T.ProductOp -> True
         T.CoproductOp -> True
         T.ThinArrow -> False
