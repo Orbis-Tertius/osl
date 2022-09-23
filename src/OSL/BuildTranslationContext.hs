@@ -39,7 +39,7 @@ import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.OSL (Declaration (..), Type (..), ValidContext (..), Name (Sym, GenSym))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
-import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), LengthMapping (..), ValuesMapping (..), KeysMapping (..), KeyIndicatorMapping (..))
+import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), LengthMapping (..), ValuesMapping (..), KeysMapping (..))
 import OSL.ValidContext (getExistingDeclaration, addDeclaration)
 
 
@@ -160,12 +160,9 @@ addFreeVariableMapping freeVariable = do
           lMap <- ScalarMapping <$> getFreeS11NameM (Arity 0)
           kSym <- addGensym (F ann (Just n) (N ann) a)
           kMap <- addFreeVariableMapping kSym
-          iSym <- addGensym (F ann (Just n) a (N ann))
-          iMap <- addFreeVariableMapping iSym
           let mapping = MapMapping
                 (LengthMapping lMap)
                 (KeysMapping kMap)
-                (KeyIndicatorMapping iMap)
                 (ValuesMapping vMap)
           addMapping freeVariable mapping
           return mapping
@@ -239,9 +236,8 @@ getBoundS11NamesInMapping arity =
       rec a `Set.union` rec b
     ListMapping (LengthMapping a) (ValuesMapping b) ->
       rec a `Set.union` rec b
-    MapMapping (LengthMapping a) (KeysMapping b)
-        (KeyIndicatorMapping c) (ValuesMapping d) ->
-      rec a `Set.union` (rec b `Set.union` (rec c `Set.union` rec d))
+    MapMapping (LengthMapping a) (KeysMapping b) (ValuesMapping d) ->
+      rec a `Set.union` (rec b `Set.union` rec d)
     LambdaMapping _ _ _ _ _ -> mempty
     PropMapping _ -> mempty
     PredicateMapping _ -> mempty
@@ -332,12 +328,10 @@ mapAritiesInMapping f =
       ListMapping
       (LengthMapping (rec a))
       (ValuesMapping (rec b))
-    MapMapping (LengthMapping a) (KeysMapping b)
-        (KeyIndicatorMapping c) (ValuesMapping d) ->
+    MapMapping (LengthMapping a) (KeysMapping b) (ValuesMapping d) ->
       MapMapping
       (LengthMapping (rec a))
       (KeysMapping (rec b))
-      (KeyIndicatorMapping (rec c))
       (ValuesMapping (rec d))
     LambdaMapping gc lc v vT t ->
       -- TODO: should recurse into gc and/or lc?

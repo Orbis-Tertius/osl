@@ -382,7 +382,9 @@ def paysFeeToCorrectAddress : FeeParams -> Tx -> Prop
      (txOutAddress(o) = from(FeePaymentAddress)(feePaymentAddress(p)))
    & (all i : N < length(keys(f)),
       let k : AssetClass := nth(keys(f), i);
-      lookup(k, f) = lookup(k, from(Value)(value(o)))).
+      let v : Map^128(AssetClass, Quantity) := from(Value)(value(o));
+      some j : N, (nth(keys(v), i) = k)
+    & (lookup(k, f) = lookup(k, v))).
 
 def checkCost : FeeParams -> Tx -> List^128(ScriptSize * Steps) -> Frac -> Prop
   := \p : FeeParams
@@ -423,21 +425,21 @@ def feeRequirementMet
 
 def txExists : Rollup -> TxId -> Prop
   := \R : Rollup => \i : TxId
-  => !(isNothing(lookup(i, txs(R)))).
+  => some j : N, nth(keys(txs(R)), j) = i.
 
 
 def inputExists : Rollup -> TxOutRef + RootOutRef -> Prop
   := \R : Rollup => \x : TxOutRef + RootOutRef
   => (some y : TxOutRef, (x = iota1(y))
-    & ((1N +N cast(from(TxOutRefIndex)(txOutRefIndex(y))))
-        <= maybe((\t : Tx => length(outputs(t))))(
-                 0N,
-                 lookup(txOutRefId(y), txs(R)))))
+    & (some i : N < length(keys(txs(R))),
+       (nth(keys(txs(R)), i) = txOutRefId(y))
+     & ((1N +N cast(from(TxOutRefIndex)(txOutRefIndex(y))))
+         <= length(outputs(lookup(txOutRefId(y), txs(R)))))))
     | (some y : RootOutRef, (x = iota2(y))
-     & ((1N +N cast(from(RootOutRefIndex)(rootOutRefIndex(y))))
-        <= maybe((\rs : List^128(RootOut) => length(rs)))(
-                 0N,
-                 lookup(rootOutRefTime(y), roots(R))))).
+     & (some i : N < length(keys(roots(R))),
+        (nth(keys(roots(R)), i) = rootOutRefTime(y))
+      & ((1N +N cast(from(RootOutRefIndex)(rootOutRefIndex(y))))
+         <= length(lookup(rootOutRefTime(y), roots(R)))))).
 
 
 def spendingInputExists : Rollup -> SpendIn -> Prop
@@ -461,7 +463,7 @@ def inputsExist : Rollup -> Tx -> Prop
 
 def getTxOut : Rollup -> TxOutRef -> TxOut
   := \R : Rollup => \x : TxOutRef
-  => let o : List^128(TxOut) := outputs(exists(lookup(txOutRefId(x), txs(R))));
+  => let o : List^128(TxOut) := outputs(lookup(txOutRefId(x), txs(R)));
      let i : N := cast(from(TxOutRefIndex)(txOutRefIndex(x)));
      nth(o,i).
 
@@ -493,11 +495,11 @@ def inputAddressesAreAuthorized : Rollup -> Tx -> Prop
         (x = to(SpendIn)(iota1(y)))
       & isAuthorizedAddress(t, a)
       & (a = txOutAddress(getTxOut(R, y))))
-   | (some y : RootOutRef, some a : Address,
-      let os : Maybe(List^128(RootOut)) := lookup(rootOutRefTime(y), roots(R));
+   | (some y : RootOutRef, some a : Address, some i : N < length(keys(roots(R))),
+      let os : List^128(RootOut) := lookup(rootOutRefTime(y), roots(R));
       let r : Address := pi1(from(RootOut)
-            (nth(exists(os), cast(from(RootOutRefIndex)(rootOutRefIndex(y))))));
-        !(isNothing(os))
+            (nth(os, cast(from(RootOutRefIndex)(rootOutRefIndex(y))))));
+        (rootOutRefTime(y) = nth(keys(roots(R)), i))
       & isAuthorizedAddress(t, a)
       & (a = r)).
 
@@ -536,10 +538,15 @@ def txBalances
   => all j : N < length(assetClasses),
      let y : AssetClass := nth(assetClasses, j);
      let a : Z := cast(from(Quantity)(totalInput(inputValues, i, y)));
-     let b : Z := maybe((\x : MintQuantity => getMintQuantity(x)))
-                    (0Z, lookup(y, mintValue(mint(t))));
      let c : Z := cast(from(Quantity)(totalOutput(t, y)));
-     (a +Z b) = c.
+     some b : F, some i : N < length(keys(mintValue(mint(t)))),
+     let b' : Z := cast(b);
+     (((b' = 0Z) & (all i : N < length(keys(mintValue(mint(t)))),
+                   !(nth(keys(mintValue(mint(t))), i) = y)))
+      | (some i : N < length(keys(mintValue(mint(t)))),
+         (nth(keys(mintValue(mint(t))), i) = y)
+         & (b' = getMintQuantity(lookup(y, mintValue(mint(t)))))))
+   & ((a +Z b') = c).
 
 
 def spendingScriptsAcceptTx
@@ -988,7 +995,7 @@ def existsRollupWithIO
   => some f : Time ->^4096 FeeParams,
      some assetClasses : List^4096(AssetClass),
      some R : Rollup, rollupIsValid(assetClasses, f, R)
-   & (let r' : List^128(RootOut) := exists(lookup(t, roots(R)));
+   & (let r' : List^128(RootOut) := lookup(t, roots(R));
      (all i : N < length(r),
       some j : N < length(r'),
       rootOutsEqual(assetClasses, nth(r, i), nth(r, j)))
@@ -1003,5 +1010,5 @@ def existsRollupWithIO
       nth(l, j) = nth(keys(leaves(R)), i))
    & (all i : N < length(keys(h)),
       let t : Time := nth(keys(h), i);
-      let h : RollupHash := exists(lookup(t, h));
+      let h : RollupHash := lookup(t, h);
       rollupHashUpToTimeIs(R, t, h))).
