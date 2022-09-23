@@ -12,7 +12,8 @@ import Control.Monad (foldM, forM_)
 import qualified Data.Map as Map
 import Data.Text (pack)
 
-import OSL.Term (termAnnotation, boundAnnotation)
+import OSL.Bound (boundAnnotation)
+import OSL.Term (termAnnotation)
 import OSL.Type (typeAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.OSL (Name (..), Declaration (..), Type (..), Term (..), Context (..), ValidContext (..), Bound (..), LeftBound (..), RightBound (..), DomainBound (..), CodomainBound (..), ValuesBound (..), KeysBound (..), Cardinality (..), ContextType (Global))
@@ -48,6 +49,7 @@ checkType c t =
     P ann n a b -> checkMaybeCardinality ann n >> checkType c a >> checkType c b
     N _ -> return ()
     Z _ -> return ()
+    Fp _ -> return ()
     (Fin ann n) -> checkFinType ann n
     Product _ a b -> checkType c a >> checkType c b
     Coproduct _ a b -> checkType c a >> checkType c b
@@ -103,6 +105,7 @@ checkQuantifiableType c t =
       >> checkTypeIsNumeric c b
     N _ -> return ()
     Z _ -> return ()
+    Fp _ -> return ()
     Fin ann n -> checkFinType ann n
     Product _ a b -> checkQuantifiableType c a >> checkQuantifiableType c b
     Coproduct _ a b -> checkQuantifiableType c a >> checkQuantifiableType c b
@@ -127,6 +130,7 @@ checkFiniteDimType c t =
       >> checkTypeIsNumeric c b
     N _ -> return ()
     Z _ -> return ()
+    Fp _ -> return ()
     Fin ann n -> checkFinType ann n
     Product _ a b -> checkFiniteDimType c a >> checkFiniteDimType c b
     Coproduct _ a b -> checkFiniteDimType c a >> checkFiniteDimType c b
@@ -160,6 +164,9 @@ checkTypeInclusion c ann (F _ (Just n) a b) (F _ (Just n') a' b') =
   if n <= n'
   then checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
   else Left (ErrorMessage ann "function type cardinality mismatch")
+checkTypeInclusion _ _ (Fp _) (Fp _) = return ()
+checkTypeInclusion _ _ (Z _) (Fp _) = return ()
+checkTypeInclusion _ _ (Fin _ _) (Fp _) = return ()
 checkTypeInclusion _ _ (N _) (N _) = return ()
 checkTypeInclusion _ _ (Z _) (Z _) = return ()
 checkTypeInclusion _ _ (Fin _ _) (N _) = return ()
@@ -210,6 +217,8 @@ checkTerm c t x =
       if n >= 0
         then return ()
         else Left (ErrorMessage ann "expected a natural number but got a negative integer")
+    ConstFp ann _ ->
+      checkTypeInclusion c ann (Fp ann) t
     ConstF ann f ->
       case t of
         F _ n a b -> do
@@ -671,6 +680,11 @@ checkBound c t bound =
         ScalarBound _ boundTerm -> checkTerm c (Z ann') boundTerm
         _ -> Left (ErrorMessage (boundAnnotation bound)
                      "expected an integer bound")
+    Fp ann' ->
+      case bound of
+        ScalarBound _ boundTerm -> checkTerm c (Fp ann') boundTerm
+        _ -> Left (ErrorMessage (boundAnnotation bound)
+                     "expected an F bound")
     Fin ann' n ->
       case bound of
         ScalarBound _ boundTerm -> do

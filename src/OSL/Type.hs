@@ -16,6 +16,7 @@ typeAnnotation t =
     P ann _ _ _ -> ann
     N ann -> ann
     Z ann -> ann
+    Fp ann -> ann
     Fin ann _ -> ann
     Product ann _ _ -> ann
     Coproduct ann _ _ -> ann
@@ -33,6 +34,7 @@ typeCardinality ctx t =
     P _ n _ _ -> n
     N _ -> Just 1
     Z _ -> Just 1
+    Fp _ -> Just 1
     Fin _ _ -> Just 1
     Product _ _ _ -> Just 1
     Coproduct _ _ _ -> Just 1

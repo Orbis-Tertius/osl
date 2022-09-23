@@ -80,6 +80,7 @@ token =
   , constantNatural
   , constantInteger
   , constantFinite
+  , constantField
   -- the T.Const case must come after the other constant
   -- cases to deal with ambiguity
   , T.Const <$> nonNegativeIntegerLiteral
@@ -141,6 +142,8 @@ keyword =
   , K.N <$ string "N"
   , K.Z <$ string "ℤ"
   , K.Z <$ string "Z"
+  , K.F <$ string "F"
+  , K.F <$ string "𝔽"
   , K.Fin <$ string "Fin"
   , K.Cast <$ string "cast"
   , K.Data <$ string "data"
@@ -194,6 +197,13 @@ constantInteger = do
   i <- integerLiteral
   void $ char 'Z' <|> char 'ℤ'
   return (T.ConstZ i)
+
+
+constantField :: Parser Token
+constantField = do
+  i <- nonNegativeIntegerLiteral
+  void $ char 'F' <|> char '𝔽'
+  pure (T.ConstF i)
 
 
 constantFinite :: Parser Token

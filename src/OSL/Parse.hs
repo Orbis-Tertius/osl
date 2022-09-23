@@ -171,6 +171,7 @@ type2 =
   [ consumeExact (T.Keyword K.Prop) Prop
   , consumeExact (T.Keyword K.N) N
   , consumeExact (T.Keyword K.Z) Z
+  , consumeExact (T.Keyword K.F) Fp
   , NamedType <$> getPosition <*> name
   , parenthesizedType
   , finiteType
@@ -629,6 +630,7 @@ constant =
     \case
       (T.ConstN i, p) -> pure (ConstN p i)
       (T.ConstZ i, p) -> pure (ConstZ p i)
+      (T.ConstF i, p) -> pure (ConstFp p i)
       (T.ConstFin i, p) -> pure (ConstFin p i)
       _ -> Nothing
 

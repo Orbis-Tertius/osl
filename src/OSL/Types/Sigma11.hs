@@ -8,6 +8,7 @@ module OSL.Types.Sigma11
   , Term (..)
   , Formula (..)
   , ExistentialQuantifier (..)
+  , Bound (..)
   , AuxTables (..)
   ) where
 
@@ -71,7 +72,7 @@ data Formula =
   | Or Formula Formula
   | Implies Formula Formula
   | Iff Formula Formula
-  | ForAll Term Formula
+  | ForAll Bound Formula
   | Exists ExistentialQuantifier Formula
 
 instance Show Formula where
@@ -97,29 +98,28 @@ instance Show Formula where
 
 
 data ExistentialQuantifier =
-    ExistsFO Term
-    -- TODO: not Maybe Cardinality
-  | ExistsSO (Maybe Cardinality) Term (NonEmpty Term)
-  | ExistsP (Maybe Cardinality) Term Term -- TODO: one bound
+    ExistsFO Bound
+  | ExistsSO Cardinality Bound (NonEmpty Bound)
+  | ExistsP Cardinality Bound Bound
 
 instance Show ExistentialQuantifier where
   show (ExistsFO b) = "<" <> show b
-  show (ExistsSO (Just (Cardinality n)) b bs) =
+  show (ExistsSO (Cardinality n) b bs) =
     "^" <> show n <>
     "<" <> show b <> "("
       <> intercalate ", " (("<" <>) . show <$> toList bs)
       <> ")"
-  show (ExistsSO Nothing b bs) =
-    "<" <> show b <> "("
-      <> intercalate ", " (("<" <>) . show <$> toList bs)
-      <> ")"
-  show (ExistsP (Just (Cardinality n)) b0 b1) =
+  show (ExistsP (Cardinality n) b0 b1) =
     "^" <> show n <>
-    "<" <> show b0 <>
-    "(!<" <> show b1 <> ")"
-  show (ExistsP Nothing b0 b1) =
-    "<" <> show b0 <>
-    "(!<" <> show b1 <> ")"
+    "<" <> show b0 <> "(<" <> show b1 <> ")"
+
+
+data Bound = TermBound Term | FieldMaxBound
+
+
+instance Show Bound where
+  show (TermBound t) = show t
+  show FieldMaxBound = show "|F|"
 
 
 data AuxTables =
