@@ -164,6 +164,8 @@ checkTypeInclusion c ann (F _ (Just n) a b) (F _ (Just n') a' b') =
   if n <= n'
   then checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
   else Left (ErrorMessage ann "function type cardinality mismatch")
+checkTypeInclusion _ _ (Fp _) (N _) = return ()
+checkTypeInclusion _ _ (Fp _) (Z _) = return ()
 checkTypeInclusion _ _ (Fp _) (Fp _) = return ()
 checkTypeInclusion _ _ (Z _) (Fp _) = return ()
 checkTypeInclusion _ _ (Fin _ _) (Fp _) = return ()

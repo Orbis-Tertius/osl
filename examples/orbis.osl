@@ -10,9 +10,7 @@ data Datum ~= ByteString.
 
 data Redeemer ~= ByteString.
 
-data F ~= Fin(4096).
-
-def fToNat : F -> N := \x : F => cast(from(F)(x)).
+def fToNat : F -> N := \x : F => cast(x).
 
 def bytesPerWord : N := 8N.
 
@@ -87,7 +85,7 @@ data Rollup ~=
   * Map^4096(Time, List^128(RootOut))
   * Map^4096(LeafOut, Unit).
 
-def toTime : N -> Time := \x : N => to(Time)(to(F)(cast(x))).
+def toTime : N -> Time := \x : N => to(Time)(cast(x)).
 
 def fromTime : Time -> N := \x : Time => fToNat(from(Time)(x)).
 
@@ -185,7 +183,7 @@ def getSignatories : Signatories -> List^128(PubKeyHash)
   := \s : Signatories => from(Signatories)(s).
 
 def getQuantity : Quantity -> N
-  := \x : Quantity => cast(from(F)(from(Quantity)(x))).
+  := \x : Quantity => cast(from(Quantity)(x)).
 
 def getMintQuantity : MintQuantity -> Z
   := \x : MintQuantity => cast(from(MintQuantity)(x)).
@@ -393,7 +391,7 @@ def checkCost : FeeParams -> Tx -> List^128(ScriptSize * Steps) -> Frac -> Prop
   => \x : Frac
   => let scriptSizeAgg : N := fToNat(from(ScriptSize)(sum(List(pi1)(s))));
      let steps : List^128(N) :=
-       List(cast)(List(from(F))(List(from(Steps))(List(pi2)(s))));
+       List(cast)(List(from(Steps))(List(pi2)(s)));
      some d : Frac < maxFrac,
      some e : Frac < maxFrac,
      some f : Frac < maxFrac,
@@ -431,12 +429,12 @@ def txExists : Rollup -> TxId -> Prop
 def inputExists : Rollup -> TxOutRef + RootOutRef -> Prop
   := \R : Rollup => \x : TxOutRef + RootOutRef
   => (some y : TxOutRef, (x = iota1(y))
-    & ((1N +N cast(from(F)(from(TxOutRefIndex)(txOutRefIndex(y)))))
+    & ((1N +N cast(from(TxOutRefIndex)(txOutRefIndex(y))))
         <= maybe((\t : Tx => length(outputs(t))))(
                  0N,
                  lookup(txOutRefId(y), txs(R)))))
     | (some y : RootOutRef, (x = iota2(y))
-     & ((1N +N cast(from(F)(from(RootOutRefIndex)(rootOutRefIndex(y)))))
+     & ((1N +N cast(from(RootOutRefIndex)(rootOutRefIndex(y))))
         <= maybe((\rs : List^128(RootOut) => length(rs)))(
                  0N,
                  lookup(rootOutRefTime(y), roots(R))))).
@@ -464,7 +462,7 @@ def inputsExist : Rollup -> Tx -> Prop
 def getTxOut : Rollup -> TxOutRef -> TxOut
   := \R : Rollup => \x : TxOutRef
   => let o : List^128(TxOut) := outputs(exists(lookup(txOutRefId(x), txs(R))));
-     let i : N := cast(from(F)(from(TxOutRefIndex)(txOutRefIndex(x))));
+     let i : N := cast(from(TxOutRefIndex)(txOutRefIndex(x)));
      nth(o,i).
 
 
@@ -498,7 +496,7 @@ def inputAddressesAreAuthorized : Rollup -> Tx -> Prop
    | (some y : RootOutRef, some a : Address,
       let os : Maybe(List^128(RootOut)) := lookup(rootOutRefTime(y), roots(R));
       let r : Address := pi1(from(RootOut)
-            (nth(exists(os), cast(from(F)(from(RootOutRefIndex)(rootOutRefIndex(y)))))));
+            (nth(exists(os), cast(from(RootOutRefIndex)(rootOutRefIndex(y))))));
         !(isNothing(os))
       & isAuthorizedAddress(t, a)
       & (a = r)).
@@ -545,11 +543,11 @@ def txBalances
 
 
 def spendingScriptsAcceptTx
-   : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+   : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
   -> TxId
   -> Tx
   -> Prop
-  := \scriptLimits : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+  := \scriptLimits : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
   => \x : TxId
   => \t : Tx
   => all i : Fin(128) < (length(outputs(t))),
@@ -559,21 +557,21 @@ def spendingScriptsAcceptTx
       let a : ScriptAddress := pi2(pi2(s));
       let d : Datum := pi1(s);
       let r : Redeemer := pi1(pi2(s));
-      let l : ScriptSize * Steps := scriptLimits(a, x);
+      let l : ScriptSize * Steps := scriptLimits((a, x));
       let c : ScriptContext := to(ScriptContext)(
             ( t
             , to(ScriptPurpose)(iota2(to(Spending)(to(TxOutRef)
-                ((x, to(TxOutRefIndex)(to(F)(cast(i))))))))
+                ((x, to(TxOutRefIndex)(cast(i)))))))
             ));
       accepts(a, pi1(l), pi2(l), d, r, c)).
 
 
 def mintingScriptsAcceptTx
-   : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+   : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
   -> TxId
   -> Tx
   -> Prop
-  := \scriptLimits : ScriptAddress -> TxId -> (ScriptSize * Steps)
+  := \scriptLimits : (ScriptAddress * TxId) -> (ScriptSize * Steps)
   => \x : TxId
   => \t : Tx
   => let v : Map^128(AssetClass, MintQuantity) := mintValue(mint(t));
@@ -587,16 +585,16 @@ def mintingScriptsAcceptTx
        := to(ScriptContext)((t, to(ScriptPurpose)(iota1(to(Minting)(c)))));
      !(isNothing(lookup(c, inputs)))
    & (let m : Datum * Redeemer := exists(lookup(c, inputs));
-      let l : ScriptSize * Steps := scriptLimits(a, x);
+      let l : ScriptSize * Steps := scriptLimits((a, x));
       accepts(a, pi1(l), pi2(l), pi1(m), pi2(m), ctx)).
 
 
 def scriptsAcceptTx
-   : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+   : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
   -> TxId
   -> Tx
   -> Prop
-  := \scriptLimits : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+  := \scriptLimits : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
   => \x : TxId
   => \t : Tx
   => spendingScriptsAcceptTx(scriptLimits, x, t)
@@ -614,8 +612,8 @@ def isSignedByAllSignatories : TxId -> Tx -> Prop
 
 def HALO : AssetClass
   := to(AssetClass)(
-       ( to(CurrencySymbol)(to(F)(fin(42)))
-       , to(TokenName)(to(F)(fin(42))) )).
+       ( to(CurrencySymbol)(42F)
+       , to(TokenName)(42F) )).
 
 
 def paysEnoughFee
@@ -675,7 +673,7 @@ def txIsValid
    : (Time -> FeeParams)
   -> (TxId -> List^128(Value))
   -> List^4096(AssetClass)
-  -> (ScriptAddress -> TxId -> (ScriptSize * Steps))
+  -> ((ScriptAddress * TxId) -> (ScriptSize * Steps))
   -> (TxId -> List^128(ScriptSize * Steps))
   -> Rollup
   -> TxId
@@ -684,7 +682,7 @@ def txIsValid
   := \feeParams : Time -> FeeParams
   => \inputValues : TxId -> List^128(Value)
   => \assetClasses : List^4096(AssetClass)
-  => \scriptLimits : ScriptAddress -> TxId -> (ScriptSize * Steps)
+  => \scriptLimits : (ScriptAddress * TxId) -> (ScriptSize * Steps)
   => \txScriptLimits : TxId -> List^128(ScriptSize * Steps)
   => \R : Rollup
   => \x : TxId
@@ -854,11 +852,11 @@ def assetClassesCohere
 
 
 def scriptLimitsCohere
-   : (ScriptAddress -> TxId -> (ScriptSize * Steps))
+   : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
   -> (TxId -> List^128(ScriptSize * Steps))
   -> Rollup
   -> Prop
-  := \scriptLimits : ScriptAddress -> TxId -> (ScriptSize * Steps)
+  := \scriptLimits : (ScriptAddress * TxId) -> (ScriptSize * Steps)
   => \txScriptLimits : TxId -> List^128(ScriptSize * Steps)
   => \R : Rollup
   => all i : N < length(keys(txs(R))),
@@ -873,13 +871,13 @@ def scriptLimitsCohere
       isNothing(s)
       | (let a : ScriptAddress := pi2(pi2(exists(s)));
          some k : N < length(txScriptLimits(x)),
-         nth(txScriptLimits(x), k) = scriptLimits(a, x)))
+         nth(txScriptLimits(x), k) = scriptLimits((a, x))))
    & (all j : N < length(keys(m)),
       let c : CurrencySymbol := nth(keys(m), j);
       let a : ScriptAddress := to(ScriptAddress)
         (from(CurrencySymbol)(c));
       some k : N < length(txScriptLimits(x)),
-      nth(txScriptLimits(x), k) = scriptLimits(a, x)).
+      nth(txScriptLimits(x), k) = scriptLimits((a, x))).
 
 
 def valuesEqual
@@ -929,10 +927,10 @@ def rollupIsValid
   := \assetClasses : List^4096(AssetClass)
   => \p : Time -> FeeParams
   => \R : Rollup
-  => some inputValues : TxId -> List^128(Value),
+  => some inputValues : TxId ->^4096 List^128(Value),
      some consumers : Map^65536(SpendIn, Consumer),
-     some scriptLimits : ScriptAddress -> TxId -> (ScriptSize * Steps),
-     some txScriptLimits : TxId -> List^128(ScriptSize * Steps),
+     some scriptLimits : (ScriptAddress * TxId) ->^524288 (ScriptSize * Steps),
+     some txScriptLimits : TxId ->^4096 List^128(ScriptSize * Steps),
      (all i : N < length(keys(txs(R))),
         let x : TxId := nth(keys(txs(R)), i);
         let t : Tx := exists(lookup(x, txs(R)));
@@ -987,7 +985,7 @@ def existsRollupWithIO
   => \l : List^4096(LeafOut)
   => \h : Map^4096(Time, RollupHash)
   => \p : Map^4096(Time, FeeParams)
-  => some f : Time -> FeeParams,
+  => some f : Time ->^4096 FeeParams,
      some assetClasses : List^4096(AssetClass),
      some R : Rollup, rollupIsValid(assetClasses, f, R)
    & (let r' : List^128(RootOut) := exists(lookup(t, roots(R)));
