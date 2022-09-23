@@ -109,7 +109,7 @@ def getProgramInstruction : Program -> Address -> Instruction
   := \p : Program => \a : Address
   => from(Program)(p, a).
 
-data RegisterValues ~= Register -> Word.
+data RegisterValues ~= Register ->^8 Word.
 
 data Flag ~= Bool.
 

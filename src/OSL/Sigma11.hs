@@ -22,7 +22,7 @@ import qualified Data.Set as Set
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Name (..), Term (Var, App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Predicate, Not, And, Or, Implies, Iff, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO, ExistsP))
+import OSL.Types.Sigma11 (Name (..), Term (Var, App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Predicate, Not, And, Or, Implies, Iff, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO, ExistsP), Bound (TermBound, FieldMaxBound))
 import OSL.Types.TranslationContext (Mapping (..))
 
 
@@ -43,9 +43,6 @@ instance MapNames Term where
       IndLess x y -> IndLess (mapNames f x) (mapNames f y)
       Const x -> Const x
 
-instance MapNames (NonEmpty Term) where
-  mapNames f = fmap (mapNames f)
-
 instance MapNames Formula where
   mapNames f =
     \case
@@ -62,11 +59,19 @@ instance MapNames Formula where
         Exists (ExistsFO (mapNames f bound)) (mapNames f p)
       Exists (ExistsSO n outBound inBounds) p ->
         Exists (ExistsSO n (mapNames f outBound) (mapNames f inBounds)) (mapNames f p)
-      Exists (ExistsP n outBound inBound) p ->
-        Exists (ExistsP n (mapNames f outBound) (mapNames f inBound)) (mapNames f p)
+      Exists (ExistsP n inBound outBound) p ->
+        Exists (ExistsP n (mapNames f inBound) (mapNames f outBound)) (mapNames f p)
 
+instance MapNames Bound where
+  mapNames f =
+    \case
+      TermBound t -> TermBound (mapNames f t)
+      FieldMaxBound -> FieldMaxBound
 
 instance MapNames a => MapNames (Mapping ann a) where
+  mapNames f = fmap (mapNames f)
+
+instance MapNames a => MapNames (NonEmpty a) where
   mapNames f = fmap (mapNames f)
 
 
@@ -112,8 +117,8 @@ termIndices =
 
 
 prependBounds
-  :: Maybe Cardinality
-  -> [Term]
+  :: Cardinality
+  -> [Bound]
   -> ExistentialQuantifier
   -> ExistentialQuantifier
 prependBounds n bs (ExistsFO b) =
@@ -125,4 +130,4 @@ prependBounds _ bs' (ExistsSO n b bs) =
     Just bs'' -> ExistsSO n b (bs'' <> bs)
     Nothing -> ExistsSO n b bs
 prependBounds _ _ (ExistsP _ _ _) =
-  error "there has been a mistake; applied prependBounds to ExistsP"
+  error "there is a compiler bug; applied prependBounds to ExistsP"

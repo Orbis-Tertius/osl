@@ -11,6 +11,7 @@ boundAnnotation :: Bound ann -> ann
 boundAnnotation =
   \case
     ScalarBound ann _ -> ann
+    FieldMaxBound ann -> ann
     ProductBound ann _ _ -> ann
     CoproductBound ann _ _ -> ann
     FunctionBound ann _ _ -> ann

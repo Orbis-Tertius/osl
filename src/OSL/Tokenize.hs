@@ -80,6 +80,7 @@ token =
   , constantNatural
   , constantInteger
   , constantFinite
+  , constantField
   -- the T.Const case must come after the other constant
   -- cases to deal with ambiguity
   , T.Const <$> nonNegativeIntegerLiteral
@@ -91,6 +92,10 @@ token =
   , T.AddZOp <$ string "+ℤ"
   , T.MulZOp <$ string "*Z"
   , T.MulZOp <$ string "×ℤ"
+  , T.AddFpOp <$ string "+F"
+  , T.AddFpOp <$ string "+𝔽"
+  , T.MulFpOp <$ string "*F"
+  , T.MulFpOp <$ string "×𝔽"
   , T.ProductOp <$ string "×"
   , T.Comma <$ string ","
   , T.CoproductOp <$ string "⊕"
@@ -142,6 +147,8 @@ keyword =
   , K.Z <$ string "ℤ"
   , K.Z <$ string "Z"
   , K.Fin <$ string "Fin"
+  , K.F <$ string "F"
+  , K.F <$ string "𝔽"
   , K.Cast <$ string "cast"
   , K.Data <$ string "data"
   , K.Inverse <$ string "inverse"
@@ -194,6 +201,13 @@ constantInteger = do
   i <- integerLiteral
   void $ char 'Z' <|> char 'ℤ'
   return (T.ConstZ i)
+
+
+constantField :: Parser Token
+constantField = do
+  i <- integerLiteral
+  void $ char 'F' <|> char '𝔽'
+  pure (T.ConstF i)
 
 
 constantFinite :: Parser Token

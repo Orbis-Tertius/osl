@@ -50,6 +50,7 @@ data Type ann =
   | P ann (Maybe Cardinality) (Type ann) (Type ann) -- permutations
   | N ann -- natural numbers
   | Z ann -- integers
+  | Fp ann -- native field elements
   | Fin ann Integer
   | Product ann (Type ann) (Type ann)
   | Coproduct ann (Type ann) (Type ann)
@@ -67,6 +68,7 @@ instance Show (Type ann) where
   show (P _ Nothing a b) = "(" <> show a <> " <-> " <> show b <> ")"
   show (N _) = "N"
   show (Z _) = "Z"
+  show (Fp _) = "Fp"
   show (Fin _ n) = "Fin(" <> show n <> ")"
   show (Product _ a b) = "(" <> show a <> " * " <> show b <> ")"
   show (Coproduct _ a b) = "(" <> show a <> " + " <> show b <> ")"
@@ -85,6 +87,9 @@ data Term ann =
   | AddZ ann
   | MulZ ann
   | ConstZ ann Integer
+  | ConstFp ann Integer
+  | AddFp ann
+  | MulFp ann
   | Cast ann
   | ConstFin ann Integer
   | ConstF ann [(Term ann, Term ann)]
@@ -147,6 +152,7 @@ data Term ann =
 
 data Bound ann =
     ScalarBound ann (Term ann)
+  | FieldMaxBound ann
   | ProductBound ann (LeftBound ann) (RightBound ann)
   | CoproductBound ann (LeftBound ann) (RightBound ann)
   | FunctionBound ann (DomainBound ann) (CodomainBound ann)

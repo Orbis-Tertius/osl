@@ -27,10 +27,11 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (pack)
 
+import OSL.Bound (boundAnnotation)
 import OSL.BuildTranslationContext (buildTranslationContext', getFreeOSLName, addFreeVariableMapping, addTermMapping, getFreeS11Name, getBoundS11NamesInContext)
 import OSL.Die (die)
 import OSL.Sigma11 (incrementDeBruijnIndices, incrementArities, prependBounds)
-import OSL.Term (termAnnotation, boundAnnotation)
+import OSL.Term (termAnnotation)
 import OSL.TranslationContext (mergeMappings, mergeMapping, linearizeMapping)
 import OSL.Type (typeAnnotation)
 import OSL.Types.Arity (Arity (..))
@@ -80,6 +81,12 @@ translate gc@(TranslationContext gDecls _)
     OSL.Apply ann (OSL.Apply _ (OSL.MulZ _) a) b ->
       Term <$> (S11.Mul <$> translateToTerm gc lc (OSL.Z ann) a
                         <*> translateToTerm gc lc (OSL.Z ann) b)
+    OSL.Apply ann (OSL.Apply _ (OSL.AddFp _) a) b ->
+      Term <$> (S11.Add <$> translateToTerm gc lc (OSL.Fp ann) a
+                        <*> translateToTerm gc lc (OSL.Fp ann) b)
+    OSL.Apply ann (OSL.Apply _ (OSL.MulFp _) a) b ->
+      Term <$> (S11.Add <$> translateToTerm gc lc (OSL.Fp ann) a
+                        <*> translateToTerm gc lc (OSL.Fp ann) b)
     OSL.Apply _ (OSL.Cast _) a -> do
       aT <- lift $ inferType decls a
       translate gc lc aT a
@@ -97,6 +104,7 @@ translate gc@(TranslationContext gDecls _)
     OSL.ConstN _ x -> return (Term (S11.Const x))
     OSL.ConstZ _ x -> return (Term (S11.Const x))
     OSL.ConstFin _ x -> return (Term (S11.Const x))
+    OSL.ConstFp _ x -> return (Term (S11.Const x))
     OSL.ConstSet ann xs ->
       case termType of
         OSL.F _ _ xType (OSL.Prop _) -> do
@@ -721,11 +729,15 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
     OSL.Prop ann -> lift . Left $ ErrorMessage ann "cannot quantify over Prop"
     OSL.N _ -> scalarResult
     OSL.Z _ -> scalarResult
+    OSL.Fp _ -> scalarResult
     OSL.Fin _ _ -> scalarResult
-    OSL.F _ cardinality a b -> do
+    OSL.F ann mCardinality a b -> do
       aDim <- lift $ getMappingDimensions decls a
       case (aDim, varBound) of
         (FiniteDimensions n, OSL.FunctionBound _ (OSL.DomainBound aBound) (OSL.CodomainBound bBound)) -> do
+          cardinality <- case mCardinality of
+            Just m -> pure m
+            Nothing -> lift . Left $ ErrorMessage ann "missing function type cardinality (required for quantification)"
           (bQs, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
           let fM = incrementArities n bM
           aBounds <- translateBound gc lc a (Just aBound)
@@ -737,7 +749,10 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
         (InfiniteDimensions, _) ->
           lift . Left $ ErrorMessage (typeAnnotation a)
                "expected a finite-dimensional type"
-    OSL.P ann cardinality a b ->
+    OSL.P ann mCardinality a b -> do
+      cardinality <- case mCardinality of
+        Just n -> pure n
+        Nothing -> lift . Left . ErrorMessage ann $ "missing permutation type cardinality (required for quantification)"
       case varBound of
         OSL.FunctionBound _ (OSL.DomainBound aBound) (OSL.CodomainBound bBound) -> do
           bBoundTs <- translateBound gc lc a (Just bBound)
@@ -763,7 +778,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
     OSL.Coproduct ann a b ->
       case varBound of
         OSL.CoproductBound _ (OSL.LeftBound aBound) (OSL.RightBound bBound) -> do
-          let cQ = S11.ExistsFO (S11.Const 2)
+          let cQ = S11.ExistsFO (S11.TermBound (S11.Const 2))
               cT = S11.Var (S11.Name 0 0)
               cM = ChoiceMapping (ScalarMapping cT)
               cSym = getFreeOSLName lc
@@ -793,7 +808,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
     OSL.Maybe _ a ->
       case varBound of
         OSL.MaybeBound _ (OSL.ValuesBound aBound) -> do
-          let cQ = S11.ExistsFO (S11.Const 2)
+          let cQ = S11.ExistsFO (S11.TermBound (S11.Const 2))
               cM = ScalarMapping (S11.Var (S11.Name 0 0))
           (vQs, vM) <- getExistentialQuantifierStringAndMapping gc lc a aBound
           pure (cQ : vQs, MaybeMapping (ChoiceMapping cM) (ValuesMapping vM))
@@ -801,7 +816,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
     OSL.List ann (OSL.Cardinality n) a ->
       case varBound of
         OSL.ListBound _ (OSL.ValuesBound aBound) -> do
-          let lQ = S11.ExistsFO (S11.Const n)
+          let lQ = S11.ExistsFO (S11.TermBound (S11.Const n))
               lT = S11.Var (S11.Name 0 0)
               lSym = getFreeOSLName lc
               decls' = addDeclaration lSym (OSL.FreeVariable (OSL.N ann)) decls
@@ -850,8 +865,13 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
             [bT] -> 
               pure ( [S11.ExistsFO bT]
                    , ScalarMapping (S11.Var (S11.Name 0 0)) )
-            _ -> lift . Left $ ErrorMessage (boundAnnotation varBound) "expected a scalar bound"
-        _ -> lift . Left $ ErrorMessage (boundAnnotation varBound) "expected a scalar bound"
+            _ -> lift . Left . ErrorMessage (boundAnnotation varBound)
+              $ "expected a scalar bound but got " <> pack (show bTs)
+        OSL.FieldMaxBound _ ->
+          pure ( [S11.ExistsFO S11.FieldMaxBound]
+               , ScalarMapping (S11.Var (S11.Name 0 0)) )
+        _ -> lift . Left . ErrorMessage (boundAnnotation varBound)
+          $ "expected a scalar bound but got " <> pack (show varBound)
 
 
 getMappingDimensions
@@ -865,6 +885,7 @@ getMappingDimensions ctx t =
     OSL.P _ _ _ _ -> pure InfiniteDimensions
     OSL.N _ -> pure (FiniteDimensions 1)
     OSL.Z _ -> pure (FiniteDimensions 1)
+    OSL.Fp _ -> pure (FiniteDimensions 1)
     OSL.Fin _ _ -> pure (FiniteDimensions 1)
     OSL.Product _ a b ->
       (<>) <$> getMappingDimensions ctx a
@@ -892,6 +913,7 @@ getArbitraryMapping ctx =
     OSL.Prop _ -> pure $ PropMapping (S11.Equal (S11.Const 0) (S11.Const 1))
     OSL.N _ -> return $ ScalarMapping (S11.Const 0)
     OSL.Z _ -> return $ ScalarMapping (S11.Const 0)
+    OSL.Fp _ -> return $ ScalarMapping (S11.Const 0)
     OSL.Fin _ _ -> return $ ScalarMapping (S11.Const 0)
     OSL.Product _ a b ->
       ProductMapping
@@ -1080,10 +1102,12 @@ translateBound
   -> TranslationContext 'OSL.Local ann
   -> OSL.Type ann
   -> Maybe (OSL.Bound ann)
-  -> StateT S11.AuxTables (Either (ErrorMessage ann)) [S11.Term]
+  -> StateT S11.AuxTables (Either (ErrorMessage ann)) [S11.Bound]
 translateBound gc lc@(TranslationContext decls _) t =
   \case
-    Just (OSL.ScalarBound _ term) -> (:[]) <$> translateToTerm gc lc t term
+    Just (OSL.ScalarBound _ term) ->
+      (:[]) . S11.TermBound <$> translateToTerm gc lc t term
+    Just (OSL.FieldMaxBound _) -> pure [S11.FieldMaxBound]
     Just (OSL.ProductBound ann (OSL.LeftBound aBound) (OSL.RightBound bBound)) ->
       case t of
         OSL.Product _ a b ->
@@ -1123,7 +1147,7 @@ translateBound gc lc@(TranslationContext decls _) t =
     Just (OSL.MaybeBound ann (OSL.ValuesBound vBound)) ->
       case t of
         OSL.Maybe _ a ->
-          ((S11.Const 2):) <$> translateBound gc lc a (Just vBound)
+          ((S11.TermBound (S11.Const 2)):) <$> translateBound gc lc a (Just vBound)
         _ -> lift . Left . ErrorMessage ann $ "expected a " <> pack (show t)
     Just (OSL.MapBound ann
             (OSL.KeysBound kBound)
@@ -1165,6 +1189,7 @@ inferBound ctx =
       <*> (OSL.CodomainBound <$> inferBound ctx b)
     OSL.N ann -> Left (ErrorMessage ann "cannot infer bound for N")
     OSL.Z ann -> Left (ErrorMessage ann "cannot infer bound for Z")
+    OSL.Fp ann -> pure (OSL.FieldMaxBound ann)
     OSL.Fin ann n -> pure (OSL.ScalarBound ann (OSL.ConstN ann n))
     OSL.Product ann a b ->
       OSL.ProductBound ann
@@ -1277,6 +1302,7 @@ translateToConstant gc lc@(OSL.ValidContext decls) termType =
         _ -> Left (ErrorMessage ann "expected the name of a constant")
     OSL.ConstN _ i -> pure (ScalarMapping i)
     OSL.ConstZ _ i -> pure (ScalarMapping i)
+    OSL.ConstFp _ i -> pure (ScalarMapping i)
     OSL.ConstFin _ i -> pure (ScalarMapping i)
     OSL.Apply ann (OSL.Apply _ (OSL.AddN _) x) y -> do
       xs <- translateToConstant gc lc termType x

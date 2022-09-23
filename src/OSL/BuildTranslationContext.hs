@@ -82,6 +82,7 @@ addFreeVariableMapping freeVariable = do
             "free Prop variable"
         N _ -> mapScalar
         Z _ -> mapScalar
+        Fp _ -> mapScalar
         Fin _ _ -> mapScalar
         Product _ a b -> do
           aSym <- addGensym a

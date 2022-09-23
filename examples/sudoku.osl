@@ -4,8 +4,8 @@ data Value ≅ Fin(9).
 data Row ≅ Fin(9).
 data Col ≅ Fin(9).
 data Cell ≅ Row × Col.
-data Problem ≅ Cell → Maybe(Value).
-data Solution ≅ Cell → Value.
+data Problem ≅ Cell →^81 Maybe(Value).
+data Solution ≅ Cell →^81 Value.
 data Square ≅ Fin(3) × Fin(3).
 data SquareCell ≅ Fin(3) × Fin(3).
 
