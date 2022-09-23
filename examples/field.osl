@@ -1,0 +1,52 @@
+-- Native field type
+
+data Foo ~= F.
+
+-- Field constants
+
+def foo : Foo -> Prop
+  := \x : Foo
+  => x = to(Foo)(12F).
+
+-- Casts
+
+def a0 : F := 0F.
+
+def a1 : N := cast(a0).
+
+def a2 : F := cast(a1).
+
+def a3 : Fin(3) := cast(a0).
+
+def a4 : F := cast(a3).
+
+def a5 : Z := cast(a4).
+
+def a6 : F := cast(a5).
+
+-- Arithmetic
+
+def a7 : F := a0 +F a2.
+
+def a8 : F := a0 *F a2.
+
+def bar : Prop := a8 = a7.
+
+-- Quantification
+
+def baz : Prop := all x : F < 30F, bar.
+
+def spaz : Prop := all x : F, bar.
+
+def razz : Prop := some x : F < a0, bar.
+
+def jazz : Prop := some x : F, bar.
+
+def craz : Prop := some x : Map^128(F, F), bar.
+
+def taz : Prop := some x : List^256(F), bar.
+
+def rawr : Prop := some x : (F * Fin(2)) ->^4 F, bar.
+
+def arr : Prop := foo(to(Foo)(0F))
+  | (bar & baz & spaz & razz & jazz & craz & taz & rawr).

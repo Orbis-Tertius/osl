@@ -1302,6 +1302,7 @@ translateToConstant gc lc@(OSL.ValidContext decls) termType =
         _ -> Left (ErrorMessage ann "expected the name of a constant")
     OSL.ConstN _ i -> pure (ScalarMapping i)
     OSL.ConstZ _ i -> pure (ScalarMapping i)
+    OSL.ConstFp _ i -> pure (ScalarMapping i)
     OSL.ConstFin _ i -> pure (ScalarMapping i)
     OSL.Apply ann (OSL.Apply _ (OSL.AddN _) x) y -> do
       xs <- translateToConstant gc lc termType x

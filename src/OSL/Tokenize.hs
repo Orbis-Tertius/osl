@@ -205,7 +205,7 @@ constantInteger = do
 
 constantField :: Parser Token
 constantField = do
-  i <- nonNegativeIntegerLiteral
+  i <- integerLiteral
   void $ char 'F' <|> char '𝔽'
   pure (T.ConstF i)
 
