@@ -792,7 +792,8 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
                  _ -> lift . Left $ ErrorMessage ann "expected the name of a type"
           else lift . Left $ ErrorMessage ann "named type mismatch in bound"
         OSL.ScalarBound _ _ -> scalarResult
-        _ -> lift . Left $ ErrorMessage ann ("expected a " <> pack (show name) <> " bound")
+        _ -> lift . Left . ErrorMessage ann $ "expected a " <> pack (show name)
+               <> " bound but got " <> pack (show varBound)
     OSL.Maybe _ a ->
       case varBound of
         OSL.MaybeBound _ (OSL.ValuesBound aBound) -> do
@@ -832,7 +833,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
             (OSL.F ann (Just (OSL.Cardinality n)) a b)
             (OSL.FunctionBound ann
               (OSL.DomainBound aBound)
-              (OSL.CodomainBound (OSL.MaybeBound ann (OSL.ValuesBound bBound))))
+              (OSL.CodomainBound bBound))
           pure ( kQs <> vQs
                , mergeMapping
                  (curry (\case

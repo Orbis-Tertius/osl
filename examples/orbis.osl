@@ -426,7 +426,8 @@ def feeRequirementMet
 
 def txExists : Rollup -> TxId -> Prop
   := \R : Rollup => \i : TxId
-  => some j : N, nth(keys(txs(R)), j) = i.
+  => some j : N < length(keys(txs(R))),
+     nth(keys(txs(R)), j) = i.
 
 
 def inputExists : Rollup -> TxOutRef + RootOutRef -> Prop
