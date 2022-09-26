@@ -590,7 +590,7 @@ translate gc@(TranslationContext gDecls _)
       xsType <- lift $ inferType decls xs
       xsM <- translateToMapping gc lc xsType xs
       case xsType of
-        OSL.List _ (OSL.Cardinality n) (OSL.Map _ _ kType _) -> do
+        OSL.List _ (OSL.Cardinality n) mapType@(OSL.Map _ _ kType _) -> do
           kM <- translateToMapping gc lc kType k
           case xsM of
             ListMapping (LengthMapping (ScalarMapping lT))
@@ -600,10 +600,9 @@ translate gc@(TranslationContext gDecls _)
              Term <$>
              foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
              [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
-               <$> ( (lift . mappingToTerm ann
-                       =<< flip (applyMappings ann termType) vM
-                       =<< applyMappings ann kType kM
-                           (ScalarMapping (S11.Const i))) )
+               <$> (lift . mappingToTerm ann
+                       =<< flip (applyMappings ann kType) kM
+                       =<< applyMappings ann mapType vM (ScalarMapping (S11.Const i)) )
              | i <- [0..n-1]
              ]
             _ -> lift . Left $ ErrorMessage ann "could not translate sumListLookup application"
@@ -993,13 +992,14 @@ translateToFormula gc lc@(TranslationContext decls mappings) t = do
                  "expected a term denoting a Prop"
 
 mappingToTerm
-  :: ann
+  :: Show ann => ann
   -> Mapping ann S11.Term
   -> Either (ErrorMessage ann) S11.Term
 mappingToTerm ann =
   \case
     ScalarMapping t -> pure t
-    _ -> Left (ErrorMessage ann "expected a mapping denoting a scalar")
+    m -> Left . ErrorMessage ann $ "expected a mapping denoting a scalar but got "
+         <> pack (show m)
 
 
 applyMappings
