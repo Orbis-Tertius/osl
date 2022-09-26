@@ -383,7 +383,8 @@ def paysFeeToCorrectAddress : FeeParams -> Tx -> Prop
    & (all i : N < length(keys(f)),
       let k : AssetClass := nth(keys(f), i);
       let v : Map^128(AssetClass, Quantity) := from(Value)(value(o));
-      some j : N, (nth(keys(v), i) = k)
+      some j : N < length(keys(v)),
+      (nth(keys(v), j) = k)
     & (lookup(k, f) = lookup(k, v))).
 
 def checkCost : FeeParams -> Tx -> List^128(ScriptSize * Steps) -> Frac -> Prop
@@ -590,8 +591,8 @@ def mintingScriptsAcceptTx
      let a : ScriptAddress := to(ScriptAddress)(from(CurrencySymbol)(c));
      let ctx : ScriptContext
        := to(ScriptContext)((t, to(ScriptPurpose)(iota1(to(Minting)(c)))));
-     !(isNothing(lookup(c, inputs)))
-   & (let m : Datum * Redeemer := exists(lookup(c, inputs));
+     (some i : N < length(keys(inputs)), nth(keys(inputs), i) = c)
+   & (let m : Datum * Redeemer := lookup(c, inputs);
       let l : ScriptSize * Steps := scriptLimits((a, x));
       accepts(a, pi1(l), pi2(l), pi1(m), pi2(m), ctx)).
 
@@ -633,10 +634,10 @@ def paysEnoughFee
   => \p : Time -> FeeParams
   => \x : TxId
   => \t : Tx
-  => let f : Z :=
-           maybe((\x : MintQuantity => getMintQuantity(x)))
-           (0Z, lookup(HALO, mintValue(mint(t))));
-     feeRequirementMet(p(txIdTime(x)), t, txScriptLimits(x), f).
+  => let f : Map^128(AssetClass, Quantity) := from(Value)(feeValue(fee(t)));
+     some i : N < length(keys(f)),
+     (nth(keys(f), i) = HALO)
+   & feeRequirementMet(p(txIdTime(x)), t, txScriptLimits(x), from(Quantity)(lookup(HALO, f))).
 
 
 def spendingInputTime : SpendIn -> Time
@@ -712,7 +713,7 @@ def getRootOut : Rollup -> RootOutRef -> RootOut
   := \R : Rollup => \x : RootOutRef
   => let t : Time := rootOutRefTime(x);
      let i : N := fToNat(from(RootOutRefIndex)(rootOutRefIndex(x)));
-     nth(exists(lookup(t, roots(R))), i).
+     nth(lookup(t, roots(R)), i).
 
 
 def leafOutAddress : Rollup -> LeafOut -> Address
@@ -750,9 +751,10 @@ def txConsumesItsInputs
   => \x : TxId
   => \t : Tx
   => all i : N < length(spendingInputs(t)),
-     let c : Maybe(Consumer) := lookup(nth(spendingInputs(t), i), consumers);
-     let x' : Consumer := to(Consumer)(iota1(x));
-     c = just(x').
+     let k : SpendIn := nth(spendingInputs(t), i);
+     (some j : N < length(keys(consumers)), (nth(keys(consumers), j) = k)
+      & (let c : Consumer := lookup(nth(spendingInputs(t), i), consumers);
+         c = to(Consumer)(iota1(x)))).
 
 
 def noTxTxDoubleSpend
@@ -763,7 +765,7 @@ def noTxTxDoubleSpend
   => \R : Rollup
   => all i : N < length(keys(txs(R))),
      let x : TxId := nth(keys(txs(R)), i);
-     let t : Tx := exists(lookup(x, txs(R)));
+     let t : Tx := lookup(x, txs(R));
      txConsumesItsInputs(consumers, x, t).
 
 
@@ -779,8 +781,10 @@ def noTxLeafDoubleSpend
   => \R : Rollup
   => all i : N < length(keys(leaves(R))),
      let l : LeafOut := nth(keys(leaves(R)), i);
-     just(to(Consumer)(iota2(l)))
-       = lookup(leafToSpendIn(l), consumers).
+     let l' : Consumer := to(Consumer)(iota2(l));
+     (some j : N < length(keys(consumers)),
+      (nth(keys(consumers), j) = leafToSpendIn(l))
+      & (l' = lookup(leafToSpendIn(l), consumers))).
 
 
 def noDoubleSpend
@@ -801,14 +805,15 @@ def referencesAreUnspent
   => \R : Rollup
   => all i : N < length(keys(txs(R))),
      let x : TxId := nth(keys(txs(R)), i);
-     let t : Tx := exists(lookup(x, txs(R)));
+     let t : Tx := lookup(x, txs(R));
      all j : N < length(referenceInputs(t)),
      let r : RefIn := nth(referenceInputs(t), j);
      let s : SpendIn := to(SpendIn)(from(RefIn)(r));
-     let c : Maybe(Consumer) := lookup(s, consumers);
-     isNothing(c)
+     let c : Consumer := lookup(s, consumers);
+     (all k : N < length(keys(consumers)),
+      !(nth(keys(consumers), k) = s))
    | (some y : TxId, (txIdTime(x) <= txIdTime(y))
-       & (c = just(to(Consumer)(iota1(y))))).
+       & (c = to(Consumer)(iota1(y)))).
 
 
 def valueInAssetClasses
@@ -843,7 +848,7 @@ def assetClassesCohere
   => \R : Rollup
   => (all i : N < length(keys(txs(R))),
       let x : TxId := nth(keys(txs(R)), i);
-      let t : Tx := exists(lookup(x, txs(R)));
+      let t : Tx := lookup(x, txs(R));
       valueInAssetClasses(assetClasses, from(Fee)(fee(t)))
     & mintInAssetClasses(assetClasses, mint(t))
     & (all j : N < length(outputs(t)),
@@ -851,8 +856,7 @@ def assetClassesCohere
        valueInAssetClasses(assetClasses, value(o))))
    & (all i : N < length(keys(roots(R))),
       let t : Time := nth(keys(roots(R)), i);
-      let l : List^128(RootOut) :=
-        exists(lookup(t, roots(R)));
+      let l : List^128(RootOut) := lookup(t, roots(R));
       all j : N < length(l),
       valueInAssetClasses(assetClasses,
         pi2(from(RootOut)(nth(l, j))))).
@@ -868,7 +872,7 @@ def scriptLimitsCohere
   => \R : Rollup
   => all i : N < length(keys(txs(R))),
      let x : TxId := nth(keys(txs(R)), i);
-     let t : Tx := exists(lookup(x, txs(R)));
+     let t : Tx := lookup(x, txs(R));
      let m : Map^8(CurrencySymbol, Datum * Redeemer)
        := mintInputsMap(mintInputs(t));
      (all j : N < length(outputs(t)),
@@ -909,7 +913,7 @@ def inputValuesCohere
   => \R : Rollup
   => all i : N < length(keys(txs(R))),
      let x : TxId := nth(keys(txs(R)), i);
-     let t : Tx := exists(lookup(x, txs(R)));
+     let t : Tx := lookup(x, txs(R));
      all j : N < length(spendingInputs(t)),
      let n : SpendIn := nth(spendingInputs(t), j);
      (some y : TxOutRef, (n = to(SpendIn)(iota1(y)))
@@ -940,7 +944,7 @@ def rollupIsValid
      some txScriptLimits : TxId ->^4096 List^128(ScriptSize * Steps),
      (all i : N < length(keys(txs(R))),
         let x : TxId := nth(keys(txs(R)), i);
-        let t : Tx := exists(lookup(x, txs(R)));
+        let t : Tx := lookup(x, txs(R));
         txIsValid(p, inputValues, assetClasses, scriptLimits, txScriptLimits, R, x, t))
    & leavesExist(R)
    & leavesAreSigned(R)
@@ -972,12 +976,15 @@ def checkFeeParamUnrolling : Map^4096(Time, FeeParams) -> (Time -> FeeParams) ->
   := \m : Map^4096(Time, FeeParams)
   => \f : Time -> FeeParams
   => let t0 : Time := toTime(0N);
-     (lookup(t0, m) = just(f(t0)))
+     (some i : N < length(keys(m)),
+        (nth(keys(m), i) = t0)
+      & (lookup(t0, m) = f(t0)))
    & (all t : Time,
         let t' : Time := toTime(fromTime(t) +N 1N);
         (fromTime(t) = maxInt)
-      | (isNothing(lookup(t', m)) & (f(t') = f(t)))
-      | (lookup(t', m) = just(f(t')))).
+      | ((all j : N < length(keys(m)), !(nth(keys(m), j) = t'))
+           & (f(t') = f(t)))
+      | (lookup(t', m) = f(t'))).
 
 
 def existsRollupWithIO

@@ -689,7 +689,6 @@ translate gc@(TranslationContext gDecls _)
              =<< lift (getExplicitOrInferredBound decls varType varBound)
          let lc' = TranslationContext decls'
                    (mergeMappings (Map.singleton varName newMapping) mappings)
-         -- TODO: add additional conditions for map quantification
          Formula . (\f -> foldl' (flip S11.Exists) f qs)
            <$> translateToFormula gc lc' p
     term -> lift . Left . ErrorMessage (termAnnotation term)
