@@ -5,6 +5,7 @@
 module Halo2.Types.Circuit
   ( AbstractCircuit (Circuit)
   , ArithmeticCircuit
+  , LogicCircuit
   ) where
 
 
@@ -15,8 +16,10 @@ import           Halo2.Types.RowCount            (RowCount)
 import           Halo2.Types.ColumnTypes                  (ColumnTypes)
 import           Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
 import           Halo2.Types.FiniteField                  (FiniteField)
+import           Halo2.Types.LogicConstraints             (LogicConstraints)
 import           Halo2.Types.LookupArguments              (LookupArguments)
 import           Halo2.Types.PolynomialConstraints        (PolynomialConstraints)
+
 
 data AbstractCircuit a =
   Circuit
@@ -33,3 +36,6 @@ data AbstractCircuit a =
 
 
 type ArithmeticCircuit = AbstractCircuit PolynomialConstraints
+
+
+type LogicCircuit = AbstractCircuit LogicConstraints

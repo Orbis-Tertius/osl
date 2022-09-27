@@ -27,6 +27,8 @@ library
     Halo2.Types.FiniteField
     Halo2.Types.FixedVariableValues
     Halo2.Types.InputExpression
+    Halo2.Types.LogicConstraint
+    Halo2.Types.LogicConstraints
     Halo2.Types.LookupArgument
     Halo2.Types.LookupArguments
     Halo2.Types.Monomial
