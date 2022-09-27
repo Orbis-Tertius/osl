@@ -8,9 +8,12 @@ module Halo2.Types.LogicConstraints
 
 
 import Halo2.Prelude
+import Halo2.Types.ColumnIndex (ColumnIndex)
+import Halo2.Types.FieldElement (FieldElement)
 import Halo2.Types.LogicConstraint (LogicConstraint)
 
 
-newtype LogicConstraints = LogicConstraints
+data LogicConstraints = LogicConstraints
   { constraints :: [LogicConstraint]
+  , bounds :: Map ColumnIndex FieldElement
   } deriving Generic
