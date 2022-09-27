@@ -14,7 +14,6 @@ module OSL.Types.TranslationContext
   , LengthMapping (..)
   , ValuesMapping (..)
   , KeysMapping (..)
-  , KeyIndicatorMapping (..)
   , MappingDimensions (..)
   ) where
 
@@ -56,7 +55,6 @@ data Mapping ann a =
   | MapMapping
     (LengthMapping ann a)
     (KeysMapping ann a)
-    (KeyIndicatorMapping ann a)
     (ValuesMapping ann a)
   | LambdaMapping
     (TranslationContext 'OSL.Global ann)
@@ -96,11 +94,10 @@ instance Functor (Mapping ann) where
         (LengthMapping (f <$> a))
         (ValuesMapping (f <$> b))
       MapMapping (LengthMapping a) (KeysMapping b)
-          (KeyIndicatorMapping c) (ValuesMapping d) ->
+          (ValuesMapping d) ->
         MapMapping
         (LengthMapping (f <$> a))
         (KeysMapping (f <$> b))
-        (KeyIndicatorMapping (f <$> c))
         (ValuesMapping (f <$> d))
       LambdaMapping gc lc v vT t ->
         -- TODO: should fmap descend into gc and/or lc?
@@ -123,12 +120,10 @@ instance Foldable (Mapping ann) where
         foldMap f x <> foldMap f y
       ListMapping (LengthMapping x) (ValuesMapping y) ->
         foldMap f x <> foldMap f y
-      MapMapping (LengthMapping w)
-                 (KeysMapping x)
-                 (KeyIndicatorMapping y)
+      MapMapping (LengthMapping x)
+                 (KeysMapping y)
                  (ValuesMapping z) ->
-        foldMap f w <> foldMap f x
-          <> foldMap f y <> foldMap f z
+        foldMap f x <> foldMap f y <> foldMap f z
       LambdaMapping _ _ _ _ _ -> mempty
       PropMapping _ -> mempty
       PredicateMapping _ -> mempty
@@ -161,12 +156,6 @@ newtype ValuesMapping ann a
 
 newtype KeysMapping ann a
   = KeysMapping { unKeysMapping :: Mapping ann a }
-  deriving Show
-
-
-newtype KeyIndicatorMapping ann a
-  = KeyIndicatorMapping
-    { unKeyIndicatorMapping :: Mapping ann a }
   deriving Show
 
 

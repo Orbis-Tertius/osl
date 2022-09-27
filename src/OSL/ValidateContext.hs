@@ -535,7 +535,7 @@ checkTerm c t x =
         _ -> genericErrorMessage
     Lookup ann ->
       case t of
-        F _ _ a (F _ _ (Map _ _ a' b) (Maybe _ b')) -> do
+        F _ _ a (F _ _ (Map _ _ a' b) b') -> do
           checkTypeInclusion c ann a a'
           checkTypeInclusion c ann b b'
         _ -> genericErrorMessage
@@ -973,7 +973,7 @@ inferType c t =
       case b of
         Map _ _ a' d -> do
           checkTypeInclusion c ann a a'
-          return (Maybe ann d)
+          return d
         _ -> Left (ErrorMessage ann "lookup applied to a non-Map")
     Apply ann (Keys _) xs -> do
       a <- inferType c xs

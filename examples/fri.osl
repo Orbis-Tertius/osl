@@ -195,8 +195,8 @@ def rescueHashLookup
   := \H : Map^4096(PlaintextKey, Hash)
   => \p : Plaintext => \h : Hash
   => let k : PlaintextKey := plaintextToKey(p);
-     !(isNothing(lookup(k, H)))
-   & (hashEq(h, exists(lookup(k, H)))).
+     (some i : N < length(keys(H)), nth(keys(H), i) = k)
+   & (hashEq(h, lookup(k, H))).
 
 -- Merkle commitments
 
@@ -591,7 +591,7 @@ def fri : Proof -> Prop
    & (all i : N < length(keys(H)),
       let k : PlaintextKey := nth(keys(H), i);
       some p : Plaintext, (plaintextToKey(p) = k)
-    & rescueHash(p, exists(lookup(k, H))))
+    & rescueHash(p, lookup(k, H)))
    & commitsTo(H, codeword(p), commitments(p, fin(3)))
    & checkAlphas(H, p, as)
    & checkTopLevelIndices(H, p, getLastChallenge(as), is)

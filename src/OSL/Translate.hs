@@ -40,7 +40,7 @@ import OSL.Types.ErrorMessage (ErrorMessage (..))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.Translation (Translation (Formula, Term, Mapping))
-import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..), MappingDimensions (..), LengthMapping (..), KeyIndicatorMapping (..), KeysMapping (..))
+import OSL.Types.TranslationContext (TranslationContext (..), Mapping (..), LeftMapping (..), RightMapping (..), ChoiceMapping (..), ValuesMapping (..), MappingDimensions (..), LengthMapping (..), KeysMapping (..))
 import OSL.ValidContext (getDeclaration, addDeclaration)
 import OSL.ValidateContext (inferType)
 
@@ -509,7 +509,6 @@ translate gc@(TranslationContext gDecls _)
           case xsM of
             MapMapping (LengthMapping (ScalarMapping lT))
                        (KeysMapping (ScalarMapping kT))
-                       _
                        (ValuesMapping (ScalarMapping vT)) ->
               lift $ Term <$>
               foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
@@ -525,12 +524,9 @@ translate gc@(TranslationContext gDecls _)
           xsM <- translateToMapping gc lc xsType xs
           kM <- translateToMapping gc lc kType k
           case xsM of
-            MapMapping _ _ (KeyIndicatorMapping indM)
-                (ValuesMapping vM) -> do
-              kExistsM <- applyMappings ann (OSL.N ann) indM kM
+            MapMapping _ _ (ValuesMapping vM) -> do
               vM' <- applyMappings ann vType vM kM
-              pure . Mapping
-                $ MaybeMapping (ChoiceMapping kExistsM) (ValuesMapping vM')
+              pure (Mapping vM')
             _ -> lift . Left $ ErrorMessage ann "expected a map mapping"
         _ -> lift . Left $ ErrorMessage ann "expected a map"
     OSL.Apply ann (OSL.MapPi1 _) xs -> do
@@ -539,9 +535,9 @@ translate gc@(TranslationContext gDecls _)
         OSL.Map _ _ _ (OSL.Product _ _ _) -> do
           xsM <- translateToMapping gc lc xsType xs
           case xsM of
-            MapMapping lM kM iM (ValuesMapping
+            MapMapping lM kM (ValuesMapping
                 (ProductMapping (LeftMapping aM) _)) ->
-              pure . Mapping $ MapMapping lM kM iM (ValuesMapping aM)
+              pure . Mapping $ MapMapping lM kM (ValuesMapping aM)
             _ -> lift . Left $ ErrorMessage ann "expected a map mapping"
         _ -> lift . Left $ ErrorMessage ann "expected a map"
     OSL.Apply ann (OSL.MapPi2 _) xs -> do
@@ -550,9 +546,9 @@ translate gc@(TranslationContext gDecls _)
         OSL.Map _ _ _ (OSL.Product _ _ _) -> do
           xsM <- translateToMapping gc lc xsType xs
           case xsM of
-            MapMapping lM kM iM (ValuesMapping
+            MapMapping lM kM (ValuesMapping
                 (ProductMapping _ (RightMapping bM))) ->
-              pure . Mapping $ MapMapping lM kM iM (ValuesMapping bM)
+              pure . Mapping $ MapMapping lM kM (ValuesMapping bM)
             _ -> lift . Left $ ErrorMessage ann "expected a map mapping"
         _ -> lift . Left $ ErrorMessage ann "expected a map"
     OSL.Apply _ (OSL.MapTo _ _) xs -> do
@@ -567,7 +563,7 @@ translate gc@(TranslationContext gDecls _)
         OSL.Map _ _ _ _ -> do
           xsM <- translateToMapping gc lc xsType xs
           case xsM of
-            MapMapping lM (KeysMapping kM) _ _ ->
+            MapMapping lM (KeysMapping kM) _ ->
               pure . Mapping $ ListMapping lM (ValuesMapping kM)
             _ -> lift . Left $ ErrorMessage ann "expected a map mapping"
         _ -> lift . Left $ ErrorMessage ann "expected a map"
@@ -579,7 +575,6 @@ translate gc@(TranslationContext gDecls _)
           case xsM of
             MapMapping (LengthMapping (ScalarMapping lT))
                 (KeysMapping _)
-                (KeyIndicatorMapping _)
                 (ValuesMapping
                   (ListMapping (LengthMapping (ScalarMapping mT))
                     (ValuesMapping _))) ->
@@ -595,26 +590,19 @@ translate gc@(TranslationContext gDecls _)
       xsType <- lift $ inferType decls xs
       xsM <- translateToMapping gc lc xsType xs
       case xsType of
-        OSL.List _ (OSL.Cardinality n) (OSL.Map _ _ kType _) -> do
+        OSL.List _ (OSL.Cardinality n) mapType@(OSL.Map _ _ kType _) -> do
           kM <- translateToMapping gc lc kType k
           case xsM of
             ListMapping (LengthMapping (ScalarMapping lT))
              (ValuesMapping (MapMapping (LengthMapping _)
                (KeysMapping _)
-               (KeyIndicatorMapping kiM)
                (ValuesMapping vM))) ->
              Term <$>
              foldl (liftA2 (S11.Add)) (pure (S11.Const 0))
              [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
-               <$> ( S11.Mul
-                 <$> (lift . mappingToTerm ann
-                       =<< flip (applyMappings ann termType) kM
-                       =<< applyMappings ann termType kiM
-                           (ScalarMapping (S11.Const i)))
-                 <*> (lift . mappingToTerm ann
-                       =<< flip (applyMappings ann termType) kM
-                       =<< applyMappings ann termType vM
-                           (ScalarMapping (S11.Const i))) )
+               <$> (lift . mappingToTerm ann
+                       =<< flip (applyMappings ann kType) kM
+                       =<< applyMappings ann mapType vM (ScalarMapping (S11.Const i)) )
              | i <- [0..n-1]
              ]
             _ -> lift . Left $ ErrorMessage ann "could not translate sumListLookup application"
@@ -700,7 +688,6 @@ translate gc@(TranslationContext gDecls _)
              =<< lift (getExplicitOrInferredBound decls varType varBound)
          let lc' = TranslationContext decls'
                    (mergeMappings (Map.singleton varName newMapping) mappings)
-         -- TODO: add additional conditions for map quantification
          Formula . (\f -> foldl' (flip S11.Exists) f qs)
            <$> translateToFormula gc lc' p
     term -> lift . Left . ErrorMessage (termAnnotation term)
@@ -804,7 +791,8 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
                  _ -> lift . Left $ ErrorMessage ann "expected the name of a type"
           else lift . Left $ ErrorMessage ann "named type mismatch in bound"
         OSL.ScalarBound _ _ -> scalarResult
-        _ -> lift . Left $ ErrorMessage ann ("expected a " <> pack (show name) <> " bound")
+        _ -> lift . Left . ErrorMessage ann $ "expected a " <> pack (show name)
+               <> " bound but got " <> pack (show varBound)
     OSL.Maybe _ a ->
       case varBound of
         OSL.MaybeBound _ (OSL.ValuesBound aBound) -> do
@@ -841,17 +829,17 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
             (OSL.List ann (OSL.Cardinality n) a)
             (OSL.ListBound ann (OSL.ValuesBound aBound))
           (vQs, vM) <- getExistentialQuantifierStringAndMapping gc lc
-            (OSL.F ann (Just (OSL.Cardinality n)) a (OSL.Maybe ann b))
+            (OSL.F ann (Just (OSL.Cardinality n)) a b)
             (OSL.FunctionBound ann
               (OSL.DomainBound aBound)
-              (OSL.CodomainBound (OSL.MaybeBound ann (OSL.ValuesBound bBound))))
+              (OSL.CodomainBound bBound))
           pure ( kQs <> vQs
                , mergeMapping
                  (curry (\case
                     ( ListMapping (LengthMapping lM) (ValuesMapping kM''),
-                      MaybeMapping (ChoiceMapping cM) (ValuesMapping vM'') ) ->
+                      vM'' ) ->
                       MapMapping (LengthMapping lM) (KeysMapping kM'')
-                                 (KeyIndicatorMapping cM) (ValuesMapping vM'')
+                                 (ValuesMapping vM'')
                     d -> die $ "logical impossibility in map quantifier translation: "
                                <> pack (show d)))
                  kM vM )
@@ -937,7 +925,6 @@ getArbitraryMapping ctx =
     OSL.Map ann n a b ->
       MapMapping <$> (LengthMapping <$> rec (OSL.N ann))
         <*> (KeysMapping <$> rec a)
-        <*> (KeyIndicatorMapping <$> rec (OSL.F ann (Just n) a (OSL.Fin ann 2)))
         <*> (ValuesMapping <$> rec (OSL.F ann (Just n) a b))
     OSL.F ann _ a b ->
       case getMappingDimensions ctx a of
@@ -1005,13 +992,14 @@ translateToFormula gc lc@(TranslationContext decls mappings) t = do
                  "expected a term denoting a Prop"
 
 mappingToTerm
-  :: ann
+  :: Show ann => ann
   -> Mapping ann S11.Term
   -> Either (ErrorMessage ann) S11.Term
 mappingToTerm ann =
   \case
     ScalarMapping t -> pure t
-    _ -> Left (ErrorMessage ann "expected a mapping denoting a scalar")
+    m -> Left . ErrorMessage ann $ "expected a mapping denoting a scalar but got "
+         <> pack (show m)
 
 
 applyMappings
@@ -1044,12 +1032,10 @@ applyMappings ann goalType f x =
     (ListMapping (LengthMapping lM) (ValuesMapping vM), _) ->
       ListMapping (LengthMapping lM) . ValuesMapping
         <$> rec vM x
-    (MapMapping (LengthMapping lM) (KeysMapping kM)
-       (KeyIndicatorMapping kiM) (ValuesMapping vM), _) ->
+    (MapMapping (LengthMapping lM) (KeysMapping kM) (ValuesMapping vM), _) ->
       -- TODO: why this?
       MapMapping (LengthMapping lM) (KeysMapping kM)
-        (KeyIndicatorMapping kiM) . ValuesMapping
-        <$> rec vM x
+        . ValuesMapping <$> rec vM x
     (CoproductMapping (ChoiceMapping cM)
        (LeftMapping lM) (RightMapping rM), _) ->
       CoproductMapping
