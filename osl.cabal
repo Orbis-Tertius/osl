@@ -15,7 +15,6 @@ library
     Halo2.Prelude
     Halo2.Types
     Halo2.Types.Circuit
-    Halo2.Types.CircuitConfig
     Halo2.Types.Coefficient
     Halo2.Types.ColumnType
     Halo2.Types.ColumnIndex
