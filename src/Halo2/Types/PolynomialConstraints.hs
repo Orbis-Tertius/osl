@@ -3,14 +3,17 @@
 
 
 module Halo2.Types.PolynomialConstraints
-  ( PolynomialConstraints (PolynomialConstraints, getPolynomialConstraints)
+  ( PolynomialConstraints (PolynomialConstraints)
   ) where
 
 
 import           Halo2.Prelude
 import           Halo2.Types.Polynomial (Polynomial)
+import           Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound)
 
 
-newtype PolynomialConstraints = PolynomialConstraints
-  { getPolynomialConstraints :: [Polynomial] }
+data PolynomialConstraints = PolynomialConstraints
+  { constraints :: [Polynomial]
+  , degreeBound :: PolynomialDegreeBound
+  }
   deriving (Eq, Ord, Show, Generic)
