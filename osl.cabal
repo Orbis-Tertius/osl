@@ -17,6 +17,7 @@ library
     Halo2.ArithmetizationConfig
     Halo2.Types
     Halo2.Types.ArithmetizationConfig
+    Halo2.Types.ByteDecompositionSize
     Halo2.Types.BitsPerByte
     Halo2.Types.BytesPerWord
     Halo2.Types.Circuit
@@ -30,6 +31,7 @@ library
     Halo2.Types.Exponent
     Halo2.Types.FieldElement
     Halo2.Types.FiniteField
+    Halo2.Types.FixedBound
     Halo2.Types.FixedVariableValues
     Halo2.Types.InputExpression
     Halo2.Types.LogicConstraint

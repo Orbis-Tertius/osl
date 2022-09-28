@@ -11,5 +11,6 @@ module Halo2.Prelude
 
 import           Data.Map     (Map)
 import           Data.Set     (Set)
+import Data.Generics.Labels ()
 import           GHC.Generics (Generic)
 import           Prelude
