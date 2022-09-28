@@ -12,7 +12,9 @@ data-files:
 
 library
   exposed-modules:
+    Cast
     Halo2.Prelude
+    Halo2.ArithmetizationConfig
     Halo2.Types
     Halo2.Types.ArithmetizationConfig
     Halo2.Types.BitsPerByte
@@ -76,6 +78,7 @@ library
     bytestring,
     compactable,
     containers,
+    cryptonite,
     either,
     extra,
     generic-lens,
