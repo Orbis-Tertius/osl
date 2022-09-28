@@ -10,4 +10,4 @@ import           Halo2.Prelude
 
 
 newtype FieldElement = FieldElement { getFieldElement :: Integer }
-  deriving (Enum, Eq, Ord, Show, Generic)
+  deriving (Enum, Num, Eq, Ord, Show, Generic)

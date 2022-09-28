@@ -10,5 +10,5 @@ module Halo2.Types.Byte
 import Halo2.Prelude
 
 
-newtype Byte = Byte { unByte :: Int }
+newtype Byte = Byte { unByte :: Integer }
   deriving Generic
