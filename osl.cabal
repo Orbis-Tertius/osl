@@ -15,9 +15,12 @@ library
     Cast
     Halo2.Prelude
     Halo2.ArithmetizationConfig
+    Halo2.ByteDecomposition
     Halo2.Types
     Halo2.Types.ArithmetizationConfig
+    Halo2.Types.Byte
     Halo2.Types.ByteDecompositionSize
+    Halo2.Types.ByteDecomposition
     Halo2.Types.BitsPerByte
     Halo2.Types.BytesPerWord
     Halo2.Types.Circuit
