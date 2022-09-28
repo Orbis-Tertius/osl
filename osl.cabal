@@ -14,6 +14,9 @@ library
   exposed-modules:
     Halo2.Prelude
     Halo2.Types
+    Halo2.Types.ArithmetizationConfig
+    Halo2.Types.BitsPerByte
+    Halo2.Types.BytesPerWord
     Halo2.Types.Circuit
     Halo2.Types.Coefficient
     Halo2.Types.ColumnType
