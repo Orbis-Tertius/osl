@@ -2,16 +2,21 @@
 
 
 module Halo2.Types.LogicConstraint
-  ( LogicConstraint (Equals, LessThan, Not, And, Or)
+  ( AtomicLogicConstraint (Equals, LessThan)
+  , LogicConstraint (Atom, Not, And, Or)
   ) where
 
 
 import Halo2.Types.Polynomial (Polynomial)
 
 
-data LogicConstraint =
+data AtomicLogicConstraint =
     Equals Polynomial Polynomial
   | LessThan Polynomial Polynomial
+
+
+data LogicConstraint =
+    Atom AtomicLogicConstraint
   | Not LogicConstraint
   | And [LogicConstraint]
   | Or [LogicConstraint]
