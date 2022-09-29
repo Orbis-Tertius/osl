@@ -25,6 +25,7 @@ library
     Halo2.Types.BitsPerByte
     Halo2.Types.BytesPerWord
     Halo2.Types.Circuit
+    Halo2.Types.CircuitWithWitnesses
     Halo2.Types.Coefficient
     Halo2.Types.ColumnType
     Halo2.Types.ColumnIndex

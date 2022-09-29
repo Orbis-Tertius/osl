@@ -18,9 +18,9 @@ import           Halo2.Types.WitnessGenerationContext (WitnessGenerationContext)
 -- which are provided as input to the zkSNARK proving process.
 -- A circuit with witnesses specifies a circuit and which columns
 -- constitute the witness and what function computes the witness.
-data CircuitWithWitnesses =
+data CircuitWithWitnesses a =
   CircuitWithWitnesses
-  { circuit        :: Circuit
+  { circuit        :: Circuit a
   , witnessColumns :: WitnessColumns
   , witnesses      :: WitnessGenerationContext -> Witness
   }
