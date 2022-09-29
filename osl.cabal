@@ -35,7 +35,8 @@ library
     Halo2.Types.FieldElement
     Halo2.Types.FiniteField
     Halo2.Types.FixedBound
-    Halo2.Types.FixedVariableValues
+    Halo2.Types.FixedColumn
+    Halo2.Types.FixedValues
     Halo2.Types.InputExpression
     Halo2.Types.LogicConstraint
     Halo2.Types.LogicConstraints
