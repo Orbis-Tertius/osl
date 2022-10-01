@@ -1,26 +1,50 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 
 module Halo2.LogicToArithmetic (eval) where
 
 
---import Halo2.Prelude
---import Halo2.FiniteField (half)
+import qualified Data.Map as Map
+
+import Halo2.Prelude
+import qualified Halo2.Coefficient as C
+import qualified Halo2.Polynomial as P
+import qualified Halo2.FiniteField as F
+import Halo2.Types.FiniteField (FiniteField)
 import Halo2.Types.LogicConstraint (LogicConstraint (..), AtomicLogicConstraint (..))
-import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..))
+import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..), TruthValueColumnIndex (..), AtomAdvice (..))
 import Halo2.Types.Polynomial (Polynomial (..))
+import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 
 
-eval :: LogicToArithmeticColumnLayout
+eval :: FiniteField
+     -> LogicToArithmeticColumnLayout
      -> LogicConstraint
-     -> Polynomial
-eval _layout =
+     -> Maybe Polynomial
+eval f layout =
   \case
-    Atom (Equals _p _q) ->
-      todo
+    Atom (Equals p q) -> do
+      advice <- Map.lookup (Equals p q) (layout ^. #atomAdvice)
+      pure $ P.times f (signPoly f advice) (eqMono advice)
     _ -> todo
 
+
+signPoly :: FiniteField -> AtomAdvice -> Polynomial
+signPoly f advice =
+  P.times f (P.constant (F.half f))
+    (P.plus f (P.constant F.one)
+      (P.var (PolynomialVariable
+                (advice ^. #sign . #unSignColumnIndex)
+                0)))
+
+
+eqMono :: AtomAdvice -> Polynomial
+eqMono advice =
+  P.multilinearMonomial C.one
+    $ flip PolynomialVariable 0 . unTruthValueColumnIndex
+       <$> advice ^. #truthValue
 
 todo :: a
 todo = todo

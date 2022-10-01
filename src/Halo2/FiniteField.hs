@@ -7,6 +7,8 @@ module Halo2.FiniteField
   , times
   , reciprocal
   , half
+  , one
+  , zero
   ) where
 
 
@@ -37,3 +39,11 @@ reciprocal (FiniteField _n) (FieldElement _m) =
 half :: FiniteField -> FieldElement
 half f = fromMaybe (die "could not compute 1/2")
   $ reciprocal f 2
+
+
+one :: FieldElement
+one = FieldElement 1
+
+
+zero :: FieldElement
+zero = FieldElement 0

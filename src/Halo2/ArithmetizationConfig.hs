@@ -9,7 +9,6 @@ module Halo2.ArithmetizationConfig
 
 
 import Cast (intToInteger)
-import Control.Lens ((^.))
 import Crypto.Number.Basic (numBits)
 import Halo2.Prelude
 import Halo2.Types.ArithmetizationConfig (ArithmetizationConfig (..))

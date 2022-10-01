@@ -7,12 +7,14 @@ module Halo2.Types.LogicConstraint
   ) where
 
 
+import Halo2.Prelude
 import Halo2.Types.Polynomial (Polynomial)
 
 
 data AtomicLogicConstraint =
     Equals Polynomial Polynomial
   | LessThan Polynomial Polynomial
+  deriving (Eq, Ord)
 
 
 data LogicConstraint =
