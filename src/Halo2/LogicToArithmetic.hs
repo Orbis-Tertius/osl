@@ -11,7 +11,7 @@ module Halo2.LogicToArithmetic
   , byteDecompositionGate
   , getLayout
   , getSignRangeCheck
-  , getByteRangeAndTruthTableCheck
+  , getByteRangeAndTruthTableChecks
   ) where
 
 
@@ -194,14 +194,25 @@ getSignRangeCheck f layout c = do
        )]
 
 
-getByteRangeAndTruthTableCheck :: LogicToArithmeticColumnLayout
+getByteRangeAndTruthTableChecks :: LogicToArithmeticColumnLayout
   -> AtomicLogicConstraint
   -> Maybe LookupArgument
-getByteRangeAndTruthTableCheck = todo
-
-
-todo :: a
-todo = todo
+getByteRangeAndTruthTableChecks layout c = do
+  advice <- Map.lookup c (layout ^. #atomAdvice)
+  let b0 = layout ^. #truthTable
+             . #zeroIndicatorColumnIndex
+             . #unZeroIndicatorColumnIndex
+      b1 = layout ^. #truthTable
+             . #byteRangeColumnIndex
+             . #unByteRangeColumnIndex
+  pure . LookupArgument $ do
+    (byteCol, truthValCol) <-
+      zip (advice ^. #bytes)
+          (advice ^. #truthValue)
+    let delta = P.var (PolynomialVariable (truthValCol ^. #unTruthValueColumnIndex) 0)
+        beta = P.var (PolynomialVariable (byteCol ^. #unByteColumnIndex) 0)
+    [   (InputExpression delta, LookupTableColumn b0)
+      , (InputExpression beta, LookupTableColumn b1) ]
 
 
 nextColIndex :: State ColumnIndex ColumnIndex
