@@ -12,6 +12,7 @@ import Halo2.Prelude
 import qualified Halo2.Coefficient as C
 import qualified Halo2.Polynomial as P
 import qualified Halo2.FiniteField as F
+import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.FiniteField (FiniteField)
 import Halo2.Types.LogicConstraint (LogicConstraint (..), AtomicLogicConstraint (..))
 import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..), TruthValueColumnIndex (..), AtomAdvice (..))
@@ -28,6 +29,10 @@ eval f layout =
     Atom (Equals p q) -> do
       advice <- Map.lookup (Equals p q) (layout ^. #atomAdvice)
       pure $ P.times f (signPoly f advice) (eqMono advice)
+    Atom (LessThan p q) -> do
+      advice <- Map.lookup (LessThan p q) (layout ^. #atomAdvice)
+      pure $ P.times f (signPoly f advice)
+             (some f (unTruthValueColumnIndex <$> advice ^. #truthValue))
     _ -> todo
 
 
@@ -45,6 +50,15 @@ eqMono advice =
   P.multilinearMonomial C.one
     $ flip PolynomialVariable 0 . unTruthValueColumnIndex
        <$> advice ^. #truthValue
+
+
+some :: FiniteField -> [ColumnIndex] -> Polynomial
+some _ [] = P.zero
+some f (x:xs) =
+  let a = P.var (PolynomialVariable x 0)
+      b = some f xs in
+  P.plus f a (P.minus f b (P.times f a b))
+
 
 todo :: a
 todo = todo

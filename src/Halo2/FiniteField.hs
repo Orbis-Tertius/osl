@@ -9,6 +9,7 @@ module Halo2.FiniteField
   , half
   , one
   , zero
+  , minusOne
   ) where
 
 
@@ -47,3 +48,8 @@ one = FieldElement 1
 
 zero :: FieldElement
 zero = FieldElement 0
+
+
+minusOne :: FiniteField -> FieldElement
+minusOne (FiniteField n) =
+  FieldElement (intToInteger (n-1))

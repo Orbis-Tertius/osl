@@ -8,6 +8,10 @@ module Halo2.Polynomial
   , constant
   , var
   , multilinearMonomial
+  , zero
+  , one
+  , negative
+  , minus
   ) where
 
 
@@ -16,6 +20,7 @@ import qualified Data.Map as Map
 import Halo2.Prelude
 import qualified Halo2.Coefficient as C
 import qualified Halo2.PowerProduct as P
+import qualified Halo2.FiniteField as F
 import Halo2.Types.Coefficient (Coefficient (..))
 import Halo2.Types.FiniteField (FiniteField)
 import Halo2.Types.FieldElement (FieldElement)
@@ -71,3 +76,23 @@ multilinearMonomial a xs =
         (Map.fromList
           ((,1) <$> xs)))
       a)
+
+
+zero :: Polynomial
+zero = constant F.zero
+
+
+one :: Polynomial
+one = constant F.one
+
+
+minusOne :: FiniteField -> Polynomial
+minusOne f = constant (F.minusOne f)
+
+
+negative :: FiniteField -> Polynomial -> Polynomial
+negative f = times f (minusOne f)
+
+
+minus :: FiniteField -> Polynomial -> Polynomial -> Polynomial
+minus f a b = plus f a (negative f b)
