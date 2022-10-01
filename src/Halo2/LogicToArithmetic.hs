@@ -1,11 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 
 module Halo2.LogicToArithmetic
   ( eval
   , translateLogicGate
+  , byteDecompositionGate
   ) where
 
 
@@ -17,8 +19,8 @@ import qualified Halo2.Polynomial as P
 import qualified Halo2.FiniteField as F
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.FiniteField (FiniteField)
-import Halo2.Types.LogicConstraint (LogicConstraint (..), AtomicLogicConstraint (..))
-import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..), TruthValueColumnIndex (..), AtomAdvice (..))
+import Halo2.Types.LogicConstraint (LogicConstraint (..), AtomicLogicConstraint (..), atomicConstraintArgs)
+import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..), TruthValueColumnIndex (..), AtomAdvice (..), ByteColumnIndex (..))
 import Halo2.Types.Polynomial (Polynomial (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 
@@ -38,10 +40,7 @@ byteDecompositionGate
   -> AtomicLogicConstraint
   -> Maybe Polynomial
 byteDecompositionGate f layout c =
-  let (a, b) =
-        case c of
-          Equals a b -> (a,b)
-          LessThan a b -> (a,b)
+  let (a, b) = atomicConstraintArgs c
   in do
     advice <- Map.lookup c (layout ^. #atomAdvice)
     pure $ P.minus f (P.minus f a b)
@@ -49,7 +48,13 @@ byteDecompositionGate f layout c =
          (P.var (PolynomialVariable
                    (advice ^. #sign . #unSignColumnIndex)
                    0))
-         (P.sum f [ ]))
+         (P.sum f
+           [ P.times f (P.constant (2 ^ j)) d
+           | (j, d) :: (Integer, Polynomial) <- zip [0..]
+               (reverse (P.var . flip PolynomialVariable 0
+                       . unByteColumnIndex
+                     <$> (advice ^. #bytes)))
+           ]))
 
 
 eval :: FiniteField

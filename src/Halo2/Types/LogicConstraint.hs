@@ -1,9 +1,11 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 
 module Halo2.Types.LogicConstraint
   ( AtomicLogicConstraint (Equals, LessThan)
   , LogicConstraint (Atom, Not, And, Or)
+  , atomicConstraintArgs
   ) where
 
 
@@ -15,6 +17,13 @@ data AtomicLogicConstraint =
     Equals Polynomial Polynomial
   | LessThan Polynomial Polynomial
   deriving (Eq, Ord)
+
+
+atomicConstraintArgs :: AtomicLogicConstraint -> (Polynomial, Polynomial)
+atomicConstraintArgs =
+  \case
+    Equals a b -> (a, b)
+    LessThan a b -> (a, b)
 
 
 data LogicConstraint =
