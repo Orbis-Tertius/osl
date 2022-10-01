@@ -33,7 +33,14 @@ eval f layout =
       advice <- Map.lookup (LessThan p q) (layout ^. #atomAdvice)
       pure $ P.times f (signPoly f advice)
              (some f (unTruthValueColumnIndex <$> advice ^. #truthValue))
-    _ -> todo
+    Not p -> P.minus f P.one <$> rec p
+    And p q -> P.times f <$> rec p <*> rec q
+    Or p q ->
+      let a = rec p
+          b = rec q in
+      P.plus f <$> a <*> (P.minus f <$> b <*> (P.times f <$> a <*> b))
+  where
+    rec = eval f layout
 
 
 signPoly :: FiniteField -> AtomAdvice -> Polynomial
@@ -58,7 +65,3 @@ some f (x:xs) =
   let a = P.var (PolynomialVariable x 0)
       b = some f xs in
   P.plus f a (P.minus f b (P.times f a b))
-
-
-todo :: a
-todo = todo

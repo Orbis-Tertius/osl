@@ -20,5 +20,5 @@ data AtomicLogicConstraint =
 data LogicConstraint =
     Atom AtomicLogicConstraint
   | Not LogicConstraint
-  | And [LogicConstraint]
-  | Or [LogicConstraint]
+  | And LogicConstraint LogicConstraint
+  | Or LogicConstraint LogicConstraint
