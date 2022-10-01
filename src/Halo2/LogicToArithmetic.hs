@@ -3,7 +3,10 @@
 {-# LANGUAGE OverloadedLabels #-}
 
 
-module Halo2.LogicToArithmetic (eval) where
+module Halo2.LogicToArithmetic
+  ( eval
+  , translateLogicGate
+  ) where
 
 
 import qualified Data.Map as Map
@@ -18,6 +21,15 @@ import Halo2.Types.LogicConstraint (LogicConstraint (..), AtomicLogicConstraint 
 import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..), TruthValueColumnIndex (..), AtomAdvice (..))
 import Halo2.Types.Polynomial (Polynomial (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
+
+
+translateLogicGate
+  :: FiniteField
+  -> LogicToArithmeticColumnLayout
+  -> LogicConstraint
+  -> Maybe Polynomial
+translateLogicGate f layout p =
+  P.minus f <$> eval f layout p <*> pure P.one
 
 
 eval :: FiniteField
