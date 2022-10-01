@@ -36,6 +36,7 @@ import Halo2.Types.InputExpression (InputExpression (..))
 import Halo2.Types.LogicConstraint (LogicConstraint (..), AtomicLogicConstraint (..), atomicConstraintArgs)
 import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..), TruthValueColumnIndex (..), AtomAdvice (..), ByteColumnIndex (..), ByteRangeColumnIndex (..), ZeroIndicatorColumnIndex (..), TruthTableColumnIndices (..), SignColumnIndex (..))
 import Halo2.Types.LookupArgument (LookupArgument (..))
+import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.Polynomial (Polynomial (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 
@@ -187,7 +188,9 @@ getSignRangeCheck f layout c = do
   advice <- Map.lookup c (layout ^. #atomAdvice)
   pure . LookupArgument
     $ [( InputExpression (signPoly f advice)
-       , layout ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex
+       , LookupTableColumn $ layout ^. #truthTable
+           . #zeroIndicatorColumnIndex
+           . #unZeroIndicatorColumnIndex
        )]
 
 

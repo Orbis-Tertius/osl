@@ -51,6 +51,7 @@ library
     Halo2.Types.LogicToArithmeticColumnLayout
     Halo2.Types.LookupArgument
     Halo2.Types.LookupArguments
+    Halo2.Types.LookupTableColumn
     Halo2.Types.Polynomial
     Halo2.Types.PolynomialConstraints
     Halo2.Types.PolynomialDegreeBound
