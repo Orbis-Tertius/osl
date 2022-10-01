@@ -12,8 +12,8 @@ import Data.Text (Text, pack, unpack)
 import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try, choice, getPosition, option, many1, optionMaybe)
 import qualified Text.Parsec.Prim as Prim
 
+import Die (die)
 import OSL.Bound (boundAnnotation)
-import OSL.Die (die)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.OSL (Context (..), Name, Declaration (..), Term (..), Type (..), Bound (..), LeftBound (..), RightBound (..), Cardinality (..), ValuesBound (..), KeysBound (..), DomainBound (..), CodomainBound (..))
 import qualified OSL.Types.Keyword as K

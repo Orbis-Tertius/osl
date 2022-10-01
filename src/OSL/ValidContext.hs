@@ -12,7 +12,7 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 
-import OSL.Die (die)
+import Die (die)
 import OSL.Types.OSL (ValidContext (..), Name, Declaration)
 
 

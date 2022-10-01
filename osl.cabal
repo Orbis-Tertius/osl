@@ -13,9 +13,12 @@ data-files:
 library
   exposed-modules:
     Cast
+    Die
     Halo2.Prelude
     Halo2.ArithmetizationConfig
     Halo2.ByteDecomposition
+    Halo2.FiniteField
+    Halo2.LogicToArithmetic
     Halo2.TruthTable
     Halo2.Types
     Halo2.Types.ArithmetizationConfig
@@ -59,7 +62,6 @@ library
     Halo2.Types.WitnessGenerationContext
     OSL.Bound
     OSL.BuildTranslationContext
-    OSL.Die
     OSL.EntryPoint
     OSL.Parse
     OSL.Sigma11

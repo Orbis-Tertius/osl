@@ -1,4 +1,4 @@
-module OSL.Die (die) where
+module Die (die) where
 
 
 import Data.Text (Text, unpack)

@@ -27,9 +27,9 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (pack)
 
+import Die (die)
 import OSL.Bound (boundAnnotation)
 import OSL.BuildTranslationContext (buildTranslationContext', getFreeOSLName, addFreeVariableMapping, addTermMapping, getFreeS11Name, getBoundS11NamesInContext)
-import OSL.Die (die)
 import OSL.Sigma11 (incrementDeBruijnIndices, incrementArities, prependBounds)
 import OSL.Term (termAnnotation)
 import OSL.TranslationContext (mergeMappings, mergeMapping, linearizeMapping)

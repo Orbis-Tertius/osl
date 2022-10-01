@@ -40,7 +40,7 @@ data AtomAdvice =
   AtomAdvice
   { sign :: SignColumnIndex
   , bytes :: [ByteColumnIndex] -- most significant first
-  , truthValue :: TruthValueColumnIndex
+  , truthValue :: [TruthValueColumnIndex]
   } deriving Generic
 
 
