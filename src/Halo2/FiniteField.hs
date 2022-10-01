@@ -2,15 +2,31 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module Halo2.FiniteField (reciprocal, half) where
+module Halo2.FiniteField
+  ( plus
+  , times
+  , reciprocal
+  , half
+  ) where
 
 
 import Data.Maybe (fromMaybe)
 
+import Cast (intToInteger)
 import Die (die)
 import Halo2.Prelude
 import Halo2.Types.FiniteField (FiniteField (..))
 import Halo2.Types.FieldElement (FieldElement (..))
+
+
+plus :: FiniteField -> FieldElement -> FieldElement -> FieldElement
+plus (FiniteField n) (FieldElement a) (FieldElement b) =
+  FieldElement ((a + b) `mod` intToInteger n)
+
+
+times :: FiniteField -> FieldElement -> FieldElement -> FieldElement
+times (FiniteField n) (FieldElement a) (FieldElement b) =
+  FieldElement ((a * b) `mod` intToInteger n)
 
 
 reciprocal :: FiniteField -> FieldElement -> Maybe FieldElement
