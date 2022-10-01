@@ -1,16 +1,19 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 
 module Halo2.ByteDecomposition
   ( decomposeBytes
   , composeBytes
+  , countBytes
   ) where
 
 
 import Cast (intToInteger)
 import Halo2.Prelude
 import Halo2.Types.FieldElement (FieldElement (..))
+import Halo2.Types.FixedBound (FixedBound (..))
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Byte (Byte (..))
 import Halo2.Types.ByteDecomposition (ByteDecomposition (..))
@@ -29,3 +32,9 @@ composeBytes _ (ByteDecomposition []) = 0
 composeBytes (BitsPerByte b) (ByteDecomposition (Byte x : xs)) =
   (FieldElement (x * (2 ^ intToInteger (b * length xs))))
     + composeBytes (BitsPerByte b) (ByteDecomposition xs)
+
+
+countBytes :: BitsPerByte -> FixedBound -> Int
+countBytes bits (FixedBound b) =
+  length . (^. #unByteDecomposition)
+    $ decomposeBytes bits (FieldElement (intToInteger (b-1)))

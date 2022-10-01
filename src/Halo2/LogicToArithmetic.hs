@@ -2,25 +2,36 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
 
 module Halo2.LogicToArithmetic
   ( eval
   , translateLogicGate
   , byteDecompositionGate
+  , getLayout
   ) where
 
 
+import Control.Monad (forM, replicateM)
+import Control.Monad.State (State, get, put, runState)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Halo2.Prelude
+import Halo2.ByteDecomposition (countBytes)
 import qualified Halo2.Coefficient as C
 import qualified Halo2.Polynomial as P
 import qualified Halo2.FiniteField as F
-import Halo2.Types.ColumnIndex (ColumnIndex)
-import Halo2.Types.FiniteField (FiniteField)
+import Halo2.Types.BitsPerByte (BitsPerByte (..))
+import Halo2.Types.Circuit (LogicCircuit)
+import Halo2.Types.ColumnIndex (ColumnIndex (..))
+import Halo2.Types.ColumnTypes (ColumnTypes (..))
+import Halo2.Types.ColumnType (ColumnType (Fixed))
+import Halo2.Types.FiniteField (FiniteField (..))
+import Halo2.Types.FixedBound (FixedBound (..))
 import Halo2.Types.LogicConstraint (LogicConstraint (..), AtomicLogicConstraint (..), atomicConstraintArgs)
-import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..), TruthValueColumnIndex (..), AtomAdvice (..), ByteColumnIndex (..))
+import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..), TruthValueColumnIndex (..), AtomAdvice (..), ByteColumnIndex (..), ByteRangeColumnIndex (..), ZeroIndicatorColumnIndex (..), TruthTableColumnIndices (..), SignColumnIndex (..))
 import Halo2.Types.Polynomial (Polynomial (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 
@@ -102,3 +113,70 @@ some f (x:xs) =
   let a = P.var (PolynomialVariable x 0)
       b = some f xs in
   P.plus f a (P.minus f b (P.times f a b))
+
+
+getLayout :: BitsPerByte
+  -> FiniteField
+  -> LogicCircuit
+  -> LogicToArithmeticColumnLayout
+getLayout bits f lc =
+  let i0 = ColumnIndex . length
+         $ lc ^. #columnTypes . #getColumnTypes
+  in fst $ runState (getLayoutM bits f lc) i0
+
+
+getLayoutM :: BitsPerByte
+  -> FiniteField
+  -> LogicCircuit
+  -> State ColumnIndex LogicToArithmeticColumnLayout
+getLayoutM bits f lc = do
+  tabi0 <- ByteRangeColumnIndex <$> nextColIndex
+  tabi1 <- ZeroIndicatorColumnIndex <$> nextColIndex
+  atomAdvices <- fmap Map.fromList .
+    forM (Set.toList (getAtomicConstraints lc)) $ \ac ->
+      (ac,) <$> getAtomAdviceM bits f
+  let colTypes = lc ^. #columnTypes
+              <> ColumnTypes [Fixed, Fixed]
+      lcCols = Set.fromList . fmap ColumnIndex
+        $ [ 0 .. length (lc ^. #columnTypes . #getColumnTypes)
+                 - 1 ]
+  pure $ LogicToArithmeticColumnLayout
+    colTypes
+    lcCols
+    atomAdvices
+    (TruthTableColumnIndices tabi0 tabi1)
+
+
+getAtomAdviceM :: BitsPerByte
+  -> FiniteField
+  -> State ColumnIndex AtomAdvice
+getAtomAdviceM bits (FiniteField fieldSize) = do
+  AtomAdvice
+    <$> (SignColumnIndex <$> nextColIndex)
+    <*> (replicateM n (ByteColumnIndex <$> nextColIndex))
+    <*> (replicateM n (TruthValueColumnIndex <$> nextColIndex))
+  where n = countBytes bits (FixedBound fieldSize)
+
+
+getAtomicConstraints :: LogicCircuit -> Set AtomicLogicConstraint
+getAtomicConstraints lc =
+  Set.unions $ getAtomicSubformulas
+    <$> lc ^. #gateConstraints . #constraints
+
+
+getAtomicSubformulas :: LogicConstraint -> Set AtomicLogicConstraint
+getAtomicSubformulas =
+  \case
+    Atom a -> Set.singleton a
+    Not p -> rec p
+    And p q -> rec p <> rec q
+    Or p q -> rec p <> rec q
+  where
+    rec = getAtomicSubformulas
+
+
+nextColIndex :: State ColumnIndex ColumnIndex
+nextColIndex = do
+  i <- get
+  put (i+1)
+  pure i
