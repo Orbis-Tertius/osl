@@ -31,7 +31,7 @@ times (FiniteField n) (FieldElement a) (FieldElement b) =
 
 reciprocal :: FiniteField -> FieldElement -> Maybe FieldElement
 reciprocal (FiniteField _n) (FieldElement _m) =
-  Nothing -- todo
+  Nothing -- TODO
 
 
 half :: FiniteField -> FieldElement
