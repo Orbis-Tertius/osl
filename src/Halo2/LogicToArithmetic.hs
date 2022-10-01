@@ -10,6 +10,8 @@ module Halo2.LogicToArithmetic
   , translateLogicGate
   , byteDecompositionGate
   , getLayout
+  , getSignRangeCheck
+  , getByteRangeAndTruthTableCheck
   ) where
 
 
@@ -30,8 +32,10 @@ import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.ColumnType (ColumnType (Fixed))
 import Halo2.Types.FiniteField (FiniteField (..))
 import Halo2.Types.FixedBound (FixedBound (..))
+import Halo2.Types.InputExpression (InputExpression (..))
 import Halo2.Types.LogicConstraint (LogicConstraint (..), AtomicLogicConstraint (..), atomicConstraintArgs)
 import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..), TruthValueColumnIndex (..), AtomAdvice (..), ByteColumnIndex (..), ByteRangeColumnIndex (..), ZeroIndicatorColumnIndex (..), TruthTableColumnIndices (..), SignColumnIndex (..))
+import Halo2.Types.LookupArgument (LookupArgument (..))
 import Halo2.Types.Polynomial (Polynomial (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 
@@ -173,6 +177,28 @@ getAtomicSubformulas =
     Or p q -> rec p <> rec q
   where
     rec = getAtomicSubformulas
+
+
+getSignRangeCheck :: FiniteField
+  -> LogicToArithmeticColumnLayout
+  -> AtomicLogicConstraint
+  -> Maybe LookupArgument
+getSignRangeCheck f layout c = do
+  advice <- Map.lookup c (layout ^. #atomAdvice)
+  pure . LookupArgument
+    $ [( InputExpression (signPoly f advice)
+       , layout ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex
+       )]
+
+
+getByteRangeAndTruthTableCheck :: LogicToArithmeticColumnLayout
+  -> AtomicLogicConstraint
+  -> Maybe LookupArgument
+getByteRangeAndTruthTableCheck = todo
+
+
+todo :: a
+todo = todo
 
 
 nextColIndex :: State ColumnIndex ColumnIndex
