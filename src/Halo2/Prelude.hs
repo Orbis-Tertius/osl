@@ -15,4 +15,4 @@ import           Data.Map     (Map)
 import           Data.Set     (Set)
 import Data.Generics.Labels ()
 import           GHC.Generics (Generic)
-import           Prelude
+import           Prelude hiding (sum)

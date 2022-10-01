@@ -12,6 +12,7 @@ module Halo2.Polynomial
   , one
   , negative
   , minus
+  , sum
   ) where
 
 
@@ -96,3 +97,7 @@ negative f = times f (minusOne f)
 
 minus :: FiniteField -> Polynomial -> Polynomial -> Polynomial
 minus f a b = plus f a (negative f b)
+
+
+sum :: FiniteField -> [Polynomial] -> Polynomial
+sum f = foldl (plus f) zero

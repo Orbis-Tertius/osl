@@ -32,6 +32,26 @@ translateLogicGate f layout p =
   P.minus f <$> eval f layout p <*> pure P.one
 
 
+byteDecompositionGate
+  :: FiniteField
+  -> LogicToArithmeticColumnLayout
+  -> AtomicLogicConstraint
+  -> Maybe Polynomial
+byteDecompositionGate f layout c =
+  let (a, b) =
+        case c of
+          Equals a b -> (a,b)
+          LessThan a b -> (a,b)
+  in do
+    advice <- Map.lookup c (layout ^. #atomAdvice)
+    pure $ P.minus f (P.minus f a b)
+       (P.times f
+         (P.var (PolynomialVariable
+                   (advice ^. #sign . #unSignColumnIndex)
+                   0))
+         (P.sum f [ ]))
+
+
 eval :: FiniteField
      -> LogicToArithmeticColumnLayout
      -> LogicConstraint
