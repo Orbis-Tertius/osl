@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 
@@ -12,4 +13,4 @@ import           Halo2.Types.FixedColumn        (FixedColumn)
 
 newtype FixedValues = FixedValues
   { getFixedValues :: Map ColumnIndex FixedColumn }
-  deriving (Eq, Ord, Generic, Show)
+  deriving (Eq, Ord, Generic, Show, Semigroup, Monoid)

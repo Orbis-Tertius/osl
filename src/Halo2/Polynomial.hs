@@ -13,6 +13,7 @@ module Halo2.Polynomial
   , negative
   , minus
   , sum
+  , degree
   ) where
 
 
@@ -101,3 +102,8 @@ minus f a b = plus f a (negative f b)
 
 sum :: FiniteField -> [Polynomial] -> Polynomial
 sum f = foldl (plus f) zero
+
+
+degree :: Polynomial -> Int
+degree (Polynomial p) =
+  foldl max 0 (P.degree <$> Map.keys p)

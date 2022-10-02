@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 
@@ -12,4 +13,4 @@ import           Halo2.Types.LookupArgument (LookupArgument)
 
 
 newtype LookupArguments = LookupArguments { getLookupArguments :: [LookupArgument] }
-  deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Ord, Show, Generic, Semigroup, Monoid)

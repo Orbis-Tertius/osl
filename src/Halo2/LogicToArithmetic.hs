@@ -12,33 +12,42 @@ module Halo2.LogicToArithmetic
   , getLayout
   , getSignRangeCheck
   , getByteRangeAndTruthTableChecks
+  , logicToArithmeticCircuit
   ) where
 
 
 import Control.Monad (forM, replicateM)
 import Control.Monad.State (State, get, put, runState)
+import Crypto.Number.Basic (numBits)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import Cast (intToInteger)
 import Halo2.Prelude
 import Halo2.ByteDecomposition (countBytes)
 import qualified Halo2.Coefficient as C
 import qualified Halo2.Polynomial as P
 import qualified Halo2.FiniteField as F
+import Halo2.TruthTable (getByteRangeColumn, getZeroIndicatorColumn)
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
-import Halo2.Types.Circuit (LogicCircuit)
+import Halo2.Types.Circuit (Circuit (..), LogicCircuit, ArithmeticCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (..))
 import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.ColumnType (ColumnType (Fixed))
 import Halo2.Types.FiniteField (FiniteField (..))
 import Halo2.Types.FixedBound (FixedBound (..))
+import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
 import Halo2.Types.LogicConstraint (LogicConstraint (..), AtomicLogicConstraint (..), atomicConstraintArgs)
 import Halo2.Types.LogicToArithmeticColumnLayout (LogicToArithmeticColumnLayout (..), TruthValueColumnIndex (..), AtomAdvice (..), ByteColumnIndex (..), ByteRangeColumnIndex (..), ZeroIndicatorColumnIndex (..), TruthTableColumnIndices (..), SignColumnIndex (..))
 import Halo2.Types.LookupArgument (LookupArgument (..))
+import Halo2.Types.LookupArguments (LookupArguments (..))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.Polynomial (Polynomial (..))
+import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
+import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
+import Halo2.Types.RowCount (RowCount)
 
 
 translateLogicGate
@@ -220,3 +229,50 @@ nextColIndex = do
   i <- get
   put (i+1)
   pure i
+
+getPolyDegreeBound :: Polynomial -> PolynomialDegreeBound
+getPolyDegreeBound p =
+  PolynomialDegreeBound
+    $ 2 ^ (numBits (intToInteger (P.degree p)))
+
+
+logicToArithmeticCircuit
+  :: BitsPerByte
+  -> FiniteField
+  -> RowCount
+  -> LogicCircuit
+  -> Maybe ArithmeticCircuit
+logicToArithmeticCircuit bits f rows lc = do
+  let layout = getLayout bits f lc
+      atoms = Set.toList (getAtomicConstraints lc)
+  translatedGates <-
+    forM (lc ^. #gateConstraints . #constraints)
+      $ translateLogicGate f layout
+  decompositionGates <-
+    forM atoms $ byteDecompositionGate f layout
+  let polyGates = translatedGates <> decompositionGates
+      degreeBound = foldl max 0
+        (getPolyDegreeBound <$> polyGates)
+  signChecks <-
+    forM atoms $ getSignRangeCheck f layout
+  rangeAndTruthChecks <-
+    forM atoms $ getByteRangeAndTruthTableChecks layout
+  pure $
+    Circuit f
+    (layout ^. #columnTypes)
+    (lc ^. #equalityConstrainableColumns)
+    (PolynomialConstraints polyGates degreeBound)
+    ((lc ^. #lookupArguments)
+      <> LookupArguments signChecks
+      <> LookupArguments rangeAndTruthChecks)
+    rows
+    (lc ^. #equalityConstraints)
+    ((lc ^. #fixedValues)
+      <> FixedValues (Map.singleton
+         (layout ^. #truthTable . #byteRangeColumnIndex
+           . #unByteRangeColumnIndex)
+         (getByteRangeColumn bits rows))
+      <> FixedValues (Map.singleton
+         (layout ^. #truthTable . #zeroIndicatorColumnIndex
+           . #unZeroIndicatorColumnIndex)
+         (getZeroIndicatorColumn rows)))
