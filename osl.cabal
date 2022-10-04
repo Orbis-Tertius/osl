@@ -87,6 +87,7 @@ library
     Semicircuit.Types.PNFFormula
     Semicircuit.Types.QFFormula
     Semicircuit.Types.Semicircuit
+    Semicircuit.PNFFormula
 
   build-depends:
     base >= 4.9 && < 5,

@@ -10,7 +10,7 @@ module Semicircuit.Types.Semicircuit
 import Data.List.NonEmpty (NonEmpty)
 import Data.Set (Set)
 
-import Semicircuit.Types.PNFFormula (PNFFormula)
+import Semicircuit.Types.PNFFormula (Formula)
 import OSL.Types.Sigma11 (Term, Name)
 
 
@@ -18,7 +18,7 @@ data Semicircuit =
   Semicircuit
   IndicatorFunctionCalls
   FunctionCalls
-  PNFFormula
+  Formula
 
 
 newtype IndicatorFunctionCalls =

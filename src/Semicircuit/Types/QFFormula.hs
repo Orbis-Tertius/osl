@@ -1,5 +1,5 @@
 module Semicircuit.Types.QFFormula
-  ( QFFormula (..) ) where
+  ( Formula (..) ) where
 
 
 import Data.List.NonEmpty (NonEmpty)
@@ -7,12 +7,12 @@ import Data.List.NonEmpty (NonEmpty)
 import OSL.Types.Sigma11 (Term, PredicateName)
 
 
-data QFFormula =
+data Formula =
     Equal Term Term
   | LessOrEqual Term Term
   | Predicate PredicateName (NonEmpty Term)
-  | Not QFFormula
-  | And QFFormula QFFormula
-  | Or QFFormula QFFormula
-  | Implies QFFormula QFFormula
-  | Iff QFFormula QFFormula
+  | Not Formula
+  | And Formula Formula
+  | Or Formula Formula
+  | Implies Formula Formula
+  | Iff Formula Formula
