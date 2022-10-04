@@ -22,7 +22,7 @@ import qualified Data.Set as Set
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Name (..), Term (Var, App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Predicate, Not, And, Or, Implies, Iff, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO, ExistsP), Bound (TermBound, FieldMaxBound))
+import OSL.Types.Sigma11 (Name (..), Term, Term' (Var, App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Predicate, Not, And, Or, Implies, Iff, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO, ExistsP), Bound (TermBound, FieldMaxBound))
 import OSL.Types.TranslationContext (Mapping (..))
 
 

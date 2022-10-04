@@ -5,7 +5,8 @@
 module OSL.Types.Sigma11
   ( Name (Name)
   , PredicateName (PredicateName)
-  , Term (..)
+  , Term
+  , Term' (..)
   , Formula (..)
   , ExistentialQuantifier (..)
   , Bound (..)
@@ -39,17 +40,20 @@ instance Show PredicateName where
   show (PredicateName a i) = "P" <> show i <> "^" <> show a
 
 
-data Term =
-    Var Name
-  | App Name (NonEmpty Term)
-  | AppInverse Name Term
-  | Add Term Term
-  | Mul Term Term
-  | IndLess Term Term
+type Term = Term' Name
+
+
+data Term' name =
+    Var name
+  | App name (NonEmpty (Term' name))
+  | AppInverse name Term
+  | Add (Term' name) (Term' name)
+  | Mul (Term' name) (Term' name)
+  | IndLess (Term' name) (Term' name)
   | Const Integer
   deriving Eq
 
-instance Show Term where
+instance Show name => Show (Term' name) where
   show (Var name) = show name
   show (App f xs) =
     show f <> "(" <> intercalate ", " (show <$> toList xs) <> ")"
