@@ -2,7 +2,8 @@ module OSL.EntryPoint (main, runMain) where
 
 
 import Control.Monad.Trans.State.Strict (runStateT)
-import Data.Text (pack)
+import Data.Either.Extra (mapLeft)
+import Data.Text (Text, pack)
 import Data.Text.IO (readFile)
 import Prelude hiding (readFile)
 import System.Environment (getArgs)
@@ -28,24 +29,27 @@ main = do
 runMain :: String -> String -> IO String
 runMain fileName targetName = do
   source <- readFile fileName
-  case tokenize fileName source of
-    Left err -> pure $ "Tokenizing error: " <> show err
-    Right toks -> do
-      case parseContext fileName toks of
-        Left err -> pure $ "Parse error: " <> show err
-        Right rawCtx -> do
-          case validateContext rawCtx of
-            Left err -> pure $ "Type checking error: " <> show err
-            Right validCtx ->
-              case buildTranslationContext validCtx of
-                Right gc -> do
-                  let lc = toLocalTranslationContext gc
-                  case getDeclaration validCtx (Sym (pack targetName)) of
-                    Just (Defined _ targetTerm) ->
-                      case runStateT (translateToFormula gc lc targetTerm) mempty of
-                        Left err -> pure $ "Error translating: " <> show err
-                        Right (translated, aux) ->
-                          pure $ "Translated OSL:\n" <> show translated <>
-                            (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
-                    _ -> pure "please provide the name of a defined term"
-                Left err -> pure $ "Error building context: " <> show err
+  case calcMain fileName targetName source of
+    Left err -> pure err
+    Right result -> pure result
+
+
+calcMain :: String -> String -> Text -> Either String String
+calcMain fileName targetName source = do
+  toks <- mapLeft (("Tokenizing error: " <>) . show)
+          $ tokenize fileName source
+  rawCtx <- mapLeft (("Parse error: " <>) . show)
+            $ parseContext fileName toks
+  validCtx <- mapLeft (("Type checking error: " <>) . show)
+              $ validateContext rawCtx
+  gc <- mapLeft (("Error building context: " <>) . show)
+        $ buildTranslationContext validCtx
+  let lc = toLocalTranslationContext gc
+  case getDeclaration validCtx (Sym (pack targetName)) of
+    Just (Defined _ targetTerm) -> do
+      (translated, aux) <-
+        mapLeft (("Error translating: " <>) . show)
+        $ runStateT (translateToFormula gc lc targetTerm) mempty
+      pure $ "Translated OSL:\n" <> show translated <>
+        (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
+    _ -> pure "please provide the name of a defined term"
