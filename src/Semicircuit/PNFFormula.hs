@@ -27,9 +27,12 @@ toPrenexNormalForm ann =
     S11.And a b -> rec' QF.And a b
     S11.Or a b -> rec' QF.Or a b
     S11.Not a -> do
+      -- TODO this is wrong; quantifier types flip
       PNF.Formula a' q <- rec a
       pure $ PNF.Formula (QF.Not a') q
+    -- TODO this is wrong; a quantifier types flip
     S11.Implies a b -> rec' QF.Implies a b
+    -- TODO this is wrong
     S11.Iff a b -> rec' QF.Iff a b
     S11.Predicate p args ->
       pure $ PNF.Formula (QF.Predicate p args) mempty

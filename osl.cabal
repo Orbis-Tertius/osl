@@ -84,10 +84,11 @@ library
     OSL.Types.TranslationContext
     OSL.ValidContext
     OSL.ValidateContext
+    Semicircuit.LiftSecondOrderQuantifiers
+    Semicircuit.PNFFormula
     Semicircuit.Types.PNFFormula
     Semicircuit.Types.QFFormula
     Semicircuit.Types.Semicircuit
-    Semicircuit.PNFFormula
 
   build-depends:
     base >= 4.9 && < 5,
