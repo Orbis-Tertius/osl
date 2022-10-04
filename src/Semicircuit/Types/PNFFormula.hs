@@ -1,18 +1,22 @@
 module Semicircuit.Types.PNFFormula
   ( PNFFormula (..)
+  , Quantifiers (..)
+  , FOExistsQ (..)
+  , NumPrecUniQs (..)
+  , FOUniQ (..)
+  , SOExistsQ (..)
   ) where
+
+
+import Data.List.NonEmpty (NonEmpty)
+
+import OSL.Types.Cardinality (Cardinality)
+import OSL.Types.Sigma11 (Bound)
+import Semicircuit.Types.QFFormula (QFFormula)
 
 
 data PNFFormula =
   PNFFormula
-  { qfFormula :: QFFormula
-  , foQuantifiers :: FOQuantifiers
-  , soQuantifiers :: SOQuantifiers
-  }
-
-
-data PNFFormula' =
-  PNFFormula'
   { qfFormula :: QFFormula
   , quantifiers :: Quantifiers
   }
@@ -20,37 +24,21 @@ data PNFFormula' =
 
 data Quantifiers =
   Quantifiers
-  { foExistentialQuantifiers :: [FOExistentialQuantifier]
-  , foUniversalQuantifiers :: [FOUniversalQuantifier]
-  , soQuantifiers :: SOQuantifiers
+  { foExistentialQuantifiers :: [FOExistsQ]
+  , foUniversalQuantifiers :: [FOUniQ]
+  , soQuantifiers :: [SOExistsQ]
   }
 
 
-data FOExistentialQuantifier =
-  FOExistentialQuantifier
-  Bound
-  NumberOfPrecedingUniversalQuantifiers
+data FOExistsQ = Exists Bound NumPrecUniQs
 
 
-newtype NumberOfPrecedingUniversalQuantifiers =
-  NumberOfPrecedingUniversalQuantifiers Int
+newtype NumPrecUniQs = NumPrecUniQs Int
 
 
-data FOUniversalQuantifier =
-  FOUniversalQuantifier Bound
+data FOUniQ = ForAll Bound
 
 
-newtype FOQuantifiers = FOQuantifiers [FOQuantifier]
-
-
-newtype SOQuantifiers = SOQuantifiers [SOQuantifier]
-
-
-data FOQuantifier =
-    ForAll Bound
-  | ExistsFO Bound
-
-
-data SOQuantifier =
-    SOQuantifier Cardinality Bound (NonEmpty Bound)
-  | SOPQuantifier Cardinality Bound Bound
+data SOExistsQ =
+    ExistsF Cardinality Bound (NonEmpty Bound)
+  | ExistsP Cardinality Bound Bound

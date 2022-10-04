@@ -2,6 +2,11 @@ module Semicircuit.Types.QFFormula
   ( QFFormula (..) ) where
 
 
+import Data.List.NonEmpty (NonEmpty)
+
+import OSL.Types.Sigma11 (Term, PredicateName)
+
+
 data QFFormula =
     Equal Term Term
   | LessOrEqual Term Term
