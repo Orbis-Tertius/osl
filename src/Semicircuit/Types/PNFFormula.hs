@@ -31,6 +31,7 @@ data Quantifiers =
   , foUniversalQuantifiers :: [FOUniQ]
   , soQuantifiers :: [SOExistsQ]
   }
+  deriving Eq
 
 instance Semigroup Quantifiers where
   (Quantifiers a b c) <> (Quantifiers a' b' c') =
@@ -41,15 +42,18 @@ instance Monoid Quantifiers where
 
 
 data FOExistsQ = Exists Bound NumPrecUniQs
+  deriving Eq
 
 
 newtype NumPrecUniQs = NumPrecUniQs Int
-  deriving Num
+  deriving (Eq, Num)
 
 
 data FOUniQ = ForAll Bound
+  deriving Eq
 
 
 data SOExistsQ =
     ExistsF Cardinality Bound (NonEmpty Bound)
   | ExistsP Cardinality Bound Bound
+  deriving Eq

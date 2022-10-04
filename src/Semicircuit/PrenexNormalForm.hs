@@ -8,7 +8,7 @@ module Semicircuit.PrenexNormalForm
 
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.Sigma11 (Formula (..), ExistentialQuantifier (..))
+import OSL.Types.Sigma11 (Formula (..))
 
 
 -- Bring all second-order quantifiers to the front,
@@ -24,7 +24,7 @@ toPrenexNormalForm
   :: ann
   -> Formula
   -> Either (ErrorMessage ann) Formula
-toPrenexNormalForm ann a = todo
+toPrenexNormalForm _ann _a = todo
 
 
 todo :: a

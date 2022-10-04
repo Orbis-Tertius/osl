@@ -47,6 +47,7 @@ data Term =
   | Mul Term Term
   | IndLess Term Term
   | Const Integer
+  deriving Eq
 
 instance Show Term where
   show (Var name) = show name
@@ -115,6 +116,7 @@ instance Show ExistentialQuantifier where
 
 
 data Bound = TermBound Term | FieldMaxBound
+  deriving Eq
 
 
 instance Show Bound where
