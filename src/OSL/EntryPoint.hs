@@ -16,6 +16,7 @@ import OSL.TranslationContext (toLocalTranslationContext)
 import OSL.Types.OSL (Declaration (Defined), Name (Sym))
 import OSL.ValidateContext (validateContext)
 import OSL.ValidContext (getDeclaration)
+import Semicircuit.PNFFormula (toPrenexNormalForm)
 
 
 main :: IO ()
@@ -50,6 +51,8 @@ calcMain fileName targetName source = do
       (translated, aux) <-
         mapLeft (("Error translating: " <>) . show)
         $ runStateT (translateToFormula gc lc targetTerm) mempty
+      _ <- mapLeft (("Error converting to prenex normal form: " <>) . show)
+           $ toPrenexNormalForm () translated
       pure $ "Translated OSL:\n" <> show translated <>
         (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
     _ -> pure "please provide the name of a defined term"
