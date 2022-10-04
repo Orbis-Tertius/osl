@@ -84,7 +84,7 @@ library
     OSL.Types.TranslationContext
     OSL.ValidContext
     OSL.ValidateContext
-    Semicircuit.LiftSecondOrderQuantifiers
+    Semicircuit.PrenexNormalForm
     Semicircuit.PNFFormula
     Semicircuit.Types.PNFFormula
     Semicircuit.Types.QFFormula

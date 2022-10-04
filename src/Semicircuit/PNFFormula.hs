@@ -3,7 +3,7 @@
 
 
 module Semicircuit.PNFFormula
-  ( toPrenexNormalForm
+  ( toPNFFormula
   ) where
 
 
@@ -19,8 +19,10 @@ import qualified Semicircuit.Types.PNFFormula as PNF
 import qualified Semicircuit.Types.QFFormula as QF
 
 
-toPrenexNormalForm :: ann -> S11.Formula -> Either (ErrorMessage ann) PNF.Formula
-toPrenexNormalForm ann =
+-- TODO: Let's assume that the input formula is already
+-- in prenex normal form
+toPNFFormula :: ann -> S11.Formula -> Either (ErrorMessage ann) PNF.Formula
+toPNFFormula ann =
   \case
     S11.Equal a b -> pure $ PNF.Formula (QF.Equal a b) mempty
     S11.LessOrEqual a b -> pure $ PNF.Formula (QF.LessOrEqual a b) mempty
@@ -58,7 +60,7 @@ toPrenexNormalForm ann =
       let qNew = PNF.Quantifiers [] [] [PNF.ExistsP c b0 b1]
       pure $ PNF.Formula a' (qNew <> aq)
   where
-    rec = toPrenexNormalForm ann
+    rec = toPNFFormula ann
 
     rec' f a b = do
       PNF.Formula a' aq <- rec a
