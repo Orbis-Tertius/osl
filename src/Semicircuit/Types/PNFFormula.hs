@@ -51,5 +51,5 @@ data FOUniQ = ForAll Bound
 
 
 data SOExistsQ =
-    ExistsF Cardinality Bound (NonEmpty Bound) NumPrecUniQs
-  | ExistsP Cardinality Bound Bound NumPrecUniQs
+    ExistsF Cardinality Bound (NonEmpty Bound)
+  | ExistsP Cardinality Bound Bound
