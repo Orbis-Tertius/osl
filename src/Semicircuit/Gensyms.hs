@@ -1,0 +1,123 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+
+
+module Semicircuit.Gensyms
+  ( deBruijnToGensyms
+  ) where
+
+
+import Control.Monad.State (State, runState, get, put)
+import Data.Map (Map)
+import qualified Data.Map as Map
+import qualified Data.List.NonEmpty as NonEmpty
+
+import OSL.Types.Arity (Arity (..))
+import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
+import OSL.Sigma11 (incrementDeBruijnIndices)
+import qualified OSL.Types.Sigma11 as DB
+import qualified Semicircuit.Types.Sigma11 as GS
+
+
+-- Rename the de Bruijn indices in the given formula
+-- to gensyms.
+deBruijnToGensyms :: DB.Formula -> GS.Formula
+deBruijnToGensyms a = fst $
+  runState (deBruijnToGensyms' a) (S 0 mempty)
+
+
+newtype NextSym = NextSym Int
+  deriving (Eq, Num)
+
+
+data S = S NextSym (Map DB.Name GS.Name)
+
+
+deBruijnToGensyms'
+  :: DB.Formula
+  -> State S GS.Formula
+deBruijnToGensyms' =
+  \case
+    DB.Equal a b ->
+      GS.Equal <$> term a <*> term b
+    DB.LessOrEqual a b ->
+      GS.LessOrEqual <$> term a <*> term b
+    DB.Predicate p xs ->
+      GS.Predicate p <$> mapM term xs
+    DB.Not p -> GS.Not <$> rec p
+    DB.And p q -> GS.And <$> rec p <*> rec q
+    DB.Or p q -> GS.Or <$> rec p <*> rec q
+    DB.Implies p q -> GS.Implies <$> rec p <*> rec q
+    DB.Iff p q -> GS.Iff <$> rec p <*> rec q
+    DB.ForAll b p -> do
+      b' <- bound b
+      pushIndices (Arity 0)
+      x <- mapName (DB.Name (Arity 0) (DeBruijnIndex 0))
+      GS.ForAll x b' <$> rec p
+    DB.Exists (DB.ExistsFO b) p -> do
+      b' <- bound b
+      pushIndices (Arity 0)
+      x <- mapName (DB.Name (Arity 0) (DeBruijnIndex 0))
+      GS.Exists (GS.ExistsFO x b') <$> rec p
+    DB.Exists (DB.ExistsSO n b bs) p -> do
+      b' <- bound b
+      bs' <- mapM bound bs
+      let arity = Arity (NonEmpty.length bs)
+      pushIndices arity
+      x <- mapName (DB.Name arity (DeBruijnIndex 0))
+      GS.Exists (GS.ExistsSO x n b' bs') <$> rec p
+    DB.Exists (DB.ExistsP n b0 b1) p -> do
+      b0' <- bound b0
+      b1' <- bound b1
+      pushIndices (Arity 1)
+      x <- mapName (DB.Name (Arity 1) (DeBruijnIndex 0))
+      GS.Exists (GS.ExistsP x n b0' b1') <$> rec p
+  where
+    rec = deBruijnToGensyms'
+
+
+bound :: DB.Bound -> State S GS.Bound
+bound =
+  \case
+    DB.TermBound x -> GS.TermBound <$> term x
+    DB.FieldMaxBound -> pure GS.FieldMaxBound
+
+
+term :: DB.Term -> State S GS.Term
+term =
+  \case
+    DB.Var x -> GS.Var <$> mapName x
+    DB.App f xs ->
+      GS.App <$> mapName f <*> mapM term xs
+    DB.AppInverse f x ->
+      GS.AppInverse <$> mapName f <*> term x
+    DB.Add x y -> GS.Add <$> term x <*> term y
+    DB.Mul x y -> GS.Mul <$> term x <*> term y
+    DB.IndLess x y -> GS.IndLess <$> term x <*> term y
+    DB.Const x -> pure (GS.Const x)
+
+
+mapName :: DB.Name -> State S GS.Name
+mapName x@(DB.Name arity _) = do
+  S _ m <- get
+  case Map.lookup x m of
+    Just y -> pure y
+    Nothing -> do
+      sym <- nextSym
+      S n _ <- get
+      let y = GS.Name arity sym
+      put (S n (Map.insert x y m))
+      pure y
+
+
+nextSym :: State S Int
+nextSym = do
+  S (NextSym sym) m <- get
+  put (S (NextSym (sym+1)) m)
+  pure sym
+
+
+pushIndices :: Arity -> State S ()
+pushIndices arity = do
+  S n m <- get
+  put (S n (Map.mapKeys (incrementDeBruijnIndices arity 1) m))

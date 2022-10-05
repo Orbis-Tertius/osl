@@ -118,7 +118,6 @@ instance Show ExistentialQuantifier where
 data Bound = TermBound Term | FieldMaxBound
   deriving Eq
 
-
 instance Show Bound where
   show (TermBound t) = show t
   show FieldMaxBound = show "|F|"

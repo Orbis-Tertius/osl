@@ -84,6 +84,7 @@ library
     OSL.Types.TranslationContext
     OSL.ValidContext
     OSL.ValidateContext
+    Semicircuit.Gensyms
     Semicircuit.PrenexNormalForm
     Semicircuit.PNFFormula
     Semicircuit.Types.PNFFormula
