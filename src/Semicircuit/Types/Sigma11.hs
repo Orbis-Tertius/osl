@@ -20,6 +20,7 @@ module Semicircuit.Types.Sigma11
   , Formula (..)
   , ExistentialQuantifier (..)
   , Bound (..)
+  , Quantifier (..)
   ) where
 
 
@@ -67,3 +68,8 @@ data ExistentialQuantifier =
 
 data Bound = TermBound Term | FieldMaxBound
   deriving Eq
+
+
+data Quantifier =
+    Universal Name Bound
+  | Existential ExistentialQuantifier
