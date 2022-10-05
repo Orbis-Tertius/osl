@@ -10,7 +10,7 @@ module Semicircuit.PrenexNormalForm
 
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..))
+import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..), ExistentialQuantifier (..))
 
 
 -- Assumes input is in prenex normal form.
@@ -72,7 +72,23 @@ flipQuantifiers
   :: ann
   -> [Quantifier]
   -> Either (ErrorMessage ann) [Quantifier]
-flipQuantifiers = todo
+flipQuantifiers ann qs =
+  mapM (flipQuantifier ann) qs
+
+
+flipQuantifier
+  :: ann
+  -> Quantifier
+  -> Either (ErrorMessage ann) Quantifier
+flipQuantifier ann =
+  \case
+    Universal x b ->
+      pure (Existential (ExistsFO x b))
+    Existential (ExistsFO x b) ->
+      pure (Universal x b)
+    Existential _ ->
+      Left . ErrorMessage ann $
+        "not supported: second-order quantification in negative position"
 
 
 todo :: a
