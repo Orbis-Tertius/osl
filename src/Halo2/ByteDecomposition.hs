@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -28,7 +27,7 @@ decomposeBytes (BitsPerByte b) (FieldElement x) =
 composeBytes :: BitsPerByte -> ByteDecomposition -> FieldElement
 composeBytes _ (ByteDecomposition []) = 0
 composeBytes (BitsPerByte b) (ByteDecomposition (Byte x : xs)) =
-  (FieldElement (x * (2 ^ intToInteger (b * length xs))))
+  FieldElement (x * (2 ^ intToInteger (b * length xs)))
     + composeBytes (BitsPerByte b) (ByteDecomposition xs)
 
 countBytes :: BitsPerByte -> FixedBound -> Int

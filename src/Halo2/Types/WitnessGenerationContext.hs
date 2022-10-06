@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.WitnessGenerationContext (WitnessGenerationContext (WitnessGenerationContext)) where

@@ -62,7 +62,7 @@ pushUniversalQuantifiersDown ann us qs f =
           let q' = prependBounds (uncurry InputBound <$> us) q
               f'' = prependArguments g (fst <$> us) f'
           pure ([Existential q'] <> qs'', f'')
-        SomeP _ _ _ _ ->
+        SomeP {} ->
           Left . ErrorMessage ann $
             "unsupported: permutation quantifier inside a universal quantifier"
 
@@ -112,8 +112,7 @@ flipQuantifiers ::
   ann ->
   [Quantifier] ->
   Either (ErrorMessage ann) [Quantifier]
-flipQuantifiers ann qs =
-  mapM (flipQuantifier ann) qs
+flipQuantifiers ann = mapM (flipQuantifier ann)
 
 flipQuantifier ::
   ann ->

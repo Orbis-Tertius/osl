@@ -34,8 +34,8 @@ typeCardinality ctx t =
     Z _ -> Just 1
     Fp _ -> Just 1
     Fin _ _ -> Just 1
-    Product _ _ _ -> Just 1
-    Coproduct _ _ _ -> Just 1
+    Product {} -> Just 1
+    Coproduct {} -> Just 1
     NamedType _ name ->
       case getDeclaration ctx name of
         Just (Data t') -> typeCardinality ctx t'

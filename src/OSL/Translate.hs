@@ -21,7 +21,6 @@ import Control.Monad.Trans.State.Strict (StateT, execStateT, get, put)
 import Data.Functor.Identity (runIdentity)
 import Data.List (foldl')
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
@@ -160,10 +159,10 @@ translate
                 aux@(S11.AuxTables fTables pTables) <- get
                 xs :: [[Integer]] <-
                   fmap linearizeMapping
-                    <$> ( forM
+                    <$>   forM
                             (fst <$> fs)
                             (lift . translateToConstant gDecls decls xType)
-                        )
+                         
                 ys :: [[Integer]] <-
                   fmap linearizeMapping
                     <$> forM
@@ -564,7 +563,7 @@ translate
                   lift $
                     Term
                       <$> foldl
-                        (liftA2 (S11.Add))
+                        (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
                             . (S11.IndLess (S11.Const j) rT `S11.Mul`)
@@ -592,7 +591,7 @@ translate
                   lift $
                     Term
                       <$> foldl
-                        (liftA2 (S11.Add))
+                        (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
                             . (S11.IndLess (S11.Const j) rT `S11.Mul`)
@@ -616,7 +615,7 @@ translate
                   lift $
                     Term
                       <$> foldl
-                        (liftA2 (S11.Add))
+                        (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
                             <$> ( S11.Mul
@@ -631,7 +630,7 @@ translate
                   lift $
                     Term
                       <$> foldl
-                        (liftA2 (S11.Add))
+                        (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
                             <$> applyTerms ann xsT (S11.Const i)
@@ -647,7 +646,7 @@ translate
                   lift $
                     Term
                       <$> foldl
-                        (liftA2 (S11.Add))
+                        (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
                             <$> (applyTerms ann vT =<< applyTerms ann kT (S11.Const i))
@@ -670,7 +669,7 @@ translate
       OSL.Apply ann (OSL.MapPi1 _) xs -> do
         xsType <- lift $ inferType decls xs
         case xsType of
-          OSL.Map _ _ _ (OSL.Product _ _ _) -> do
+          OSL.Map _ _ _ (OSL.Product {}) -> do
             xsM <- translateToMapping gc lc xsType xs
             case xsM of
               MapMapping
@@ -685,7 +684,7 @@ translate
       OSL.Apply ann (OSL.MapPi2 _) xs -> do
         xsType <- lift $ inferType decls xs
         case xsType of
-          OSL.Map _ _ _ (OSL.Product _ _ _) -> do
+          OSL.Map _ _ _ (OSL.Product {}) -> do
             xsM <- translateToMapping gc lc xsType xs
             case xsM of
               MapMapping
@@ -706,7 +705,7 @@ translate
       OSL.Apply ann (OSL.Keys _) xs -> do
         xsType <- lift $ inferType decls xs
         case xsType of
-          OSL.Map _ _ _ _ -> do
+          OSL.Map {} -> do
             xsM <- translateToMapping gc lc xsType xs
             case xsM of
               MapMapping lM (KeysMapping kM) _ ->
@@ -717,7 +716,7 @@ translate
         xsType <- lift $ inferType decls xs
         xsM <- translateToMapping gc lc xsType xs
         case xsType of
-          OSL.Map _ (OSL.Cardinality n) _ (OSL.List _ _ _) ->
+          OSL.Map _ (OSL.Cardinality n) _ (OSL.List {}) ->
             case xsM of
               MapMapping
                 (LengthMapping (ScalarMapping lT))
@@ -731,7 +730,7 @@ translate
                   lift $
                     Term
                       <$> foldl
-                        (liftA2 (S11.Add))
+                        (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
                             <$> applyTerms ann mT (S11.Const i)
@@ -757,7 +756,7 @@ translate
                   ) ->
                   Term
                     <$> foldl
-                      (liftA2 (S11.Add))
+                      (liftA2 S11.Add)
                       (pure (S11.Const 0))
                       [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
                           <$> ( lift . mappingToTerm ann
@@ -1104,8 +1103,8 @@ getMappingDimensions ::
 getMappingDimensions ctx t =
   case t of
     OSL.Prop ann -> Left (ErrorMessage ann "expected a quantifiable type; got Prop")
-    OSL.F _ _ _ _ -> pure InfiniteDimensions
-    OSL.P _ _ _ _ -> pure InfiniteDimensions
+    OSL.F {} -> pure InfiniteDimensions
+    OSL.P {} -> pure InfiniteDimensions
     OSL.N _ -> pure (FiniteDimensions 1)
     OSL.Z _ -> pure (FiniteDimensions 1)
     OSL.Fp _ -> pure (FiniteDimensions 1)
@@ -1126,8 +1125,8 @@ getMappingDimensions ctx t =
       case getDeclaration ctx a of
         Just (OSL.Data b) -> getMappingDimensions ctx b
         _ -> Left (ErrorMessage ann "expected the name of a type")
-    OSL.List _ _ _ -> pure InfiniteDimensions
-    OSL.Map _ _ _ _ -> pure InfiniteDimensions
+    OSL.List {} -> pure InfiniteDimensions
+    OSL.Map {} -> pure InfiniteDimensions
 
 getArbitraryMapping ::
   OSL.ValidContext t ann ->
@@ -1173,7 +1172,7 @@ getArbitraryMapping ctx =
           incrementArities m <$> getArbitraryMapping ctx b
         Right InfiniteDimensions ->
           Left (ErrorMessage ann "expected a finite-dimensional domain type")
-    OSL.P _ _ _ _ -> pure $ ScalarMapping (S11.var (S11.Name 1 0))
+    OSL.P {} -> pure $ ScalarMapping (S11.var (S11.Name 1 0))
   where
     rec = getArbitraryMapping ctx
 
@@ -1218,7 +1217,7 @@ translateToFormula gc lc@(TranslationContext decls mappings) t = do
   case trans of
     Formula f -> pure f
     Mapping (PropMapping f) -> pure f
-    Mapping (LambdaMapping _ _ _ _ _) ->
+    Mapping (LambdaMapping {}) ->
       case t of
         OSL.Lambda _ varName varType body -> do
           let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
@@ -1413,7 +1412,7 @@ translateBound gc lc@(TranslationContext decls _) t =
     Just (OSL.MaybeBound ann (OSL.ValuesBound vBound)) ->
       case t of
         OSL.Maybe _ a ->
-          ((S11.TermBound (S11.Const 2)) :) <$> translateBound gc lc a (Just vBound)
+          (S11.TermBound (S11.Const 2) :) <$> translateBound gc lc a (Just vBound)
         _ -> lift . Left . ErrorMessage ann $ "expected a " <> pack (show t)
     Just
       ( OSL.MapBound
@@ -1579,7 +1578,7 @@ applyEqualityToMappings ann ctx t xSrc x ySrc y =
         "cannot compare these things for equality: "
           <> pack (show (xSrc, x, ySrc, y, t))
   where
-    rec a x' y' = applyEqualityToMappings ann ctx a xSrc x' ySrc y'
+    rec a x' = applyEqualityToMappings ann ctx a xSrc x' ySrc
 
 translateToConstant ::
   Show ann =>
@@ -1669,8 +1668,8 @@ getFreeS11PredicateNameM ::
 getFreeS11PredicateNameM arity = do
   S11.AuxTables _ ps <- get
   pure
-    . fromMaybe (S11.PredicateName arity (DeBruijnIndex 0))
-    . fmap (S11.PredicateName arity . (+ 1) . (^. #deBruijnIndex))
+    . maybe (S11.PredicateName arity (DeBruijnIndex 0))
+      (S11.PredicateName arity . (+ 1) . (^. #deBruijnIndex))
     . Set.lookupMax
     $ Map.keysSet ps
 

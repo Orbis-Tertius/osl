@@ -122,7 +122,7 @@ instance Foldable (Mapping ann) where
         (KeysMapping y)
         (ValuesMapping z) ->
           foldMap f x <> foldMap f y <> foldMap f z
-      LambdaMapping _ _ _ _ _ -> mempty
+      LambdaMapping {} -> mempty
       PropMapping _ -> mempty
       PredicateMapping _ -> mempty
 

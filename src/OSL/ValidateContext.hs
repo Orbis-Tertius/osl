@@ -7,7 +7,7 @@ module OSL.ValidateContext
   )
 where
 
-import Control.Monad (foldM, forM_)
+import Control.Monad (foldM, forM_, unless, when)
 import qualified Data.Map as Map
 import Data.Text (pack)
 import OSL.Bound (boundAnnotation)
@@ -288,9 +288,8 @@ checkTerm c t x =
           if n < 0
             then Left . ErrorMessage ann $ "expected an element of a finite type but got a negative number"
             else
-              if n >= m
-                then Left . ErrorMessage ann $ "expected an element of Fin(" <> pack (show m) <> ") but got " <> pack (show n)
-                else return ()
+              when (n >= m)
+               . Left . ErrorMessage ann $ "expected an element of Fin(" <> pack (show m) <> ") but got " <> pack (show n)
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t) <> " but got a constant of a finite type"
     Inverse ann ->
       case t of
@@ -358,22 +357,22 @@ checkTerm c t x =
           checkTypeIsNumeric c a'
           checkTypeIsNumeric c a''
           checkTypeInclusion c ann a' a''
-          if n == n' && m == m' then pure () else genericErrorMessage
+          unless (n == n' && m == m') genericErrorMessage
         (List _ n (List _ m a'), List _ n' (List _ m' a'')) -> do
           checkTypeIsNumeric c a'
           checkTypeIsNumeric c a''
           checkTypeInclusion c ann a' a''
-          if n == n' && m == m' then pure () else genericErrorMessage
+          unless (n == n' && m == m') genericErrorMessage
         (List _ n (Maybe _ a'), List _ n' (Maybe _ a'')) -> do
           checkTypeIsNumeric c a'
           checkTypeIsNumeric c a''
           checkTypeInclusion c ann a' a''
-          if n == n' then pure () else genericErrorMessage
+          unless (n == n') genericErrorMessage
         (List _ n a', List _ n' a'') -> do
           checkTypeIsNumeric c a'
           checkTypeIsNumeric c a''
           checkTypeInclusion c ann a' a''
-          if n == n' then pure () else genericErrorMessage
+          unless (n == n') genericErrorMessage
         _ ->
           Left . ErrorMessage ann $
             "could not apply List(cast) because it was applied to a "
@@ -475,7 +474,7 @@ checkTerm c t x =
         _ -> genericErrorMessage
     Length _ ->
       case t of
-        F _ _ (List _ _ _) (N _) -> return ()
+        F _ _ (List {}) (N _) -> return ()
         _ -> genericErrorMessage
     Nth ann ->
       case t of
@@ -504,40 +503,32 @@ checkTerm c t x =
       case t of
         F _ _ (List _ _ a') (List _ _ (NamedType _ name')) -> do
           checkTypeInclusion c ann a' a
-          if name == name'
-            then return ()
-            else genericErrorMessage
+          unless (name' == name) genericErrorMessage
         _ -> genericErrorMessage
     ListFrom ann name -> do
       a <- getNamedType c ann name
       case t of
         F _ _ (List _ _ (NamedType _ name')) (List _ _ a') -> do
           checkTypeInclusion c ann a a'
-          if name == name'
-            then return ()
-            else genericErrorMessage
+          unless (name' == name) genericErrorMessage
         _ -> genericErrorMessage
     ListMaybeTo ann name -> do
       a <- getNamedType c ann name
       case t of
         F _ _ (List _ _ (Maybe _ a')) (List _ _ (Maybe _ (NamedType _ name'))) -> do
           checkTypeInclusion c ann a' a
-          if name == name'
-            then return ()
-            else genericErrorMessage
+          unless (name' == name) genericErrorMessage
         _ -> genericErrorMessage
     ListMaybeFrom ann name -> do
       a <- getNamedType c ann name
       case t of
         F _ _ (List _ _ (Maybe _ (NamedType _ name'))) (List _ _ (Maybe _ a')) -> do
           checkTypeInclusion c ann a a'
-          if name == name'
-            then return ()
-            else genericErrorMessage
+          unless (name' == name) genericErrorMessage
         _ -> genericErrorMessage
     ListLength _ ->
       case t of
-        F _ _ (List _ _ (List _ _ _)) (List _ _ (N _)) -> return ()
+        F _ _ (List _ _ (List {})) (List _ _ (N _)) -> return ()
         _ -> genericErrorMessage
     ListMaybePi1 ann ->
       case t of
@@ -551,7 +542,7 @@ checkTerm c t x =
         _ -> genericErrorMessage
     ListMaybeLength _ ->
       case t of
-        F _ _ (List _ _ (Maybe _ (List _ _ _))) (List _ _ (Maybe _ (N _))) -> return ()
+        F _ _ (List _ _ (Maybe _ (List {}))) (List _ _ (Maybe _ (N _))) -> return ()
         _ -> genericErrorMessage
     Sum ann ->
       case t of
@@ -600,9 +591,7 @@ checkTerm c t x =
         F _ _ (Map _ _ a' b) (Map _ _ (NamedType _ name') b') -> do
           checkTypeInclusion c ann a' a
           checkTypeInclusion c ann b b'
-          if name' == name
-            then return ()
-            else genericErrorMessage
+          unless (name' == name) genericErrorMessage
         _ -> genericErrorMessage
     MapFrom ann name -> do
       a <- getNamedType c ann name
@@ -610,13 +599,11 @@ checkTerm c t x =
         F _ _ (Map _ _ k (NamedType _ name')) (Map _ _ k' b) -> do
           checkTypeInclusion c ann k k'
           checkTypeInclusion c ann a b
-          if name' == name
-            then return ()
-            else genericErrorMessage
+          unless (name' == name) genericErrorMessage
         _ -> genericErrorMessage
     SumMapLength _ ->
       case t of
-        F _ _ (Map _ _ _ (List _ _ _)) (N _) -> pure ()
+        F _ _ (Map _ _ _ (List {})) (N _) -> pure ()
         _ -> genericErrorMessage
     SumListLookup _ann0 k ->
       case t of
@@ -976,7 +963,7 @@ inferType c t =
     Apply ann (Length _) xs -> do
       a <- inferType c xs
       case a of
-        List _ _ _ -> pure (N ann)
+        List {} -> pure (N ann)
         _ -> Left (ErrorMessage ann "length applied to a non-List")
     Apply ann (ListPi1 _) xs -> do
       a <- inferType c xs
@@ -991,7 +978,7 @@ inferType c t =
     Apply ann (ListLength _) xs -> do
       a <- inferType c xs
       case a of
-        List _ n (List _ _ _) -> return (List ann n (N ann))
+        List _ n (List {}) -> return (List ann n (N ann))
         _ -> Left (ErrorMessage ann "List(length) applied to a non-List-of-Lists")
     Apply ann (ListMaybePi1 _) xs -> do
       a <- inferType c xs
@@ -1006,7 +993,7 @@ inferType c t =
     Apply ann (ListMaybeLength _) xs -> do
       a <- inferType c xs
       case a of
-        List _ n (Maybe _ (List _ _ _)) ->
+        List _ n (Maybe _ (List {})) ->
           return (List ann n (Maybe ann (N ann)))
         _ -> Left (ErrorMessage ann "List(Maybe(length)) applied to a non-List-of-Maybe-Lists")
     Apply ann (ListTo _ name) xs -> do
@@ -1105,7 +1092,7 @@ inferType c t =
     Apply ann (SumMapLength _) xs -> do
       a <- inferType c xs
       case a of
-        Map _ _ _ (List _ _ _) -> return (N ann)
+        Map _ _ _ (List {}) -> return (N ann)
         _ -> Left (ErrorMessage ann "sum.Map(length) applied to a non-Map-of-Lists")
     Apply ann (SumListLookup _ k) xs -> do
       a <- inferType c k

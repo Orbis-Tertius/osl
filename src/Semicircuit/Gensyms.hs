@@ -8,7 +8,7 @@ module Semicircuit.Gensyms
 where
 
 import Control.Lens ((^.))
-import Control.Monad.State (State, get, put, runState)
+import Control.Monad.State (State, get, put, evalState)
 import Data.Functor ((<&>))
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -22,8 +22,7 @@ import qualified Semicircuit.Types.Sigma11 as GS
 -- to gensyms.
 deBruijnToGensyms :: DB.Formula -> GS.Formula
 deBruijnToGensyms a =
-  fst $
-    runState (deBruijnToGensyms' a) (S 0 mempty)
+  evalState (deBruijnToGensyms' a) (S 0 mempty)
 
 newtype NextSym = NextSym Int
   deriving (Eq, Num)

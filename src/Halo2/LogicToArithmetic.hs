@@ -17,7 +17,7 @@ where
 
 import Cast (intToInteger)
 import Control.Monad (forM, replicateM)
-import Control.Monad.State (State, get, put, runState)
+import Control.Monad.State (State, get, put, evalState)
 import Crypto.Number.Basic (numBits)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -157,7 +157,7 @@ getLayout bits f lc =
   let i0 =
         ColumnIndex . length $
           lc ^. #columnTypes . #getColumnTypes
-   in fst $ runState (getLayoutM bits f lc) i0
+   in evalState (getLayoutM bits f lc) i0
 
 getLayoutM ::
   BitsPerByte ->
@@ -194,8 +194,8 @@ getAtomAdviceM ::
 getAtomAdviceM bits (FiniteField fieldSize) = do
   AtomAdvice
     <$> (SignColumnIndex <$> nextColIndex)
-    <*> (replicateM n (ByteColumnIndex <$> nextColIndex))
-    <*> (replicateM n (TruthValueColumnIndex <$> nextColIndex))
+    <*> replicateM n (ByteColumnIndex <$> nextColIndex)
+    <*> replicateM n (TruthValueColumnIndex <$> nextColIndex)
   where
     n = countBytes bits (FixedBound fieldSize)
 
@@ -268,7 +268,7 @@ nextColIndex = do
 getPolyDegreeBound :: Polynomial -> PolynomialDegreeBound
 getPolyDegreeBound p =
   PolynomialDegreeBound $
-    2 ^ (numBits (intToInteger (P.degree p)))
+    2 ^ numBits (intToInteger (P.degree p))
 
 logicToArithmeticCircuit ::
   BitsPerByte ->

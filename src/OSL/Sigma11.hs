@@ -101,11 +101,11 @@ termIndices =
   \case
     App (Name fArity fIndex) x ->
       Map.singleton fArity (Set.singleton fIndex)
-        `unionIndices` ( foldl'
+        `unionIndices`   foldl'
                            unionIndices
                            mempty
                            (termIndices <$> x)
-                       )
+                        
     AppInverse (Name fArity fIndex) x ->
       Map.singleton fArity (Set.singleton fIndex)
         `unionIndices` termIndices x
@@ -123,5 +123,5 @@ prependBounds n bs (Some _ [] b) =
   Some n bs b
 prependBounds _ bs' (Some n bs b) =
   Some n (bs' <> bs) b
-prependBounds _ _ (SomeP _ _ _) =
+prependBounds _ _ (SomeP {}) =
   error "there is a compiler bug; applied prependBounds to SomeP"

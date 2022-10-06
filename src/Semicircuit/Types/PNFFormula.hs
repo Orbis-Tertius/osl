@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Semicircuit.Types.PNFFormula
   ( Formula (..),
     Quantifiers (..),

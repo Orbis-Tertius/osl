@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedLabels #-}
 
 module Semicircuit.Sigma11
   ( prependBounds,
@@ -16,7 +15,7 @@ prependBounds ::
   ExistentialQuantifier
 prependBounds bs' (Some x n bs b) =
   Some x n (bs' <> bs) b
-prependBounds _ (SomeP _ _ _ _) =
+prependBounds _ (SomeP {}) =
   error "there is a compiler bug; applied prependBounds to SomeP"
 
 prependQuantifiers :: [Quantifier] -> Formula -> Formula

@@ -26,7 +26,6 @@ import Control.Monad.Trans.Except (ExceptT (..), except, runExceptT, throwE)
 import Control.Monad.Trans.State.Strict (StateT, execStateT, get, modify)
 import Data.Functor.Identity (runIdentity)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Die (die)
@@ -118,7 +117,7 @@ addFreeVariableMapping freeVariable = do
               getFiniteDimMappingArity
                 (typeAnnotation a)
                 aMap
-          let mapping = (mapAritiesInMapping (+ aDim) bMap)
+          let mapping = mapAritiesInMapping (+ aDim) bMap
           addMapping freeVariable mapping
           return mapping
         P _ _ a b -> do
@@ -131,7 +130,7 @@ addFreeVariableMapping freeVariable = do
               getFiniteDimMappingArity
                 (typeAnnotation a)
                 aMap
-          let mapping = (mapAritiesInMapping (+ aDim) bMap)
+          let mapping = mapAritiesInMapping (+ aDim) bMap
           addMapping freeVariable mapping
           return mapping
         NamedType ann aName -> do
@@ -243,12 +242,12 @@ getBoundS11NamesInMapping arity =
       rec a `Set.union` rec b
     MapMapping (LengthMapping a) (KeysMapping b) (ValuesMapping d) ->
       rec a `Set.union` (rec b `Set.union` rec d)
-    LambdaMapping _ _ _ _ _ -> mempty
+    LambdaMapping {} -> mempty
     PropMapping _ -> mempty
     PredicateMapping _ -> mempty
   where
     f :: S11.Term -> Set S11.Name
-    f (S11.App h xs) = g h `Set.union` (Set.unions (f <$> xs))
+    f (S11.App h xs) = g h `Set.union` Set.unions (f <$> xs)
     f (S11.AppInverse h x) = g h `Set.union` f x
     f (S11.Add x y) = f x `Set.union` f y
     f (S11.Mul x y) = f x `Set.union` f y
@@ -268,8 +267,8 @@ getFreeS11Name ::
   Set S11.Name ->
   S11.Name
 getFreeS11Name arity =
-  fromMaybe (S11.Name arity (DeBruijnIndex 0))
-    . fmap (S11.Name arity . (+ 1) . (^. #deBruijnIndex))
+  maybe (S11.Name arity (DeBruijnIndex 0))
+    (S11.Name arity . (+ 1) . (^. #deBruijnIndex))
     . Set.lookupMax
 
 getFreeS11NameM ::

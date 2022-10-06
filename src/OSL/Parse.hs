@@ -1,6 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
 
 module OSL.Parse (parseContext) where
 
@@ -100,12 +99,10 @@ type0 = do
     case op of
       T.ThinArrow -> do
         n <- optionMaybe cardinality
-        t' <- type0
-        pure (Just (F p n t t'))
+        Just . F p n t <$> type0
       T.LeftRightArrow -> do
         n <- optionMaybe cardinality
-        t' <- type1
-        pure (Just (P p n t t'))
+        Just . P p n t <$> type1
       _ -> mzero
   case rest of
     Nothing -> pure t
@@ -208,7 +205,7 @@ mapType = do
 
 term0 :: Parser (Term SourcePos)
 term0 =
-  choice $
+  choice
     [ quantifier T.ForAll ForAll,
       quantifier T.ForSome ForSome,
       lambda,
@@ -220,9 +217,9 @@ quantifier ::
   Token ->
   ( SourcePos ->
     Name ->
-    Type (SourcePos) ->
+    Type SourcePos ->
     Maybe (Bound SourcePos) ->
-    Term (SourcePos) ->
+    Term SourcePos ->
     Term SourcePos
   ) ->
   Parser (Term SourcePos)
@@ -234,8 +231,7 @@ quantifier tok ctor = do
   varType <- type0
   varBound <- optionMaybe (consumeExact_ T.Less >> bound0)
   consumeExact_ T.Comma
-  q <- term0
-  pure (ctor p varName varType varBound q)
+  ctor p varName varType varBound <$> term0
 
 bound0 :: Parser (Bound SourcePos)
 bound0 = do
@@ -312,7 +308,7 @@ boundTail op ctor =
 
 bound1 :: Parser (Bound SourcePos)
 bound1 =
-  choice $
+  choice
     [ scalarBound,
       listBound,
       maybeBound,
@@ -376,8 +372,7 @@ lambda = do
   consumeExact_ T.Colon
   varType <- type0
   consumeExact_ T.ThickArrow
-  y <- term0
-  pure (Lambda p varName varType y)
+  Lambda p varName varType <$> term0
 
 letExpr :: Parser (Term SourcePos)
 letExpr = do
@@ -389,8 +384,7 @@ letExpr = do
   consumeExact_ T.DefEquals
   def <- term0
   consumeExact_ T.Semicolon
-  y <- term0
-  pure (Let p varName varType def y)
+  Let p varName varType def <$> term0
 
 term1 :: Parser (Term SourcePos)
 term1 = do
@@ -524,7 +518,7 @@ setElements = do
 
 term3 :: Parser (Term SourcePos)
 term3 =
-  choice $
+  choice
     [ namedTerm,
       constant,
       parenthesizedTerm,
@@ -724,7 +718,8 @@ applyBinaryOp ::
   Term SourcePos ->
   Term SourcePos ->
   Term SourcePos
-applyBinaryOp op p x y = Apply p (Apply p (op p) x) y
+applyBinaryOp op p =
+  Apply p . Apply p (op p)
 
 unaryOp ::
   Parser a ->
@@ -750,7 +745,7 @@ tuple = do
     (x' : xs') ->
       pure
         ( foldr
-            (\y z -> Apply p (Apply p (Pair p) y) z)
+            (Apply p . Apply p (Pair p))
             x'
             xs'
         )

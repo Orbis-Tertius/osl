@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE LambdaCase #-}
 
 module OSL.TranslationContext
   ( toLocalTranslationContext,
