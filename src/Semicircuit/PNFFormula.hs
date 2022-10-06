@@ -14,6 +14,7 @@ import qualified Semicircuit.Types.PNFFormula as PNF
 import qualified Semicircuit.Types.QFFormula as QF
 
 
+-- Turns a strong prenex normal form into a PNF formula.
 toPNFFormula :: ann -> S11.Formula -> Either (ErrorMessage ann) PNF.Formula
 toPNFFormula ann =
   \case

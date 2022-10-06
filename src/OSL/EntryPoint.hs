@@ -18,6 +18,8 @@ import OSL.ValidateContext (validateContext)
 import OSL.ValidContext (getDeclaration)
 import Semicircuit.Gensyms (deBruijnToGensyms)
 import Semicircuit.PNFFormula (toPNFFormula)
+import Semicircuit.PrenexNormalForm (toStrongPrenexNormalForm)
+import Semicircuit.Sigma11 (prependQuantifiers)
 
 
 main :: IO ()
@@ -52,8 +54,11 @@ calcMain fileName targetName source = do
       (translated, aux) <-
         mapLeft (("Error translating: " <>) . show)
         $ runStateT (translateToFormula gc lc targetTerm) mempty
+      spnf <- mapLeft (("Error converting to strong prenex normal form: " <>) . show)
+          $ toStrongPrenexNormalForm ()
+            (deBruijnToGensyms translated)
       _ <- mapLeft (("Error converting to PNF formula: " <>) . show)
-           $ toPNFFormula () (deBruijnToGensyms translated)
+           $ toPNFFormula () (uncurry prependQuantifiers spnf)
       pure $ "Translated OSL:\n" <> show translated <>
         (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
     _ -> pure "please provide the name of a defined term"
