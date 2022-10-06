@@ -17,6 +17,7 @@
 module Semicircuit.Types.Sigma11
   ( Name (Name)
   , Term (..)
+  , var
   , Formula (..)
   , ExistentialQuantifier (..)
   , someFirstOrder
@@ -54,6 +55,9 @@ data Term =
   | IndLess Term Term
   | Const Integer
   deriving Eq
+
+var :: Name -> Term
+var x = App x []
 
 instance MapNames Term where
   mapNames f (App g xs) =

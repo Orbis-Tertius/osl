@@ -10,7 +10,8 @@ module Semicircuit.PrenexNormalForm
 
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..), ExistentialQuantifier (..), someFirstOrder, OutputBound (..), Name, Bound)
+import Semicircuit.Sigma11 (prependBounds, prependArguments)
+import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..), ExistentialQuantifier (..), someFirstOrder, OutputBound (..), Name, Bound, InputBound (..))
 
 
 -- Assumes input is in prenex normal form.
@@ -57,8 +58,16 @@ pushUniversalQuantifiersDown ann us qs f =
     [] -> pure (uncurry Universal <$> us, f)
     Universal x b : qs' ->
       pushUniversalQuantifiersDown ann (us <> [(x, b)]) qs' f
-    Existential q : qs' ->
-      todo q qs'
+    Existential q : qs' -> do
+      (qs'', f') <- pushUniversalQuantifiersDown ann us qs' f
+      case q of
+        Some g _ _ _ -> do
+          let q' = prependBounds (uncurry InputBound <$> us) q
+              f'' = prependArguments g (fst <$> us) f'
+          pure ([Existential q'] <> qs'', f'')
+        SomeP _ _ _ _ ->
+          Left . ErrorMessage ann
+            $ "unsupported: permutation quantifier inside a universal quantifier"
 
 
 toPrenexNormalForm
@@ -120,7 +129,3 @@ flipQuantifier ann =
     Existential _ ->
       Left . ErrorMessage ann $
         "not supported: second-order quantification in negative position"
-
-
-todo :: a
-todo = todo
