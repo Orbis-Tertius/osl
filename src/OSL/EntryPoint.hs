@@ -26,39 +26,59 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [fileName, targetName] -> putStrLn =<< runMain fileName targetName
+    [fileName, targetName] -> putStrLn . unOutput
+      =<< runMain (FileName fileName) (TargetName targetName)
     _ -> putStrLn "Error: please provide a filename and the name of a term and nothing else"
 
 
-runMain :: String -> String -> IO String
-runMain fileName targetName = do
+newtype FileName = FileName String
+
+
+newtype TargetName = TargetName String
+
+
+newtype ErrorMessage = ErrorMessage String
+
+
+newtype SuccessfulOutput = SuccessfulOutput String
+
+
+newtype Source = Source Text
+
+
+newtype Output = Output { unOutput :: String }
+
+
+runMain :: FileName -> TargetName -> IO Output
+runMain (FileName fileName) (TargetName targetName) = do
   source <- readFile fileName
-  case calcMain fileName targetName source of
-    Left err -> pure err
-    Right result -> pure result
+  case calcMain (FileName fileName) (TargetName targetName) (Source source) of
+    Left (ErrorMessage err) -> pure (Output err)
+    Right (SuccessfulOutput result) -> pure (Output result)
 
 
-calcMain :: String -> String -> Text -> Either String String
-calcMain fileName targetName source = do
-  toks <- mapLeft (("Tokenizing error: " <>) . show)
+calcMain :: FileName -> TargetName -> Source -> Either ErrorMessage SuccessfulOutput
+calcMain (FileName fileName) (TargetName targetName) (Source source) = do
+  toks <- mapLeft (ErrorMessage . ("Tokenizing error: " <>) . show)
           $ tokenize fileName source
-  rawCtx <- mapLeft (("Parse error: " <>) . show)
+  rawCtx <- mapLeft (ErrorMessage . ("Parse error: " <>) . show)
             $ parseContext fileName toks
-  validCtx <- mapLeft (("Type checking error: " <>) . show)
+  validCtx <- mapLeft (ErrorMessage . ("Type checking error: " <>) . show)
               $ validateContext rawCtx
-  gc <- mapLeft (("Error building context: " <>) . show)
+  gc <- mapLeft (ErrorMessage . ("Error building context: " <>) . show)
         $ buildTranslationContext validCtx
   let lc = toLocalTranslationContext gc
   case getDeclaration validCtx (Sym (pack targetName)) of
     Just (Defined _ targetTerm) -> do
       (translated, aux) <-
-        mapLeft (("Error translating: " <>) . show)
+        mapLeft (ErrorMessage . ("Error translating: " <>) . show)
         $ runStateT (translateToFormula gc lc targetTerm) mempty
-      spnf <- mapLeft (("Error converting to strong prenex normal form: " <>) . show)
+      spnf <- mapLeft (ErrorMessage . ("Error converting to strong prenex normal form: " <>) . show)
           $ toStrongPrenexNormalForm ()
             (deBruijnToGensyms translated)
-      _ <- mapLeft (("Error converting to PNF formula: " <>) . show)
+      _ <- mapLeft (ErrorMessage . ("Error converting to PNF formula: " <>) . show)
            $ toPNFFormula () (uncurry prependQuantifiers spnf)
-      pure $ "Translated OSL:\n" <> show translated <>
+      pure . SuccessfulOutput $ "Translated OSL:\n"
+        <> show translated <>
         (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
-    _ -> pure "please provide the name of a defined term"
+    _ -> Left . ErrorMessage $ "please provide the name of a defined term"
