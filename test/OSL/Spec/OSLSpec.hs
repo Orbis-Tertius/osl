@@ -8,7 +8,7 @@ module OSL.Spec.OSLSpec (spec) where
 
 import Control.Monad (forM_)
 import Data.String (IsString)
-import OSL.EntryPoint (runMain)
+import OSL.EntryPoint (runMain, FileName (..), TargetName (..), Output (..))
 import Test.Syd (Spec, describe, it, shouldBe, liftIO)
 import Text.RawString.QQ (r)
 
@@ -38,8 +38,10 @@ runTestCase :: TestCase -> Spec
 runTestCase (TestCase (TestFile fileName) (TestName testName) (Expectation expected)) =
   it ("produces the expected result on " <> fileName
         <> " " <> testName) $ do
-    result <- liftIO $ runMain ("examples/" <> fileName <> ".osl") testName
-    result `shouldBe` expected
+    result <- liftIO $ runMain
+      (FileName ("examples/" <> fileName <> ".osl"))
+      (TargetName testName)
+    result `shouldBe` Output expected
 
 
 testCases :: [TestCase]

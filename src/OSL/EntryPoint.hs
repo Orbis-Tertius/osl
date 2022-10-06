@@ -1,4 +1,14 @@
-module OSL.EntryPoint (main, runMain) where
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+
+module OSL.EntryPoint
+  ( main
+  , runMain
+  , FileName (..)
+  , TargetName (..)
+  , Output (..)
+  ) where
 
 
 import Control.Monad.Trans.State.Strict (runStateT)
@@ -47,6 +57,7 @@ newtype Source = Source Text
 
 
 newtype Output = Output { unOutput :: String }
+  deriving newtype (Eq, Show)
 
 
 runMain :: FileName -> TargetName -> IO Output
