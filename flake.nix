@@ -53,7 +53,7 @@
                   ghcid = { };
                   hlint = { };
                   haskell-language-server = { };
-                  stylish-haskell = { };
+                  ormolu = { };
                   sydtest-discover = { };
                 };
                 # Non-Haskell shell tools go here
