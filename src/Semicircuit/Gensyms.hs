@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 
 module Semicircuit.Gensyms
@@ -7,10 +8,11 @@ module Semicircuit.Gensyms
   ) where
 
 
+import Control.Lens ((^.))
 import Control.Monad.State (State, runState, get, put)
+import Data.Functor ((<&>))
 import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.List.NonEmpty as NonEmpty
 
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
@@ -54,24 +56,30 @@ deBruijnToGensyms' =
       pushIndices (Arity 0)
       x <- mapName (DB.Name (Arity 0) (DeBruijnIndex 0))
       GS.ForAll x b' <$> rec p
-    DB.Exists (DB.ExistsFO b) p -> do
-      b' <- bound b
-      pushIndices (Arity 0)
-      x <- mapName (DB.Name (Arity 0) (DeBruijnIndex 0))
-      GS.Exists (GS.ExistsFO x b') <$> rec p
-    DB.Exists (DB.ExistsSO n b bs) p -> do
-      b' <- bound b
-      bs' <- mapM bound bs
-      let arity = Arity (NonEmpty.length bs)
+    DB.ForSome (DB.Some n bs b) p -> do
+      b' <- GS.OutputBound <$>
+        bound (b ^. #unOutputBound)
+      bs' <-
+        mapM (\b'' ->
+          GS.InputBound
+            <$> (GS.Name (Arity 0) <$> nextSym)
+            <*> bound b'')
+        (bs <&> (^. #unInputBound))
+      let arity = Arity (length bs)
       pushIndices arity
       x <- mapName (DB.Name arity (DeBruijnIndex 0))
-      GS.Exists (GS.ExistsSO x n b' bs') <$> rec p
-    DB.Exists (DB.ExistsP n b0 b1) p -> do
-      b0' <- bound b0
-      b1' <- bound b1
+      GS.ForSome (GS.Some x n bs' b') <$> rec p
+    DB.ForSome (DB.SomeP n b0 b1) p -> do
+      b0' <- GS.InputBound
+        <$> (GS.Name 0 <$> nextSym)
+        <*> bound (b0 ^. #unInputBound)
+      b1' <- GS.OutputBound
+        <$> bound (b1 ^. #unOutputBound)
       pushIndices (Arity 1)
       x <- mapName (DB.Name (Arity 1) (DeBruijnIndex 0))
-      GS.Exists (GS.ExistsP x n b0' b1') <$> rec p
+      GS.ForSome
+        (GS.SomeP x n b0' b1')
+        <$> rec p
   where
     rec = deBruijnToGensyms'
 
@@ -86,7 +94,6 @@ bound =
 term :: DB.Term -> State S GS.Term
 term =
   \case
-    DB.Var x -> GS.Var <$> mapName x
     DB.App f xs ->
       GS.App <$> mapName f <*> mapM term xs
     DB.AppInverse f x ->

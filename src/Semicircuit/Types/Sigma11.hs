@@ -19,16 +19,19 @@ module Semicircuit.Types.Sigma11
   , Term (..)
   , Formula (..)
   , ExistentialQuantifier (..)
+  , someFirstOrder
   , Bound (..)
+  , InputBound (..)
+  , OutputBound (..)
   , Quantifier (..)
+  , MapNames (..)
   ) where
 
 
-import Data.List.NonEmpty (NonEmpty)
 import GHC.Generics (Generic)
 
 import OSL.Types.Arity (Arity)
-import OSL.Types.Cardinality (Cardinality)
+import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.Sigma11 (PredicateName)
 
 
@@ -36,9 +39,15 @@ data Name = Name { arity :: Arity, sym :: Int }
   deriving (Eq, Ord, Generic)
 
 
+class MapNames a where
+  mapNames :: (Name -> Name) -> a -> a
+
+instance MapNames a => MapNames [a] where
+  mapNames f = fmap (mapNames f)
+
+
 data Term =
-    Var Name
-  | App Name (NonEmpty Term)
+    App Name [Term]
   | AppInverse Name Term
   | Add Term Term
   | Mul Term Term
@@ -46,27 +55,56 @@ data Term =
   | Const Integer
   deriving Eq
 
+instance MapNames Term where
+  mapNames f (App g xs) =
+    App (f g) (mapNames f <$> xs)
+  mapNames f (AppInverse g x) =
+    AppInverse (f g) (mapNames f x)
+  mapNames f (Add x y) =
+    Add (mapNames f x) (mapNames f y)
+  mapNames f (Mul x y) =
+    Mul (mapNames f x) (mapNames f y)
+  mapNames f (IndLess x y) =
+    IndLess (mapNames f x) (mapNames f y)
+  mapNames _ (Const i) = Const i
+
 
 data Formula =
     Equal Term Term
   | LessOrEqual Term Term
-  | Predicate PredicateName (NonEmpty Term)
+  | Predicate PredicateName [Term]
   | Not Formula
   | And Formula Formula
   | Or Formula Formula
   | Implies Formula Formula
   | Iff Formula Formula
   | ForAll Name Bound Formula
-  | Exists ExistentialQuantifier Formula
+  | ForSome ExistentialQuantifier Formula
 
 
 data ExistentialQuantifier =
-    ExistsFO Name Bound
-  | ExistsSO Name Cardinality Bound (NonEmpty Bound)
-  | ExistsP Name Cardinality Bound Bound
+    Some Name Cardinality [InputBound] OutputBound
+  | SomeP Name Cardinality InputBound OutputBound
+
+
+someFirstOrder :: Name -> Bound -> ExistentialQuantifier
+someFirstOrder x b =
+  Some x (Cardinality 0) [] (OutputBound b)
 
 
 data Bound = TermBound Term | FieldMaxBound
+  deriving Eq
+
+
+data InputBound =
+  InputBound
+  { name :: Name
+  , bound :: Bound }
+  deriving Eq
+
+
+newtype OutputBound =
+  OutputBound { unOutputBound :: Bound}
   deriving Eq
 
 

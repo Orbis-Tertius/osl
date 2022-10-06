@@ -8,7 +8,7 @@ module Semicircuit.PNFFormula
 
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import qualified OSL.Types.Sigma11 as S11
+import qualified Semicircuit.Types.Sigma11 as S11
 import qualified Semicircuit.Types.PNFFormula as PNF
 import qualified Semicircuit.Types.QFFormula as QF
 
@@ -30,26 +30,16 @@ toPNFFormula ann =
     S11.Iff a b -> rec' QF.Iff a b
     S11.Predicate p args ->
       pure $ PNF.Formula (QF.Predicate p args) mempty
-    S11.ForAll b a -> do
+    S11.ForAll x b a -> do
       PNF.Formula a' aq <- rec a
-      case aq of
-        PNF.Quantifiers _ _ [] -> do
-          let qNew = PNF.Quantifiers [] [PNF.ForAll b] []
-              aq' = incrementPrecedingUniQs aq
-          pure $ PNF.Formula a' (qNew <> aq')
-        _ -> Left . ErrorMessage ann $
-          "second-order quantifier inside a first-order universal quantifier"
-    S11.Exists (S11.ExistsFO b) a -> do
+      todo x b a' aq
+    S11.ForSome (S11.Some x c bs b) a -> do
       PNF.Formula a' aq <- rec a
-      let qNew = PNF.Quantifiers [PNF.Exists b 0] [] []
+      let qNew = PNF.Quantifiers [PNF.Some x c bs b] []
       pure $ PNF.Formula a' (qNew <> aq)
-    S11.Exists (S11.ExistsSO c b bs) a -> do
+    S11.ForSome (S11.SomeP x c b0 b1) a -> do
       PNF.Formula a' aq <- rec a
-      let qNew = PNF.Quantifiers [] [] [PNF.ExistsF c b bs]
-      pure $ PNF.Formula a' (qNew <> aq)
-    S11.Exists (S11.ExistsP c b0 b1) a -> do
-      PNF.Formula a' aq <- rec a
-      let qNew = PNF.Quantifiers [] [] [PNF.ExistsP c b0 b1]
+      let qNew = PNF.Quantifiers [PNF.SomeP x c b0 b1] []
       pure $ PNF.Formula a' (qNew <> aq)
   where
     rec = toPNFFormula ann
@@ -63,13 +53,5 @@ toPNFFormula ann =
           $ "input formula is not a prenex normal form"
 
 
-incrementPrecedingUniQs :: PNF.Quantifiers -> PNF.Quantifiers
-incrementPrecedingUniQs (PNF.Quantifiers foE foU so) =
-  PNF.Quantifiers (f <$> foE) foU (g <$> so)
-  where
-    f :: PNF.FOExistsQ -> PNF.FOExistsQ
-    f (PNF.Exists b n) = PNF.Exists b (n+1)
-
-    g :: PNF.SOExistsQ -> PNF.SOExistsQ
-    g (PNF.ExistsF c b bs) = PNF.ExistsF c b bs
-    g (PNF.ExistsP c b0 b1) = PNF.ExistsP c b0 b1
+todo :: a
+todo = todo

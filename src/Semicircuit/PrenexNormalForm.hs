@@ -10,7 +10,7 @@ module Semicircuit.PrenexNormalForm
 
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..), ExistentialQuantifier (..))
+import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..), ExistentialQuantifier (..), someFirstOrder, OutputBound (..))
 
 
 -- Assumes input is in prenex normal form.
@@ -61,7 +61,7 @@ toPrenexNormalForm ann =
     ForAll x b p -> do
       (pQs, p') <- rec p
       pure (Universal x b : pQs, p')
-    Exists q p -> do
+    ForSome q p -> do
       (pQs, p') <- rec p
       pure (Existential q : pQs, p')
   where
@@ -83,8 +83,8 @@ flipQuantifier
 flipQuantifier ann =
   \case
     Universal x b ->
-      pure (Existential (ExistsFO x b))
-    Existential (ExistsFO x b) ->
+      pure (Existential (someFirstOrder x b))
+    Existential (Some x _ [] (OutputBound b)) ->
       pure (Universal x b)
     Existential _ ->
       Left . ErrorMessage ann $

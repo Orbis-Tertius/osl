@@ -1,5 +1,8 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module OSL.Sigma11
   ( MapNames (mapNames)
@@ -12,8 +15,6 @@ module OSL.Sigma11
 
 
 import Data.List (foldl')
-import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -22,7 +23,7 @@ import qualified Data.Set as Set
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Name (..), Term (Var, App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Predicate, Not, And, Or, Implies, Iff, ForAll, Exists), ExistentialQuantifier (ExistsFO, ExistsSO, ExistsP), Bound (TermBound, FieldMaxBound))
+import OSL.Types.Sigma11 (Name (..), Term (App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Predicate, Not, And, Or, Implies, Iff, ForAll, ForSome), ExistentialQuantifier (Some, SomeP), Bound (TermBound, FieldMaxBound), InputBound (..), OutputBound (..))
 import OSL.Types.TranslationContext (Mapping (..))
 
 
@@ -35,7 +36,6 @@ instance MapNames Name where
 instance MapNames Term where
   mapNames f =
     \case
-      Var x -> Var (f x)
       App g xs -> App (f g) (mapNames f xs)
       AppInverse g x -> AppInverse (f g) (mapNames f x)
       Add x y -> Add (mapNames f x) (mapNames f y)
@@ -55,12 +55,10 @@ instance MapNames Formula where
       Implies p q -> Implies (mapNames f p) (mapNames f q)
       Iff p q -> Iff (mapNames f p) (mapNames f q)
       ForAll bound p -> ForAll (mapNames f bound) (mapNames f p)
-      Exists (ExistsFO bound) p ->
-        Exists (ExistsFO (mapNames f bound)) (mapNames f p)
-      Exists (ExistsSO n outBound inBounds) p ->
-        Exists (ExistsSO n (mapNames f outBound) (mapNames f inBounds)) (mapNames f p)
-      Exists (ExistsP n inBound outBound) p ->
-        Exists (ExistsP n (mapNames f inBound) (mapNames f outBound)) (mapNames f p)
+      ForSome (Some n inBounds outBound) p ->
+        ForSome (Some n (mapNames f inBounds) (mapNames f outBound)) (mapNames f p)
+      ForSome (SomeP n inBound outBound) p ->
+        ForSome (SomeP n (mapNames f inBound) (mapNames f outBound)) (mapNames f p)
 
 instance MapNames Bound where
   mapNames f =
@@ -68,10 +66,14 @@ instance MapNames Bound where
       TermBound t -> TermBound (mapNames f t)
       FieldMaxBound -> FieldMaxBound
 
+deriving newtype instance MapNames InputBound
+
+deriving newtype instance MapNames OutputBound
+
 instance MapNames a => MapNames (Mapping ann a) where
   mapNames f = fmap (mapNames f)
 
-instance MapNames a => MapNames (NonEmpty a) where
+instance MapNames a => MapNames [a] where
   mapNames f = fmap (mapNames f)
 
 
@@ -100,8 +102,6 @@ unionIndices = Map.unionWith Set.union
 termIndices :: Term -> Map Arity (Set DeBruijnIndex)
 termIndices =
   \case
-    Var (Name arity i) ->
-      Map.singleton arity (Set.singleton i)
     App (Name fArity fIndex) x ->
       Map.singleton fArity (Set.singleton fIndex)
         `unionIndices`
@@ -118,16 +118,10 @@ termIndices =
 
 prependBounds
   :: Cardinality
-  -> [Bound]
+  -> [InputBound]
   -> ExistentialQuantifier
   -> ExistentialQuantifier
-prependBounds n bs (ExistsFO b) =
-  case NonEmpty.nonEmpty bs of
-    Just bs' -> ExistsSO n b bs'
-    Nothing -> ExistsFO b
-prependBounds _ bs' (ExistsSO n b bs) =
-  case NonEmpty.nonEmpty bs' of
-    Just bs'' -> ExistsSO n b (bs'' <> bs)
-    Nothing -> ExistsSO n b bs
-prependBounds _ _ (ExistsP _ _ _) =
-  error "there is a compiler bug; applied prependBounds to ExistsP"
+prependBounds _ bs' (Some n bs b) =
+  Some n (bs' <> bs) b
+prependBounds _ _ (SomeP _ _ _) =
+  error "there is a compiler bug; applied prependBounds to SomeP"

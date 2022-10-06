@@ -5,16 +5,14 @@ module Semicircuit.Types.QFFormula
   ( Formula (..) ) where
 
 
-import Data.List.NonEmpty (NonEmpty)
-
-import OSL.Sigma11 (MapNames (..))
-import OSL.Types.Sigma11 (Term, PredicateName)
+import OSL.Types.Sigma11 (PredicateName)
+import Semicircuit.Types.Sigma11 (Term, MapNames (..))
 
 
 data Formula =
     Equal Term Term
   | LessOrEqual Term Term
-  | Predicate PredicateName (NonEmpty Term)
+  | Predicate PredicateName [Term]
   | Not Formula
   | And Formula Formula
   | Or Formula Formula

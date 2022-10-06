@@ -4,17 +4,13 @@
 module Semicircuit.Types.PNFFormula
   ( Formula (..)
   , Quantifiers (..)
-  , FOExistsQ (..)
-  , NumPrecUniQs (..)
-  , FOUniQ (..)
-  , SOExistsQ (..)
+  , ExistentialQuantifier (..)
+  , UniversalQuantifier (..)
   ) where
 
 
-import Data.List.NonEmpty (NonEmpty)
-
 import OSL.Types.Cardinality (Cardinality)
-import OSL.Types.Sigma11 (Bound)
+import Semicircuit.Types.Sigma11 (Bound, InputBound, OutputBound, Name)
 import qualified Semicircuit.Types.QFFormula as QF
 
 
@@ -27,33 +23,24 @@ data Formula =
 
 data Quantifiers =
   Quantifiers
-  { foExistentialQuantifiers :: [FOExistsQ]
-  , foUniversalQuantifiers :: [FOUniQ]
-  , soQuantifiers :: [SOExistsQ]
+  { existentialQuantifiers :: [ExistentialQuantifier]
+  , universalQuantifiers :: [UniversalQuantifier]
   }
   deriving Eq
 
 instance Semigroup Quantifiers where
-  (Quantifiers a b c) <> (Quantifiers a' b' c') =
-    Quantifiers (a <> a') (b <> b') (c <> c')
+  (Quantifiers a b) <> (Quantifiers a' b') =
+    Quantifiers (a <> a') (b <> b')
 
 instance Monoid Quantifiers where
-  mempty = Quantifiers [] [] []
+  mempty = Quantifiers [] []
 
 
-data FOExistsQ = Exists Bound NumPrecUniQs
+data ExistentialQuantifier =
+    Some Name Cardinality [InputBound] OutputBound
+  | SomeP Name Cardinality InputBound OutputBound
   deriving Eq
 
 
-newtype NumPrecUniQs = NumPrecUniQs Int
-  deriving (Eq, Num)
-
-
-data FOUniQ = ForAll Bound
-  deriving Eq
-
-
-data SOExistsQ =
-    ExistsF Cardinality Bound (NonEmpty Bound)
-  | ExistsP Cardinality Bound Bound
+data UniversalQuantifier = All Name Bound
   deriving Eq

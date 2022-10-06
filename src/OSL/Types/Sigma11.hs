@@ -6,15 +6,18 @@ module OSL.Types.Sigma11
   ( Name (Name)
   , PredicateName (PredicateName)
   , Term (..)
+  , var
   , Formula (..)
   , ExistentialQuantifier (..)
+  , someFirstOrder
+  , InputBound (..)
+  , OutputBound (..)
   , Bound (..)
   , AuxTables (..)
   ) where
 
 
 import Data.List (intercalate)
-import Data.List.NonEmpty (NonEmpty, toList)
 import Data.Map (Map)
 import Data.Set (Set)
 import Data.Generics.Labels ()
@@ -40,8 +43,7 @@ instance Show PredicateName where
 
 
 data Term =
-    Var Name
-  | App Name (NonEmpty Term)
+    App Name [Term]
   | AppInverse Name Term
   | Add Term Term
   | Mul Term Term
@@ -49,10 +51,13 @@ data Term =
   | Const Integer
   deriving Eq
 
+var :: Name -> Term
+var x = App x []
+
 instance Show Term where
-  show (Var name) = show name
+  show (App name []) = show name
   show (App f xs) =
-    show f <> "(" <> intercalate ", " (show <$> toList xs) <> ")"
+    show f <> "(" <> intercalate ", " (show <$> xs) <> ")"
   show (AppInverse f x) =
     show f <> "^-1(" <> show x <> ")"
   show (Add x y) =
@@ -67,14 +72,14 @@ instance Show Term where
 data Formula =
     Equal Term Term
   | LessOrEqual Term Term
-  | Predicate PredicateName (NonEmpty Term)
+  | Predicate PredicateName [Term]
   | Not Formula
   | And Formula Formula
   | Or Formula Formula
   | Implies Formula Formula
   | Iff Formula Formula
   | ForAll Bound Formula
-  | Exists ExistentialQuantifier Formula
+  | ForSome ExistentialQuantifier Formula
 
 instance Show Formula where
   show (Equal x y) =
@@ -92,25 +97,44 @@ instance Show Formula where
     "(" <> show p <> " <-> " <> show q <> ")"
   show (ForAll b p) =
     "(all <" <> show b <> ", " <> show p <> ")"
-  show (Exists q p) =
+  show (ForSome q p) =
     "(some " <> show q <> ", " <> show p <> ")"
   show (Predicate p qs) =
-     show p <> "(" <> intercalate ", " (toList (show <$> qs)) <> ")"
+     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
+
+
+-- In an input bound, de Bruijn indices refer first to the preceding
+-- input argument values, with the last argument having the lowest index,
+-- and then to the variables in the scope surrounding the quantifier.
+newtype InputBound =
+  InputBound { unInputBound :: Bound }
+  deriving (Eq, Show, Generic)
+
+
+-- In an output bound, de Bruijn indices refer first to the input
+-- argument values, with the last argument having the lowest index,
+-- and then to the variables in the scope surrounding the quantifier.
+newtype OutputBound =
+  OutputBound { unOutputBound :: Bound }
+  deriving (Eq, Show, Generic)
 
 
 data ExistentialQuantifier =
-    ExistsFO Bound
-  | ExistsSO Cardinality Bound (NonEmpty Bound)
-  | ExistsP Cardinality Bound Bound
+    Some Cardinality [InputBound] OutputBound
+  | SomeP Cardinality InputBound OutputBound
+
+someFirstOrder :: Bound -> ExistentialQuantifier
+someFirstOrder b =
+  Some (Cardinality 0) [] (OutputBound b)
 
 instance Show ExistentialQuantifier where
-  show (ExistsFO b) = "<" <> show b
-  show (ExistsSO (Cardinality n) b bs) =
+  show (Some _ [] b) = "<" <> show b
+  show (Some (Cardinality n) bs b) =
     "^" <> show n <>
     "<" <> show b <> "("
-      <> intercalate ", " (("<" <>) . show <$> toList bs)
+      <> intercalate ", " (("<" <>) . show <$> bs)
       <> ")"
-  show (ExistsP (Cardinality n) b0 b1) =
+  show (SomeP (Cardinality n) b0 b1) =
     "^" <> show n <>
     "<" <> show b0 <> "(<" <> show b1 <> ")"
 
