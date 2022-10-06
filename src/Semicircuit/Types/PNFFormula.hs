@@ -9,8 +9,7 @@ module Semicircuit.Types.PNFFormula
   ) where
 
 
-import OSL.Types.Cardinality (Cardinality)
-import Semicircuit.Types.Sigma11 (Bound, InputBound, OutputBound, Name)
+import Semicircuit.Types.Sigma11 (Bound, Name, ExistentialQuantifier (..))
 import qualified Semicircuit.Types.QFFormula as QF
 
 
@@ -34,12 +33,6 @@ instance Semigroup Quantifiers where
 
 instance Monoid Quantifiers where
   mempty = Quantifiers [] []
-
-
-data ExistentialQuantifier =
-    Some Name Cardinality [InputBound] OutputBound
-  | SomeP Name Cardinality InputBound OutputBound
-  deriving Eq
 
 
 data UniversalQuantifier = All Name Bound

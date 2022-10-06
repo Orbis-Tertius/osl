@@ -8,6 +8,7 @@ module Semicircuit.PNFFormula
 
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
+import Semicircuit.Sigma11 (prependBounds)
 import qualified Semicircuit.Types.Sigma11 as S11
 import qualified Semicircuit.Types.PNFFormula as PNF
 import qualified Semicircuit.Types.QFFormula as QF
@@ -31,8 +32,14 @@ toPNFFormula ann =
     S11.Predicate p args ->
       pure $ PNF.Formula (QF.Predicate p args) mempty
     S11.ForAll x b a -> do
-      PNF.Formula a' aq <- rec a
-      todo x b a' aq
+      PNF.Formula a' (PNF.Quantifiers aqE aqU)
+        <- rec a
+      let qNew = PNF.Quantifiers [] [PNF.All x b]
+          aq' = PNF.Quantifiers
+            (prependBounds [S11.InputBound x b]
+              <$> aqE)
+            aqU
+      pure (PNF.Formula a' (qNew <> aq'))
     S11.ForSome (S11.Some x c bs b) a -> do
       PNF.Formula a' aq <- rec a
       let qNew = PNF.Quantifiers [PNF.Some x c bs b] []
@@ -51,7 +58,3 @@ toPNFFormula ann =
         then pure $ PNF.Formula (f a' b') mempty
         else Left . ErrorMessage ann
           $ "input formula is not a prenex normal form"
-
-
-todo :: a
-todo = todo

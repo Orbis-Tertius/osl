@@ -85,6 +85,7 @@ data Formula =
 data ExistentialQuantifier =
     Some Name Cardinality [InputBound] OutputBound
   | SomeP Name Cardinality InputBound OutputBound
+  deriving Eq
 
 
 someFirstOrder :: Name -> Bound -> ExistentialQuantifier

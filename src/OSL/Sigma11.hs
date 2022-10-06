@@ -21,7 +21,6 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 import OSL.Types.Arity (Arity (..))
-import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.Sigma11 (Name (..), Term (App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Predicate, Not, And, Or, Implies, Iff, ForAll, ForSome), ExistentialQuantifier (Some, SomeP), Bound (TermBound, FieldMaxBound), InputBound (..), OutputBound (..))
 import OSL.Types.TranslationContext (Mapping (..))
@@ -117,11 +116,10 @@ termIndices =
 
 
 prependBounds
-  :: Cardinality
-  -> [InputBound]
+  :: [InputBound]
   -> ExistentialQuantifier
   -> ExistentialQuantifier
-prependBounds _ bs' (Some n bs b) =
+prependBounds bs' (Some n bs b) =
   Some n (bs' <> bs) b
-prependBounds _ _ (SomeP _ _ _) =
+prependBounds _ (SomeP _ _ _) =
   error "there is a compiler bug; applied prependBounds to SomeP"
