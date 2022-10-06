@@ -717,15 +717,18 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
     OSL.Z _ -> scalarResult
     OSL.Fp _ -> scalarResult
     OSL.Fin _ _ -> scalarResult
-    OSL.F _ _ a b -> do
+    OSL.F ann mCardinality a b -> do
       aDim <- lift $ getMappingDimensions decls a
       case (aDim, varBound) of
         (FiniteDimensions n, OSL.FunctionBound _ (OSL.DomainBound aBound) (OSL.CodomainBound bBound)) -> do
+          cardinality <- case mCardinality of
+            Just m -> pure m
+            Nothing -> lift . Left $ ErrorMessage ann "missing function type cardinality (required for quantification)"
           (bQs, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
           let fM = incrementArities n bM
           aBounds <- fmap S11.InputBound
             <$> translateBound gc lc a (Just aBound)
-          let fQs = prependBounds aBounds <$> bQs
+          let fQs = prependBounds cardinality aBounds <$> bQs
           pure (fQs, fM)
         (FiniteDimensions _, _) ->
           lift . Left $ ErrorMessage (boundAnnotation varBound)

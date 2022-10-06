@@ -95,9 +95,14 @@ toPrenexNormalForm ann =
       (qQs, q') <- rec q
       pQs' <- flipQuantifiers ann pQs
       pure (pQs' <> qQs, Implies p' q')
-    Iff _ _ ->
-      Left . ErrorMessage ann $
-        "not supported: quantifiers inside <->"
+    Iff p q -> do
+      (pQs, p') <- rec p
+      (qQs, q') <- rec q
+      case pQs <> qQs of
+        [] -> pure ([], Iff p' q')
+        _ ->
+          Left . ErrorMessage ann $
+            "not supported: quantifiers inside <->"
     ForAll x b p -> do
       (pQs, p') <- rec p
       pure (Universal x b : pQs, p')
