@@ -180,7 +180,7 @@ addMapping
   -> Mapping ann S11.Name
   -> StateT (TranslationContext t ann) m ()
 addMapping name mapping =
-  addTermMapping name (S11.Var <$> mapping)
+  addTermMapping name (S11.var <$> mapping)
 
 
 addTermMapping
@@ -243,7 +243,6 @@ getBoundS11NamesInMapping arity =
     PredicateMapping _ -> mempty
   where
     f :: S11.Term -> Set S11.Name
-    f (S11.Var name) = g name
     f (S11.App h xs) = g h `Set.union` (Set.unions (f <$> xs))
     f (S11.AppInverse h x) = g h `Set.union` f x
     f (S11.Add x y) = f x `Set.union` f y

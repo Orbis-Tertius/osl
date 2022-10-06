@@ -21,7 +21,6 @@ import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.State.Strict (StateT, execStateT, get, put)
 import Data.Functor.Identity (runIdentity)
 import Data.List (foldl')
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -97,7 +96,7 @@ translate gc@(TranslationContext gDecls _)
       fType <- lift $ inferType decls f
       fT <- translateToTerm gc lc fType f
       case (fType, fT) of
-        (OSL.P _ _ _ xType, S11.Var fT') -> do
+        (OSL.P _ _ _ xType, S11.App fT' []) -> do
           xT <- translateToTerm gc lc xType x
           pure (Term (S11.AppInverse fT' xT))
         _ -> lift . Left $ ErrorMessage ann "expected a permutation"
@@ -157,7 +156,7 @@ translate gc@(TranslationContext gDecls _)
                     (Map.insert nm f fTables)
                     pTables
                   pure nm
-              pure (Mapping (ScalarMapping (S11.Var nm)))
+              pure (Mapping (ScalarMapping (S11.var nm)))
         _ -> lift . Left . ErrorMessage ann $ "expected a "
           <> pack (show termType) <> " but got a function table literal"
     OSL.Apply ann (OSL.NamedTerm ann' fName) x ->
@@ -680,7 +679,7 @@ translate gc@(TranslationContext gDecls _)
          let lc' = TranslationContext decls'
                    (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
          bounds <- translateBound gc lc varType varBound
-         Formula . foldl (.) id (S11.Exists . S11.ExistsFO <$> bounds)
+         Formula . foldl (.) id (S11.ForSome . S11.someFirstOrder <$> bounds)
            <$> translateToFormula gc lc' p
        InfiniteDimensions -> do
          (qs, newMapping) <-
@@ -688,7 +687,7 @@ translate gc@(TranslationContext gDecls _)
              =<< lift (getExplicitOrInferredBound decls varType varBound)
          let lc' = TranslationContext decls'
                    (mergeMappings (Map.singleton varName newMapping) mappings)
-         Formula . (\f -> foldl' (flip S11.Exists) f qs)
+         Formula . (\f -> foldl' (flip S11.ForSome) f qs)
            <$> translateToFormula gc lc' p
     term -> lift . Left . ErrorMessage (termAnnotation term)
       $ "could not translate term: " <> pack (show term)
@@ -727,7 +726,8 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
             Nothing -> lift . Left $ ErrorMessage ann "missing function type cardinality (required for quantification)"
           (bQs, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
           let fM = incrementArities n bM
-          aBounds <- translateBound gc lc a (Just aBound)
+          aBounds <- fmap S11.InputBound
+            <$> translateBound gc lc a (Just aBound)
           let fQs = prependBounds cardinality aBounds <$> bQs
           pure (fQs, fM)
         (FiniteDimensions _, _) ->
@@ -742,13 +742,15 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
         Nothing -> lift . Left . ErrorMessage ann $ "missing permutation type cardinality (required for quantification)"
       case varBound of
         OSL.FunctionBound _ (OSL.DomainBound aBound) (OSL.CodomainBound bBound) -> do
-          bBoundTs <- translateBound gc lc a (Just bBound)
+          bBoundTs <- fmap S11.OutputBound
+            <$> translateBound gc lc a (Just bBound)
           (_, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
           let fM = incrementArities 1 bM
-          aBoundTs <- translateBound gc lc a (Just aBound)
+          aBoundTs <- fmap S11.InputBound
+            <$> translateBound gc lc a (Just aBound)
           case (aBoundTs, bBoundTs) of
             ([aBoundT], [bBoundT]) ->
-              pure ([S11.ExistsP cardinality bBoundT aBoundT], fM)
+              pure ([S11.SomeP cardinality aBoundT bBoundT], fM)
             _ -> lift . Left $ ErrorMessage ann "non-scalar bounds for a permutation; this is a compiler bug"
         _ -> lift . Left $ ErrorMessage (boundAnnotation varBound)
                    "expected a function bound"
@@ -765,8 +767,8 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
     OSL.Coproduct ann a b ->
       case varBound of
         OSL.CoproductBound _ (OSL.LeftBound aBound) (OSL.RightBound bBound) -> do
-          let cQ = S11.ExistsFO (S11.TermBound (S11.Const 2))
-              cT = S11.Var (S11.Name 0 0)
+          let cQ = S11.someFirstOrder (S11.TermBound (S11.Const 2))
+              cT = S11.var (S11.Name 0 0)
               cM = ChoiceMapping (ScalarMapping cT)
               cSym = getFreeOSLName lc
               decls' = addDeclaration cSym (OSL.FreeVariable (OSL.Fin ann 2)) decls
@@ -796,16 +798,16 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
     OSL.Maybe _ a ->
       case varBound of
         OSL.MaybeBound _ (OSL.ValuesBound aBound) -> do
-          let cQ = S11.ExistsFO (S11.TermBound (S11.Const 2))
-              cM = ScalarMapping (S11.Var (S11.Name 0 0))
+          let cQ = S11.someFirstOrder (S11.TermBound (S11.Const 2))
+              cM = ScalarMapping (S11.var (S11.Name 0 0))
           (vQs, vM) <- getExistentialQuantifierStringAndMapping gc lc a aBound
           pure (cQ : vQs, MaybeMapping (ChoiceMapping cM) (ValuesMapping vM))
         _ -> lift . Left $ ErrorMessage (boundAnnotation varBound) "expected a maybe bound"
     OSL.List ann (OSL.Cardinality n) a ->
       case varBound of
         OSL.ListBound _ (OSL.ValuesBound aBound) -> do
-          let lQ = S11.ExistsFO (S11.TermBound (S11.Const n))
-              lT = S11.Var (S11.Name 0 0)
+          let lQ = S11.someFirstOrder (S11.TermBound (S11.Const n))
+              lT = S11.var (S11.Name 0 0)
               lSym = getFreeOSLName lc
               decls' = addDeclaration lSym (OSL.FreeVariable (OSL.N ann)) decls
               lc' = TranslationContext decls' mappings
@@ -851,13 +853,13 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
           bTs <- translateBound gc lc varType (Just varBound)
           case bTs of
             [bT] -> 
-              pure ( [S11.ExistsFO bT]
-                   , ScalarMapping (S11.Var (S11.Name 0 0)) )
+              pure ( [S11.someFirstOrder bT]
+                   , ScalarMapping (S11.var (S11.Name 0 0)) )
             _ -> lift . Left . ErrorMessage (boundAnnotation varBound)
               $ "expected a scalar bound but got " <> pack (show bTs)
         OSL.FieldMaxBound _ ->
-          pure ( [S11.ExistsFO S11.FieldMaxBound]
-               , ScalarMapping (S11.Var (S11.Name 0 0)) )
+          pure ( [S11.someFirstOrder S11.FieldMaxBound]
+               , ScalarMapping (S11.var (S11.Name 0 0)) )
         _ -> lift . Left . ErrorMessage (boundAnnotation varBound)
           $ "expected a scalar bound but got " <> pack (show varBound)
 
@@ -933,7 +935,7 @@ getArbitraryMapping ctx =
           incrementArities m <$> getArbitraryMapping ctx b
         Right InfiniteDimensions ->
           Left (ErrorMessage ann "expected a finite-dimensional domain type")
-    OSL.P _ _ _ _ -> pure $ ScalarMapping (S11.Var (S11.Name 1 0))
+    OSL.P _ _ _ _ -> pure $ ScalarMapping (S11.var (S11.Name 1 0))
   where
     rec = getArbitraryMapping ctx      
 
@@ -1061,10 +1063,8 @@ applyMappings ann goalType f x =
                                    (S11.Mul (S11.Const (-1)) aT))
                           cT)
     (PredicateMapping p, xM) -> do
-      case NonEmpty.nonEmpty (linearizeMapping xM) of
-        Just args' -> pure . PropMapping $ S11.Predicate p args'
-        Nothing -> lift . Left . ErrorMessage ann 
-          $ "predicate argument is empty; this is a compiler bug"
+      pure . PropMapping . S11.Predicate p
+        $ linearizeMapping xM
     _ -> lift . Left $ ErrorMessage ann ("unable to apply mappings:\n" <> pack (show f) <> "\n<---\n" <> pack (show x))
   where rec = applyMappings ann goalType
 
@@ -1076,7 +1076,6 @@ applyTerms
   -> Either (ErrorMessage ann) S11.Term
 applyTerms ann f x =
   case f of
-    S11.Var f' -> pure $ S11.App f' [x]
     S11.App f' ys -> pure $ S11.App f' (ys <> [x])
     _ -> Left $ ErrorMessage ann
       ("expected a function term; got " <> pack (show f))

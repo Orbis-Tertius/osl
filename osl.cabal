@@ -84,6 +84,14 @@ library
     OSL.Types.TranslationContext
     OSL.ValidContext
     OSL.ValidateContext
+    Semicircuit.Gensyms
+    Semicircuit.PrenexNormalForm
+    Semicircuit.PNFFormula
+    Semicircuit.Sigma11
+    Semicircuit.Types.PNFFormula
+    Semicircuit.Types.QFFormula
+    Semicircuit.Types.Semicircuit
+    Semicircuit.Types.Sigma11
 
   build-depends:
     base >= 4.9 && < 5,
