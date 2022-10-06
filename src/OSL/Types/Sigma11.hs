@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 
 
@@ -108,7 +110,8 @@ instance Show Formula where
 -- and then to the variables in the scope surrounding the quantifier.
 newtype InputBound =
   InputBound { unInputBound :: Bound }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Generic)
+  deriving newtype Show
 
 
 -- In an output bound, de Bruijn indices refer first to the input
@@ -116,7 +119,8 @@ newtype InputBound =
 -- and then to the variables in the scope surrounding the quantifier.
 newtype OutputBound =
   OutputBound { unOutputBound :: Bound }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Generic)
+  deriving newtype Show
 
 
 data ExistentialQuantifier =
