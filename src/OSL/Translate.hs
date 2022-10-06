@@ -159,10 +159,10 @@ translate
                 aux@(S11.AuxTables fTables pTables) <- get
                 xs :: [[Integer]] <-
                   fmap linearizeMapping
-                    <$>   forM
-                            (fst <$> fs)
-                            (lift . translateToConstant gDecls decls xType)
-                         
+                    <$> forM
+                      (fst <$> fs)
+                      (lift . translateToConstant gDecls decls xType)
+
                 ys :: [[Integer]] <-
                   fmap linearizeMapping
                     <$> forM
@@ -1668,7 +1668,8 @@ getFreeS11PredicateNameM ::
 getFreeS11PredicateNameM arity = do
   S11.AuxTables _ ps <- get
   pure
-    . maybe (S11.PredicateName arity (DeBruijnIndex 0))
+    . maybe
+      (S11.PredicateName arity (DeBruijnIndex 0))
       (S11.PredicateName arity . (+ 1) . (^. #deBruijnIndex))
     . Set.lookupMax
     $ Map.keysSet ps

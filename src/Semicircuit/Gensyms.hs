@@ -8,7 +8,7 @@ module Semicircuit.Gensyms
 where
 
 import Control.Lens ((^.))
-import Control.Monad.State (State, get, put, evalState)
+import Control.Monad.State (State, evalState, get, put)
 import Data.Functor ((<&>))
 import Data.Map (Map)
 import qualified Data.Map as Map

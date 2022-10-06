@@ -101,11 +101,10 @@ termIndices =
   \case
     App (Name fArity fIndex) x ->
       Map.singleton fArity (Set.singleton fIndex)
-        `unionIndices`   foldl'
-                           unionIndices
-                           mempty
-                           (termIndices <$> x)
-                        
+        `unionIndices` foldl'
+          unionIndices
+          mempty
+          (termIndices <$> x)
     AppInverse (Name fArity fIndex) x ->
       Map.singleton fArity (Set.singleton fIndex)
         `unionIndices` termIndices x

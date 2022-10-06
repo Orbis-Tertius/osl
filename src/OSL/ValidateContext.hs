@@ -289,7 +289,9 @@ checkTerm c t x =
             then Left . ErrorMessage ann $ "expected an element of a finite type but got a negative number"
             else
               when (n >= m)
-               . Left . ErrorMessage ann $ "expected an element of Fin(" <> pack (show m) <> ") but got " <> pack (show n)
+                . Left
+                . ErrorMessage ann
+                $ "expected an element of Fin(" <> pack (show m) <> ") but got " <> pack (show n)
         _ -> Left . ErrorMessage ann $ "expected a " <> pack (show t) <> " but got a constant of a finite type"
     Inverse ann ->
       case t of

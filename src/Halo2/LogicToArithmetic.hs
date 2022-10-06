@@ -17,7 +17,7 @@ where
 
 import Cast (intToInteger)
 import Control.Monad (forM, replicateM)
-import Control.Monad.State (State, get, put, evalState)
+import Control.Monad.State (State, evalState, get, put)
 import Crypto.Number.Basic (numBits)
 import qualified Data.Map as Map
 import qualified Data.Set as Set

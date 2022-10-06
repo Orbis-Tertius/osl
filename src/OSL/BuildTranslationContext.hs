@@ -267,7 +267,8 @@ getFreeS11Name ::
   Set S11.Name ->
   S11.Name
 getFreeS11Name arity =
-  maybe (S11.Name arity (DeBruijnIndex 0))
+  maybe
+    (S11.Name arity (DeBruijnIndex 0))
     (S11.Name arity . (+ 1) . (^. #deBruijnIndex))
     . Set.lookupMax
 
