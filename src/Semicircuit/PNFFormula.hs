@@ -15,7 +15,10 @@ import qualified Semicircuit.Types.QFFormula as QF
 
 
 -- Turns a strong prenex normal form into a PNF formula.
-toPNFFormula :: ann -> S11.Formula -> Either (ErrorMessage ann) PNF.Formula
+toPNFFormula
+  :: ann
+  -> S11.Formula
+  -> Either (ErrorMessage ann) PNF.Formula
 toPNFFormula ann =
   \case
     S11.Equal a b -> pure $ PNF.Formula (QF.Equal a b) mempty

@@ -18,7 +18,7 @@ import OSL.ValidateContext (validateContext)
 import OSL.ValidContext (getDeclaration)
 import Semicircuit.Gensyms (deBruijnToGensyms)
 import Semicircuit.PNFFormula (toPNFFormula)
-import Semicircuit.PrenexNormalForm (toStrongPrenexNormalForm)
+import Semicircuit.PrenexNormalForm (toStrongPrenexNormalForm, toPrenexNormalForm)
 import Semicircuit.Sigma11 (prependQuantifiers)
 
 
@@ -73,9 +73,10 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) = do
       (translated, aux) <-
         mapLeft (ErrorMessage . ("Error translating: " <>) . show)
         $ runStateT (translateToFormula gc lc targetTerm) mempty
+      pnf <- mapLeft (ErrorMessage . ("Error converting to prenex normal form: " <>) . show)
+             $ toPrenexNormalForm () (deBruijnToGensyms translated)
       spnf <- mapLeft (ErrorMessage . ("Error converting to strong prenex normal form: " <>) . show)
-          $ toStrongPrenexNormalForm ()
-            (deBruijnToGensyms translated)
+          $ uncurry (toStrongPrenexNormalForm ()) pnf
       _ <- mapLeft (ErrorMessage . ("Error converting to PNF formula: " <>) . show)
            $ toPNFFormula () (uncurry prependQuantifiers spnf)
       pure . SuccessfulOutput $ "Translated OSL:\n"

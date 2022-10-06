@@ -25,6 +25,7 @@ import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..), ExistentialQuan
 -- quantified values.
 toStrongPrenexNormalForm
   :: ann
+  -> [Quantifier]
   -> Formula
   -> Either (ErrorMessage ann) ([Quantifier], Formula)
 toStrongPrenexNormalForm = todo
