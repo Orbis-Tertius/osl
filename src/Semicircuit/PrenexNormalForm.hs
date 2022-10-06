@@ -10,7 +10,7 @@ module Semicircuit.PrenexNormalForm
 
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..), ExistentialQuantifier (..), someFirstOrder, OutputBound (..))
+import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..), ExistentialQuantifier (..), someFirstOrder, OutputBound (..), Name, Bound)
 
 
 -- Assumes input is in prenex normal form.
@@ -28,7 +28,37 @@ toStrongPrenexNormalForm
   -> [Quantifier]
   -> Formula
   -> Either (ErrorMessage ann) ([Quantifier], Formula)
-toStrongPrenexNormalForm = todo
+toStrongPrenexNormalForm ann qs f =
+  case qs of
+    [] -> pure ([], f)
+    Existential q : qs' -> do
+      (qs'', f') <- rec qs' f
+      pure (Existential q : qs'', f')
+    Universal x b : qs' -> do
+      (qs'', f') <- rec qs' f
+      case qs'' of
+        [] -> pure ([Universal x b], f')
+        Universal _ _ : _ ->
+          pure (Universal x b : qs'', f')
+        Existential _ : _ ->
+          pushUniversalQuantifiersDown ann [(x, b)] qs'' f'
+  where
+    rec = toStrongPrenexNormalForm ann
+
+
+pushUniversalQuantifiersDown
+  :: ann
+  -> [(Name, Bound)]
+  -> [Quantifier]
+  -> Formula
+  -> Either (ErrorMessage ann) ([Quantifier], Formula)
+pushUniversalQuantifiersDown ann us qs f =
+  case qs of
+    [] -> pure (uncurry Universal <$> us, f)
+    Universal x b : qs' ->
+      pushUniversalQuantifiersDown ann (us <> [(x, b)]) qs' f
+    Existential q : qs' ->
+      todo q qs'
 
 
 toPrenexNormalForm
