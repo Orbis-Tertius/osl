@@ -1,57 +1,52 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module OSL.Types.Sigma11
-  ( Name (Name)
-  , PredicateName (PredicateName)
-  , Term (..)
-  , var
-  , Formula (..)
-  , ExistentialQuantifier (..)
-  , someFirstOrder
-  , InputBound (..)
-  , OutputBound (..)
-  , Bound (..)
-  , AuxTables (..)
-  ) where
+  ( Name (Name),
+    PredicateName (PredicateName),
+    Term (..),
+    var,
+    Formula (..),
+    ExistentialQuantifier (..),
+    someFirstOrder,
+    InputBound (..),
+    OutputBound (..),
+    Bound (..),
+    AuxTables (..),
+  )
+where
 
-
+import Data.Generics.Labels ()
 import Data.List (intercalate)
 import Data.Map (Map)
 import Data.Set (Set)
-import Data.Generics.Labels ()
 import GHC.Generics (Generic)
-
 import OSL.Types.Arity (Arity)
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex)
 
-
-data Name = Name { arity :: Arity, deBruijnIndex :: DeBruijnIndex }
+data Name = Name {arity :: Arity, deBruijnIndex :: DeBruijnIndex}
   deriving (Eq, Ord, Generic)
 
 instance Show Name where
   show (Name a i) = show i <> "^" <> show a
 
-
-data PredicateName = PredicateName { arity :: Arity, deBruijnIndex :: DeBruijnIndex }
+data PredicateName = PredicateName {arity :: Arity, deBruijnIndex :: DeBruijnIndex}
   deriving (Eq, Ord, Generic)
 
 instance Show PredicateName where
   show (PredicateName a i) = "P" <> show i <> "^" <> show a
 
-
-data Term =
-    App Name [Term]
+data Term
+  = App Name [Term]
   | AppInverse Name Term
   | Add Term Term
   | Mul Term Term
   | IndLess Term Term
   | Const Integer
-  deriving Eq
+  deriving (Eq)
 
 var :: Name -> Term
 var x = App x []
@@ -70,9 +65,8 @@ instance Show Term where
     "ind_<(" <> show x <> ", " <> show y <> ")"
   show (Const x) = show x
 
-
-data Formula =
-    Equal Term Term
+data Formula
+  = Equal Term Term
   | LessOrEqual Term Term
   | Predicate PredicateName [Term]
   | Not Formula
@@ -102,29 +96,24 @@ instance Show Formula where
   show (ForSome q p) =
     "(some " <> show q <> ", " <> show p <> ")"
   show (Predicate p qs) =
-     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
-
+    show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
 
 -- In an input bound, de Bruijn indices refer first to the preceding
 -- input argument values, with the last argument having the lowest index,
 -- and then to the variables in the scope surrounding the quantifier.
-newtype InputBound =
-  InputBound { unInputBound :: Bound }
+newtype InputBound = InputBound {unInputBound :: Bound}
   deriving (Eq, Generic)
-  deriving newtype Show
-
+  deriving newtype (Show)
 
 -- In an output bound, de Bruijn indices refer first to the input
 -- argument values, with the last argument having the lowest index,
 -- and then to the variables in the scope surrounding the quantifier.
-newtype OutputBound =
-  OutputBound { unOutputBound :: Bound }
+newtype OutputBound = OutputBound {unOutputBound :: Bound}
   deriving (Eq, Generic)
-  deriving newtype Show
+  deriving newtype (Show)
 
-
-data ExistentialQuantifier =
-    Some Cardinality [InputBound] OutputBound
+data ExistentialQuantifier
+  = Some Cardinality [InputBound] OutputBound
   | SomeP Cardinality InputBound OutputBound
 
 someFirstOrder :: Bound -> ExistentialQuantifier
@@ -134,27 +123,32 @@ someFirstOrder b =
 instance Show ExistentialQuantifier where
   show (Some _ [] b) = "<" <> show b
   show (Some (Cardinality n) bs b) =
-    "^" <> show n <>
-    "<" <> show b <> "("
+    "^"
+      <> show n
+      <> "<"
+      <> show b
+      <> "("
       <> intercalate ", " (("<" <>) . show <$> bs)
       <> ")"
   show (SomeP (Cardinality n) b0 b1) =
-    "^" <> show n <>
-    "<" <> show b0 <> "(<" <> show b1 <> ")"
-
+    "^"
+      <> show n
+      <> "<"
+      <> show b0
+      <> "(<"
+      <> show b1
+      <> ")"
 
 data Bound = TermBound Term | FieldMaxBound
-  deriving Eq
+  deriving (Eq)
 
 instance Show Bound where
   show (TermBound t) = show t
   show FieldMaxBound = show "|F|"
 
-
-data AuxTables =
-  AuxTables
-  { functionTables :: Map Name (Map [Integer] Integer)
-  , predicateTables :: Map PredicateName (Set [Integer])
+data AuxTables = AuxTables
+  { functionTables :: Map Name (Map [Integer] Integer),
+    predicateTables :: Map PredicateName (Set [Integer])
   }
   deriving (Eq, Show, Generic)
 

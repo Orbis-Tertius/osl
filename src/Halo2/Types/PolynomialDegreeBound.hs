@@ -1,15 +1,13 @@
-{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NoImplicitPrelude          #-}
-
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.PolynomialDegreeBound
-  ( PolynomialDegreeBound (PolynomialDegreeBound, getPolynomialDegreeBound)
-  ) where
+  ( PolynomialDegreeBound (PolynomialDegreeBound, getPolynomialDegreeBound),
+  )
+where
 
+import Halo2.Prelude
 
-import           Halo2.Prelude
-
-
-newtype PolynomialDegreeBound = PolynomialDegreeBound { getPolynomialDegreeBound :: Int }
+newtype PolynomialDegreeBound = PolynomialDegreeBound {getPolynomialDegreeBound :: Int}
   deriving (Eq, Ord, Num, Enum, Real, Integral, Generic, Show)

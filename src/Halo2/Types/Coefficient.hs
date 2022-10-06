@@ -1,14 +1,11 @@
-{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
+module Halo2.Types.Coefficient (Coefficient (Coefficient, getCoefficient)) where
 
-module Halo2.Types.Coefficient ( Coefficient (Coefficient, getCoefficient) ) where
+import Halo2.Prelude
+import Halo2.Types.FieldElement (FieldElement)
 
-
-import           Halo2.Prelude
-import           Halo2.Types.FieldElement (FieldElement)
-
-
-newtype Coefficient = Coefficient { getCoefficient :: FieldElement }
+newtype Coefficient = Coefficient {getCoefficient :: FieldElement}
   deriving (Enum, Eq, Ord, Show, Generic)

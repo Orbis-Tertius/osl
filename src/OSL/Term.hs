@@ -2,9 +2,7 @@
 
 module OSL.Term (termAnnotation) where
 
-
 import OSL.Types.OSL (Term (..))
-
 
 termAnnotation :: Term ann -> ann
 termAnnotation =

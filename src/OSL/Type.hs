@@ -1,12 +1,11 @@
 module OSL.Type
-  ( typeAnnotation
-  , typeCardinality
-  ) where
+  ( typeAnnotation,
+    typeCardinality,
+  )
+where
 
-
+import OSL.Types.OSL (Cardinality (..), Declaration (Data), Type (..), ValidContext)
 import OSL.ValidContext (getDeclaration)
-import OSL.Types.OSL (Type (..), ValidContext, Cardinality (..), Declaration (Data))
-
 
 typeAnnotation :: Type ann -> ann
 typeAnnotation t =
@@ -24,7 +23,6 @@ typeAnnotation t =
     Maybe ann _ -> ann
     List ann _ _ -> ann
     Map ann _ _ _ -> ann
-
 
 typeCardinality :: ValidContext t ann -> Type ann -> Maybe Cardinality
 typeCardinality ctx t =

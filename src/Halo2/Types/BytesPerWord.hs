@@ -5,5 +5,5 @@ module Halo2.Types.BytesPerWord (BytesPerWord (BytesPerWord)) where
 
 import Halo2.Prelude
 
-newtype BytesPerWord = BytesPerWord { unBytesPerWord :: Int }
-  deriving Generic
+newtype BytesPerWord = BytesPerWord {unBytesPerWord :: Int}
+  deriving (Generic)

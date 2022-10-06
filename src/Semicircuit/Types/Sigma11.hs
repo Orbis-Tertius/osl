@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-
 -- This is different from OSL.Types.Sigma11
 -- in that the types in this module use explicit
 -- variable names rather than de Bruijn indices.
@@ -15,30 +14,27 @@
 -- variable names are given explicitly in quantifiers.
 
 module Semicircuit.Types.Sigma11
-  ( Name (Name)
-  , Term (..)
-  , var
-  , Formula (..)
-  , ExistentialQuantifier (..)
-  , someFirstOrder
-  , Bound (..)
-  , InputBound (..)
-  , OutputBound (..)
-  , Quantifier (..)
-  , MapNames (..)
-  ) where
-
+  ( Name (Name),
+    Term (..),
+    var,
+    Formula (..),
+    ExistentialQuantifier (..),
+    someFirstOrder,
+    Bound (..),
+    InputBound (..),
+    OutputBound (..),
+    Quantifier (..),
+    MapNames (..),
+  )
+where
 
 import GHC.Generics (Generic)
-
 import OSL.Types.Arity (Arity)
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.Sigma11 (PredicateName)
 
-
-data Name = Name { arity :: Arity, sym :: Int }
+data Name = Name {arity :: Arity, sym :: Int}
   deriving (Eq, Ord, Generic)
-
 
 class MapNames a where
   mapNames :: (Name -> Name) -> a -> a
@@ -46,15 +42,14 @@ class MapNames a where
 instance MapNames a => MapNames [a] where
   mapNames f = fmap (mapNames f)
 
-
-data Term =
-    App Name [Term]
+data Term
+  = App Name [Term]
   | AppInverse Name Term
   | Add Term Term
   | Mul Term Term
   | IndLess Term Term
   | Const Integer
-  deriving Eq
+  deriving (Eq)
 
 var :: Name -> Term
 var x = App x []
@@ -72,9 +67,8 @@ instance MapNames Term where
     IndLess (mapNames f x) (mapNames f y)
   mapNames _ (Const i) = Const i
 
-
-data Formula =
-    Equal Term Term
+data Formula
+  = Equal Term Term
   | LessOrEqual Term Term
   | Predicate PredicateName [Term]
   | Not Formula
@@ -85,34 +79,27 @@ data Formula =
   | ForAll Name Bound Formula
   | ForSome ExistentialQuantifier Formula
 
-
-data ExistentialQuantifier =
-    Some Name Cardinality [InputBound] OutputBound
+data ExistentialQuantifier
+  = Some Name Cardinality [InputBound] OutputBound
   | SomeP Name Cardinality InputBound OutputBound
-  deriving Eq
-
+  deriving (Eq)
 
 someFirstOrder :: Name -> Bound -> ExistentialQuantifier
 someFirstOrder x b =
   Some x (Cardinality 0) [] (OutputBound b)
 
-
 data Bound = TermBound Term | FieldMaxBound
-  deriving Eq
+  deriving (Eq)
 
+data InputBound = InputBound
+  { name :: Name,
+    bound :: Bound
+  }
+  deriving (Eq)
 
-data InputBound =
-  InputBound
-  { name :: Name
-  , bound :: Bound }
-  deriving Eq
+newtype OutputBound = OutputBound {unOutputBound :: Bound}
+  deriving (Eq)
 
-
-newtype OutputBound =
-  OutputBound { unOutputBound :: Bound}
-  deriving Eq
-
-
-data Quantifier =
-    Universal Name Bound
+data Quantifier
+  = Universal Name Bound
   | Existential ExistentialQuantifier
