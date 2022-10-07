@@ -34,7 +34,7 @@
       pkgs = import nixpkgs { inherit system; };
       hsPkgs =
         with pkgs.haskell.lib;
-        pkgs.haskellPackages.override
+        pkgs.haskell.packages.ghc924.override
           {
             overrides = hfinal: hprev:
               {
@@ -45,7 +45,6 @@
           };
     in
     {
-      inherit hsPkgs;
       devShells.default = hsPkgs.osl.env.overrideAttrs (attrs: {
         buildInputs = attrs.buildInputs ++ [
           hsPkgs.cabal-install
@@ -59,7 +58,7 @@
           hlint = lint-utils.outputs.linters.${system}.hlint self;
           hpack = lint-utils.outputs.linters.${system}.hpack self;
           nixpkgs-fmt = lint-utils.outputs.linters.${system}.nixpkgs-fmt self;
-          ormolu = lint-utils.outputs.linters.${system}.ormolu self;
+          ormolu = lint-utils.outputs.linters.${system}.ormoluStandardGhc921 self;
         };
     });
 

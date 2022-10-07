@@ -97,7 +97,6 @@ library
     base >= 4.9 && < 5,
     aeson,
     bytestring,
-    compactable,
     containers,
     cryptonite,
     either,

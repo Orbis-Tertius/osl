@@ -10,7 +10,6 @@ module OSL.TranslationContext
   )
 where
 
-import Control.Functor.Compactable (compact)
 import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -80,7 +79,7 @@ highestIndicesInMapping ::
   Mapping ann Term ->
   Map Arity DeBruijnIndex
 highestIndicesInMapping =
-  compact . fmap Set.lookupMax . mappingIndices
+  Map.mapMaybe id . fmap Set.lookupMax . mappingIndices
 
 linearizeMapping :: Mapping ann a -> [a]
 linearizeMapping = foldl' (flip (:)) []

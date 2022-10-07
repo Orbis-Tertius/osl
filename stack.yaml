@@ -2,8 +2,4 @@ resolver: lts-18.16
 packages:
 - ./.
 
-extra-deps:
-- git: https://gitlab.com/fresheyeball/compactable.git
-  commit: f63927b1e438c267f0d12f36e5b3735cfaebeeb4
-
 allow-newer: true
