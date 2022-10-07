@@ -32,6 +32,7 @@
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
     let
       pkgs = import nixpkgs { inherit system; };
+      lintPkgs = import lint-utils.inputs.nixpkgs { inherit system; };
       hsPkgs =
         with pkgs.haskell.lib;
         pkgs.haskell.packages.ghc924.override
@@ -49,7 +50,8 @@
         buildInputs = attrs.buildInputs ++ [
           hsPkgs.cabal-install
           pkgs.nixpkgs-fmt
-          pkgs.ghcid
+          hsPkgs.ghcid
+          hsPkgs.ormolu
         ];
       });
       packages.default = hsPkgs.osl;
