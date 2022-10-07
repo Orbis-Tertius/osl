@@ -1,38 +1,35 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedLabels #-}
-
+{-# LANGUAGE OverloadedStrings #-}
 
 module Semicircuit.Sigma11
-  ( prependBounds
-  , prependQuantifiers
-  , prependArguments
-  ) where
+  ( prependBounds,
+    prependQuantifiers,
+    prependArguments,
+  )
+where
 
+import Data.List (foldl')
+import Die (die)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
 
-import Semicircuit.Types.Sigma11 (ExistentialQuantifier (Some, SomeP), InputBound (..), Quantifier (Universal, Existential), Formula (ForAll, ForSome, Equal, LessOrEqual, Predicate, Not, And, Or, Implies, Iff), Term (App, AppInverse, Add, Mul, IndLess, Const), Name, var, Bound (TermBound, FieldMaxBound), OutputBound (..))
-
-
-prependBounds
-  :: [InputBound]
-  -> ExistentialQuantifier
-  -> ExistentialQuantifier
+prependBounds ::
+  [InputBound] ->
+  ExistentialQuantifier ->
+  ExistentialQuantifier
 prependBounds bs' (Some x n bs b) =
   Some x n (bs' <> bs) b
-prependBounds _ (SomeP _ _ _ _) =
-  error "there is a compiler bug; applied prependBounds to SomeP"
-
+prependBounds _ (SomeP {}) =
+  die "there is a compiler bug; applied prependBounds to SomeP"
 
 prependQuantifiers :: [Quantifier] -> Formula -> Formula
 prependQuantifiers qs f =
-  foldl (flip prependQuantifier) f qs
-
+  foldl' (flip prependQuantifier) f qs
 
 prependQuantifier :: Quantifier -> Formula -> Formula
 prependQuantifier (Universal x b) f =
   ForAll x b f
 prependQuantifier (Existential q) f =
   ForSome q f
-
 
 -- Prepends the given arguments to all applications
 -- of the given name. This substitution does not need
@@ -59,13 +56,15 @@ prependArguments f xs =
       \case
         App g xs' ->
           if g == f
-          then App g ((var <$> xs) <> xs')
-          else App g xs'
+            then App g ((var <$> xs) <> xs')
+            else App g xs'
         AppInverse g x ->
           if g == f
-          then error $ "prependArguments of AppInverse f: "
-            <> "this is a compiler bug"
-          else AppInverse g x
+            then
+              die $
+                "prependArguments of AppInverse f: "
+                  <> "this is a compiler bug"
+            else AppInverse g x
         Add x y ->
           Add (term x) (term y)
         Mul x y ->
@@ -74,27 +73,23 @@ prependArguments f xs =
           IndLess (term x) (term y)
         Const x -> Const x
 
-
 mapBound :: (Term -> Term) -> Bound -> Bound
 mapBound f =
   \case
     TermBound x -> TermBound (f x)
     FieldMaxBound -> FieldMaxBound
 
-
 mapInputBound :: (Term -> Term) -> InputBound -> InputBound
 mapInputBound f (InputBound x b) =
   InputBound x (mapBound f b)
-
 
 mapOutputBound :: (Term -> Term) -> OutputBound -> OutputBound
 mapOutputBound f (OutputBound b) =
   OutputBound (mapBound f b)
 
-
-mapExistentialQuantifierBounds
-  :: (Term -> Term)
-  -> (ExistentialQuantifier -> ExistentialQuantifier)
+mapExistentialQuantifierBounds ::
+  (Term -> Term) ->
+  (ExistentialQuantifier -> ExistentialQuantifier)
 mapExistentialQuantifierBounds f =
   \case
     Some x n bs b ->

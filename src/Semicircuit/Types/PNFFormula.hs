@@ -1,31 +1,24 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
-
 module Semicircuit.Types.PNFFormula
-  ( Formula (..)
-  , Quantifiers (..)
-  , ExistentialQuantifier (..)
-  , UniversalQuantifier (..)
-  ) where
+  ( Formula (..),
+    Quantifiers (..),
+    ExistentialQuantifier (..),
+    UniversalQuantifier (..),
+  )
+where
 
-
-import Semicircuit.Types.Sigma11 (Bound, Name, ExistentialQuantifier (..))
 import qualified Semicircuit.Types.QFFormula as QF
+import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier (..), Name)
 
-
-data Formula =
-  Formula
-  { qfFormula :: QF.Formula
-  , quantifiers :: Quantifiers
+data Formula = Formula
+  { qfFormula :: QF.Formula,
+    quantifiers :: Quantifiers
   }
 
-
-data Quantifiers =
-  Quantifiers
-  { existentialQuantifiers :: [ExistentialQuantifier]
-  , universalQuantifiers :: [UniversalQuantifier]
+data Quantifiers = Quantifiers
+  { existentialQuantifiers :: [ExistentialQuantifier],
+    universalQuantifiers :: [UniversalQuantifier]
   }
-  deriving Eq
+  deriving (Eq)
 
 instance Semigroup Quantifiers where
   (Quantifiers a b) <> (Quantifiers a' b') =
@@ -34,6 +27,5 @@ instance Semigroup Quantifiers where
 instance Monoid Quantifiers where
   mempty = Quantifiers [] []
 
-
 data UniversalQuantifier = All Name Bound
-  deriving Eq
+  deriving (Eq)

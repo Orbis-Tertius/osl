@@ -1,39 +1,35 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 
-
 module OSL.Types.OSL
-  ( Name (..)
-  , Cardinality (..)
-  , Type (..)
-  , Term (..)
-  , Bound (..)
-  , LeftBound (..)
-  , RightBound (..)
-  , DomainBound (..)
-  , CodomainBound (..)
-  , ValuesBound (..)
-  , KeysBound (..)
-  , Declaration (..)
-  , Context (..)
-  , ContextType (..)
-  , ValidContext (..)
-  ) where
-
+  ( Name (..),
+    Cardinality (..),
+    Type (..),
+    Term (..),
+    Bound (..),
+    LeftBound (..),
+    RightBound (..),
+    DomainBound (..),
+    CodomainBound (..),
+    ValuesBound (..),
+    KeysBound (..),
+    Declaration (..),
+    Context (..),
+    ContextType (..),
+    ValidContext (..),
+  )
+where
 
 import Data.Generics.Labels ()
 import Data.Map (Map)
 import Data.Text (Text, unpack)
 import GHC.Generics (Generic)
-
 import OSL.Types.Cardinality (Cardinality (..))
 
-
-data Name =
-    Sym Text
+data Name
+  = Sym Text
   | GenSym Int
   deriving (Eq, Show, Generic)
 
@@ -43,9 +39,8 @@ instance Ord Name where
   Sym _ <= GenSym _ = True
   GenSym _ <= Sym _ = False
 
-
-data Type ann =
-    Prop ann
+data Type ann
+  = Prop ann
   | F ann (Maybe Cardinality) (Type ann) (Type ann) -- functions
   | P ann (Maybe Cardinality) (Type ann) (Type ann) -- permutations
   | N ann -- natural numbers
@@ -58,7 +53,6 @@ data Type ann =
   | Maybe ann (Type ann)
   | List ann Cardinality (Type ann)
   | Map ann Cardinality (Type ann) (Type ann)
-
 
 instance Show (Type ann) where
   show (Prop _) = "Prop"
@@ -78,9 +72,8 @@ instance Show (Type ann) where
   show (List _ n a) = "List^ " <> show n <> "(" <> show a <> ")"
   show (Map _ n a b) = "Map^" <> show n <> "(" <> show a <> ", " <> show b <> ")"
 
-
-data Term ann =
-    NamedTerm ann Name
+data Term ann
+  = NamedTerm ann Name
   | AddN ann
   | MulN ann
   | ConstN ann Integer
@@ -147,11 +140,10 @@ data Term ann =
   | Iff ann (Term ann) (Term ann)
   | ForAll ann Name (Type ann) (Maybe (Bound ann)) (Term ann)
   | ForSome ann Name (Type ann) (Maybe (Bound ann)) (Term ann)
-  deriving Show
+  deriving (Show)
 
-
-data Bound ann =
-    ScalarBound ann (Term ann)
+data Bound ann
+  = ScalarBound ann (Term ann)
   | FieldMaxBound ann
   | ProductBound ann (LeftBound ann) (RightBound ann)
   | CoproductBound ann (LeftBound ann) (RightBound ann)
@@ -160,47 +152,36 @@ data Bound ann =
   | MaybeBound ann (ValuesBound ann)
   | MapBound ann (KeysBound ann) (ValuesBound ann)
   | ToBound ann Name (Bound ann)
-  deriving Show
+  deriving (Show)
 
+newtype LeftBound ann = LeftBound {unLeftBound :: Bound ann}
+  deriving (Show)
 
-newtype LeftBound ann = LeftBound { unLeftBound :: Bound ann }
-  deriving Show
+newtype RightBound ann = RightBound {unRightBound :: Bound ann}
+  deriving (Show)
 
+newtype DomainBound ann = DomainBound {unDomainBound :: Bound ann}
+  deriving (Show)
 
-newtype RightBound ann = RightBound { unRightBound :: Bound ann }
-  deriving Show
+newtype CodomainBound ann = CodomainBound {unCodomainBound :: Bound ann}
+  deriving (Show)
 
+newtype ValuesBound ann = ValuesBound {unValuesBound :: Bound ann}
+  deriving (Show)
 
-newtype DomainBound ann = DomainBound { unDomainBound :: Bound ann }
-  deriving Show
+newtype KeysBound ann = KeysBound {unKeysBound :: Bound ann}
+  deriving (Show)
 
-
-newtype CodomainBound ann = CodomainBound { unCodomainBound :: Bound ann }
-  deriving Show
-
-
-newtype ValuesBound ann = ValuesBound { unValuesBound :: Bound ann }
-  deriving Show
-
-
-newtype KeysBound ann = KeysBound { unKeysBound :: Bound ann }
-  deriving Show
-
-
-data Declaration ann =
-    FreeVariable (Type ann)
+data Declaration ann
+  = FreeVariable (Type ann)
   | Data (Type ann)
   | Defined (Type ann) (Term ann)
-  deriving Show
+  deriving (Show)
 
-
-newtype Context ann = Context { unContext :: [(Name, Declaration ann)] }
-
+newtype Context ann = Context {unContext :: [(Name, Declaration ann)]}
 
 data ContextType = Global | Local
-  deriving Show
+  deriving (Show)
 
-
-newtype ValidContext (t :: ContextType) ann =
-  ValidContext { unValidContext :: Map Name (Declaration ann) }
-  deriving Show
+newtype ValidContext (t :: ContextType) ann = ValidContext {unValidContext :: Map Name (Declaration ann)}
+  deriving (Show)

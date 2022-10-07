@@ -1,12 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedLabels #-}
-
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.ArithmetizationConfig
-  ( getArithmetizationConfig
-  , getByteDecompositionSize
-  ) where
-
+  ( getArithmetizationConfig,
+    getByteDecompositionSize,
+  )
+where
 
 import Cast (intToInteger)
 import Crypto.Number.Basic (numBits)
@@ -18,24 +17,21 @@ import Halo2.Types.BytesPerWord (BytesPerWord (..))
 import Halo2.Types.FiniteField (FiniteField (..))
 import Halo2.Types.FixedBound (FixedBound (..))
 
-
 getArithmetizationConfig :: FiniteField -> BitsPerByte -> ArithmetizationConfig
 getArithmetizationConfig finiteField bitsPerByte =
   ArithmetizationConfig
-  bitsPerByte
-  (getBytesPerWord finiteField bitsPerByte)
-  finiteField
-
+    bitsPerByte
+    (getBytesPerWord finiteField bitsPerByte)
+    finiteField
 
 getBytesPerWord :: FiniteField -> BitsPerByte -> BytesPerWord
 getBytesPerWord (FiniteField fieldSize) (BitsPerByte bitsPerByte) =
   case numBits (intToInteger fieldSize) `quotRem` bitsPerByte of
     (q, 0) -> BytesPerWord q
-    (q, _) -> BytesPerWord (q+1)
-
+    (q, _) -> BytesPerWord (q + 1)
 
 getByteDecompositionSize :: ArithmetizationConfig -> FixedBound -> ByteDecompositionSize
 getByteDecompositionSize config (FixedBound b) =
   case numBits (intToInteger b) `quotRem` (config ^. #bitsPerByte . #unBitsPerByte) of
     (q, 0) -> ByteDecompositionSize q
-    (q, _) -> ByteDecompositionSize (q+1)
+    (q, _) -> ByteDecompositionSize (q + 1)

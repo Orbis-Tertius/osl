@@ -1,16 +1,12 @@
 {-# LANGUAGE LambdaCase #-}
 
-
-module Semicircuit.Types.QFFormula
-  ( Formula (..) ) where
-
+module Semicircuit.Types.QFFormula (Formula (..)) where
 
 import OSL.Types.Sigma11 (PredicateName)
-import Semicircuit.Types.Sigma11 (Term, MapNames (..))
+import Semicircuit.Types.Sigma11 (MapNames (..), Term)
 
-
-data Formula =
-    Equal Term Term
+data Formula
+  = Equal Term Term
   | LessOrEqual Term Term
   | Predicate PredicateName [Term]
   | Not Formula

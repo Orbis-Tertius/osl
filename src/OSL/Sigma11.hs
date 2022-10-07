@@ -1,31 +1,31 @@
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module OSL.Sigma11
-  ( MapNames (mapNames)
-  , incrementDeBruijnIndices
-  , incrementArities
-  , unionIndices
-  , termIndices
-  , prependBounds
-  ) where
-
+  ( MapNames (mapNames),
+    incrementDeBruijnIndices,
+    incrementArities,
+    unionIndices,
+    termIndices,
+    prependBounds,
+  )
+where
 
 import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-
+import Die (die)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Name (..), Term (App, AppInverse, Add, Mul, IndLess, Const), Formula (Equal, LessOrEqual, Predicate, Not, And, Or, Implies, Iff, ForAll, ForSome), ExistentialQuantifier (Some, SomeP), Bound (TermBound, FieldMaxBound), InputBound (..), OutputBound (..))
+import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate), InputBound (..), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Mul))
 import OSL.Types.TranslationContext (Mapping (..))
-
 
 class MapNames a where
   mapNames :: (Name -> Name) -> a -> a
@@ -76,37 +76,37 @@ instance MapNames a => MapNames (Mapping ann a) where
 instance MapNames a => MapNames [a] where
   mapNames f = fmap (mapNames f)
 
-
 incrementArities :: MapNames a => Int -> a -> a
 incrementArities by =
   mapNames
-  (\(Name (Arity arity) index) ->
-     Name (Arity (arity + by)) index)
-
+    ( \(Name (Arity arity) index) ->
+        Name (Arity (arity + by)) index
+    )
 
 incrementDeBruijnIndices :: MapNames a => Arity -> Int -> a -> a
 incrementDeBruijnIndices arity by =
-  mapNames (\(Name arity' index) ->
-    if arity' == arity
-    then Name arity' (index + DeBruijnIndex by)
-    else Name arity' index)
+  mapNames
+    ( \(Name arity' index) ->
+        if arity' == arity
+          then Name arity' (index + DeBruijnIndex by)
+          else Name arity' index
+    )
 
-
-unionIndices
-  :: Map Arity (Set DeBruijnIndex)
-  -> Map Arity (Set DeBruijnIndex)
-  -> Map Arity (Set DeBruijnIndex)
+unionIndices ::
+  Map Arity (Set DeBruijnIndex) ->
+  Map Arity (Set DeBruijnIndex) ->
+  Map Arity (Set DeBruijnIndex)
 unionIndices = Map.unionWith Set.union
-
 
 termIndices :: Term -> Map Arity (Set DeBruijnIndex)
 termIndices =
   \case
     App (Name fArity fIndex) x ->
       Map.singleton fArity (Set.singleton fIndex)
-        `unionIndices`
-        (foldl' unionIndices mempty
-          (termIndices <$> x))
+        `unionIndices` foldl'
+          unionIndices
+          mempty
+          (termIndices <$> x)
     AppInverse (Name fArity fIndex) x ->
       Map.singleton fArity (Set.singleton fIndex)
         `unionIndices` termIndices x
@@ -115,15 +115,14 @@ termIndices =
     IndLess x y -> termIndices x `unionIndices` termIndices y
     Const _ -> mempty
 
-
-prependBounds
-  :: Cardinality
-  -> [InputBound]
-  -> ExistentialQuantifier
-  -> ExistentialQuantifier
+prependBounds ::
+  Cardinality ->
+  [InputBound] ->
+  ExistentialQuantifier ->
+  ExistentialQuantifier
 prependBounds n bs (Some _ [] b) =
   Some n bs b
 prependBounds _ bs' (Some n bs b) =
   Some n (bs' <> bs) b
-prependBounds _ _ (SomeP _ _ _) =
-  error "there is a compiler bug; applied prependBounds to SomeP"
+prependBounds _ _ (SomeP {}) =
+  die "there is a compiler bug; applied prependBounds to SomeP"

@@ -1,11 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 
-
 module OSL.Bound (boundAnnotation) where
 
-
 import OSL.Types.OSL (Bound (..))
-
 
 boundAnnotation :: Bound ann -> ann
 boundAnnotation =

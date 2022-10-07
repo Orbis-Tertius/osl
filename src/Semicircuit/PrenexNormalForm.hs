@@ -2,17 +2,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
-
 module Semicircuit.PrenexNormalForm
-  ( toStrongPrenexNormalForm
-  , toPrenexNormalForm
-  ) where
-
+  ( toStrongPrenexNormalForm,
+    toPrenexNormalForm,
+  )
+where
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Sigma11 (prependBounds, prependArguments)
-import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..), ExistentialQuantifier (..), someFirstOrder, OutputBound (..), Name, Bound, InputBound (..))
-
+import Semicircuit.Sigma11 (prependArguments, prependBounds)
+import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), someFirstOrder)
 
 -- Assumes input is in prenex normal form.
 -- Bring all second-order quantifiers to the front,
@@ -24,11 +22,11 @@ import Semicircuit.Types.Sigma11 (Formula (..), Quantifier (..), ExistentialQuan
 -- increase in arity when preceded by universal
 -- quantifiers, becoming dependent on those universally
 -- quantified values.
-toStrongPrenexNormalForm
-  :: ann
-  -> [Quantifier]
-  -> Formula
-  -> Either (ErrorMessage ann) ([Quantifier], Formula)
+toStrongPrenexNormalForm ::
+  ann ->
+  [Quantifier] ->
+  Formula ->
+  Either (ErrorMessage ann) ([Quantifier], Formula)
 toStrongPrenexNormalForm ann qs f =
   case qs of
     [] -> pure ([], f)
@@ -46,13 +44,12 @@ toStrongPrenexNormalForm ann qs f =
   where
     rec = toStrongPrenexNormalForm ann
 
-
-pushUniversalQuantifiersDown
-  :: ann
-  -> [(Name, Bound)]
-  -> [Quantifier]
-  -> Formula
-  -> Either (ErrorMessage ann) ([Quantifier], Formula)
+pushUniversalQuantifiersDown ::
+  ann ->
+  [(Name, Bound)] ->
+  [Quantifier] ->
+  Formula ->
+  Either (ErrorMessage ann) ([Quantifier], Formula)
 pushUniversalQuantifiersDown ann us qs f =
   case qs of
     [] -> pure (uncurry Universal <$> us, f)
@@ -65,15 +62,14 @@ pushUniversalQuantifiersDown ann us qs f =
           let q' = prependBounds (uncurry InputBound <$> us) q
               f'' = prependArguments g (fst <$> us) f'
           pure ([Existential q'] <> qs'', f'')
-        SomeP _ _ _ _ ->
-          Left . ErrorMessage ann
-            $ "unsupported: permutation quantifier inside a universal quantifier"
+        SomeP {} ->
+          Left . ErrorMessage ann $
+            "unsupported: permutation quantifier inside a universal quantifier"
 
-
-toPrenexNormalForm
-  :: ann
-  -> Formula
-  -> Either (ErrorMessage ann) ([Quantifier], Formula)
+toPrenexNormalForm ::
+  ann ->
+  Formula ->
+  Either (ErrorMessage ann) ([Quantifier], Formula)
 toPrenexNormalForm ann =
   \case
     Equal a b -> pure ([], Equal a b)
@@ -81,7 +77,7 @@ toPrenexNormalForm ann =
     Predicate p xs -> pure ([], Predicate p xs)
     Not p -> do
       (qs, p') <- rec p
-      (, Not p') <$> flipQuantifiers ann qs
+      (,Not p') <$> flipQuantifiers ann qs
     And p q -> do
       (pQs, p') <- rec p
       (qQs, q') <- rec q
@@ -112,19 +108,16 @@ toPrenexNormalForm ann =
   where
     rec = toPrenexNormalForm ann
 
+flipQuantifiers ::
+  ann ->
+  [Quantifier] ->
+  Either (ErrorMessage ann) [Quantifier]
+flipQuantifiers ann = mapM (flipQuantifier ann)
 
-flipQuantifiers
-  :: ann
-  -> [Quantifier]
-  -> Either (ErrorMessage ann) [Quantifier]
-flipQuantifiers ann qs =
-  mapM (flipQuantifier ann) qs
-
-
-flipQuantifier
-  :: ann
-  -> Quantifier
-  -> Either (ErrorMessage ann) Quantifier
+flipQuantifier ::
+  ann ->
+  Quantifier ->
+  Either (ErrorMessage ann) Quantifier
 flipQuantifier ann =
   \case
     Universal x b ->

@@ -1,7 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+module Main (main) where
 
-module Main ( main ) where
-
-
-import           OSL.EntryPoint (main)
+import OSL.EntryPoint (main)

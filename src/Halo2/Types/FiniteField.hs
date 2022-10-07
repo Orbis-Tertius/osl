@@ -1,13 +1,10 @@
-{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
+module Halo2.Types.FiniteField (FiniteField (FiniteField)) where
 
-module Halo2.Types.FiniteField ( FiniteField (FiniteField) ) where
+import Halo2.Prelude
 
-
-import           Halo2.Prelude
-
-
-newtype FiniteField = FiniteField { degree :: Int }
+newtype FiniteField = FiniteField {degree :: Int}
   deriving (Num, Enum, Real, Integral, Eq, Ord, Show, Generic)

@@ -2,85 +2,94 @@
   nixConfig.bash-prompt = "[nix-develop-osl:] ";
   description = "Orbis Specification Language compiler";
   inputs = {
-    # Nixpkgs set to specific URL for haskellNix
-    nixpkgs.url = "github:NixOS/nixpkgs/baaf9459d6105c243239289e1e82e3cdd5ac4809";
-    nixpkgs.follows = "haskellNix/nixpkgs-unstable";
-
-    #CI integration
-    flake-compat-ci.url = "github:hercules-ci/flake-compat-ci";
-    flake-compat = {
-      url = "github:edolstra/flake-compat";
+    flake-utils = {
+      url = "github:numtide/flake-utils";
+    };
+    lint-utils = {
+      url = "git+https://gitlab.homotopic.tech/nix/lint-utils";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    safe-coloured-text-src = {
+      url = "github:NorfairKing/safe-coloured-text/675cb01fce5f46718416d7746de5b856ed90a63f";
       flake = false;
     };
-
-    flake-utils.url = "github:numtide/flake-utils";
-    sydtest-src = {
-        url = "github:NorfairKing/sydtest/314d53ae175b540817a24d4211dab24fe6cb9232";
-        flake = false;
-      };
-    validity-src = {
-        url = "github:NorfairKing/validity/f5e5d69b3502cdd9243b412c31ba9619b9e89462";
-        flake = false;
-      };
-
-    #HaskellNix is implemented using a set nixpkgs.follows; allowing for flake-build
-    haskellNix = {
-      inputs.nixpkgs.follows = "nixpkgs";
-      url = "github:input-output-hk/haskell.nix";
+    autodocodec-src = {
+      url = "github:NorfairKing/autodocodec/c8c6965d97a04fb483c03c0a8479533f252a34d7";
+      flake = false;
     };
   };
-
-  outputs = { self, nixpkgs, flake-utils, sydtest-src, validity-src, haskellNix,  flake-compat, flake-compat-ci }:
+  outputs =
+    inputs@
+    { self
+    , flake-utils
+    , lint-utils
+    , nixpkgs
+    , safe-coloured-text-src
+    , autodocodec-src
+    , ...
+    }:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
-      let
-        deferPluginErrors = true;
-        overlays = [
-          haskellNix.overlay
-          (import "${sydtest-src}/nix/overlay.nix")
-          (import "${validity-src}/nix/overlay.nix")
-          (final: prev: {
-            osl =
-              final.haskell-nix.project' {
-                src = ./.;
-                compiler-nix-name = "ghc8107";
-                projectFileName = "stack.yaml";
-                modules = [{
-                  packages = {
-                  };
-                }];
-                shell.tools = {
-                  cabal = { };
-                  ghcid = { };
-                  hlint = { };
-                  haskell-language-server = { };
-                  stylish-haskell = { };
-                  sydtest-discover = { };
-                };
-                # Non-Haskell shell tools go here
-                shell.buildInputs = with pkgs; [
-                  nixpkgs-fmt
-                ];
-                shell.shellHook =
-                  ''
-                  manual-ci() (
-                    set -e
-
-                    ./ci/lint.sh
-                    cabal test
-                    nix-build
-                  )
-                  '';
+    let
+      pkgs = import nixpkgs { inherit system; };
+      lintPkgs = import lint-utils.inputs.nixpkgs { inherit system; };
+      hsPkgs =
+        with pkgs.haskell.lib;
+        pkgs.haskell.packages.ghc924.override
+          {
+            overrides = hfinal: hprev:
+              {
+                safe-coloured-text = hprev.callCabal2nix "safe-coloured-text" (safe-coloured-text-src + /safe-coloured-text) { };
+                autodocodec-yaml = hprev.callCabal2nix "autodocodec" (autodocodec-src + /autodocodec-yaml) { };
+                osl = disableLibraryProfiling (hprev.callCabal2nix "osl" ./. { });
+                osl-spec = disableLibraryProfiling (hprev.callCabal2nix "osl:spec" ./. { });
               };
-          })
-        ];
-        pkgs = import nixpkgs { inherit system overlays; inherit (haskellNix) config; };
-        flake = pkgs.osl.flake { };
-      in flake // {
-        
-        ciNix = flake-compat-ci.lib.recurseIntoFlakeWith {
-          flake = self;
-          systems = [ "x86_64-linux" ];
+          };
+      ormolu-check =
+        pkgs.stdenv.mkDerivation {
+          name = "ormolu-check";
+          src = ./.;
+          doCheck = true;
+          buildPhase = ''
+            ${pkgs.git.outPath}/bin/git init
+            ${pkgs.git.outPath}/bin/git add -A
+            ${pkgs.git.outPath}/bin/git config user.email "foo@bar.com"
+            ${pkgs.git.outPath}/bin/git config user.name "Foobar"
+            ${pkgs.git.outPath}/bin/git commit -m "initial commit"
+            ${hsPkgs.ormolu.outPath}/bin/ormolu -m inplace $(find ./. -type f -name '*.hs')
+            if [ -z "$(${pkgs.git.outPath}/bin/git status --porcelain)" ]; then
+              echo "ok"
+            else
+              echo "ormolu check failed"
+              exit 1
+            fi
+          '';
+          installPhase = ''
+            mkdir -p $out
+          '';
         };
-        defaultPackage = flake.packages."osl:exe:osl";
+    in
+    {
+      devShells.default = hsPkgs.osl.env.overrideAttrs (attrs: {
+        buildInputs = attrs.buildInputs ++ [
+          hsPkgs.cabal-install
+          pkgs.nixpkgs-fmt
+          hsPkgs.ghcid
+          hsPkgs.ormolu
+          hsPkgs.hlint
+        ];
       });
+      packages.default = hsPkgs.osl;
+      packages.ormolu-check = ormolu-check;
+      checks =
+        with lint-utils.outputs.linters.${system};
+        {
+          hlint = hlint self;
+          hpack = hpack self;
+          nixpkgs-fmt = nixpkgs-fmt self;
+          inherit ormolu-check;
+          spec = hsPkgs.osl-spec;
+        };
+    });
+
 }

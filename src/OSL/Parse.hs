@@ -1,53 +1,42 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
-
 
 module OSL.Parse (parseContext) where
 
-
 import Control.Monad (guard, mzero)
 import Data.Either.Combinators (mapLeft)
+import Data.List (foldl')
 import Data.Text (Text, pack, unpack)
-import Text.Parsec (SourceName, SourcePos, Parsec, many, eof, token, (<|>), try, choice, getPosition, option, many1, optionMaybe)
-import qualified Text.Parsec.Prim as Prim
-
 import Die (die)
 import OSL.Bound (boundAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.OSL (Context (..), Name, Declaration (..), Term (..), Type (..), Bound (..), LeftBound (..), RightBound (..), Cardinality (..), ValuesBound (..), KeysBound (..), DomainBound (..), CodomainBound (..))
 import qualified OSL.Types.Keyword as K
+import OSL.Types.OSL (Bound (..), Cardinality (..), CodomainBound (..), Context (..), Declaration (..), DomainBound (..), KeysBound (..), LeftBound (..), Name, RightBound (..), Term (..), Type (..), ValuesBound (..))
 import OSL.Types.Token (Token)
 import qualified OSL.Types.Token as T
-
+import Text.Parsec (Parsec, SourceName, SourcePos, choice, eof, getPosition, many, many1, option, optionMaybe, token, try, (<|>))
+import qualified Text.Parsec.Prim as Prim
 
 parseContext :: SourceName -> [(Token, SourcePos)] -> Either (ErrorMessage ()) (Context SourcePos)
 parseContext = parse' context
 
-
 type Parser = Parsec [(Token, SourcePos)] ()
-
 
 parse' :: Parser a -> SourceName -> [(Token, SourcePos)] -> Either (ErrorMessage ()) a
 parse' p n = mapLeft (ErrorMessage () . pack . show) . Prim.parse p n
 
-
 consume :: ((Token, SourcePos) -> Maybe a) -> Parser a
 consume = token (unpack . printToken . fst) snd
-
 
 consumeExact :: Token -> (SourcePos -> a) -> Parser a
 consumeExact tok tm =
   consume (\(t, p) -> guard (t == tok) >> pure (tm p))
 
-
 consumeExact_ :: Token -> Parser ()
 consumeExact_ tok = consumeExact tok (const ())
 
-
 printToken :: Token -> Text
 printToken = pack . show
-
 
 context :: Parser (Context SourcePos)
 context = do
@@ -55,15 +44,13 @@ context = do
   eof
   pure (Context decls)
 
-
 declaration :: Parser (Name, Declaration SourcePos)
 declaration =
   choice
-  [ dataDeclaration
-  , defDeclaration
-  , freeDeclaration
-  ]
-
+    [ dataDeclaration,
+      defDeclaration,
+      freeDeclaration
+    ]
 
 dataDeclaration :: Parser (Name, Declaration SourcePos)
 dataDeclaration = do
@@ -73,7 +60,6 @@ dataDeclaration = do
   t <- type0
   consumeExact_ T.Period
   pure (n, Data t)
-
 
 defDeclaration :: Parser (Name, Declaration SourcePos)
 defDeclaration = do
@@ -86,7 +72,6 @@ defDeclaration = do
   consumeExact_ T.Period
   pure (n, Defined ty def)
 
-
 freeDeclaration :: Parser (Name, Declaration SourcePos)
 freeDeclaration = do
   n <- name
@@ -95,14 +80,12 @@ freeDeclaration = do
   consumeExact_ T.Period
   pure (n, FreeVariable t)
 
-
 name :: Parser Name
 name =
   consume $
     \case
       (T.Var x, _) -> pure x
-      _            -> mzero
-
+      _ -> mzero
 
 type0 :: Parser (Type SourcePos)
 type0 = do
@@ -117,17 +100,14 @@ type0 = do
     case op of
       T.ThinArrow -> do
         n <- optionMaybe cardinality
-        t' <- type0
-        pure (Just (F p n t t'))
+        Just . F p n t <$> type0
       T.LeftRightArrow -> do
         n <- optionMaybe cardinality
-        t' <- type1
-        pure (Just (P p n t t'))
+        Just . P p n t <$> type1
       _ -> mzero
   case rest of
     Nothing -> pure t
     Just t' -> pure t'
-
 
 type1 :: Parser (Type SourcePos)
 type1 = do
@@ -139,7 +119,6 @@ type1 = do
     Just (Left ts') -> pure (Product p t ts')
     Just (Right ts') -> pure (Coproduct p t ts')
 
-
 productTail :: Parser (Type SourcePos)
 productTail = do
   p <- getPosition
@@ -149,7 +128,6 @@ productTail = do
   case ts of
     Nothing -> pure t
     Just ts' -> pure (Product p t ts')
-
 
 coproductTail :: Parser (Type SourcePos)
 coproductTail = do
@@ -161,25 +139,21 @@ coproductTail = do
     Nothing -> pure t
     Just ts' -> pure (Coproduct p t ts')
 
-
 type2 :: Parser (Type SourcePos)
 type2 =
-  choice
-  $
-  try
-  <$>
-  [ consumeExact (T.Keyword K.Prop) Prop
-  , consumeExact (T.Keyword K.N) N
-  , consumeExact (T.Keyword K.Z) Z
-  , consumeExact (T.Keyword K.F) Fp
-  , NamedType <$> getPosition <*> name
-  , parenthesizedType
-  , finiteType
-  , maybeType
-  , listType
-  , mapType
-  ]
-
+  choice $
+    try
+      <$> [ consumeExact (T.Keyword K.Prop) Prop,
+            consumeExact (T.Keyword K.N) N,
+            consumeExact (T.Keyword K.Z) Z,
+            consumeExact (T.Keyword K.F) Fp,
+            NamedType <$> getPosition <*> name,
+            parenthesizedType,
+            finiteType,
+            maybeType,
+            listType,
+            mapType
+          ]
 
 parenthesizedType :: Parser (Type SourcePos)
 parenthesizedType = do
@@ -187,7 +161,6 @@ parenthesizedType = do
   t <- type0
   consumeExact_ T.CloseParen
   pure t
-
 
 finiteType :: Parser (Type SourcePos)
 finiteType = do
@@ -200,7 +173,6 @@ finiteType = do
   consumeExact_ T.CloseParen
   pure t
 
-
 maybeType :: Parser (Type SourcePos)
 maybeType = do
   p <- getPosition
@@ -209,7 +181,6 @@ maybeType = do
   t <- type0
   consumeExact_ T.CloseParen
   pure (Maybe p t)
-
 
 listType :: Parser (Type SourcePos)
 listType = do
@@ -220,7 +191,6 @@ listType = do
   t <- type0
   consumeExact_ T.CloseParen
   pure (List p n t)
-
 
 mapType :: Parser (Type SourcePos)
 mapType = do
@@ -234,27 +204,26 @@ mapType = do
   consumeExact_ T.CloseParen
   pure (Map p n t0 t1)
 
-
 term0 :: Parser (Term SourcePos)
 term0 =
   choice
-  $
-  [ quantifier T.ForAll ForAll
-  , quantifier T.ForSome ForSome
-  , lambda
-  , letExpr
-  , term1
-  ]
+    [ quantifier T.ForAll ForAll,
+      quantifier T.ForSome ForSome,
+      lambda,
+      letExpr,
+      term1
+    ]
 
-
-quantifier :: Token
-  -> (SourcePos
-      -> Name
-      -> Type (SourcePos)
-      -> Maybe (Bound SourcePos)
-      -> Term (SourcePos)
-      -> Term SourcePos)
-  -> Parser (Term SourcePos)
+quantifier ::
+  Token ->
+  ( SourcePos ->
+    Name ->
+    Type SourcePos ->
+    Maybe (Bound SourcePos) ->
+    Term SourcePos ->
+    Term SourcePos
+  ) ->
+  Parser (Term SourcePos)
 quantifier tok ctor = do
   p <- getPosition
   consumeExact_ tok
@@ -263,88 +232,91 @@ quantifier tok ctor = do
   varType <- type0
   varBound <- optionMaybe (consumeExact_ T.Less >> bound0)
   consumeExact_ T.Comma
-  q <- term0
-  pure (ctor p varName varType varBound q)
-
+  ctor p varName varType varBound <$> term0
 
 bound0 :: Parser (Bound SourcePos)
 bound0 = do
   b0 <- bound1
-  bs <- option Nothing
-    (Just <$> (productBoundTail
-          <|> coproductBoundTail
-          <|> functionBoundTail))
+  bs <-
+    option
+      Nothing
+      ( Just
+          <$> ( productBoundTail
+                  <|> coproductBoundTail
+                  <|> functionBoundTail
+              )
+      )
   case bs of
     Nothing -> pure b0
     Just bs' -> pure (appendBoundTail b0 bs')
 
-
 -- The bound tail takes a constructor which takes the head
 -- and pures the whole bound.
-data BoundTail =
-    ProductBoundTail [Bound SourcePos]
+data BoundTail
+  = ProductBoundTail [Bound SourcePos]
   | CoproductBoundTail [Bound SourcePos]
   | FunctionBoundTail [Bound SourcePos]
-
 
 appendBoundTail :: Bound SourcePos -> BoundTail -> Bound SourcePos
 appendBoundTail b0 =
   \case
     ProductBoundTail bs ->
-      foldl (\bAcc bNext ->
-        ProductBound
-        (boundAnnotation bAcc)
-        (LeftBound bAcc)
-        (RightBound bNext))
-      b0 bs
+      foldl'
+        ( \bAcc bNext ->
+            ProductBound
+              (boundAnnotation bAcc)
+              (LeftBound bAcc)
+              (RightBound bNext)
+        )
+        b0
+        bs
     CoproductBoundTail bs ->
-      foldl (\bAcc bNext ->
-        CoproductBound
-        (boundAnnotation bAcc)
-        (LeftBound bAcc)
-        (RightBound bNext))
-      b0 bs
+      foldl'
+        ( \bAcc bNext ->
+            CoproductBound
+              (boundAnnotation bAcc)
+              (LeftBound bAcc)
+              (RightBound bNext)
+        )
+        b0
+        bs
     FunctionBoundTail bs ->
-      foldl (\bAcc bNext ->
-        FunctionBound
-        (boundAnnotation bAcc)
-        (DomainBound bAcc)
-        (CodomainBound bNext))
-      b0 bs
-
+      foldl'
+        ( \bAcc bNext ->
+            FunctionBound
+              (boundAnnotation bAcc)
+              (DomainBound bAcc)
+              (CodomainBound bNext)
+        )
+        b0
+        bs
 
 productBoundTail :: Parser BoundTail
 productBoundTail = boundTail T.ProductOp ProductBoundTail
 
-
 coproductBoundTail :: Parser BoundTail
 coproductBoundTail = boundTail T.CoproductOp CoproductBoundTail
-
 
 functionBoundTail :: Parser BoundTail
 functionBoundTail = boundTail T.ThinArrow FunctionBoundTail
 
-
-boundTail
-  :: T.Token
-  -> ([Bound SourcePos] -> BoundTail)
-  -> Parser BoundTail
+boundTail ::
+  T.Token ->
+  ([Bound SourcePos] -> BoundTail) ->
+  Parser BoundTail
 boundTail op ctor =
   ctor <$> many1 (consumeExact_ op >> bound1)
-
 
 bound1 :: Parser (Bound SourcePos)
 bound1 =
   choice
-  $
-  [ scalarBound
-  , listBound
-  , maybeBound
-  , mapBound
-  , toBound
-  , parenthesizedBound
-  ]
-
+    [ scalarBound,
+      listBound,
+      maybeBound,
+      mapBound,
+      toBound,
+      parenthesizedBound
+    ]
 
 parenthesizedBound :: Parser (Bound SourcePos)
 parenthesizedBound = do
@@ -353,10 +325,8 @@ parenthesizedBound = do
   consumeExact_ T.CloseParen
   pure b
 
-
 scalarBound :: Parser (Bound SourcePos)
 scalarBound = ScalarBound <$> getPosition <*> term1
-
 
 listBound :: Parser (Bound SourcePos)
 listBound =
@@ -364,22 +334,23 @@ listBound =
     <$> getPosition
     <*> (ValuesBound <$> parenthesizedBound)
 
-
 maybeBound :: Parser (Bound SourcePos)
 maybeBound =
-  MaybeBound 
+  MaybeBound
     <$> getPosition
     <*> (ValuesBound <$> parenthesizedBound)
-
 
 mapBound :: Parser (Bound SourcePos)
 mapBound =
   MapBound
     <$> getPosition
     <*> (KeysBound <$> (consumeExact_ T.OpenParen >> bound0))
-    <*> (ValuesBound <$> (consumeExact_ T.Comma
-          >> bound0 `preceding` consumeExact_ T.CloseParen))
-
+    <*> ( ValuesBound
+            <$> ( consumeExact_ T.Comma
+                    >> bound0
+                    `preceding` consumeExact_ T.CloseParen
+                )
+        )
 
 preceding :: Monad m => m a -> m () -> m a
 preceding f g = do
@@ -387,14 +358,12 @@ preceding f g = do
   g
   pure r
 
-
 toBound :: Parser (Bound SourcePos)
 toBound =
   ToBound
     <$> getPosition
     <*> (consumeExact_ T.OpenParen >> name)
     <*> (consumeExact_ T.Comma >> bound0 `preceding` consumeExact_ T.CloseParen)
-
 
 lambda :: Parser (Term SourcePos)
 lambda = do
@@ -404,9 +373,7 @@ lambda = do
   consumeExact_ T.Colon
   varType <- type0
   consumeExact_ T.ThickArrow
-  y <- term0
-  pure (Lambda p varName varType y)
-
+  Lambda p varName varType <$> term0
 
 letExpr :: Parser (Term SourcePos)
 letExpr = do
@@ -418,15 +385,12 @@ letExpr = do
   consumeExact_ T.DefEquals
   def <- term0
   consumeExact_ T.Semicolon
-  y <- term0
-  pure (Let p varName varType def y)
-
+  Let p varName varType def <$> term0
 
 term1 :: Parser (Term SourcePos)
 term1 = do
   x <- term2
   try (operatorOn x) <|> pure x
-
 
 operatorOn :: Term SourcePos -> Parser (Term SourcePos)
 operatorOn x = do
@@ -450,12 +414,12 @@ operatorOn x = do
       _ -> Nothing
   xs <-
     if isAssociative op
-    then do
-      y <- term2
-      ys <- many (consumeExact_ op >> term2)
-      pure (y:ys)
-    else (:[]) <$> term2
-  pure (foldl (opCtor op p) x xs)
+      then do
+        y <- term2
+        ys <- many (consumeExact_ op >> term2)
+        pure (y : ys)
+      else (: []) <$> term2
+  pure (foldl' (opCtor op p) x xs)
   where
     opCtor =
       \case
@@ -473,7 +437,7 @@ operatorOn x = do
         T.LeftRightArrow -> Iff
         T.Equal -> Equal
         T.LessOrEqual -> LessOrEqual
-        _ -> error "opCtor called outside defined domain"
+        _ -> die "opCtor called outside defined domain"
 
     isAssociative =
       \case
@@ -491,21 +455,17 @@ operatorOn x = do
         T.LeftRightArrow -> False
         T.Equal -> False
         T.LessOrEqual -> False
-        _ -> error "isAssociative called outside defined domain"
-
+        _ -> die "isAssociative called outside defined domain"
 
 term2 :: Parser (Term SourcePos)
 term2 =
-  choice
-  $
-  try
-  <$>
-  [ tuple
-  , unaryOp term0 T.Not Not
-  , functionApplication
-  , term3
-  ]
-
+  choice $
+    try
+      <$> [ tuple,
+            unaryOp term0 T.Not Not,
+            functionApplication,
+            term3
+          ]
 
 functionApplication :: Parser (Term SourcePos)
 functionApplication = do
@@ -515,8 +475,7 @@ functionApplication = do
   arg <- term1
   args <- many (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
-  pure (foldl (Apply p) f (arg:args))
-
+  pure (foldl' (Apply p) f (arg : args))
 
 parenthesizedTerm :: Parser (Term SourcePos)
 parenthesizedTerm = do
@@ -524,7 +483,6 @@ parenthesizedTerm = do
   x <- term0
   consumeExact_ T.CloseParen
   pure x
-
 
 functionTableLiteral :: Parser (Term SourcePos)
 functionTableLiteral = do
@@ -534,18 +492,15 @@ functionTableLiteral = do
   consumeExact_ T.CloseBracket
   pure t
 
-
 functionTableBody :: Parser [(Term SourcePos, Term SourcePos)]
 functionTableBody = do
   mr0 <- optionMaybe functionTableRow
   case mr0 of
     Nothing -> pure []
-    Just r0 -> (r0:) <$> many (consumeExact_ T.Comma >> functionTableRow)
-
+    Just r0 -> (r0 :) <$> many (consumeExact_ T.Comma >> functionTableRow)
 
 functionTableRow :: Parser (Term SourcePos, Term SourcePos)
 functionTableRow = (,) <$> term1 <*> (consumeExact_ T.ThickArrow >> term1)
-
 
 setLiteral :: Parser (Term SourcePos)
 setLiteral = do
@@ -555,51 +510,46 @@ setLiteral = do
   consumeExact_ T.CloseBrace
   pure t
 
-
 setElements :: Parser [Term SourcePos]
 setElements = do
   mx0 <- optionMaybe term1
   case mx0 of
     Nothing -> pure []
-    Just x0 -> (x0:) <$> many (consumeExact_ T.Comma >> term1)
-
+    Just x0 -> (x0 :) <$> many (consumeExact_ T.Comma >> term1)
 
 term3 :: Parser (Term SourcePos)
 term3 =
   choice
-  $
-  [ namedTerm
-  , constant
-  , parenthesizedTerm
-  , functionTableLiteral
-  , setLiteral
-  , builtin K.Cast Cast
-  , builtin K.Inverse Inverse
-  , builtin K.Pi1 Pi1
-  , builtin K.Pi2 Pi2
-  , builtin K.Iota1 Iota1
-  , builtin K.Iota2 Iota2
-  , unaryOp name (T.Keyword K.To) To
-  , unaryOp name (T.Keyword K.From) From
-  , builtin K.IsNothing IsNothing
-  , builtin K.Nothing' Nothing'
-  , builtin K.Just' Just'
-  , unaryOp term0 (T.Keyword K.Maybe') Maybe'
-  , builtin K.Exists Exists
-  , builtin K.Length Length
-  , builtin K.Nth Nth
-  , functorApplication
-  , builtin K.Lookup Lookup
-  , builtin K.Keys Keys
-  , builtin K.Sum Sum
-  , builtin K.SumMapLength SumMapLength
-  , sumListLookup
-  ]
-
+    [ namedTerm,
+      constant,
+      parenthesizedTerm,
+      functionTableLiteral,
+      setLiteral,
+      builtin K.Cast Cast,
+      builtin K.Inverse Inverse,
+      builtin K.Pi1 Pi1,
+      builtin K.Pi2 Pi2,
+      builtin K.Iota1 Iota1,
+      builtin K.Iota2 Iota2,
+      unaryOp name (T.Keyword K.To) To,
+      unaryOp name (T.Keyword K.From) From,
+      builtin K.IsNothing IsNothing,
+      builtin K.Nothing' Nothing',
+      builtin K.Just' Just',
+      unaryOp term0 (T.Keyword K.Maybe') Maybe',
+      builtin K.Exists Exists,
+      builtin K.Length Length,
+      builtin K.Nth Nth,
+      functorApplication,
+      builtin K.Lookup Lookup,
+      builtin K.Keys Keys,
+      builtin K.Sum Sum,
+      builtin K.SumMapLength SumMapLength,
+      sumListLookup
+    ]
 
 cardinality :: Parser Cardinality
 cardinality = Cardinality <$> caretBound
-
 
 caretBound :: Parser Integer
 caretBound = do
@@ -607,9 +557,7 @@ caretBound = do
   consume $
     \case
       (T.Const i, _) -> pure i
-      _              -> mzero
-
-
+      _ -> mzero
 
 sumListLookup :: Parser (Term SourcePos)
 sumListLookup = do
@@ -623,12 +571,10 @@ sumListLookup = do
     Nothing -> pure (SumListLookup p k)
     Just v' -> pure (Apply p (SumListLookup p k) v')
 
-
 namedTerm :: Parser (Term SourcePos)
 namedTerm = do
   p <- getPosition
   NamedTerm p <$> name
-
 
 constant :: Parser (Term SourcePos)
 constant =
@@ -640,15 +586,14 @@ constant =
       (T.ConstFin i, p) -> pure (ConstFin p i)
       _ -> Nothing
 
-
-builtin :: K.Keyword
-  -> (SourcePos -> Term SourcePos)
-  -> Parser (Term SourcePos)
+builtin ::
+  K.Keyword ->
+  (SourcePos -> Term SourcePos) ->
+  Parser (Term SourcePos)
 builtin k op = do
   p <- getPosition
   consumeExact_ (T.Keyword k)
   pure (op p)
-
 
 functorApplication :: Parser (Term SourcePos)
 functorApplication = do
@@ -690,7 +635,7 @@ functorApplication = do
         \case
           (T.Keyword K.Cast, _) -> pure K.Cast
           (T.Keyword K.Pi1, _) -> pure K.Pi1
-          (T.Keyword K.Pi2, _) -> pure K.Pi2 
+          (T.Keyword K.Pi2, _) -> pure K.Pi2
           (T.Keyword K.To, _) -> pure K.To
           (T.Keyword K.From, _) -> pure K.From
           (T.Keyword K.Length, _) -> pure K.Length
@@ -768,19 +713,20 @@ functorApplication = do
       pure h
     _ -> mzero
 
+applyBinaryOp ::
+  (SourcePos -> Term SourcePos) ->
+  SourcePos ->
+  Term SourcePos ->
+  Term SourcePos ->
+  Term SourcePos
+applyBinaryOp op p =
+  Apply p . Apply p (op p)
 
-applyBinaryOp :: (SourcePos -> Term SourcePos)
-  -> SourcePos
-  -> Term SourcePos
-  -> Term SourcePos
-  -> Term SourcePos
-applyBinaryOp op p x y = Apply p (Apply p (op p) x) y
-
-
-unaryOp :: Parser a
-  -> Token
-  -> (SourcePos -> a -> Term SourcePos)
-  -> Parser (Term SourcePos)
+unaryOp ::
+  Parser a ->
+  Token ->
+  (SourcePos -> a -> Term SourcePos) ->
+  Parser (Term SourcePos)
 unaryOp subexpr opTok opCtor = do
   p <- getPosition
   consumeExact_ opTok
@@ -789,7 +735,6 @@ unaryOp subexpr opTok opCtor = do
   consumeExact_ T.CloseParen
   pure (opCtor p x)
 
-
 tuple :: Parser (Term SourcePos)
 tuple = do
   p <- getPosition
@@ -797,11 +742,12 @@ tuple = do
   x <- term1
   xs <- many1 (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
-  case reverse (x:xs) of
-    (x':xs') ->
+  case reverse (x : xs) of
+    (x' : xs') ->
       pure
-        (foldr
-          (\y z -> Apply p (Apply p (Pair p) y) z)
-          x'
-          xs')
+        ( foldr
+            (Apply p . Apply p (Pair p))
+            x'
+            xs'
+        )
     [] -> die "logical impossibility: reverse of non-empty list is empty"
