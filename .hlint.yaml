@@ -12,7 +12,7 @@
        - error: {lhs: fromJust, rhs: fromMaybe, name: "No fromJust"}
        - error: {lhs: read, rhs: readMay, name: "No read"}
        - error: {lhs: toEnum, rhs: toEnumMay, name: "No toEnum"}
-       - error: {lhs: Prelude.fromEnum, Prelude.SafeEnum.fromEnum, name: "No fromEnum"}
+       - error: {lhs: Prelude.fromEnum, rhs: Prelude.SafeEnum.fromEnum, name: "No fromEnum"}
        - error: {lhs: succ, rhs: succMay, name: "No succ"}
        - error: {lhs: pred, rhs: predMay, name: "No pred"}
        - error: {lhs: minimum, rhs: minimumMay, name: "No minimum"}
