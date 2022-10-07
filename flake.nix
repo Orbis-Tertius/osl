@@ -58,11 +58,25 @@
       });
       packages.default = hsPkgs.osl;
       checks =
+        with lint-utils.outputs.linters.${system};
         {
-          hlint = lint-utils.outputs.linters.${system}.hlint self;
-          hpack = lint-utils.outputs.linters.${system}.hpack self;
-          nixpkgs-fmt = lint-utils.outputs.linters.${system}.nixpkgs-fmt self;
-          ormolu = lint-utils.outputs.linters.${system}.ormoluStandardGhc921 self;
+          hlint = hlint self;
+          hpack = hpack self;
+          nixpkgs-fmt = nixpkgs-fmt self;
+          ormolu =
+            pkgs.stdenv.mkDerivation {
+              name = "ormolu-check";
+              src = ./.;
+              buildPhase = ''
+                ${hsPkgs.ormolu.outPath}/bin/ormolu -m inplace $(find ./. -type f -name '*.hs')
+                if [ ! -z "$(${pkgs.git} status --porcelain)" ]; then
+                  exit 1
+                fi
+              '';
+              installPhase = ''
+                mkdir -p $out
+              '';
+            };
           spec = hsPkgs.osl-spec;
         };
     });
