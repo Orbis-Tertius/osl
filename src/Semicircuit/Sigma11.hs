@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Semicircuit.Sigma11
   ( prependBounds,
@@ -7,6 +8,8 @@ module Semicircuit.Sigma11
   )
 where
 
+import Data.List (foldl')
+import Die (die)
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
 
 prependBounds ::
@@ -16,11 +19,11 @@ prependBounds ::
 prependBounds bs' (Some x n bs b) =
   Some x n (bs' <> bs) b
 prependBounds _ (SomeP {}) =
-  error "there is a compiler bug; applied prependBounds to SomeP"
+  die "there is a compiler bug; applied prependBounds to SomeP"
 
 prependQuantifiers :: [Quantifier] -> Formula -> Formula
 prependQuantifiers qs f =
-  foldl (flip prependQuantifier) f qs
+  foldl' (flip prependQuantifier) f qs
 
 prependQuantifier :: Quantifier -> Formula -> Formula
 prependQuantifier (Universal x b) f =
@@ -58,7 +61,7 @@ prependArguments f xs =
         AppInverse g x ->
           if g == f
             then
-              error $
+              die $
                 "prependArguments of AppInverse f: "
                   <> "this is a compiler bug"
             else AppInverse g x

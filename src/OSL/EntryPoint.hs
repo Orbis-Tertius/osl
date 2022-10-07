@@ -13,7 +13,8 @@ where
 import Control.Monad.Trans.State.Strict (runStateT)
 import Data.Either.Extra (mapLeft)
 import Data.Text (Text, pack)
-import Data.Text.IO (readFile)
+import Data.Text.Encoding (decodeUtf8')
+import Data.ByteString (readFile)
 import OSL.BuildTranslationContext (buildTranslationContext)
 import OSL.Parse (parseContext)
 import OSL.Tokenize (tokenize)
@@ -53,10 +54,13 @@ newtype Output = Output {unOutput :: String}
 
 runMain :: FileName -> TargetName -> IO Output
 runMain (FileName fileName) (TargetName targetName) = do
-  source <- readFile fileName
-  case calcMain (FileName fileName) (TargetName targetName) (Source source) of
-    Left (ErrorMessage err) -> pure (Output err)
-    Right (SuccessfulOutput result) -> pure (Output result)
+  sourceBs <- readFile fileName
+  case decodeUtf8' sourceBs of
+    Right source ->
+      case calcMain (FileName fileName) (TargetName targetName) (Source source) of
+        Left (ErrorMessage err) -> pure (Output err)
+        Right (SuccessfulOutput result) -> pure (Output result)
+    _ -> pure (Output "could not decode source file; is it not UTF-8?")
 
 calcMain :: FileName -> TargetName -> Source -> Either ErrorMessage SuccessfulOutput
 calcMain (FileName fileName) (TargetName targetName) (Source source) = do

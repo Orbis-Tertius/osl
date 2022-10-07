@@ -16,6 +16,7 @@ module Halo2.Polynomial
   )
 where
 
+import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Halo2.Coefficient as C
 import qualified Halo2.FiniteField as F
@@ -44,7 +45,7 @@ sumMonomials ::
   FiniteField ->
   [(PowerProduct, Coefficient)] ->
   Map PowerProduct Coefficient
-sumMonomials f = foldl g mempty
+sumMonomials f = foldl' g mempty
   where
     g ::
       Map PowerProduct Coefficient ->
@@ -94,8 +95,8 @@ minus :: FiniteField -> Polynomial -> Polynomial -> Polynomial
 minus f a b = plus f a (negative f b)
 
 sum :: FiniteField -> [Polynomial] -> Polynomial
-sum f = foldl (plus f) zero
+sum f = foldl' (plus f) zero
 
 degree :: Polynomial -> Int
 degree (Polynomial p) =
-  foldl max 0 (P.degree <$> Map.keys p)
+  foldl' max 0 (P.degree <$> Map.keys p)

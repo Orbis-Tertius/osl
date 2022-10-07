@@ -46,7 +46,6 @@
        - error: {lhs: sum, rhs: foldl'}
        - error: {lhs: product, rhs: foldl'}
        - error: {lhs: genericLength, rhs: length}
-       - hint: {lhs: unless, rhs: when . not}
        - error: {lhs: unsafePeriodIO, rhs: id, name: "No unsafePerformIO"}
        - error: {lhs: unsafeDupablePerformIO, rhs: id, name: "No unsafeDupablePerformIO"}
        - error: {lhs: unsafeInterleaveIO, rhs: id, name: "No unsafeInterleaveIO"}

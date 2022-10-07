@@ -38,7 +38,7 @@ mergeMappings ::
 mergeMappings as bs =
   let aMaxes = highestIndicesInMappings as
       f =
-        foldl
+        foldl'
           (.)
           id
           [ incrementDeBruijnIndices arity (m + 1)
@@ -54,7 +54,7 @@ mergeMapping ::
 mergeMapping f a b =
   let aMaxes = highestIndicesInMapping a
       g =
-        foldl
+        foldl'
           (.)
           id
           [ incrementDeBruijnIndices arity (m + 1)

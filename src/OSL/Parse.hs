@@ -5,6 +5,7 @@ module OSL.Parse (parseContext) where
 
 import Control.Monad (guard, mzero)
 import Data.Either.Combinators (mapLeft)
+import Data.List (foldl')
 import Data.Text (Text, pack, unpack)
 import Die (die)
 import OSL.Bound (boundAnnotation)
@@ -260,7 +261,7 @@ appendBoundTail :: Bound SourcePos -> BoundTail -> Bound SourcePos
 appendBoundTail b0 =
   \case
     ProductBoundTail bs ->
-      foldl
+      foldl'
         ( \bAcc bNext ->
             ProductBound
               (boundAnnotation bAcc)
@@ -270,7 +271,7 @@ appendBoundTail b0 =
         b0
         bs
     CoproductBoundTail bs ->
-      foldl
+      foldl'
         ( \bAcc bNext ->
             CoproductBound
               (boundAnnotation bAcc)
@@ -280,7 +281,7 @@ appendBoundTail b0 =
         b0
         bs
     FunctionBoundTail bs ->
-      foldl
+      foldl'
         ( \bAcc bNext ->
             FunctionBound
               (boundAnnotation bAcc)
@@ -418,7 +419,7 @@ operatorOn x = do
         ys <- many (consumeExact_ op >> term2)
         pure (y : ys)
       else (: []) <$> term2
-  pure (foldl (opCtor op p) x xs)
+  pure (foldl' (opCtor op p) x xs)
   where
     opCtor =
       \case
@@ -436,7 +437,7 @@ operatorOn x = do
         T.LeftRightArrow -> Iff
         T.Equal -> Equal
         T.LessOrEqual -> LessOrEqual
-        _ -> error "opCtor called outside defined domain"
+        _ -> die "opCtor called outside defined domain"
 
     isAssociative =
       \case
@@ -454,7 +455,7 @@ operatorOn x = do
         T.LeftRightArrow -> False
         T.Equal -> False
         T.LessOrEqual -> False
-        _ -> error "isAssociative called outside defined domain"
+        _ -> die "isAssociative called outside defined domain"
 
 term2 :: Parser (Term SourcePos)
 term2 =
@@ -474,7 +475,7 @@ functionApplication = do
   arg <- term1
   args <- many (consumeExact_ T.Comma >> term1)
   consumeExact_ T.CloseParen
-  pure (foldl (Apply p) f (arg : args))
+  pure (foldl' (Apply p) f (arg : args))
 
 parenthesizedTerm :: Parser (Term SourcePos)
 parenthesizedTerm = do

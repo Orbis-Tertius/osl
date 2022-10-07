@@ -6,6 +6,7 @@ module Halo2.PowerProduct
   )
 where
 
+import Data.List (foldl')
 import qualified Data.Map as Map
 import Halo2.Prelude
 import Halo2.Types.Exponent (Exponent (..))
@@ -17,4 +18,4 @@ times (PowerProduct a) (PowerProduct b) =
 
 degree :: PowerProduct -> Int
 degree (PowerProduct m) =
-  product (getExponent <$> Map.elems m)
+  foldl' (*) 0 (getExponent <$> Map.elems m)

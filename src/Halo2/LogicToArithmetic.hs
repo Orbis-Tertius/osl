@@ -19,6 +19,7 @@ import Cast (intToInteger)
 import Control.Monad (forM, replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Crypto.Number.Basic (numBits)
+import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.ByteDecomposition (countBytes)
@@ -286,7 +287,7 @@ logicToArithmeticCircuit bits f rows lc = do
     forM atoms $ byteDecompositionGate f layout
   let polyGates = translatedGates <> decompositionGates
       degreeBound =
-        foldl
+        foldl'
           max
           0
           (getPolyDegreeBound <$> polyGates)

@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module OSL.Sigma11
@@ -19,6 +20,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Die (die)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
@@ -123,4 +125,4 @@ prependBounds n bs (Some _ [] b) =
 prependBounds _ bs' (Some n bs b) =
   Some n (bs' <> bs) b
 prependBounds _ _ (SomeP {}) =
-  error "there is a compiler bug; applied prependBounds to SomeP"
+  die "there is a compiler bug; applied prependBounds to SomeP"

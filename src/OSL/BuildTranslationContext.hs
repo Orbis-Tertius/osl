@@ -93,7 +93,7 @@ addFreeVariableMapping freeVariable = do
                   (LeftMapping aMap)
                   (RightMapping bMap)
           addMapping freeVariable mapping
-          return mapping
+          pure mapping
         Coproduct _ a b -> do
           aSym <- addGensym a
           bSym <- addGensym b
@@ -106,7 +106,7 @@ addFreeVariableMapping freeVariable = do
                   (LeftMapping aMap)
                   (RightMapping bMap)
           addMapping freeVariable mapping
-          return mapping
+          pure mapping
         F _ _ a b -> do
           aSym <- addGensym a
           bSym <- addGensym b
@@ -119,7 +119,7 @@ addFreeVariableMapping freeVariable = do
                 aMap
           let mapping = mapAritiesInMapping (+ aDim) bMap
           addMapping freeVariable mapping
-          return mapping
+          pure mapping
         P _ _ a b -> do
           aSym <- addGensym a
           bSym <- addGensym b
@@ -132,13 +132,13 @@ addFreeVariableMapping freeVariable = do
                 aMap
           let mapping = mapAritiesInMapping (+ aDim) bMap
           addMapping freeVariable mapping
-          return mapping
+          pure mapping
         NamedType ann aName -> do
           a <- getTypeDeclaration ann aName
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
           addMapping freeVariable aMap
-          return aMap
+          pure aMap
         Maybe _ a -> do
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
@@ -148,7 +148,7 @@ addFreeVariableMapping freeVariable = do
                   (ChoiceMapping i)
                   (ValuesMapping aMap)
           addMapping freeVariable mapping
-          return mapping
+          pure mapping
         List _ _ a -> do
           aSym <- addGensym a
           aMap <- addFreeVariableMapping aSym
@@ -158,7 +158,7 @@ addFreeVariableMapping freeVariable = do
                   (LengthMapping l)
                   (ValuesMapping (mapAritiesInMapping (+ 1) aMap))
           addMapping freeVariable mapping
-          return mapping
+          pure mapping
         Map ann n a b -> do
           vSym <- addGensym (F ann (Just n) a b)
           vMap <- addFreeVariableMapping vSym
@@ -171,13 +171,13 @@ addFreeVariableMapping freeVariable = do
                   (KeysMapping kMap)
                   (ValuesMapping vMap)
           addMapping freeVariable mapping
-          return mapping
+          pure mapping
     _ -> die "logically impossible: free variable is not a free variable"
   where
     mapScalar = do
       mapping <- ScalarMapping <$> getFreeS11NameM (Arity 0)
       addMapping freeVariable mapping
-      return mapping
+      pure mapping
 
 addMapping ::
   Monad m =>
@@ -286,7 +286,7 @@ addGensym ::
 addGensym t = do
   name <- getFreeOSLName <$> get
   addFreeVariableDeclaration name t
-  return name
+  pure name
 
 getFreeOSLName ::
   TranslationContext t ann ->
@@ -349,7 +349,7 @@ getFiniteDimMappingArity ::
   Either (ErrorMessage ann) Arity
 getFiniteDimMappingArity ann =
   \case
-    ScalarMapping _ -> return (Arity 1)
+    ScalarMapping _ -> pure (Arity 1)
     ProductMapping (LeftMapping a) (RightMapping b) ->
       (+) <$> rec a <*> rec b
     CoproductMapping _ (LeftMapping a) (RightMapping b) ->
@@ -369,7 +369,7 @@ getTypeDeclaration ::
 getTypeDeclaration ann name = do
   TranslationContext (ValidContext c) _ <- get
   case Map.lookup name c of
-    Just (Data a) -> return a
+    Just (Data a) -> pure a
     -- these errors should be logically impossible:
     Just _ -> lift . throwE $ ErrorMessage ann "expected the name of a type"
     Nothing -> lift . throwE $ ErrorMessage ann "undefined name"

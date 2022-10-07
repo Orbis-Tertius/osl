@@ -56,8 +56,8 @@ translate
     \case
       OSL.NamedTerm ann name ->
         case Map.lookup name mappings of
-          Just (ScalarMapping x) -> return (Term x)
-          Just m -> return (Mapping m)
+          Just (ScalarMapping x) -> pure (Term x)
+          Just m -> pure (Mapping m)
           Nothing ->
             case Map.lookup name declsMap of
               Just (OSL.Defined defType def) -> do
@@ -115,10 +115,10 @@ translate
             xT <- translateToTerm gc lc xType x
             pure (Term (S11.AppInverse fT' xT))
           _ -> lift . Left $ ErrorMessage ann "expected a permutation"
-      OSL.ConstN _ x -> return (Term (S11.Const x))
-      OSL.ConstZ _ x -> return (Term (S11.Const x))
-      OSL.ConstFin _ x -> return (Term (S11.Const x))
-      OSL.ConstFp _ x -> return (Term (S11.Const x))
+      OSL.ConstN _ x -> pure (Term (S11.Const x))
+      OSL.ConstZ _ x -> pure (Term (S11.Const x))
+      OSL.ConstFin _ x -> pure (Term (S11.Const x))
+      OSL.ConstFp _ x -> pure (Term (S11.Const x))
       OSL.ConstSet ann xs ->
         case termType of
           OSL.F _ _ xType (OSL.Prop _) -> do
@@ -222,21 +222,21 @@ translate
         aM <- translateToMapping gc lc aT a
         case aM of
           ProductMapping (LeftMapping m) _ ->
-            return (Mapping m)
+            pure (Mapping m)
           _ -> lift . Left $ ErrorMessage ann "expected a pair"
       OSL.Apply ann (OSL.Pi2 _) a -> do
         aT <- lift $ inferType decls a
         aM <- translateToMapping gc lc aT a
         case aM of
           ProductMapping _ (RightMapping m) ->
-            return (Mapping m)
+            pure (Mapping m)
           _ -> lift . Left $ ErrorMessage ann "expected a pair"
       OSL.Apply ann (OSL.Iota1 _) a ->
         case termType of
           OSL.Coproduct _ b c -> do
             aM <- translateToMapping gc lc b a
             bM <- lift $ getArbitraryMapping decls c
-            return . Mapping $
+            pure . Mapping $
               CoproductMapping
                 (ChoiceMapping (ScalarMapping (S11.Const 0)))
                 (LeftMapping aM)
@@ -247,7 +247,7 @@ translate
           OSL.Coproduct _ b c -> do
             aM <- lift $ getArbitraryMapping decls b
             bM <- translateToMapping gc lc c a
-            return . Mapping $
+            pure . Mapping $
               CoproductMapping
                 (ChoiceMapping (ScalarMapping (S11.Const 0)))
                 (LeftMapping aM)
@@ -562,7 +562,7 @@ translate
                   ) ->
                   lift $
                     Term
-                      <$> foldl
+                      <$> foldl'
                         (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
@@ -590,7 +590,7 @@ translate
                   ) ->
                   lift $
                     Term
-                      <$> foldl
+                      <$> foldl'
                         (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
@@ -614,7 +614,7 @@ translate
                   ) ->
                   lift $
                     Term
-                      <$> foldl
+                      <$> foldl'
                         (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
@@ -629,7 +629,7 @@ translate
                 (ValuesMapping (ScalarMapping xsT)) ->
                   lift $
                     Term
-                      <$> foldl
+                      <$> foldl'
                         (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
@@ -645,7 +645,7 @@ translate
                 (ValuesMapping (ScalarMapping vT)) ->
                   lift $
                     Term
-                      <$> foldl
+                      <$> foldl'
                         (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
@@ -729,7 +729,7 @@ translate
                   ) ->
                   lift $
                     Term
-                      <$> foldl
+                      <$> foldl'
                         (liftA2 S11.Add)
                         (pure (S11.Const 0))
                         [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
@@ -755,7 +755,7 @@ translate
                       )
                   ) ->
                   Term
-                    <$> foldl
+                    <$> foldl'
                       (liftA2 S11.Add)
                       (pure (S11.Const 0))
                       [ (S11.IndLess (S11.Const i) lT `S11.Mul`)
@@ -838,7 +838,7 @@ translate
                     decls'
                     (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
             bounds <- translateBound gc lc varType varBound
-            Formula . foldl (.) id (S11.ForAll <$> bounds)
+            Formula . foldl' (.) id (S11.ForAll <$> bounds)
               <$> translateToFormula gc lc' p
           InfiniteDimensions ->
             lift . Left $ ErrorMessage ann "universal quantification over an infinite-dimensional type"
@@ -856,7 +856,7 @@ translate
                     decls'
                     (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
             bounds <- translateBound gc lc varType varBound
-            Formula . foldl (.) id (S11.ForSome . S11.someFirstOrder <$> bounds)
+            Formula . foldl' (.) id (S11.ForSome . S11.someFirstOrder <$> bounds)
               <$> translateToFormula gc lc' p
           InfiniteDimensions -> do
             (qs, newMapping) <-
@@ -1135,10 +1135,10 @@ getArbitraryMapping ::
 getArbitraryMapping ctx =
   \case
     OSL.Prop _ -> pure $ PropMapping (S11.Equal (S11.Const 0) (S11.Const 1))
-    OSL.N _ -> return $ ScalarMapping (S11.Const 0)
-    OSL.Z _ -> return $ ScalarMapping (S11.Const 0)
-    OSL.Fp _ -> return $ ScalarMapping (S11.Const 0)
-    OSL.Fin _ _ -> return $ ScalarMapping (S11.Const 0)
+    OSL.N _ -> pure $ ScalarMapping (S11.Const 0)
+    OSL.Z _ -> pure $ ScalarMapping (S11.Const 0)
+    OSL.Fp _ -> pure $ ScalarMapping (S11.Const 0)
+    OSL.Fin _ _ -> pure $ ScalarMapping (S11.Const 0)
     OSL.Product _ a b ->
       ProductMapping
         <$> (LeftMapping <$> rec a)
@@ -1200,7 +1200,7 @@ translateToTerm ::
 translateToTerm gc lc tType t = do
   trans <- translate gc lc tType t
   case trans of
-    Term t' -> return t'
+    Term t' -> pure t'
     Mapping m -> lift $ mappingToTerm (termAnnotation t) m
     m ->
       lift . Left . ErrorMessage (termAnnotation t) $
@@ -1687,7 +1687,7 @@ getFreeS11NameM arity ctx (S11.AuxTables fs _) = do
     )
 
 mconcatM :: Monad m => Monoid a => [m a] -> m a
-mconcatM [] = return mempty
+mconcatM [] = pure mempty
 mconcatM (xM : xMs) = do
   x <- xM
   (x <>) <$> mconcatM xMs

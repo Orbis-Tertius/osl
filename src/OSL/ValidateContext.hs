@@ -7,7 +7,8 @@ module OSL.ValidateContext
   )
 where
 
-import Control.Monad (foldM, forM_, unless, when)
+import Cast (intToInteger)
+import Control.Monad (foldM, forM_, when, unless)
 import qualified Data.Map as Map
 import Data.Text (pack)
 import OSL.Bound (boundAnnotation)
@@ -36,23 +37,23 @@ addToContext c@(ValidContext decls) (name, decl) = do
     Defined t def -> do
       checkType c t
       checkTerm c t def
-  return c'
+  pure c'
 
 checkType :: Show ann => ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
 checkType c t =
   case t of
-    Prop _ -> return ()
+    Prop _ -> pure ()
     F ann n a b -> checkMaybeCardinality ann n >> checkType c a >> checkType c b
     P ann n a b -> checkMaybeCardinality ann n >> checkType c a >> checkType c b
-    N _ -> return ()
-    Z _ -> return ()
-    Fp _ -> return ()
+    N _ -> pure ()
+    Z _ -> pure ()
+    Fp _ -> pure ()
     (Fin ann n) -> checkFinType ann n
     Product _ a b -> checkType c a >> checkType c b
     Coproduct _ a b -> checkType c a >> checkType c b
     NamedType ann name ->
       case getDeclaration c name of
-        Just (Data _) -> return ()
+        Just (Data _) -> pure ()
         Just _ -> Left (ErrorMessage ann "expected a type but got a term")
         Nothing ->
           Left . ErrorMessage ann $
@@ -67,13 +68,13 @@ checkType c t =
 checkFinType :: ann -> Integer -> Either (ErrorMessage ann) ()
 checkFinType ann n =
   if n >= 0
-    then return ()
+    then pure ()
     else Left (ErrorMessage ann "Fin type has a negative cardinality")
 
 getNamedType :: ValidContext t ann -> ann -> Name -> Either (ErrorMessage ann) (Type ann)
 getNamedType c ann name =
   case getDeclaration c name of
-    Just (Data t) -> return t
+    Just (Data t) -> pure t
     Just _ -> Left (ErrorMessage ann "expected a type but got a term")
     Nothing ->
       Left . ErrorMessage ann $
@@ -82,8 +83,8 @@ getNamedType c ann name =
 getNamedTermType :: ValidContext t ann -> ann -> Name -> Either (ErrorMessage ann) (Type ann)
 getNamedTermType c ann name =
   case getDeclaration c name of
-    Just (FreeVariable t) -> return t
-    Just (Defined t _) -> return t
+    Just (FreeVariable t) -> pure t
+    Just (Defined t _) -> pure t
     Just _ -> Left (ErrorMessage ann "expected a term but got a type")
     Nothing ->
       Left . ErrorMessage ann $
@@ -105,9 +106,9 @@ checkQuantifiableType c t =
       checkMaybeCardinality ann n
         >> checkTypeIsNumeric c a
         >> checkTypeIsNumeric c b
-    N _ -> return ()
-    Z _ -> return ()
-    Fp _ -> return ()
+    N _ -> pure ()
+    Z _ -> pure ()
+    Fp _ -> pure ()
     Fin ann n -> checkFinType ann n
     Product _ a b -> checkQuantifiableType c a >> checkQuantifiableType c b
     Coproduct _ a b -> checkQuantifiableType c a >> checkQuantifiableType c b
@@ -135,9 +136,9 @@ checkFiniteDimType c t =
       checkMaybeCardinality ann n
         >> checkTypeIsNumeric c a
         >> checkTypeIsNumeric c b
-    N _ -> return ()
-    Z _ -> return ()
-    Fp _ -> return ()
+    N _ -> pure ()
+    Z _ -> pure ()
+    Fp _ -> pure ()
     Fin ann n -> checkFinType ann n
     Product _ a b -> checkFiniteDimType c a >> checkFiniteDimType c b
     Coproduct _ a b -> checkFiniteDimType c a >> checkFiniteDimType c b
@@ -150,7 +151,7 @@ checkFiniteDimType c t =
         >> checkFiniteDimType c b
 
 checkTypeInclusion :: Show ann => ValidContext t ann -> ann -> Type ann -> Type ann -> Either (ErrorMessage ann) ()
-checkTypeInclusion _ _ (Prop _) (Prop _) = return ()
+checkTypeInclusion _ _ (Prop _) (Prop _) = pure ()
 checkTypeInclusion c ann (F _ _ a b) (F _ Nothing a' b') =
   checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
 checkTypeInclusion _ ann (F _ Nothing _ _) (F _ (Just _) _ _) =
@@ -171,19 +172,19 @@ checkTypeInclusion c ann (F _ (Just n) a b) (F _ (Just n') a' b') =
   if n <= n'
     then checkTypeInclusion c ann a' a >> checkTypeInclusion c ann b b'
     else Left (ErrorMessage ann "function type cardinality mismatch")
-checkTypeInclusion _ _ (Fp _) (N _) = return ()
-checkTypeInclusion _ _ (Fp _) (Z _) = return ()
-checkTypeInclusion _ _ (Fp _) (Fp _) = return ()
-checkTypeInclusion _ _ (Z _) (Fp _) = return ()
-checkTypeInclusion _ _ (Fin _ _) (Fp _) = return ()
-checkTypeInclusion _ _ (N _) (N _) = return ()
-checkTypeInclusion _ _ (Z _) (Z _) = return ()
-checkTypeInclusion _ _ (Fin _ _) (N _) = return ()
-checkTypeInclusion _ _ (Fin _ _) (Z _) = return ()
-checkTypeInclusion _ _ (N _) (Z _) = return ()
+checkTypeInclusion _ _ (Fp _) (N _) = pure ()
+checkTypeInclusion _ _ (Fp _) (Z _) = pure ()
+checkTypeInclusion _ _ (Fp _) (Fp _) = pure ()
+checkTypeInclusion _ _ (Z _) (Fp _) = pure ()
+checkTypeInclusion _ _ (Fin _ _) (Fp _) = pure ()
+checkTypeInclusion _ _ (N _) (N _) = pure ()
+checkTypeInclusion _ _ (Z _) (Z _) = pure ()
+checkTypeInclusion _ _ (Fin _ _) (N _) = pure ()
+checkTypeInclusion _ _ (Fin _ _) (Z _) = pure ()
+checkTypeInclusion _ _ (N _) (Z _) = pure ()
 checkTypeInclusion _ ann (Fin _ n) (Fin _ n') =
   if n <= n'
-    then return ()
+    then pure ()
     else Left (ErrorMessage ann "finite type cardinality mismatch")
 checkTypeInclusion c ann (Product _ a b) (Product _ a' b') =
   checkTypeInclusion c ann a a' >> checkTypeInclusion c ann b b'
@@ -191,7 +192,7 @@ checkTypeInclusion c ann (Coproduct _ a b) (Coproduct _ a' b') =
   checkTypeInclusion c ann a a' >> checkTypeInclusion c ann b b'
 checkTypeInclusion _ ann (NamedType _ name) (NamedType _ name') =
   if name == name'
-    then return ()
+    then pure ()
     else Left (ErrorMessage ann ("type mismatch: " <> pack (show name) <> " and " <> pack (show name')))
 checkTypeInclusion c ann (Maybe _ a) (Maybe _ b) =
   checkTypeInclusion c ann a b
@@ -232,7 +233,7 @@ checkTerm c t x =
     ConstN ann n -> do
       checkTypeInclusion c ann t (N ann)
       if n >= 0
-        then return ()
+        then pure ()
         else Left (ErrorMessage ann "expected a natural number but got a negative integer")
     ConstFp ann _ ->
       checkTypeInclusion c ann (Fp ann) t
@@ -253,7 +254,7 @@ checkTerm c t x =
         F _ n a b -> do
           case n of
             Just (Cardinality n') ->
-              if n' >= fromIntegral (length f)
+              if n' >= intToInteger (length f)
                 then pure ()
                 else Left (ErrorMessage ann "too many mappings in function literal")
             Nothing -> pure ()
@@ -369,12 +370,12 @@ checkTerm c t x =
           checkTypeIsNumeric c a'
           checkTypeIsNumeric c a''
           checkTypeInclusion c ann a' a''
-          unless (n == n') genericErrorMessage
+          when (n /= n') genericErrorMessage
         (List _ n a', List _ n' a'') -> do
           checkTypeIsNumeric c a'
           checkTypeIsNumeric c a''
           checkTypeInclusion c ann a' a''
-          unless (n == n') genericErrorMessage
+          when (n /= n') genericErrorMessage
         _ ->
           Left . ErrorMessage ann $
             "could not apply List(cast) because it was applied to a "
@@ -436,7 +437,7 @@ checkTerm c t x =
         _ -> genericErrorMessage
     Nothing' _ ->
       case t of
-        Maybe _ _ -> return ()
+        Maybe _ _ -> pure ()
         _ -> genericErrorMessage
     Maybe' ann f ->
       case t of
@@ -476,7 +477,7 @@ checkTerm c t x =
         _ -> genericErrorMessage
     Length _ ->
       case t of
-        F _ _ (List {}) (N _) -> return ()
+        F _ _ (List {}) (N _) -> pure ()
         _ -> genericErrorMessage
     Nth ann ->
       case t of
@@ -505,32 +506,32 @@ checkTerm c t x =
       case t of
         F _ _ (List _ _ a') (List _ _ (NamedType _ name')) -> do
           checkTypeInclusion c ann a' a
-          unless (name' == name) genericErrorMessage
+          when (name' /= name) genericErrorMessage
         _ -> genericErrorMessage
     ListFrom ann name -> do
       a <- getNamedType c ann name
       case t of
         F _ _ (List _ _ (NamedType _ name')) (List _ _ a') -> do
           checkTypeInclusion c ann a a'
-          unless (name' == name) genericErrorMessage
+          when (name' /= name) genericErrorMessage
         _ -> genericErrorMessage
     ListMaybeTo ann name -> do
       a <- getNamedType c ann name
       case t of
         F _ _ (List _ _ (Maybe _ a')) (List _ _ (Maybe _ (NamedType _ name'))) -> do
           checkTypeInclusion c ann a' a
-          unless (name' == name) genericErrorMessage
+          when (name' /= name) genericErrorMessage
         _ -> genericErrorMessage
     ListMaybeFrom ann name -> do
       a <- getNamedType c ann name
       case t of
         F _ _ (List _ _ (Maybe _ (NamedType _ name'))) (List _ _ (Maybe _ a')) -> do
           checkTypeInclusion c ann a a'
-          unless (name' == name) genericErrorMessage
+          when (name' /= name) genericErrorMessage
         _ -> genericErrorMessage
     ListLength _ ->
       case t of
-        F _ _ (List _ _ (List {})) (List _ _ (N _)) -> return ()
+        F _ _ (List _ _ (List {})) (List _ _ (N _)) -> pure ()
         _ -> genericErrorMessage
     ListMaybePi1 ann ->
       case t of
@@ -544,7 +545,7 @@ checkTerm c t x =
         _ -> genericErrorMessage
     ListMaybeLength _ ->
       case t of
-        F _ _ (List _ _ (Maybe _ (List {}))) (List _ _ (Maybe _ (N _))) -> return ()
+        F _ _ (List _ _ (Maybe _ (List {}))) (List _ _ (Maybe _ (N _))) -> pure ()
         _ -> genericErrorMessage
     Sum ann ->
       case t of
@@ -593,7 +594,7 @@ checkTerm c t x =
         F _ _ (Map _ _ a' b) (Map _ _ (NamedType _ name') b') -> do
           checkTypeInclusion c ann a' a
           checkTypeInclusion c ann b b'
-          unless (name' == name) genericErrorMessage
+          when (name' /= name) genericErrorMessage
         _ -> genericErrorMessage
     MapFrom ann name -> do
       a <- getNamedType c ann name
@@ -601,7 +602,7 @@ checkTerm c t x =
         F _ _ (Map _ _ k (NamedType _ name')) (Map _ _ k' b) -> do
           checkTypeInclusion c ann k k'
           checkTypeInclusion c ann a b
-          unless (name' == name) genericErrorMessage
+          when (name' /= name) genericErrorMessage
         _ -> genericErrorMessage
     SumMapLength _ ->
       case t of
@@ -621,7 +622,7 @@ checkTerm c t x =
             Left err -> Left err
             Right a -> do
               checkTerm c a z
-              return a
+              pure a
           checkFiniteDimType c a
         _ -> genericErrorMessage
     LessOrEqual _ y z -> do
@@ -631,10 +632,10 @@ checkTerm c t x =
             Left _ -> do
               a <- inferType c z
               checkTerm c a y
-              return a
+              pure a
             Right a -> do
               checkTerm c a z
-              return a
+              pure a
           checkTypeIsNumeric c a
         _ -> genericErrorMessage
     And ann p q -> do
@@ -827,8 +828,8 @@ inferType ::
 inferType c t =
   case t of
     NamedTerm ann name -> getNamedTermType c ann name
-    ConstN ann _ -> return (N ann)
-    ConstZ ann _ -> return (Z ann)
+    ConstN ann _ -> pure (N ann)
+    ConstZ ann _ -> pure (Z ann)
     ConstFin ann _ -> Left (ErrorMessage ann "cannot infer cardinality of type of finite constant")
     ConstSet ann (x : xs) -> do
       xType <- inferType c x
@@ -838,7 +839,7 @@ inferType c t =
       xType <- inferType c x
       yType <- inferType c y
       forM_ fs (\(x', y') -> checkTerm c xType x' >> checkTerm c yType y')
-      pure (F ann (Just (Cardinality (fromIntegral (length fs)))) xType yType)
+      pure (F ann (Just (Cardinality (intToInteger (length fs)))) xType yType)
     AddN ann -> pure (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
     MulN ann -> pure (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
     AddZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
@@ -849,10 +850,10 @@ inferType c t =
     ListCast ann -> Left (ErrorMessage ann "cannot infer the type of List(cast) from context")
     To ann name -> do
       a <- getNamedType c ann name
-      return (F ann Nothing a (NamedType ann name))
+      pure (F ann Nothing a (NamedType ann name))
     From ann name -> do
       a <- getNamedType c ann name
-      return (F ann Nothing (NamedType ann name) a)
+      pure (F ann Nothing (NamedType ann name) a)
     Apply ann (Inverse _) f -> do
       a <- inferType c f
       case a of
@@ -865,7 +866,7 @@ inferType c t =
         (F _ n d e, F _ n' d' e') -> do
           checkTypeInclusion c ann d d'
           checkTypeInclusion c ann d' d
-          return (F ann (min <$> n <*> n') d (Product ann e e'))
+          pure (F ann (min <$> n <*> n') d (Product ann e e'))
         _ -> Left (ErrorMessage ann "ill-typed function product; one of the arguments is not a function")
     FunctionCoproduct ann f g -> do
       a <- inferType c f
@@ -874,26 +875,26 @@ inferType c t =
         (F _ n d e, F _ m d' e') -> do
           checkTypeInclusion c ann e e'
           checkTypeInclusion c ann e' e
-          return (F ann (min <$> n <*> m) (Coproduct ann d d') e)
+          pure (F ann (min <$> n <*> m) (Coproduct ann d d') e)
         _ -> Left (ErrorMessage ann "ill-typed function coproduct; one of the arguments is not a function")
     Maybe' ann f -> do
       a <- inferType c f
       case a of
-        F _ n b d -> return (F ann n d (F ann n (Maybe ann b) d))
+        F _ n b d -> pure (F ann n d (F ann n (Maybe ann b) d))
         _ -> Left . ErrorMessage ann $ "expected a function as the first argument to maybe but got a " <> pack (show a)
     Apply ann (Apply _ (Pair _) x) y -> do
       a <- inferType c x
       b <- inferType c y
-      return (Product ann a b)
+      pure (Product ann a b)
     Apply ann (Pi1 _) x -> do
       a <- inferType c x
       case a of
-        Product _ b _ -> return b
+        Product _ b _ -> pure b
         _ -> Left (ErrorMessage ann "pi1 applied to a non-tuple")
     Apply ann (Pi2 _) x -> do
       a <- inferType c x
       case a of
-        Product _ _ b -> return b
+        Product _ _ b -> pure b
         _ -> Left (ErrorMessage ann "pi2 applied to a non-tuple")
     Apply ann (IsNothing _) x -> do
       a <- inferType c x
@@ -904,7 +905,7 @@ inferType c t =
     Apply ann (Exists _) x -> do
       a <- inferType c x
       case a of
-        Maybe _ b -> return b
+        Maybe _ b -> pure b
         _ -> Left (ErrorMessage ann "exists applied to a non-Maybe")
     Apply ann (MaybePi1 _) x -> do
       a <- inferType c x
@@ -970,33 +971,33 @@ inferType c t =
     Apply ann (ListPi1 _) xs -> do
       a <- inferType c xs
       case a of
-        List _ n (Product _ b _) -> return (List ann n b)
+        List _ n (Product _ b _) -> pure (List ann n b)
         _ -> Left (ErrorMessage ann "List(pi1) applied to a non-List or a List of non-tuples")
     Apply ann (ListPi2 _) xs -> do
       a <- inferType c xs
       case a of
-        List _ n (Product _ _ b) -> return (List ann n b)
+        List _ n (Product _ _ b) -> pure (List ann n b)
         _ -> Left (ErrorMessage ann "List(pi2) applied to a non-List or a List of non-tuples")
     Apply ann (ListLength _) xs -> do
       a <- inferType c xs
       case a of
-        List _ n (List {}) -> return (List ann n (N ann))
+        List _ n (List {}) -> pure (List ann n (N ann))
         _ -> Left (ErrorMessage ann "List(length) applied to a non-List-of-Lists")
     Apply ann (ListMaybePi1 _) xs -> do
       a <- inferType c xs
       case a of
-        List _ n (Maybe _ (Product _ b _)) -> return (List ann n (Maybe ann b))
+        List _ n (Maybe _ (Product _ b _)) -> pure (List ann n (Maybe ann b))
         _ -> Left (ErrorMessage ann "List(Maybe(pi1)) applied to a non-List-of-Maybe-tuples")
     Apply ann (ListMaybePi2 _) xs -> do
       a <- inferType c xs
       case a of
-        List _ n (Maybe _ (Product _ _ b)) -> return (List ann n (Maybe ann b))
+        List _ n (Maybe _ (Product _ _ b)) -> pure (List ann n (Maybe ann b))
         _ -> Left (ErrorMessage ann "List(Maybe(pi2)) applied to a non-List-of-Maybe-tuples")
     Apply ann (ListMaybeLength _) xs -> do
       a <- inferType c xs
       case a of
         List _ n (Maybe _ (List {})) ->
-          return (List ann n (Maybe ann (N ann)))
+          pure (List ann n (Maybe ann (N ann)))
         _ -> Left (ErrorMessage ann "List(Maybe(length)) applied to a non-List-of-Maybe-Lists")
     Apply ann (ListTo _ name) xs -> do
       a <- getNamedType c ann name
@@ -1037,19 +1038,19 @@ inferType c t =
       case a of
         List _ _ (Maybe _ b) -> do
           checkTypeIsNumeric c b
-          return b
+          pure b
         List _ _ (List _ _ (Maybe _ b)) -> do
           checkTypeIsNumeric c b
-          return b
+          pure b
         List _ _ (List _ _ b) -> do
           checkTypeIsNumeric c b
-          return b
+          pure b
         List _ _ b -> do
           checkTypeIsNumeric c b
-          return b
+          pure b
         Map _ _ _ b -> do
           checkTypeIsNumeric c b
-          return b
+          pure b
         _ -> Left (ErrorMessage ann "sum applied to a non-summable term")
     Apply ann (Apply _ (Lookup _) k) xs -> do
       a <- inferType c k
@@ -1057,12 +1058,12 @@ inferType c t =
       case b of
         Map _ _ a' d -> do
           checkTypeInclusion c ann a a'
-          return d
+          pure d
         _ -> Left (ErrorMessage ann "lookup applied to a non-Map")
     Apply ann (Keys _) xs -> do
       a <- inferType c xs
       case a of
-        Map _ n b _ -> return (List ann n b)
+        Map _ n b _ -> pure (List ann n b)
         _ -> Left (ErrorMessage ann "keys applied to a non-Map")
     Apply ann (MapTo _ name) xs -> do
       xsType <- inferType c xs
@@ -1084,17 +1085,17 @@ inferType c t =
     Apply ann (MapPi1 _) xs -> do
       a <- inferType c xs
       case a of
-        Map _ n b (Product _ d _) -> return (Map ann n b d)
+        Map _ n b (Product _ d _) -> pure (Map ann n b d)
         _ -> Left (ErrorMessage ann "Map(pi1) applied to a non-Map or a Map whose value type is not a Cartesian product")
     Apply ann (MapPi2 _) xs -> do
       a <- inferType c xs
       case a of
-        Map _ n b (Product _ _ d) -> return (Map ann n b d)
+        Map _ n b (Product _ _ d) -> pure (Map ann n b d)
         _ -> Left (ErrorMessage ann "Map(pi2) applied to a non-Map or a Map whose value type is not a Cartesian product")
     Apply ann (SumMapLength _) xs -> do
       a <- inferType c xs
       case a of
-        Map _ _ _ (List {}) -> return (N ann)
+        Map _ _ _ (List {}) -> pure (N ann)
         _ -> Left (ErrorMessage ann "sum.Map(length) applied to a non-Map-of-Lists")
     Apply ann (SumListLookup _ k) xs -> do
       a <- inferType c k
@@ -1103,7 +1104,7 @@ inferType c t =
         List _ _ (Map _ _ a' d) -> do
           checkTypeIsNumeric c d
           checkTypeInclusion c ann a a'
-          return d
+          pure d
         _ -> Left (ErrorMessage ann "sum.List(lookup(_)) applied to a non-List-of-Maps")
     -- NOTICE: generic application inference for those cases not covered above;
     -- must come last among all apply cases
@@ -1112,16 +1113,16 @@ inferType c t =
       case a of
         F _ _ b d -> do
           checkTerm c b x
-          return d
+          pure d
         P _ _ b d -> do
           checkTerm c b x
-          return d
+          pure d
         _ -> Left (ErrorMessage ann "function application head does not contain a function")
     Lambda ann varName domain def -> do
       checkType c domain
       c' <- addToContext c (varName, FreeVariable domain)
       codomain <- inferType c' def
-      return (F ann Nothing domain codomain)
+      pure (F ann Nothing domain codomain)
     Let _ varName varType def body -> do
       checkType c varType
       c' <- addToContext c (varName, Defined varType def)
@@ -1131,54 +1132,54 @@ inferType c t =
         Left _ -> do
           a <- inferType c z
           checkTerm c a y
-          return a
+          pure a
         Right a -> do
           checkTerm c a z
-          return a
+          pure a
       checkFiniteDimType c a
-      return (Prop ann)
+      pure (Prop ann)
     LessOrEqual ann y z -> do
       a <- case inferType c y of
         Left _ -> do
           a <- inferType c z
           checkTerm c a y
-          return a
+          pure a
         Right a -> do
           checkTerm c a z
-          return a
+          pure a
       checkTypeIsNumeric c a
-      return (Prop ann)
+      pure (Prop ann)
     And ann p q -> do
       checkTerm c (Prop ann) p
       checkTerm c (Prop ann) q
-      return (Prop ann)
+      pure (Prop ann)
     Or ann p q -> do
       checkTerm c (Prop ann) p
       checkTerm c (Prop ann) q
-      return (Prop ann)
+      pure (Prop ann)
     Not ann p -> do
       checkTerm c (Prop ann) p
-      return (Prop ann)
+      pure (Prop ann)
     Implies ann p q -> do
       checkTerm c (Prop ann) p
       checkTerm c (Prop ann) q
-      return (Prop ann)
+      pure (Prop ann)
     Iff ann p q -> do
       checkTerm c (Prop ann) p
       checkTerm c (Prop ann) q
-      return (Prop ann)
+      pure (Prop ann)
     ForAll ann varName varType varBound p -> do
       checkType c varType
       maybe (pure ()) (checkBound c varType) varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
-      return (Prop ann)
+      pure (Prop ann)
     ForSome ann varName varType varBound p -> do
       checkType c varType
       maybe (pure ()) (checkBound c varType) varBound
       c' <- addToContext c (varName, FreeVariable varType)
       checkTerm c' (Prop ann) p
-      return (Prop ann)
+      pure (Prop ann)
     _ ->
       Left . ErrorMessage (termAnnotation t) $
         "could not infer type of term from context: "
@@ -1187,10 +1188,10 @@ inferType c t =
 checkTypeIsNumeric :: Show ann => ValidContext t ann -> Type ann -> Either (ErrorMessage ann) ()
 checkTypeIsNumeric c t =
   case t of
-    N _ -> return ()
-    Z _ -> return ()
-    Fin _ _ -> return ()
-    Fp _ -> return ()
+    N _ -> pure ()
+    Z _ -> pure ()
+    Fin _ _ -> pure ()
+    Fp _ -> pure ()
     NamedType ann name -> getNamedType c ann name >>= checkTypeIsNumeric c
     _ -> Left . ErrorMessage (typeAnnotation t) $ "expected a numeric type but got " <> pack (show t)
 

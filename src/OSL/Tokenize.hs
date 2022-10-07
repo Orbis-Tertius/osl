@@ -4,6 +4,7 @@ module OSL.Tokenize (tokenize) where
 
 import Control.Monad (void)
 import Data.Either.Combinators (mapLeft)
+import Data.List (foldl')
 import Data.Text (Text, cons, pack)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.Keyword (Keyword)
@@ -25,9 +26,9 @@ tokens = do
     t <- token
     p <- getPosition
     void (many whitespace)
-    return (t, p)
+    pure (t, p)
   eof
-  return ts
+  pure ts
 
 whitespace :: Parser ()
 whitespace = void (oneOf " \t\r\n") <|> try oneLineComment <|> try multiLineComment
@@ -173,19 +174,19 @@ name :: Parser Name
 name = do
   begin <- oneOf (['a' .. 'z'] <> ['A' .. 'Z'] <> "_")
   rest <- many (oneOf (['a' .. 'z'] <> ['A' .. 'Z'] <> ['0' .. '9'] <> "_\'"))
-  return (Sym (cons begin (pack rest)))
+  pure (Sym (cons begin (pack rest)))
 
 constantNatural :: Parser Token
 constantNatural = do
   i <- nonNegativeIntegerLiteral
   void $ char 'N' <|> char 'ℕ'
-  return (T.ConstN i)
+  pure (T.ConstN i)
 
 constantInteger :: Parser Token
 constantInteger = do
   i <- integerLiteral
   void $ char 'Z' <|> char 'ℤ'
-  return (T.ConstZ i)
+  pure (T.ConstZ i)
 
 constantField :: Parser Token
 constantField = do
@@ -202,7 +203,7 @@ constantFinite = do
   i <- integerLiteral
   _ <- many whitespace
   void $ char ')'
-  return (T.ConstFin i)
+  pure (T.ConstFin i)
 
 integerLiteral :: Parser Integer
 integerLiteral = negativeIntegerLiteral <|> nonNegativeIntegerLiteral
@@ -232,4 +233,4 @@ digitToInteger =
     _ -> 0
 
 digitsToInteger :: String -> Integer
-digitsToInteger = foldl (\a x -> a * 10 + x) 0 . fmap digitToInteger
+digitsToInteger = foldl' (\a x -> a * 10 + x) 0 . fmap digitToInteger
