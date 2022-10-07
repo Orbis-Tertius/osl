@@ -11,10 +11,10 @@ module OSL.EntryPoint
 where
 
 import Control.Monad.Trans.State.Strict (runStateT)
+import Data.ByteString (readFile)
 import Data.Either.Extra (mapLeft)
 import Data.Text (Text, pack)
 import Data.Text.Encoding (decodeUtf8')
-import Data.ByteString (readFile)
 import OSL.BuildTranslationContext (buildTranslationContext)
 import OSL.Parse (parseContext)
 import OSL.Tokenize (tokenize)

@@ -8,7 +8,7 @@ module OSL.ValidateContext
 where
 
 import Cast (intToInteger)
-import Control.Monad (foldM, forM_, when, unless)
+import Control.Monad (foldM, forM_, unless, when)
 import qualified Data.Map as Map
 import Data.Text (pack)
 import OSL.Bound (boundAnnotation)
