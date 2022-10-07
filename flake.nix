@@ -52,6 +52,7 @@
           pkgs.nixpkgs-fmt
           hsPkgs.ghcid
           hsPkgs.ormolu
+          hsPkgs.hlint
         ];
       });
       packages.default = hsPkgs.osl;
