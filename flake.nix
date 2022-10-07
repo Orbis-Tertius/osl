@@ -45,6 +45,29 @@
                 osl-spec = disableLibraryProfiling (hprev.callCabal2nix "osl:spec" ./. { });
               };
           };
+      ormolu-check =
+        pkgs.stdenv.mkDerivation {
+          name = "ormolu-check";
+          src = ./.;
+          doCheck = true;
+          buildPhase = ''
+            ${pkgs.git.outPath}/bin/git init
+            ${pkgs.git.outPath}/bin/git add -A
+            ${pkgs.git.outPath}/bin/git config user.email "foo@bar.com"
+            ${pkgs.git.outPath}/bin/git config user.name "Foobar"
+            ${pkgs.git.outPath}/bin/git commit -m "initial commit"
+            ${hsPkgs.ormolu.outPath}/bin/ormolu -m inplace $(find ./. -type f -name '*.hs')
+            if [ -z "$(${pkgs.git.outPath}/bin/git status --porcelain)" ]; then
+              echo "ok"
+            else
+              echo "ormolu check failed"
+              exit 1
+            fi
+          '';
+          installPhase = ''
+            mkdir -p $out
+          '';
+        };
     in
     {
       devShells.default = hsPkgs.osl.env.overrideAttrs (attrs: {
@@ -57,26 +80,14 @@
         ];
       });
       packages.default = hsPkgs.osl;
+      packages.ormolu-check = ormolu-check;
       checks =
         with lint-utils.outputs.linters.${system};
         {
           hlint = hlint self;
           hpack = hpack self;
           nixpkgs-fmt = nixpkgs-fmt self;
-          ormolu =
-            pkgs.stdenv.mkDerivation {
-              name = "ormolu-check";
-              src = ./.;
-              buildPhase = ''
-                ${hsPkgs.ormolu.outPath}/bin/ormolu -m inplace $(find ./. -type f -name '*.hs')
-                if [ ! -z "$(${pkgs.git} status --porcelain)" ]; then
-                  exit 1
-                fi
-              '';
-              installPhase = ''
-                mkdir -p $out
-              '';
-            };
+          inherit ormolu-check;
           spec = hsPkgs.osl-spec;
         };
     });
