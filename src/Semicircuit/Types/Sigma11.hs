@@ -49,7 +49,7 @@ data Term
   | Mul Term Term
   | IndLess Term Term
   | Const Integer
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 var :: Name -> Term
 var x = App x []
@@ -95,10 +95,10 @@ data InputBound = InputBound
   { name :: Name,
     bound :: Bound
   }
-  deriving (Eq)
+  deriving (Eq, Generic)
 
 newtype OutputBound = OutputBound {unOutputBound :: Bound}
-  deriving (Eq)
+  deriving (Eq, Generic)
 
 data Quantifier
   = Universal Name Bound

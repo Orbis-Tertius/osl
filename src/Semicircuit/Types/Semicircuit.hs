@@ -1,3 +1,7 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+
 module Semicircuit.Types.Semicircuit
   ( Semicircuit (..),
     FunctionCalls (..),
@@ -9,7 +13,7 @@ where
 
 import Data.List.NonEmpty (NonEmpty)
 import Data.Set (Set)
-import OSL.Types.Sigma11 (Name, Term)
+import Semicircuit.Types.Sigma11 (Name, Term)
 import Semicircuit.Types.PNFFormula (Formula)
 
 data Semicircuit
@@ -20,12 +24,16 @@ data Semicircuit
 
 newtype IndicatorFunctionCalls
   = IndicatorFunctionCalls (Set IndicatorFunctionCall)
+  deriving newtype (Semigroup, Monoid)
 
 newtype FunctionCalls
   = FunctionCalls (Set FunctionCall)
+  deriving newtype (Semigroup, Monoid)
 
 data IndicatorFunctionCall
   = IndicatorFunctionCall Term Term
+  deriving (Eq, Ord)
 
 data FunctionCall
   = FunctionCall Name (NonEmpty Term)
+  deriving (Eq, Ord)
