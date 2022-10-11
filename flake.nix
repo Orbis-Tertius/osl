@@ -92,7 +92,6 @@
         {
           hlint = hlint self;
           hpack = hpack self;
-          nixpkgs-fmt = nixpkgs-fmt self;
           inherit ormolu-check;
           spec = hsPkgs.osl-spec;
         };
