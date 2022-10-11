@@ -17,6 +17,21 @@
         "type": "github"
       }
     },
+    "flake-compat-ci": {
+      "locked": {
+        "lastModified": 1646664117,
+        "narHash": "sha256-AX2VewPcS9eRsoirVHfnk07MHAOH6CTDiD10XtRaZbk=",
+        "owner": "hercules-ci",
+        "repo": "flake-compat-ci",
+        "rev": "e588637b2eec4261ed0d36335c83a117f2744dea",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "flake-compat-ci",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "locked": {
         "lastModified": 1659877975,
@@ -87,6 +102,7 @@
     "root": {
       "inputs": {
         "autodocodec-src": "autodocodec-src",
+        "flake-compat-ci": "flake-compat-ci",
         "flake-utils": "flake-utils",
         "lint-utils": "lint-utils",
         "nixpkgs": "nixpkgs",
