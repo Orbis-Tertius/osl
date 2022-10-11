@@ -80,9 +80,10 @@ deBruijnToGensyms' =
           <$> bound (b1 ^. #unOutputBound)
       pushIndices (Arity 1)
       x <- mapName (DB.Name (Arity 1) (DeBruijnIndex 0))
-      r <- GS.ForSome
-        (GS.SomeP x n b0' b1')
-        <$> rec p
+      r <-
+        GS.ForSome
+          (GS.SomeP x n b0' b1')
+          <$> rec p
       popIndices (Arity 1)
       pure r
   where
@@ -132,5 +133,11 @@ pushIndices arity = do
 popIndices :: Arity -> State S ()
 popIndices arity = do
   S n m <- get
-  put (S n (Map.mapKeys (incrementDeBruijnIndices arity (-1))
-             (Map.delete (DB.Name arity 0) m)))
+  put
+    ( S
+        n
+        ( Map.mapKeys
+            (incrementDeBruijnIndices arity (-1))
+            (Map.delete (DB.Name arity 0) m)
+        )
+    )

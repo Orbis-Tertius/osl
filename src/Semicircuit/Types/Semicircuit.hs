@@ -1,7 +1,6 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-
 module Semicircuit.Types.Semicircuit
   ( Semicircuit (..),
     FunctionCalls (..),
@@ -13,8 +12,8 @@ where
 
 import Data.List.NonEmpty (NonEmpty)
 import Data.Set (Set)
-import Semicircuit.Types.Sigma11 (Name, Term)
 import Semicircuit.Types.PNFFormula (Formula)
+import Semicircuit.Types.Sigma11 (Name, Term)
 
 data Semicircuit
   = Semicircuit

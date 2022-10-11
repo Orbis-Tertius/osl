@@ -3,10 +3,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Semicircuit.PNFFormula
-  ( toPNFFormula
-  , indicatorFunctionCalls
-  , functionCalls
-  , toSemicircuit
+  ( toPNFFormula,
+    indicatorFunctionCalls,
+    functionCalls,
+    toSemicircuit,
   )
 where
 
@@ -17,8 +17,8 @@ import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Sigma11 (prependBounds)
 import qualified Semicircuit.Types.PNFFormula as PNF
 import qualified Semicircuit.Types.QFFormula as QF
+import Semicircuit.Types.Semicircuit (FunctionCall (..), FunctionCalls (..), IndicatorFunctionCall (..), IndicatorFunctionCalls (..), Semicircuit (..))
 import qualified Semicircuit.Types.Sigma11 as S11
-import Semicircuit.Types.Semicircuit (IndicatorFunctionCalls (..), IndicatorFunctionCall (..), FunctionCalls (..), FunctionCall (..), Semicircuit (..))
 
 -- Turns a strong prenex normal form into a PNF formula.
 toPNFFormula ::
@@ -73,7 +73,6 @@ toPNFFormula ann =
           Left . ErrorMessage ann $
             "input formula is not a prenex normal form"
 
-
 -- Gets the indicator function calls in the given PNF formula.
 indicatorFunctionCalls :: PNF.Formula -> IndicatorFunctionCalls
 indicatorFunctionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
@@ -91,40 +90,45 @@ indicatorFunctionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
         QF.Implies p q -> qff p <> qff q
         QF.Iff p q -> qff p <> qff q
 
-    eQ :: PNF.ExistentialQuantifier
-       -> IndicatorFunctionCalls
+    eQ ::
+      PNF.ExistentialQuantifier ->
+      IndicatorFunctionCalls
     eQ =
       \case
         S11.Some _ _ inBounds outBound ->
           mconcat (bound . (^. #bound) <$> inBounds)
-          <> bound (outBound ^. #unOutputBound)
+            <> bound (outBound ^. #unOutputBound)
         S11.SomeP _ _ inBound outBound ->
           bound (inBound ^. #bound)
-          <> bound (outBound ^. #unOutputBound)
+            <> bound (outBound ^. #unOutputBound)
 
-    uQ :: PNF.UniversalQuantifier
-       -> IndicatorFunctionCalls
+    uQ ::
+      PNF.UniversalQuantifier ->
+      IndicatorFunctionCalls
     uQ (PNF.All _ b) = bound b
 
-    bound :: S11.Bound
-          -> IndicatorFunctionCalls
+    bound ::
+      S11.Bound ->
+      IndicatorFunctionCalls
     bound =
       \case
         S11.TermBound x -> term x
         S11.FieldMaxBound -> mempty
 
-    term :: S11.Term
-         -> IndicatorFunctionCalls
+    term ::
+      S11.Term ->
+      IndicatorFunctionCalls
     term =
       \case
         S11.App _ xs -> mconcat (term <$> xs)
         S11.AppInverse _ x -> term x
         S11.Add x y -> term x <> term y
         S11.Mul x y -> term x <> term y
-        S11.IndLess x y -> term x <> term y
-          <> IndicatorFunctionCalls (Set.singleton (IndicatorFunctionCall x y))
+        S11.IndLess x y ->
+          term x
+            <> term y
+            <> IndicatorFunctionCalls (Set.singleton (IndicatorFunctionCall x y))
         S11.Const _ -> mempty
-
 
 functionCalls :: PNF.Formula -> FunctionCalls
 functionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
@@ -142,47 +146,52 @@ functionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
         QF.Implies p q -> qff p <> qff q
         QF.Iff p q -> qff p <> qff q
 
-    eQ :: PNF.ExistentialQuantifier
-       -> FunctionCalls
+    eQ ::
+      PNF.ExistentialQuantifier ->
+      FunctionCalls
     eQ =
       \case
         S11.Some _ _ inBounds outBound ->
           mconcat (bound . (^. #bound) <$> inBounds)
-          <> bound (outBound ^. #unOutputBound)
+            <> bound (outBound ^. #unOutputBound)
         S11.SomeP _ _ inBound outBound ->
           bound (inBound ^. #bound)
-          <> bound (outBound ^. #unOutputBound)
+            <> bound (outBound ^. #unOutputBound)
 
-    uQ :: PNF.UniversalQuantifier
-       -> FunctionCalls
+    uQ ::
+      PNF.UniversalQuantifier ->
+      FunctionCalls
     uQ (PNF.All _ b) = bound b
 
-    bound :: S11.Bound
-          -> FunctionCalls
+    bound ::
+      S11.Bound ->
+      FunctionCalls
     bound =
       \case
         S11.TermBound x -> term x
         S11.FieldMaxBound -> mempty
 
-    term :: S11.Term
-         -> FunctionCalls
+    term ::
+      S11.Term ->
+      FunctionCalls
     term =
       \case
-        S11.App f xs -> mconcat (term <$> xs)
-          <> (case NonEmpty.nonEmpty xs of
-                Just xs' -> FunctionCalls (Set.singleton (FunctionCall f xs'))
-                Nothing -> mempty)
+        S11.App f xs ->
+          mconcat (term <$> xs)
+            <> ( case NonEmpty.nonEmpty xs of
+                   Just xs' -> FunctionCalls (Set.singleton (FunctionCall f xs'))
+                   Nothing -> mempty
+               )
         S11.AppInverse _ x -> term x
         S11.Add x y -> term x <> term y
         S11.Mul x y -> term x <> term y
         S11.IndLess x y -> term x <> term y
         S11.Const _ -> mempty
 
-
 -- Turns a PNF formula into a semicircuit.
 toSemicircuit :: PNF.Formula -> Semicircuit
 toSemicircuit f =
   Semicircuit
-  (indicatorFunctionCalls f)
-  (functionCalls f)
-  f
+    (indicatorFunctionCalls f)
+    (functionCalls f)
+    f
