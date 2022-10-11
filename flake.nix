@@ -83,7 +83,7 @@
       });
       packages.default = hsPkgs.osl;
       packages.ormolu-check = ormolu-check;
-      ciNix = flake-compat-ci.lib.recurseInfoFlakeWith {
+      ciNix = flake-compat-ci.lib.recurseIntoFlakeWith {
         flake = self;
         systems = [ "x86_64-linux" ];
       };
