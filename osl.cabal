@@ -88,7 +88,7 @@ library
     Semicircuit.PrenexNormalForm
     Semicircuit.PNFFormula
     Semicircuit.Sigma11
-    Semicircuit.Translation
+    Semicircuit.ToLogicCircuit
     Semicircuit.Types.PNFFormula
     Semicircuit.Types.QFFormula
     Semicircuit.Types.Semicircuit

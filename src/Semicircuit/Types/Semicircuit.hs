@@ -7,6 +7,7 @@ module Semicircuit.Types.Semicircuit
     FunctionCall (..),
     IndicatorFunctionCalls (..),
     IndicatorFunctionCall (..),
+    AdviceTerms (..),
   )
 where
 
@@ -19,6 +20,7 @@ data Semicircuit
   = Semicircuit
       IndicatorFunctionCalls
       FunctionCalls
+      AdviceTerms
       Formula
 
 newtype IndicatorFunctionCalls
@@ -27,6 +29,10 @@ newtype IndicatorFunctionCalls
 
 newtype FunctionCalls
   = FunctionCalls (Set FunctionCall)
+  deriving newtype (Semigroup, Monoid)
+
+newtype AdviceTerms
+  = AdviceTerms (Set Term)
   deriving newtype (Semigroup, Monoid)
 
 data IndicatorFunctionCall

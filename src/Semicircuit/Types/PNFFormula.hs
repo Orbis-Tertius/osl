@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Semicircuit.Types.PNFFormula
   ( Formula (..),
     Quantifiers (..),
@@ -6,6 +8,7 @@ module Semicircuit.Types.PNFFormula
   )
 where
 
+import GHC.Generics (Generic)
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier (..), Name)
 
@@ -13,6 +16,7 @@ data Formula = Formula
   { qfFormula :: QF.Formula,
     quantifiers :: Quantifiers
   }
+  deriving Generic
 
 data Quantifiers = Quantifiers
   { existentialQuantifiers :: [ExistentialQuantifier],
