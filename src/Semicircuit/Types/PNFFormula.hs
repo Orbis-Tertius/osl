@@ -2,9 +2,9 @@
 
 module Semicircuit.Types.PNFFormula
   ( Formula (..),
-    Quantifiers (..),
+    Quantifiers (Quantifiers),
     ExistentialQuantifier (..),
-    UniversalQuantifier (..),
+    UniversalQuantifier (All),
   )
 where
 
@@ -22,7 +22,7 @@ data Quantifiers = Quantifiers
   { existentialQuantifiers :: [ExistentialQuantifier],
     universalQuantifiers :: [UniversalQuantifier]
   }
-  deriving (Eq)
+  deriving (Eq, Generic)
 
 instance Semigroup Quantifiers where
   (Quantifiers a b) <> (Quantifiers a' b') =
@@ -31,5 +31,9 @@ instance Semigroup Quantifiers where
 instance Monoid Quantifiers where
   mempty = Quantifiers [] []
 
-data UniversalQuantifier = All Name Bound
-  deriving (Eq)
+data UniversalQuantifier =
+  All
+  { name :: Name
+  , bound :: Bound
+  }
+  deriving (Eq, Generic)

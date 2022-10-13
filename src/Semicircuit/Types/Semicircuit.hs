@@ -1,8 +1,10 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Semicircuit.Types.Semicircuit
-  ( Semicircuit (..),
+  ( Semicircuit (Semicircuit),
+    FreeVariables (..),
     FunctionCalls (..),
     FunctionCall (..),
     IndicatorFunctionCalls (..),
@@ -13,15 +15,22 @@ where
 
 import Data.List.NonEmpty (NonEmpty)
 import Data.Set (Set)
+import GHC.Generics (Generic)
 import Semicircuit.Types.PNFFormula (Formula)
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 data Semicircuit
   = Semicircuit
-      IndicatorFunctionCalls
-      FunctionCalls
-      AdviceTerms
-      Formula
+    { freeVariables :: FreeVariables
+    , indicatorCalls :: IndicatorFunctionCalls
+    , functionCalls :: FunctionCalls
+    , adviceTerms :: AdviceTerms
+    , formula :: Formula
+    }
+  deriving Generic
+
+newtype FreeVariables
+  = FreeVariables { unFreeVariables :: Set Name }
 
 newtype IndicatorFunctionCalls
   = IndicatorFunctionCalls
