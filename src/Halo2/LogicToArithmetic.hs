@@ -32,7 +32,7 @@ import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Circuit (ArithmeticCircuit, Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (..))
 import Halo2.Types.ColumnType (ColumnType (Fixed))
-import Halo2.Types.ColumnTypes (ColumnTypes (..))
+import qualified Halo2.Types.ColumnTypes as ColumnTypes
 import Halo2.Types.FiniteField (FiniteField (..))
 import Halo2.Types.FixedBound (FixedBound (..))
 import Halo2.Types.FixedValues (FixedValues (..))
@@ -174,7 +174,7 @@ getLayoutM bits f lc = do
       (ac,) <$> getAtomAdviceM bits f
   let colTypes =
         lc ^. #columnTypes
-          <> ColumnTypes [Fixed, Fixed]
+          <> ColumnTypes.fromList [Fixed, Fixed]
       lcCols =
         Set.fromList . fmap ColumnIndex $
           [ 0
