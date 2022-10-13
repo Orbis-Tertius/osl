@@ -24,15 +24,17 @@ data Semicircuit
       Formula
 
 newtype IndicatorFunctionCalls
-  = IndicatorFunctionCalls (Set IndicatorFunctionCall)
+  = IndicatorFunctionCalls
+    { unIndicatorFunctionCalls
+      :: Set IndicatorFunctionCall }
   deriving newtype (Semigroup, Monoid)
 
 newtype FunctionCalls
-  = FunctionCalls (Set FunctionCall)
+  = FunctionCalls { unFunctionCalls :: Set FunctionCall }
   deriving newtype (Semigroup, Monoid)
 
 newtype AdviceTerms
-  = AdviceTerms (Set Term)
+  = AdviceTerms { unAdviceTerms :: Set Term }
   deriving newtype (Semigroup, Monoid)
 
 data IndicatorFunctionCall

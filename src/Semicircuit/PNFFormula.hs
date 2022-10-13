@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Semicircuit.PNFFormula
@@ -189,20 +190,23 @@ functionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
         S11.Const _ -> mempty
 
 indicatorFunctionCallsArguments
-  :: IndicatorFunctionCalls
-  -> AdviceTerms
-indicatorFunctionCallsArguments = todo
+  :: IndicatorFunctionCalls -> AdviceTerms
+indicatorFunctionCallsArguments =
+  mconcat . fmap indicatorFunctionCallArguments
+    . Set.toList . unIndicatorFunctionCalls
 
-functionCallsArguments
-  :: FunctionCalls
-  -> AdviceTerms
-functionCallsArguments = todo
+indicatorFunctionCallArguments
+  :: IndicatorFunctionCall -> AdviceTerms
+indicatorFunctionCallArguments (IndicatorFunctionCall x y) =
+  AdviceTerms [x, y]
 
-boundsTerms :: PNF.Quantifiers -> AdviceTerms
-boundsTerms = todo
+functionCallsArguments :: FunctionCalls -> AdviceTerms
+functionCallsArguments =
+  mconcat . fmap functionCallArguments . Set.toList . unFunctionCalls
 
-todo :: a
-todo = todo
+functionCallArguments :: FunctionCall -> AdviceTerms
+functionCallArguments (FunctionCall _ ts) =
+  AdviceTerms (Set.fromList (NonEmpty.toList ts))
 
 -- Turns a PNF formula into a semicircuit.
 toSemicircuit :: PNF.Formula -> Semicircuit
@@ -211,5 +215,4 @@ toSemicircuit f =
       fs = functionCalls f
       ts = indicatorFunctionCallsArguments ifs
         <> functionCallsArguments fs
-        <> boundsTerms (f ^. #quantifiers)
   in Semicircuit ifs fs ts f
