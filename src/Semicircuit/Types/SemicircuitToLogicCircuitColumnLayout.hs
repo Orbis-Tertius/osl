@@ -4,6 +4,10 @@ module Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
   ( OutputMapping (..)
   , ArgMapping (..)
   , NameMapping (NameMapping)
+  , OneVectorIndex (..)
+  , ZeroVectorIndex (..)
+  , LastRowIndicatorColumnIndex (..)
+  , FixedColumns (..)
   , SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout)
   ) where
 
@@ -26,9 +30,29 @@ data NameMapping =
   }
   deriving Generic
 
+newtype ZeroVectorIndex =
+  ZeroVectorIndex { unZeroVectorIndex :: ColumnIndex }
+  deriving Generic
+
+newtype OneVectorIndex =
+  OneVectorIndex { unOneVectorIndex :: ColumnIndex }
+
+newtype LastRowIndicatorColumnIndex =
+  LastRowIndicatorColumnIndex
+  { unLastRowIndicatorColumnIndex :: ColumnIndex }
+
+data FixedColumns =
+  FixedColumns
+  { zeroVector :: ZeroVectorIndex
+  , oneVector :: OneVectorIndex
+  , lastRowIndicator :: LastRowIndicatorColumnIndex
+  }
+  deriving Generic
+
 data SemicircuitToLogicCircuitColumnLayout =
   SemicircuitToLogicCircuitColumnLayout
   { columnTypes :: ColumnTypes,
-    nameMappings :: Map Name NameMapping
+    nameMappings :: Map Name NameMapping,
+    fixedColumns :: FixedColumns
   }
   deriving Generic
