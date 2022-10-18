@@ -37,19 +37,19 @@ type Layout = SemicircuitToLogicCircuitColumnLayout
 
 semicircuitToLogicCircuit
   :: FiniteField
+  -> RowCount
   -> Semicircuit
   -> LogicCircuit
-semicircuitToLogicCircuit fp x =
-  let layout = columnLayout x
-      nRows = rowCount x layout in
+semicircuitToLogicCircuit fp rowCount x =
+  let layout = columnLayout x in
   Circuit fp
   (layout ^. #columnTypes)
   (equalityConstrainableColumns x layout)
   (gateConstraints x layout)
   (lookupArguments x layout)
-  nRows
+  rowCount
   (equalityConstraints x layout)
-  (fixedValues nRows layout)
+  (fixedValues rowCount layout)
 
 
 columnLayout :: Semicircuit -> Layout
@@ -133,13 +133,6 @@ lookupArguments
   -> Layout
   -> LookupArguments
 lookupArguments = todo
-
-
-rowCount
-  :: Semicircuit
-  -> Layout
-  -> RowCount
-rowCount = todo
 
 
 todo :: a
