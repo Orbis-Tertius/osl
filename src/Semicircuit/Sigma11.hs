@@ -5,6 +5,7 @@ module Semicircuit.Sigma11
   ( prependBounds,
     prependQuantifiers,
     prependArguments,
+    existentialQuantifierName,
   )
 where
 
@@ -96,3 +97,9 @@ mapExistentialQuantifierBounds f =
       Some x n (mapInputBound f <$> bs) (mapOutputBound f b)
     SomeP x n b0 b1 ->
       SomeP x n (mapInputBound f b0) (mapOutputBound f b1)
+
+existentialQuantifierName :: ExistentialQuantifier -> Name
+existentialQuantifierName =
+  \case
+    Some x _ _ _ -> x
+    SomeP x _ _ _ -> x

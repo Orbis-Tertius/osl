@@ -40,6 +40,7 @@ import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..))
 import Die (die)
+import Semicircuit.Sigma11 (existentialQuantifierName)
 import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier (Some, SomeP))
 import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), ArgMapping (..), ZeroVectorIndex (..), OneVectorIndex (..), LastRowIndicatorColumnIndex (..))
@@ -343,7 +344,20 @@ existentialFunctionTablesDefineFunctionsConstraints
   :: Semicircuit
   -> Layout
   -> LogicConstraints
-existentialFunctionTablesDefineFunctionsConstraints = todo
+existentialFunctionTablesDefineFunctionsConstraints x layout =
+  LogicConstraints
+    [ Atom (lastRowIndicator `Equals` constant 1)
+      `Or` nextRowIsEqualConstraint layout v
+      `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v
+    | v <- existentialQuantifierName
+        <$> x ^. #formula . #quantifiers . #existentialQuantifiers
+    ]
+    mempty -- TODO
+  where
+    lastRowIndicator = var'
+      $ layout ^. #fixedColumns
+      . #lastRowIndicator
+      . #unLastRowIndicatorColumnIndex
 
 
 firstOrderInstanceVariableColumnsAreUniformConstraints
