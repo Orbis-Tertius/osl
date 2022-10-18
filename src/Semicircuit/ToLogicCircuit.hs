@@ -34,7 +34,8 @@ import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Die (die)
-import Semicircuit.Types.Semicircuit (Semicircuit, UniversalVariable (..))
+import Semicircuit.Types.PNFFormula (UniversalQuantifier)
+import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping, DummyRowAdviceColumn, FixedColumns)
 import Semicircuit.Types.Sigma11 (Name, Term)
 
@@ -103,11 +104,11 @@ universalVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
 universalVariableMappings x =
   Map.fromList <$> sequence
   (universalVariableMapping <$>
-     x ^. #universalVariables . #unUniversalVariables)
+     x ^. #formula . #quantifiers . #universalQuantifiers)
 
 
 universalVariableMapping
-  :: UniversalVariable
+  :: UniversalQuantifier
   -> State S (Name, NameMapping)
 universalVariableMapping v =
   (v ^. #name, )
@@ -186,12 +187,12 @@ equalityConstrainableColumns x layout =
     $ [layout ^. #fixedColumns . #zeroVector
                . #unZeroVectorIndex]
       <> (universalToColumnIndex layout <$>
-        (x ^. #universalVariables . #unUniversalVariables))
+        (x ^. #formula . #quantifiers . #universalQuantifiers))
 
 
 universalToColumnIndex
   :: Layout
-  -> UniversalVariable
+  -> UniversalQuantifier
   -> ColumnIndex
 universalToColumnIndex layout v =
   case Map.lookup (v ^. #name) (layout ^. #nameMappings) of
