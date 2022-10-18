@@ -246,7 +246,6 @@ gateConstraints x layout =
   mconcat
   [ instanceFunctionTablesDefineFunctionsConstraints x layout
   , existentialFunctionTablesDefineFunctionsConstraints x layout
-  , firstOrderInstanceVariableColumnsAreUniformConstraints x layout
   , quantifierFreeFormulaIsTrueConstraints x layout
   , dummyRowIndicatorConstraints x layout
   , lessThanIndicatorFunctionCallConstraints x layout
@@ -358,13 +357,6 @@ existentialFunctionTablesDefineFunctionsConstraints x layout =
       $ layout ^. #fixedColumns
       . #lastRowIndicator
       . #unLastRowIndicatorColumnIndex
-
-
-firstOrderInstanceVariableColumnsAreUniformConstraints
-  :: Semicircuit
-  -> Layout
-  -> LogicConstraints
-firstOrderInstanceVariableColumnsAreUniformConstraints = todo
 
 
 quantifierFreeFormulaIsTrueConstraints
