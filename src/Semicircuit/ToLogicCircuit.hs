@@ -23,6 +23,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (pack)
+import Halo2.FiniteField (fieldMax)
 import Halo2.Polynomial (var, var', constant, plus, times)
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
@@ -48,7 +49,7 @@ import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier 
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), ArgMapping (..), ZeroVectorIndex (..), OneVectorIndex (..), LastRowIndicatorColumnIndex (..))
-import Semicircuit.Types.Sigma11 (Name, Term (App, AppInverse, Add, Mul, IndLess, Const))
+import Semicircuit.Types.Sigma11 (Name, Term (App, AppInverse, Add, Mul, IndLess, Const), Bound (TermBound, FieldMaxBound))
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
@@ -253,7 +254,7 @@ gateConstraints ff x layout =
   [ instanceFunctionTablesDefineFunctionsConstraints x layout
   , existentialFunctionTablesDefineFunctionsConstraints x layout
   , quantifierFreeFormulaIsTrueConstraints ff x layout
-  , dummyRowIndicatorConstraints x layout
+  , dummyRowIndicatorConstraints ff x layout
   , lessThanIndicatorFunctionCallConstraints x layout
   , existentialOutputsInBoundsConstraints x layout
   , existentialInputsInBoundsConstraints x layout
@@ -445,10 +446,54 @@ quantifierFreeFormulaIsTrueConstraints ff x layout =
 
 
 dummyRowIndicatorConstraints
-  :: Semicircuit
+  :: FiniteField
+  -> Semicircuit
   -> Layout
   -> LogicConstraints
-dummyRowIndicatorConstraints = todo
+dummyRowIndicatorConstraints ff x layout =
+  LogicConstraints
+  [ Atom (dummyRowIndicator `Equals` constant 0)
+    `Or` Atom (dummyRowIndicator `Equals` constant 1)
+  , Atom (dummyRowIndicator `Equals` constant 0)
+    `Iff` someUniversalQuantifierBoundIsZeroConstraint ff x layout
+  ]
+  mempty
+  where
+    dummyRowIndicator =
+      var' $ layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
+
+
+someUniversalQuantifierBoundIsZeroConstraint
+  :: FiniteField
+  -> Semicircuit
+  -> Layout
+  -> LogicConstraint
+someUniversalQuantifierBoundIsZeroConstraint ff x layout =
+  let boundPolys = universalQuantifierBoundPolynomials ff x layout
+  in foldl Or Top
+     [ Atom (p `Equals` constant 0) | p <- boundPolys ]
+
+
+universalQuantifierBoundPolynomials
+  :: FiniteField
+  -> Semicircuit
+  -> Layout
+  -> [Polynomial]
+universalQuantifierBoundPolynomials ff x layout =
+  let bounds = (^. #bound) <$> x ^. #formula . #quantifiers
+               . #universalQuantifiers
+  in boundPolynomial ff layout <$> bounds
+
+
+boundPolynomial
+  :: FiniteField
+  -> Layout
+  -> Bound
+  -> Polynomial
+boundPolynomial ff layout =
+  \case
+    TermBound x -> termToPolynomial ff layout x
+    FieldMaxBound -> constant (fieldMax ff)
 
 
 lessThanIndicatorFunctionCallConstraints

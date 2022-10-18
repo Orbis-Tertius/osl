@@ -9,6 +9,7 @@ module Halo2.FiniteField
     one,
     zero,
     minusOne,
+    fieldMax,
   )
 where
 
@@ -44,3 +45,6 @@ zero = FieldElement 0
 minusOne :: FiniteField -> FieldElement
 minusOne (FiniteField n) =
   FieldElement (n - 1)
+
+fieldMax :: FiniteField -> FieldElement
+fieldMax = minusOne
