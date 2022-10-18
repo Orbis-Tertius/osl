@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -16,6 +17,7 @@ module Semicircuit.ToLogicCircuit
 
 
 import Control.Lens ((^.))
+import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -34,9 +36,9 @@ import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Die (die)
-import Semicircuit.Types.PNFFormula (UniversalQuantifier)
+import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier (Some, SomeP))
 import Semicircuit.Types.Semicircuit (Semicircuit)
-import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping, DummyRowAdviceColumn, FixedColumns)
+import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping, DummyRowAdviceColumn, FixedColumns, ArgMapping (..))
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
@@ -116,8 +118,30 @@ universalVariableMapping v =
                      <*> pure [])
 
 
-existentialVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
-existentialVariableMappings = todo
+existentialVariableMappings
+  :: Semicircuit
+  -> State S (Map Name NameMapping)
+existentialVariableMappings x =
+  Map.fromList <$> sequence
+  (existentialVariableMapping <$>
+     x ^. #formula . #quantifiers . #existentialQuantifiers)
+
+
+existentialVariableMapping
+  :: ExistentialQuantifier -> State S (Name, NameMapping)
+existentialVariableMapping =
+  \case
+    Some x _ ibs _ ->
+      (x,) <$>
+        (NameMapping
+          <$> (OutputMapping <$> nextCol)
+          <*> (fmap ArgMapping <$>
+                replicateM (length ibs) nextCol))
+    SomeP x _ _ _ ->
+      (x,) <$>
+        (NameMapping
+          <$> (OutputMapping <$> nextCol)
+          <*> (((:[]) . ArgMapping) <$> nextCol))
 
 
 freeVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
