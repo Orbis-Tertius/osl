@@ -38,7 +38,7 @@ import Halo2.Types.RowCount (RowCount (..))
 import Die (die)
 import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier (Some, SomeP))
 import Semicircuit.Types.Semicircuit (Semicircuit)
-import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping, DummyRowAdviceColumn, FixedColumns, ArgMapping (..))
+import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping (..), DummyRowAdviceColumn, FixedColumns, ArgMapping (..))
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
@@ -131,12 +131,12 @@ existentialVariableMapping
   :: ExistentialQuantifier -> State S (Name, NameMapping)
 existentialVariableMapping =
   \case
-    Some x _ ibs _ ->
+    Some x _ _ _ ->
       (x,) <$>
         (NameMapping
           <$> (OutputMapping <$> nextCol)
-          <*> (fmap ArgMapping <$>
-                replicateM (length ibs) nextCol))
+          <*> replicateM (x ^. #arity . #unArity)
+                (ArgMapping <$> nextCol))
     SomeP x _ _ _ ->
       (x,) <$>
         (NameMapping
@@ -145,11 +145,30 @@ existentialVariableMapping =
 
 
 freeVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
-freeVariableMappings = todo
+freeVariableMappings x =
+  Map.fromList <$> sequence
+  (freeVariableMapping <$>
+    Set.toList (x ^. #freeVariables . #unFreeVariables))
+
+
+freeVariableMapping :: Name -> State S (Name, NameMapping)
+freeVariableMapping x =
+  (x,) <$>
+    (NameMapping
+      <$> (OutputMapping <$> nextCol)
+      <*> (replicateM (x ^. #arity . #unArity)
+            (ArgMapping <$> nextCol)))
 
 
 termMappings :: Semicircuit -> State S (Map Term TermMapping)
-termMappings = todo
+termMappings x =
+  Map.fromList <$> sequence
+  (termMapping <$>
+    Set.toList (x ^. #adviceTerms . #unAdviceTerms))
+
+
+termMapping :: Term -> State S (Term, TermMapping)
+termMapping t = (t,) . TermMapping <$> nextCol
 
 
 fixedColumns :: Semicircuit -> State S FixedColumns

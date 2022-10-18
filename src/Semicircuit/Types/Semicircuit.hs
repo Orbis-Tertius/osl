@@ -31,6 +31,7 @@ data Semicircuit
 
 newtype FreeVariables
   = FreeVariables { unFreeVariables :: Set Name }
+  deriving Generic
 
 newtype IndicatorFunctionCalls
   = IndicatorFunctionCalls
@@ -45,6 +46,7 @@ newtype FunctionCalls
 newtype AdviceTerms
   = AdviceTerms { unAdviceTerms :: Set Term }
   deriving newtype (Semigroup, Monoid)
+  deriving stock Generic
 
 data IndicatorFunctionCall
   = IndicatorFunctionCall Term Term

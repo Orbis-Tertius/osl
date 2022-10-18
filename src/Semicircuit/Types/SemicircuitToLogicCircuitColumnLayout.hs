@@ -35,7 +35,7 @@ data NameMapping =
   deriving Generic
 
 data TermMapping =
-  TermMapping { unTermMapping :: Name }
+  TermMapping { unTermMapping :: ColumnIndex }
   deriving Generic
 
 newtype ZeroVectorIndex =
