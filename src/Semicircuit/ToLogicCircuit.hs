@@ -83,7 +83,24 @@ columnTypes = todo
 
 
 nameMappings :: Semicircuit -> State S (Map Name NameMapping)
-nameMappings = todo
+nameMappings x =
+  mconcat <$> sequence
+  [ freeVariableMappings x
+  , universalVariableMappings x
+  , existentialVariableMappings x
+  ]
+
+
+universalVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
+universalVariableMappings = todo
+
+
+existentialVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
+existentialVariableMappings = todo
+
+
+freeVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
+freeVariableMappings = todo
 
 
 termMappings :: Semicircuit -> State S (Map Term TermMapping)
