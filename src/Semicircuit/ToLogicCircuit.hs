@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 
 module Semicircuit.ToLogicCircuit
   ( semicircuitToLogicCircuit
@@ -15,7 +16,7 @@ module Semicircuit.ToLogicCircuit
 
 
 import Control.Lens ((^.))
-import Control.Monad.State (State, evalState)
+import Control.Monad.State (State, evalState, get, put)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -34,7 +35,7 @@ import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Die (die)
 import Semicircuit.Types.Semicircuit (Semicircuit, UniversalVariable (..))
-import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping, TermMapping, DummyRowAdviceColumn, FixedColumns)
+import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping, DummyRowAdviceColumn, FixedColumns)
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
@@ -57,6 +58,13 @@ semicircuitToLogicCircuit fp rowCount x =
 
 
 newtype S = S ColumnIndex
+
+
+nextCol :: State S ColumnIndex
+nextCol = do
+  S x <- get
+  put (S (x+1))
+  pure x
 
 
 columnLayout :: Semicircuit -> Layout
@@ -92,7 +100,19 @@ nameMappings x =
 
 
 universalVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
-universalVariableMappings = todo
+universalVariableMappings x =
+  Map.fromList <$> sequence
+  (universalVariableMapping <$>
+     x ^. #universalVariables . #unUniversalVariables)
+
+
+universalVariableMapping
+  :: UniversalVariable
+  -> State S (Name, NameMapping)
+universalVariableMapping v =
+  (v ^. #name, )
+    <$> (NameMapping <$> (OutputMapping <$> nextCol)
+                     <*> pure [])
 
 
 existentialVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
