@@ -6,6 +6,7 @@ module Halo2.Polynomial
     times,
     constant,
     var,
+    var',
     multilinearMonomial,
     zero,
     one,
@@ -23,6 +24,7 @@ import qualified Halo2.FiniteField as F
 import qualified Halo2.PowerProduct as P
 import Halo2.Prelude
 import Halo2.Types.Coefficient (Coefficient (..))
+import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.FieldElement (FieldElement)
 import Halo2.Types.FiniteField (FiniteField)
 import Halo2.Types.Polynomial (Polynomial (..))
@@ -63,6 +65,9 @@ var :: PolynomialVariable -> Polynomial
 var v =
   Polynomial
     (Map.singleton (PowerProduct (Map.singleton v 1)) C.one)
+
+var' :: ColumnIndex -> Polynomial
+var' i = var (PolynomialVariable i 0)
 
 multilinearMonomial ::
   Coefficient ->

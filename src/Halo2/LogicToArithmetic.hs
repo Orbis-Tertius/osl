@@ -117,6 +117,8 @@ eval f layout =
       let a = rec p
           b = rec q
        in P.plus f <$> a <*> (P.minus f <$> b <*> (P.times f <$> a <*> b))
+    Top -> pure (P.constant 1)
+    Bottom -> pure (P.constant 0)
   where
     rec = eval f layout
 
@@ -213,6 +215,8 @@ getAtomicSubformulas =
     Not p -> rec p
     And p q -> rec p <> rec q
     Or p q -> rec p <> rec q
+    Top -> mempty
+    Bottom -> mempty
   where
     rec = getAtomicSubformulas
 

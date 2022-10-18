@@ -22,6 +22,7 @@ import Control.Monad.State (State, evalState, get, put)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Halo2.Polynomial (var', constant)
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnType (ColumnType (Fixed, Advice, Instance))
@@ -29,7 +30,8 @@ import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
-import Halo2.Types.LogicConstraints (LogicConstraints)
+import Halo2.Types.LogicConstraint (LogicConstraint (Bottom, Atom, And, Or), AtomicLogicConstraint (LessThan, Equals))
+import Halo2.Types.LogicConstraints (LogicConstraints (..))
 import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.FiniteField (FiniteField)
@@ -253,11 +255,52 @@ gateConstraints x layout =
   ]
 
 
+lexicographicallyLessThanConstraint
+     -- the lists are zipped to document that they have
+     -- equal lengths
+  :: [(ColumnIndex, ColumnIndex)]
+  -> LogicConstraint
+lexicographicallyLessThanConstraint ab =
+  case ab of
+    [] -> Bottom
+    ((a,b):ab') ->
+      Atom (var' a `LessThan` var' b)
+      `Or` (Atom (var' a `Equals` var' b)
+        `And` rec ab')
+  where
+    rec = lexicographicallyLessThanConstraint
+
+
 instanceFunctionTablesDefineFunctionsConstraints
   :: Semicircuit
   -> Layout
   -> LogicConstraints
-instanceFunctionTablesDefineFunctionsConstraints = todo
+instanceFunctionTablesDefineFunctionsConstraints x layout =
+  LogicConstraints
+    -- TODO: for *each* function table this
+    [Atom (lastRowIndicator `Equals` constant 1)
+      `Or` nextInstanceRowIsEqualConstraint x layout
+      `Or` nextInstanceRowIsLexicographicallyGreaterConstraint x layout]
+    mempty
+  where
+    lastRowIndicator = var'
+      $ layout ^. #fixedColumns
+      . #lastRowIndicator
+      . #unLastRowIndicatorColumnIndex
+
+
+nextInstanceRowIsEqualConstraint
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraint
+nextInstanceRowIsEqualConstraint = todo
+
+
+nextInstanceRowIsLexicographicallyGreaterConstraint
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraint
+nextInstanceRowIsLexicographicallyGreaterConstraint = todo
 
 
 existentialFunctionTablesDefineFunctionsConstraints
