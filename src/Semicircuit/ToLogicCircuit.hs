@@ -15,10 +15,13 @@ module Semicircuit.ToLogicCircuit
 
 
 import Control.Lens ((^.))
+import Control.Monad.State (State, evalState)
+import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
+import Halo2.Types.ColumnTypes (ColumnTypes)
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
@@ -31,7 +34,8 @@ import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Die (die)
 import Semicircuit.Types.Semicircuit (Semicircuit, UniversalVariable (..))
-import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout)
+import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping, TermMapping, DummyRowAdviceColumn, FixedColumns)
+import Semicircuit.Types.Sigma11 (Name, Term)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
@@ -52,8 +56,46 @@ semicircuitToLogicCircuit fp rowCount x =
   (fixedValues rowCount layout)
 
 
+newtype S = S ColumnIndex
+
+
 columnLayout :: Semicircuit -> Layout
-columnLayout = todo
+columnLayout x =
+  flip evalState (S 0) $ do
+    nm <- nameMappings x
+    tm <- termMappings x
+    dr <- dummyRowAdviceColumn x
+    fs <- fixedColumns x
+    pure $
+      SemicircuitToLogicCircuitColumnLayout
+      (columnTypes x nm tm dr fs)
+      nm tm fs dr
+
+
+columnTypes
+  :: Semicircuit
+  -> Map Name NameMapping
+  -> Map Term TermMapping
+  -> DummyRowAdviceColumn
+  -> FixedColumns
+  -> ColumnTypes
+columnTypes = todo
+
+
+nameMappings :: Semicircuit -> State S (Map Name NameMapping)
+nameMappings = todo
+
+
+termMappings :: Semicircuit -> State S (Map Term TermMapping)
+termMappings = todo
+
+
+fixedColumns :: Semicircuit -> State S FixedColumns
+fixedColumns = todo
+
+
+dummyRowAdviceColumn :: Semicircuit -> State S DummyRowAdviceColumn
+dummyRowAdviceColumn = todo
 
 
 fixedValues :: RowCount -> Layout -> FixedValues

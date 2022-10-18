@@ -1,13 +1,15 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
-  ( OutputMapping (..)
-  , ArgMapping (..)
+  ( OutputMapping (OutputMapping)
+  , ArgMapping (ArgMapping)
   , NameMapping (NameMapping)
-  , OneVectorIndex (..)
-  , ZeroVectorIndex (..)
-  , LastRowIndicatorColumnIndex (..)
-  , FixedColumns (..)
+  , TermMapping (TermMapping)
+  , OneVectorIndex (OneVectorIndex)
+  , ZeroVectorIndex (ZeroVectorIndex)
+  , LastRowIndicatorColumnIndex (LastRowIndicatorColumnIndex)
+  , FixedColumns (FixedColumns)
+  , DummyRowAdviceColumn (DummyRowAdviceColumn)
   , SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout)
   ) where
 
@@ -18,7 +20,7 @@ import Halo2.Types.ColumnTypes (ColumnTypes)
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 newtype OutputMapping =
-  HeadMapping { unOutputMapping :: ColumnIndex }
+  OutputMapping { unOutputMapping :: ColumnIndex }
   deriving Generic
 
 newtype ArgMapping =
