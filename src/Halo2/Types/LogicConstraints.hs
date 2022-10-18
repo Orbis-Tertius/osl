@@ -16,3 +16,10 @@ data LogicConstraints = LogicConstraints
     bounds :: Map ColumnIndex FixedBound
   }
   deriving (Generic)
+
+instance Semigroup LogicConstraints where
+  (LogicConstraints a b) <> (LogicConstraints c d) =
+    LogicConstraints (a <> c) (b <> d)
+
+instance Monoid LogicConstraints where
+  mempty = LogicConstraints mempty mempty

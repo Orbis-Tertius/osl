@@ -110,7 +110,6 @@ equalityConstrainableColumns x layout =
         (x ^. #universalVariables . #unUniversalVariables))
 
 
-
 universalToColumnIndex
   :: Layout
   -> UniversalVariable
@@ -125,7 +124,81 @@ gateConstraints
   :: Semicircuit
   -> Layout
   -> LogicConstraints
-gateConstraints = todo
+gateConstraints x layout =
+  mconcat
+  [ instanceFunctionTablesDefineFunctionsConstraints x layout
+  , existentialFunctionTablesDefineFunctionsConstraints x layout
+  , firstOrderInstanceVariableColumnsAreUniformConstraints x layout
+  , quantifierFreeFormulaIsTrueConstraints x layout
+  , lessThanIndicatorFunctionCallConstraints x layout
+  , existentialOutputsInBoundsConstraints x layout
+  , existentialInputsInBoundsConstraints x layout
+  , universalTableConstraints x layout
+  , existentialOutputIndependenceFromUniversalsConstraints x layout
+  ]
+
+
+instanceFunctionTablesDefineFunctionsConstraints
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraints
+instanceFunctionTablesDefineFunctionsConstraints = todo
+
+
+existentialFunctionTablesDefineFunctionsConstraints
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraints
+existentialFunctionTablesDefineFunctionsConstraints = todo
+
+
+firstOrderInstanceVariableColumnsAreUniformConstraints
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraints
+firstOrderInstanceVariableColumnsAreUniformConstraints = todo
+
+
+quantifierFreeFormulaIsTrueConstraints
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraints
+quantifierFreeFormulaIsTrueConstraints = todo
+
+
+lessThanIndicatorFunctionCallConstraints
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraints
+lessThanIndicatorFunctionCallConstraints = todo
+
+
+existentialOutputsInBoundsConstraints
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraints
+existentialOutputsInBoundsConstraints = todo
+
+
+existentialInputsInBoundsConstraints
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraints
+existentialInputsInBoundsConstraints = todo
+
+
+universalTableConstraints
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraints
+universalTableConstraints = todo
+
+
+existentialOutputIndependenceFromUniversalsConstraints
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraints
+existentialOutputIndependenceFromUniversalsConstraints = todo
 
 
 lookupArguments
