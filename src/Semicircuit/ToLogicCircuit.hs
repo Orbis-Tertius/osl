@@ -22,7 +22,7 @@ import Control.Monad.State (State, evalState, get, put)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Halo2.Polynomial (var', constant)
+import Halo2.Polynomial (var, var', constant)
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnType (ColumnType (Fixed, Advice, Instance))
@@ -30,7 +30,7 @@ import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
-import Halo2.Types.LogicConstraint (LogicConstraint (Bottom, Atom, And, Or), AtomicLogicConstraint (LessThan, Equals))
+import Halo2.Types.LogicConstraint (LogicConstraint (Bottom, Top, Atom, And, Or), AtomicLogicConstraint (LessThan, Equals))
 import Halo2.Types.LogicConstraints (LogicConstraints (..))
 import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
@@ -38,6 +38,7 @@ import Halo2.Types.FiniteField (FiniteField)
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.RowCount (RowCount (..))
+import Halo2.Types.RowIndex (RowIndex (..))
 import Die (die)
 import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier (Some, SomeP))
 import Semicircuit.Types.Semicircuit (Semicircuit)
@@ -258,17 +259,29 @@ gateConstraints x layout =
 lexicographicallyLessThanConstraint
      -- the lists are zipped to document that they have
      -- equal lengths
-  :: [(ColumnIndex, ColumnIndex)]
+  :: [(PolynomialVariable, PolynomialVariable)]
   -> LogicConstraint
 lexicographicallyLessThanConstraint ab =
   case ab of
     [] -> Bottom
     ((a,b):ab') ->
-      Atom (var' a `LessThan` var' b)
-      `Or` (Atom (var' a `Equals` var' b)
+      Atom (var a `LessThan` var b)
+      `Or` (Atom (var a `Equals` var b)
         `And` rec ab')
   where
     rec = lexicographicallyLessThanConstraint
+
+
+equalsConstraint
+  :: [(PolynomialVariable, PolynomialVariable)]
+  -> LogicConstraint
+equalsConstraint ab =
+  case ab of
+    [] -> Top
+    ((a,b) : ab') ->
+      Atom (var a `Equals` var b) `And` rec ab'
+  where
+    rec = equalsConstraint
 
 
 instanceFunctionTablesDefineFunctionsConstraints
@@ -277,10 +290,11 @@ instanceFunctionTablesDefineFunctionsConstraints
   -> LogicConstraints
 instanceFunctionTablesDefineFunctionsConstraints x layout =
   LogicConstraints
-    -- TODO: for *each* function table this
-    [Atom (lastRowIndicator `Equals` constant 1)
-      `Or` nextInstanceRowIsEqualConstraint x layout
-      `Or` nextInstanceRowIsLexicographicallyGreaterConstraint x layout]
+    [ Atom (lastRowIndicator `Equals` constant 1)
+      `Or` nextRowIsEqualConstraint layout v
+      `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v
+    | v <- Set.toList (x ^. #freeVariables . #unFreeVariables)
+    ]
     mempty
   where
     lastRowIndicator = var'
@@ -289,18 +303,40 @@ instanceFunctionTablesDefineFunctionsConstraints x layout =
       . #unLastRowIndicatorColumnIndex
 
 
-nextInstanceRowIsEqualConstraint
-  :: Semicircuit
-  -> Layout
+nextRowIsEqualConstraint
+  :: Layout
+  -> Name
   -> LogicConstraint
-nextInstanceRowIsEqualConstraint = todo
+nextRowIsEqualConstraint layout v =
+  equalsConstraint (zip (vars 0) (vars 1))
+  where
+    vars :: RowIndex -> [PolynomialVariable]
+    vars i =
+      case Map.lookup v (layout ^. #nameMappings) of
+        Just nm -> (PolynomialVariable
+                     (nm ^. #outputMapping . #unOutputMapping)
+                     i :)
+                 $ (\c -> PolynomialVariable c i)
+                 . (^. #unArgMapping)
+               <$> (nm ^. #argMappings)
+        Nothing -> die "nextRowIsEqualConstraint: failed lookup (this is a compiler bug)"
 
 
-nextInstanceRowIsLexicographicallyGreaterConstraint
-  :: Semicircuit
-  -> Layout
+nextInputRowIsLexicographicallyGreaterConstraint
+  :: Layout
+  -> Name
   -> LogicConstraint
-nextInstanceRowIsLexicographicallyGreaterConstraint = todo
+nextInputRowIsLexicographicallyGreaterConstraint layout v =
+  lexicographicallyLessThanConstraint
+  (zip (vars 0) (vars 1))
+  where
+    vars :: RowIndex -> [PolynomialVariable]
+    vars i =
+      case Map.lookup v (layout ^. #nameMappings) of
+        Just nm -> (\c -> PolynomialVariable c i)
+                 . (^. #unArgMapping)
+               <$> (nm ^. #argMappings)
+        Nothing -> die "nextInputRowIsLexicographicallyGreaterConstraint: failed lookup (this is a compiler bug)"
 
 
 existentialFunctionTablesDefineFunctionsConstraints
