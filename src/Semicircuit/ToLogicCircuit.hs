@@ -19,7 +19,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
-import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
+import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
 import Halo2.Types.LogicConstraints (LogicConstraints)
@@ -30,7 +30,7 @@ import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Die (die)
-import Semicircuit.Types.Semicircuit (Semicircuit)
+import Semicircuit.Types.Semicircuit (Semicircuit, UniversalVariable (..))
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
@@ -102,7 +102,24 @@ equalityConstrainableColumns
   :: Semicircuit
   -> Layout
   -> EqualityConstrainableColumns
-equalityConstrainableColumns = todo
+equalityConstrainableColumns x layout =
+  EqualityConstrainableColumns
+    $ (universalToColumnIndex layout
+      `Set.map`
+      (x ^. #universalVariables . #unUniversalVariables))
+      <> Set.singleton
+         (layout ^. #fixedColumns . #zeroVector
+                  . #unZeroVectorIndex)
+
+
+universalToColumnIndex
+  :: Layout
+  -> UniversalVariable
+  -> ColumnIndex
+universalToColumnIndex layout v =
+  case Map.lookup (v ^. #name) (layout ^. #nameMappings) of
+    Just m -> m ^. #outputMapping . #unOutputMapping
+    Nothing -> die "universalToColumnIndex: failed lookup (this is a compiler bug)"
 
 
 gateConstraints

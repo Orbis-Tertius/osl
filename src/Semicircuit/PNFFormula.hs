@@ -18,7 +18,7 @@ import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Sigma11 (prependBounds)
 import qualified Semicircuit.Types.PNFFormula as PNF
 import qualified Semicircuit.Types.QFFormula as QF
-import Semicircuit.Types.Semicircuit (FunctionCall (..), FunctionCalls (..), IndicatorFunctionCall (..), IndicatorFunctionCalls (..), Semicircuit (..), AdviceTerms (..), FreeVariables (..))
+import Semicircuit.Types.Semicircuit (FunctionCall (..), FunctionCalls (..), IndicatorFunctionCall (..), IndicatorFunctionCalls (..), Semicircuit (..), AdviceTerms (..), FreeVariables (..), UniversalVariables (..))
 import qualified Semicircuit.Types.Sigma11 as S11
 
 -- Turns a strong prenex normal form into a PNF formula.
@@ -211,6 +211,9 @@ functionCallArguments (FunctionCall _ ts) =
 freeVariables :: PNF.Formula -> FreeVariables
 freeVariables = todo
 
+universalVariables :: PNF.Formula -> UniversalVariables
+universalVariables = todo
+
 todo :: a
 todo = todo
 
@@ -218,8 +221,9 @@ todo = todo
 toSemicircuit :: PNF.Formula -> Semicircuit
 toSemicircuit f =
   let fvs = freeVariables f
+      us = universalVariables f
       ifs = indicatorFunctionCalls f
       fs = functionCalls f
       ts = indicatorFunctionCallsArguments ifs
         <> functionCallsArguments fs
-  in Semicircuit fvs ifs fs ts f
+  in Semicircuit fvs us ifs fs ts f
