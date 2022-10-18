@@ -38,6 +38,7 @@ newtype IndicatorFunctionCalls
     { unIndicatorFunctionCalls
       :: Set IndicatorFunctionCall }
   deriving newtype (Semigroup, Monoid)
+  deriving stock Generic
 
 newtype FunctionCalls
   = FunctionCalls { unFunctionCalls :: Set FunctionCall }

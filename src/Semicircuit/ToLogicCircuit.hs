@@ -47,7 +47,7 @@ import Die (die)
 import Semicircuit.Sigma11 (existentialQuantifierName)
 import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier (Some, SomeP))
 import qualified Semicircuit.Types.QFFormula as QF
-import Semicircuit.Types.Semicircuit (Semicircuit)
+import Semicircuit.Types.Semicircuit (Semicircuit, IndicatorFunctionCall (..))
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), ArgMapping (..), ZeroVectorIndex (..), OneVectorIndex (..), LastRowIndicatorColumnIndex (..))
 import Semicircuit.Types.Sigma11 (Name, Term (App, AppInverse, Add, Mul, IndLess, Const), Bound (TermBound, FieldMaxBound))
 
@@ -255,7 +255,7 @@ gateConstraints ff x layout =
   , existentialFunctionTablesDefineFunctionsConstraints x layout
   , quantifierFreeFormulaIsTrueConstraints ff x layout
   , dummyRowIndicatorConstraints ff x layout
-  , lessThanIndicatorFunctionCallConstraints x layout
+  , lessThanIndicatorFunctionCallConstraints ff x layout
   , existentialOutputsInBoundsConstraints x layout
   , existentialInputsInBoundsConstraints x layout
   , universalTableConstraints x layout
@@ -497,10 +497,25 @@ boundPolynomial ff layout =
 
 
 lessThanIndicatorFunctionCallConstraints
-  :: Semicircuit
+  :: FiniteField
+  -> Semicircuit
   -> Layout
   -> LogicConstraints
-lessThanIndicatorFunctionCallConstraints = todo
+lessThanIndicatorFunctionCallConstraints ff x layout =
+  LogicConstraints
+  [ (Atom (a `Equals` constant 0) `Or` Atom (a `Equals` constant 1))
+    `And` (Atom (a `Equals` constant 1) `Iff`
+           Atom (term y `Equals` term z))
+  | IndicatorFunctionCall y z <-
+      Set.toList (x ^. #indicatorCalls . #unIndicatorFunctionCalls)
+  , let a = case Map.lookup (IndLess y z)
+                 (layout ^. #termMappings) of
+              Just (TermMapping c) -> var' c
+              Nothing -> die "lessThanIndicatorFunctionCallConstraints: lookup failed (this is a compiler bug)"
+  ]
+  mempty
+  where
+    term = termToPolynomial ff layout
 
 
 existentialOutputsInBoundsConstraints
