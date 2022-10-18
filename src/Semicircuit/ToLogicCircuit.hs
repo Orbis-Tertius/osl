@@ -24,7 +24,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
-import Halo2.Types.ColumnTypes (ColumnTypes)
+import Halo2.Types.ColumnType (ColumnType (Fixed, Advice, Instance))
+import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
@@ -60,37 +61,27 @@ semicircuitToLogicCircuit fp rowCount x =
   (fixedValues rowCount layout)
 
 
-newtype S = S ColumnIndex
+newtype S = S (ColumnIndex, ColumnTypes)
 
 
-nextCol :: State S ColumnIndex
-nextCol = do
-  S x <- get
-  put (S (x+1))
+nextCol :: ColumnType -> State S ColumnIndex
+nextCol t = do
+  S (x, ts) <- get
+  put $ S (x+1, (ts <> ColumnTypes (Map.singleton x t)))
   pure x
 
 
 columnLayout :: Semicircuit -> Layout
 columnLayout x =
-  flip evalState (S 0) $ do
+  flip evalState (S (0, mempty)) $ do
     nm <- nameMappings x
     tm <- termMappings x
-    dr <- DummyRowAdviceColumn <$> nextCol
+    dr <- DummyRowAdviceColumn <$> nextCol Advice
     fs <- fixedColumns
+    S (_, colTypes) <- get
     pure $
-      SemicircuitToLogicCircuitColumnLayout
-      (columnTypes x nm tm dr fs)
+      SemicircuitToLogicCircuitColumnLayout colTypes
       nm tm fs dr
-
-
-columnTypes
-  :: Semicircuit
-  -> Map Name NameMapping
-  -> Map Term TermMapping
-  -> DummyRowAdviceColumn
-  -> FixedColumns
-  -> ColumnTypes
-columnTypes = todo
 
 
 nameMappings :: Semicircuit -> State S (Map Name NameMapping)
@@ -114,7 +105,7 @@ universalVariableMapping
   -> State S (Name, NameMapping)
 universalVariableMapping v =
   (v ^. #name, )
-    <$> (NameMapping <$> (OutputMapping <$> nextCol)
+    <$> (NameMapping <$> (OutputMapping <$> nextCol Advice)
                      <*> pure [])
 
 
@@ -134,14 +125,14 @@ existentialVariableMapping =
     Some x _ _ _ ->
       (x,) <$>
         (NameMapping
-          <$> (OutputMapping <$> nextCol)
+          <$> (OutputMapping <$> nextCol Advice)
           <*> replicateM (x ^. #arity . #unArity)
-                (ArgMapping <$> nextCol))
+                (ArgMapping <$> nextCol Advice))
     SomeP x _ _ _ ->
       (x,) <$>
         (NameMapping
-          <$> (OutputMapping <$> nextCol)
-          <*> (((:[]) . ArgMapping) <$> nextCol))
+          <$> (OutputMapping <$> nextCol Advice)
+          <*> (((:[]) . ArgMapping) <$> nextCol Advice))
 
 
 freeVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
@@ -155,9 +146,9 @@ freeVariableMapping :: Name -> State S (Name, NameMapping)
 freeVariableMapping x =
   (x,) <$>
     (NameMapping
-      <$> (OutputMapping <$> nextCol)
+      <$> (OutputMapping <$> nextCol Instance)
       <*> (replicateM (x ^. #arity . #unArity)
-            (ArgMapping <$> nextCol)))
+            (ArgMapping <$> nextCol Instance)))
 
 
 termMappings :: Semicircuit -> State S (Map Term TermMapping)
@@ -168,15 +159,15 @@ termMappings x =
 
 
 termMapping :: Term -> State S (Term, TermMapping)
-termMapping t = (t,) . TermMapping <$> nextCol
+termMapping t = (t,) . TermMapping <$> nextCol Advice
 
 
 fixedColumns :: State S FixedColumns
 fixedColumns =
   FixedColumns
-    <$> (ZeroVectorIndex <$> nextCol)
-    <*> (OneVectorIndex <$> nextCol)
-    <*> (LastRowIndicatorColumnIndex <$> nextCol)
+    <$> (ZeroVectorIndex <$> nextCol Fixed)
+    <*> (OneVectorIndex <$> nextCol Fixed)
+    <*> (LastRowIndicatorColumnIndex <$> nextCol Fixed)
 
 
 fixedValues :: RowCount -> Layout -> FixedValues
