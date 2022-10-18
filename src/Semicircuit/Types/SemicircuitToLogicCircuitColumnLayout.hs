@@ -42,10 +42,12 @@ newtype ZeroVectorIndex =
 
 newtype OneVectorIndex =
   OneVectorIndex { unOneVectorIndex :: ColumnIndex }
+  deriving Generic
 
 newtype LastRowIndicatorColumnIndex =
   LastRowIndicatorColumnIndex
   { unLastRowIndicatorColumnIndex :: ColumnIndex }
+  deriving Generic
 
 data FixedColumns =
   FixedColumns

@@ -26,8 +26,9 @@ import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.FiniteField (FiniteField)
-import Halo2.Types.FixedValues (FixedValues)
-import Halo2.Types.RowCount (RowCount)
+import Halo2.Types.FixedColumn (FixedColumn (..))
+import Halo2.Types.FixedValues (FixedValues (..))
+import Halo2.Types.RowCount (RowCount (..))
 import Die (die)
 import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout)
@@ -39,23 +40,35 @@ semicircuitToLogicCircuit
   -> Semicircuit
   -> LogicCircuit
 semicircuitToLogicCircuit fp x =
-  let layout = columnLayout x in
+  let layout = columnLayout x
+      nRows = rowCount x layout in
   Circuit fp
   (layout ^. #columnTypes)
   (equalityConstrainableColumns x layout)
   (gateConstraints x layout)
   (lookupArguments x layout)
-  (rowCount x layout)
+  nRows
   (equalityConstraints x layout)
-  (fixedValues layout)
+  (fixedValues nRows layout)
 
 
 columnLayout :: Semicircuit -> Layout
 columnLayout = todo
 
 
-fixedValues :: Layout -> FixedValues
-fixedValues = todo
+fixedValues :: RowCount -> Layout -> FixedValues
+fixedValues (RowCount n) layout =
+  FixedValues . Map.fromList $
+  [ ( layout ^. #fixedColumns . #zeroVector
+              . #unZeroVectorIndex
+    , FixedColumn $ replicate n 0 )
+  , ( layout ^. #fixedColumns . #oneVector
+              . #unOneVectorIndex
+    , FixedColumn $ replicate n 1 )
+  , ( layout ^. #fixedColumns . #lastRowIndicator
+              . #unLastRowIndicatorColumnIndex
+    , FixedColumn $ replicate (n-1) 0 <> [1] )
+  ]
 
 
 equalityConstraints
