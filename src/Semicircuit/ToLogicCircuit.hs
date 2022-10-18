@@ -38,7 +38,7 @@ import Halo2.Types.RowCount (RowCount (..))
 import Die (die)
 import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier (Some, SomeP))
 import Semicircuit.Types.Semicircuit (Semicircuit)
-import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping (..), DummyRowAdviceColumn, FixedColumns (..), ArgMapping (..), ZeroVectorIndex (..), OneVectorIndex (..), LastRowIndicatorColumnIndex (..))
+import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), ArgMapping (..), ZeroVectorIndex (..), OneVectorIndex (..), LastRowIndicatorColumnIndex (..))
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
@@ -75,7 +75,7 @@ columnLayout x =
   flip evalState (S 0) $ do
     nm <- nameMappings x
     tm <- termMappings x
-    dr <- dummyRowAdviceColumn x
+    dr <- DummyRowAdviceColumn <$> nextCol
     fs <- fixedColumns
     pure $
       SemicircuitToLogicCircuitColumnLayout
@@ -177,10 +177,6 @@ fixedColumns =
     <$> (ZeroVectorIndex <$> nextCol)
     <*> (OneVectorIndex <$> nextCol)
     <*> (LastRowIndicatorColumnIndex <$> nextCol)
-
-
-dummyRowAdviceColumn :: Semicircuit -> State S DummyRowAdviceColumn
-dummyRowAdviceColumn = todo
 
 
 fixedValues :: RowCount -> Layout -> FixedValues
