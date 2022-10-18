@@ -36,7 +36,7 @@ newtype FreeVariables
   = FreeVariables { unFreeVariables :: Set Name }
 
 newtype UniversalVariables
-  = UniversalVariables { unUniversalVariables :: Set UniversalVariable }
+  = UniversalVariables { unUniversalVariables :: [UniversalVariable] }
   deriving Generic
 
 data UniversalVariable

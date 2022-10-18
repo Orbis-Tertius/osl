@@ -103,13 +103,12 @@ equalityConstrainableColumns
   -> Layout
   -> EqualityConstrainableColumns
 equalityConstrainableColumns x layout =
-  EqualityConstrainableColumns
-    $ (universalToColumnIndex layout
-      `Set.map`
-      (x ^. #universalVariables . #unUniversalVariables))
-      <> Set.singleton
-         (layout ^. #fixedColumns . #zeroVector
-                  . #unZeroVectorIndex)
+  EqualityConstrainableColumns . Set.fromList
+    $ [layout ^. #fixedColumns . #zeroVector
+               . #unZeroVectorIndex]
+      <> (universalToColumnIndex layout <$>
+        (x ^. #universalVariables . #unUniversalVariables))
+
 
 
 universalToColumnIndex
