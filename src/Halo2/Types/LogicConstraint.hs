@@ -3,7 +3,7 @@
 
 module Halo2.Types.LogicConstraint
   ( AtomicLogicConstraint (Equals, LessThan),
-    LogicConstraint (Atom, Not, And, Or, Top, Bottom),
+    LogicConstraint (Atom, Not, And, Or, Iff, Top, Bottom),
     atomicConstraintArgs,
   )
 where
@@ -27,5 +27,6 @@ data LogicConstraint
   | Not LogicConstraint
   | And LogicConstraint LogicConstraint
   | Or LogicConstraint LogicConstraint
+  | Iff LogicConstraint LogicConstraint
   | Top
   | Bottom

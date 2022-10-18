@@ -12,7 +12,6 @@ module Halo2.FiniteField
   )
 where
 
-import Cast (intToInteger)
 import Data.Maybe (fromMaybe)
 import Die (die)
 import Halo2.Prelude
@@ -21,11 +20,11 @@ import Halo2.Types.FiniteField (FiniteField (..))
 
 plus :: FiniteField -> FieldElement -> FieldElement -> FieldElement
 plus (FiniteField n) (FieldElement a) (FieldElement b) =
-  FieldElement ((a + b) `mod` intToInteger n)
+  FieldElement ((a + b) `mod` n)
 
 times :: FiniteField -> FieldElement -> FieldElement -> FieldElement
 times (FiniteField n) (FieldElement a) (FieldElement b) =
-  FieldElement ((a * b) `mod` intToInteger n)
+  FieldElement ((a * b) `mod` n)
 
 reciprocal :: FiniteField -> FieldElement -> Maybe FieldElement
 reciprocal (FiniteField _n) (FieldElement _m) =
@@ -44,4 +43,4 @@ zero = FieldElement 0
 
 minusOne :: FiniteField -> FieldElement
 minusOne (FiniteField n) =
-  FieldElement (intToInteger (n - 1))
+  FieldElement (n - 1)

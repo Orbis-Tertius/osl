@@ -9,5 +9,5 @@ where
 import Halo2.Prelude
 
 newtype FixedBound = FixedBound
-  {unFixedBound :: Int}
+  {unFixedBound :: Integer}
   deriving (Generic)

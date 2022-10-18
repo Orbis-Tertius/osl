@@ -7,7 +7,6 @@ module Halo2.ArithmetizationConfig
   )
 where
 
-import Cast (intToInteger)
 import Crypto.Number.Basic (numBits)
 import Halo2.Prelude
 import Halo2.Types.ArithmetizationConfig (ArithmetizationConfig (..))
@@ -26,12 +25,12 @@ getArithmetizationConfig finiteField bitsPerByte =
 
 getBytesPerWord :: FiniteField -> BitsPerByte -> BytesPerWord
 getBytesPerWord (FiniteField fieldSize) (BitsPerByte bitsPerByte) =
-  case numBits (intToInteger fieldSize) `quotRem` bitsPerByte of
+  case numBits fieldSize `quotRem` bitsPerByte of
     (q, 0) -> BytesPerWord q
     (q, _) -> BytesPerWord (q + 1)
 
 getByteDecompositionSize :: ArithmetizationConfig -> FixedBound -> ByteDecompositionSize
 getByteDecompositionSize config (FixedBound b) =
-  case numBits (intToInteger b) `quotRem` (config ^. #bitsPerByte . #unBitsPerByte) of
+  case numBits b `quotRem` (config ^. #bitsPerByte . #unBitsPerByte) of
     (q, 0) -> ByteDecompositionSize q
     (q, _) -> ByteDecompositionSize (q + 1)

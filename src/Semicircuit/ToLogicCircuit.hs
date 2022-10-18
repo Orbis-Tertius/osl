@@ -22,7 +22,8 @@ import Control.Monad.State (State, evalState, get, put)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Halo2.Polynomial (var, var', constant)
+import Data.Text (pack)
+import Halo2.Polynomial (var, var', constant, plus, times)
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnType (ColumnType (Fixed, Advice, Instance))
@@ -30,9 +31,11 @@ import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
-import Halo2.Types.LogicConstraint (LogicConstraint (Bottom, Top, Atom, And, Or), AtomicLogicConstraint (LessThan, Equals))
+import Halo2.Types.FieldElement (FieldElement (..))
+import Halo2.Types.LogicConstraint (LogicConstraint (Bottom, Top, Atom, And, Or, Not, Iff), AtomicLogicConstraint (LessThan, Equals))
 import Halo2.Types.LogicConstraints (LogicConstraints (..))
 import Halo2.Types.LookupArguments (LookupArguments)
+import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.FiniteField (FiniteField)
 import Halo2.Types.FixedColumn (FixedColumn (..))
@@ -42,23 +45,25 @@ import Halo2.Types.RowIndex (RowIndex (..))
 import Die (die)
 import Semicircuit.Sigma11 (existentialQuantifierName)
 import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier (Some, SomeP))
+import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), ArgMapping (..), ZeroVectorIndex (..), OneVectorIndex (..), LastRowIndicatorColumnIndex (..))
-import Semicircuit.Types.Sigma11 (Name, Term)
+import Semicircuit.Types.Sigma11 (Name, Term (App, AppInverse, Add, Mul, IndLess, Const))
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
+-- TODO: fixed bounds
 semicircuitToLogicCircuit
   :: FiniteField
   -> RowCount
   -> Semicircuit
   -> LogicCircuit
-semicircuitToLogicCircuit fp rowCount x =
+semicircuitToLogicCircuit ff rowCount x =
   let layout = columnLayout x in
-  Circuit fp
+  Circuit ff
   (layout ^. #columnTypes)
   (equalityConstrainableColumns x layout)
-  (gateConstraints x layout)
+  (gateConstraints ff x layout)
   (lookupArguments x layout)
   rowCount
   (equalityConstraints x layout)
@@ -239,14 +244,15 @@ universalToColumnIndex layout v =
 
 
 gateConstraints
-  :: Semicircuit
+  :: FiniteField
+  -> Semicircuit
   -> Layout
   -> LogicConstraints
-gateConstraints x layout =
+gateConstraints ff x layout =
   mconcat
   [ instanceFunctionTablesDefineFunctionsConstraints x layout
   , existentialFunctionTablesDefineFunctionsConstraints x layout
-  , quantifierFreeFormulaIsTrueConstraints x layout
+  , quantifierFreeFormulaIsTrueConstraints ff x layout
   , dummyRowIndicatorConstraints x layout
   , lessThanIndicatorFunctionCallConstraints x layout
   , existentialOutputsInBoundsConstraints x layout
@@ -351,7 +357,7 @@ existentialFunctionTablesDefineFunctionsConstraints x layout =
     | v <- existentialQuantifierName
         <$> x ^. #formula . #quantifiers . #existentialQuantifiers
     ]
-    mempty -- TODO
+    mempty
   where
     lastRowIndicator = var'
       $ layout ^. #fixedColumns
@@ -359,11 +365,83 @@ existentialFunctionTablesDefineFunctionsConstraints x layout =
       . #unLastRowIndicatorColumnIndex
 
 
+termToPolynomial
+  :: FiniteField
+  -> Layout
+  -> Term
+  -> Polynomial
+termToPolynomial ff layout =
+  \case
+    App x [] ->
+      case Map.lookup x names of
+        Just (NameMapping (OutputMapping o) []) ->
+          var' o
+        Just (NameMapping _ _) -> die "termToPolynomial: encountered empty application with non-empty name mapping (this is a compiler bug)"
+        Nothing -> die "termToPolynomial: failed name mapping lookup (this is a compiler bug)"
+    t@(App {}) -> lookupTerm t
+    t@(AppInverse {}) -> lookupTerm t
+    Add x y -> plus ff (rec x) (rec y)
+    Mul x y -> times ff (rec x) (rec y)
+    t@(IndLess {}) -> lookupTerm t
+    Const x ->
+      if x < ff ^. #order
+      then constant (FieldElement x)
+      else die $ "in termToPolynomial: constant term " <> pack (show x) <> " is greater than or equal to the field order " <> pack (show (ff ^. #order)) <> " (this is a compiler bug; should have been caught earlier)"
+  where
+    rec = termToPolynomial ff layout
+
+    names :: Map Name NameMapping
+    names = layout ^. #nameMappings
+
+    terms :: Map Term TermMapping
+    terms = layout ^. #termMappings
+
+    lookupTerm :: Term -> Polynomial
+    lookupTerm t =
+      case Map.lookup t terms of
+        Just (TermMapping i) -> var' i
+        Nothing -> die "termToPolynomial: failed term mapping lookup (this is a compiler bug)"
+
+
+qfFormulaToLogicConstraint
+  :: FiniteField
+  -> Layout
+  -> QF.Formula
+  -> LogicConstraint
+qfFormulaToLogicConstraint ff layout =
+  \case
+    QF.Equal x y ->
+      Atom (term x `Equals` term y)
+    QF.LessOrEqual x y ->
+      Atom (term x `Equals` term y)
+        `Or` Atom (term x `LessThan` term y)
+    QF.Predicate _ _ ->
+      die "not implemented: compiling predicates to circuits"
+    QF.Not p -> Not (rec p)
+    QF.And p q -> And (rec p) (rec q)
+    QF.Or p q -> Or (rec p) (rec q)
+    QF.Implies p q -> Or (Not (rec p)) (rec q)
+    QF.Iff p q -> Iff (rec p) (rec q)
+  where
+    rec = qfFormulaToLogicConstraint ff layout
+    term = termToPolynomial ff layout
+
+
 quantifierFreeFormulaIsTrueConstraints
-  :: Semicircuit
+  :: FiniteField
+  -> Semicircuit
   -> Layout
   -> LogicConstraints
-quantifierFreeFormulaIsTrueConstraints = todo
+quantifierFreeFormulaIsTrueConstraints ff x layout =
+  LogicConstraints
+  [ Atom (dummyRowIndicator `Equals` constant 1)
+    `Or` qfFormulaToLogicConstraint ff layout
+         (x ^. #formula . #qfFormula)
+  ]
+  mempty
+  where
+    dummyRowIndicator =
+      var' $ layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
 
 
 dummyRowIndicatorConstraints

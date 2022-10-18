@@ -33,4 +33,4 @@ composeBytes (BitsPerByte b) (ByteDecomposition (Byte x : xs)) =
 countBytes :: BitsPerByte -> FixedBound -> Int
 countBytes bits (FixedBound b) =
   length . (^. #unByteDecomposition) $
-    decomposeBytes bits (FieldElement (intToInteger (b - 1)))
+    decomposeBytes bits (FieldElement (b - 1))
