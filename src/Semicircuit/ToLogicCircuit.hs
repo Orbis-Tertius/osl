@@ -130,6 +130,7 @@ gateConstraints x layout =
   , existentialFunctionTablesDefineFunctionsConstraints x layout
   , firstOrderInstanceVariableColumnsAreUniformConstraints x layout
   , quantifierFreeFormulaIsTrueConstraints x layout
+  , dummyRowIndicatorConstraints x layout
   , lessThanIndicatorFunctionCallConstraints x layout
   , existentialOutputsInBoundsConstraints x layout
   , existentialInputsInBoundsConstraints x layout
@@ -164,6 +165,13 @@ quantifierFreeFormulaIsTrueConstraints
   -> Layout
   -> LogicConstraints
 quantifierFreeFormulaIsTrueConstraints = todo
+
+
+dummyRowIndicatorConstraints
+  :: Semicircuit
+  -> Layout
+  -> LogicConstraints
+dummyRowIndicatorConstraints = todo
 
 
 lessThanIndicatorFunctionCallConstraints
@@ -205,7 +213,26 @@ lookupArguments
   :: Semicircuit
   -> Layout
   -> LookupArguments
-lookupArguments = todo
+lookupArguments x layout =
+  mconcat
+  [ freeFunctionCallLookupArguments x layout
+  , existentialFunctionCallLookupArguments x layout
+  ]
+
+
+freeFunctionCallLookupArguments
+  :: Semicircuit
+  -> Layout
+  -> LookupArguments
+freeFunctionCallLookupArguments = todo
+
+
+existentialFunctionCallLookupArguments
+  :: Semicircuit
+  -> Layout
+  -> LookupArguments
+existentialFunctionCallLookupArguments = todo
+
 
 
 todo :: a
