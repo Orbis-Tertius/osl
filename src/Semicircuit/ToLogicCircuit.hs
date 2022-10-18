@@ -44,7 +44,7 @@ import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..))
 import Die (die)
-import Semicircuit.Sigma11 (existentialQuantifierName)
+import Semicircuit.Sigma11 (existentialQuantifierName, existentialQuantifierOutputBound)
 import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier (Some, SomeP))
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit, IndicatorFunctionCall (..))
@@ -256,7 +256,7 @@ gateConstraints ff x layout =
   , quantifierFreeFormulaIsTrueConstraints ff x layout
   , dummyRowIndicatorConstraints ff x layout
   , lessThanIndicatorFunctionCallConstraints ff x layout
-  , existentialOutputsInBoundsConstraints x layout
+  , existentialOutputsInBoundsConstraints ff x layout
   , existentialInputsInBoundsConstraints x layout
   , universalTableConstraints x layout
   , existentialOutputIndependenceFromUniversalsConstraints x layout
@@ -519,10 +519,26 @@ lessThanIndicatorFunctionCallConstraints ff x layout =
 
 
 existentialOutputsInBoundsConstraints
-  :: Semicircuit
+  :: FiniteField
+  -> Semicircuit
   -> Layout
   -> LogicConstraints
-existentialOutputsInBoundsConstraints = todo
+existentialOutputsInBoundsConstraints ff x layout =
+  LogicConstraints
+  [ Atom (LessThan y bp)
+  | q <- x ^. #formula . #quantifiers
+            . #existentialQuantifiers
+  , let bp = boundPolynomial ff layout 
+            . existentialQuantifierOutputBound $ q
+  , let y  = mapName . existentialQuantifierName $ q
+  ]
+  mempty
+  where
+    mapName :: Name -> Polynomial
+    mapName y =
+      case Map.lookup y (layout ^. #nameMappings) of
+        Just nm -> var' (nm ^. #outputMapping . #unOutputMapping)
+        Nothing -> die "existentialOutputsInBoundsConstraints: lookup failed (this is a compiler bug)"
 
 
 existentialInputsInBoundsConstraints

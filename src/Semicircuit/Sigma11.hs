@@ -6,6 +6,7 @@ module Semicircuit.Sigma11
     prependQuantifiers,
     prependArguments,
     existentialQuantifierName,
+    existentialQuantifierOutputBound,
   )
 where
 
@@ -103,3 +104,9 @@ existentialQuantifierName =
   \case
     Some x _ _ _ -> x
     SomeP x _ _ _ -> x
+
+existentialQuantifierOutputBound :: ExistentialQuantifier -> Bound
+existentialQuantifierOutputBound =
+  \case
+    Some _ _ _ (OutputBound b) -> b
+    SomeP _ _ _ (OutputBound b) -> b
