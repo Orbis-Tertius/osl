@@ -261,7 +261,6 @@ gateConstraints ff x layout =
   , existentialOutputsInBoundsConstraints ff x layout
   , existentialInputsInBoundsConstraints ff x layout
   , universalTableConstraints ff x layout
-  , existentialOutputIndependenceFromUniversalsConstraints x layout
   ]
 
 
@@ -631,8 +630,8 @@ universalTableConstraints ff x layout =
           ]
       ) `Or` (
         Atom (plus ff (u j 0) (constant 1) `Equals` bound j)
-        `And` Atom (u j 1 `Equals` constant 0)
-        `And` next (j-1)
+          `And` Atom (u j 1 `Equals` constant 0)
+          `And` next (j-1)
       )
 
     bound :: UniQIndex -> Polynomial
@@ -644,16 +643,8 @@ universalTableConstraints ff x layout =
         Nothing ->
           die "universalTableConstraints: bound index out of range (this is a compiler bug)"
 
-
     lastRowIndicator = var' $ layout ^. #fixedColumns
       . #lastRowIndicator . #unLastRowIndicatorColumnIndex
-
-
-existentialOutputIndependenceFromUniversalsConstraints
-  :: Semicircuit
-  -> Layout
-  -> LogicConstraints
-existentialOutputIndependenceFromUniversalsConstraints = todo
 
 
 lookupArguments
