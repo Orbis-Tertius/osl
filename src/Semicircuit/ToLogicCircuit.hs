@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedLists #-}
@@ -19,7 +20,7 @@ module Semicircuit.ToLogicCircuit
 import Control.Lens ((^.))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
-import Data.List.Extra ((!?))
+import Data.List.Extra ((!?), foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -259,7 +260,7 @@ gateConstraints ff x layout =
   , lessThanIndicatorFunctionCallConstraints ff x layout
   , existentialOutputsInBoundsConstraints ff x layout
   , existentialInputsInBoundsConstraints ff x layout
-  , universalTableConstraints x layout
+  , universalTableConstraints ff x layout
   , existentialOutputIndependenceFromUniversalsConstraints x layout
   ]
 
@@ -568,11 +569,84 @@ existentialInputsInBoundsConstraints ff x layout =
         Nothing -> die "existentialInputsInBoundsConstraints: failed name lookup (this is a compiler bug)"
 
 
+newtype UniQIndex = UniQIndex { unUniQIndex :: Int }
+  deriving (Eq, Ord, Num, Enum)
+
+
 universalTableConstraints
-  :: Semicircuit
+  :: FiniteField
+  -> Semicircuit
   -> Layout
   -> LogicConstraints
-universalTableConstraints = todo
+universalTableConstraints ff x layout =
+  LogicConstraints
+  [ foldl' Or
+    (Atom (lastRowIndicator `Equals` constant 1)
+       `Or` next lastU)
+    [ foldl' And
+      (Atom (bound i `Equals` constant 0)
+        `And` next (i-1))
+      [ Atom (u j 0 `Equals` constant 0) -- TODO is this needed?
+          `And` Atom (u j 1 `Equals` constant 0)
+      | j <- [i..lastU]
+      ]
+    | i <- [0..lastU]
+    ]
+  ]
+  mempty
+  where
+    lastU :: UniQIndex
+    lastU = UniQIndex
+          $ length (x ^. #formula . #quantifiers
+                       . #universalQuantifiers)
+              - 1
+
+    u :: UniQIndex -> RowIndex -> Polynomial
+    u i j =
+      case (x ^. #formula . #quantifiers
+               . #universalQuantifiers)
+           !? unUniQIndex i of
+        Just q ->
+          case Map.lookup (q ^. #name)
+                          (layout ^. #nameMappings) of
+            Just nm ->
+              var $
+                PolynomialVariable
+                (nm ^. #outputMapping . #unOutputMapping)
+                j
+            Nothing ->
+              die "universalTableConstraints: failed name mapping lookup (this is a compiler bug)"
+        Nothing ->
+          die "universalTableConstraints: quantifier index out of range (this is a compiler bug)"
+
+    next :: UniQIndex -> LogicConstraint
+    next (-1) = Top
+    next 0 = Atom (u 1 0 `Equals` u 1 1)
+    next j =
+      (
+        foldl' And
+          (Atom (plus ff (u j 0) (constant 1) `Equals` u j 1))
+          [ Atom (u i 0 `Equals` u i 1)
+          | i <- [0..j-2]
+          ]
+      ) `Or` (
+        Atom (plus ff (u j 0) (constant 1) `Equals` bound j)
+        `And` Atom (u j 1 `Equals` constant 0)
+        `And` next (j-1)
+      )
+
+    bound :: UniQIndex -> Polynomial
+    bound i =
+      case (x ^. #formula . #quantifiers
+               . #universalQuantifiers)
+           !? unUniQIndex i of
+        Just q -> boundPolynomial ff layout (q ^. #bound)
+        Nothing ->
+          die "universalTableConstraints: bound index out of range (this is a compiler bug)"
+
+
+    lastRowIndicator = var' $ layout ^. #fixedColumns
+      . #lastRowIndicator . #unLastRowIndicatorColumnIndex
 
 
 existentialOutputIndependenceFromUniversalsConstraints
