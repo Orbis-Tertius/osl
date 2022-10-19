@@ -19,6 +19,7 @@ module Semicircuit.ToLogicCircuit
 import Control.Lens ((^.))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
+import Data.List.Extra ((!?))
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -44,7 +45,7 @@ import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..))
 import Die (die)
-import Semicircuit.Sigma11 (existentialQuantifierName, existentialQuantifierOutputBound)
+import Semicircuit.Sigma11 (existentialQuantifierName, existentialQuantifierOutputBound, existentialQuantifierInputBounds)
 import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier (Some, SomeP))
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit, IndicatorFunctionCall (..))
@@ -257,7 +258,7 @@ gateConstraints ff x layout =
   , dummyRowIndicatorConstraints ff x layout
   , lessThanIndicatorFunctionCallConstraints ff x layout
   , existentialOutputsInBoundsConstraints ff x layout
-  , existentialInputsInBoundsConstraints x layout
+  , existentialInputsInBoundsConstraints ff x layout
   , universalTableConstraints x layout
   , existentialOutputIndependenceFromUniversalsConstraints x layout
   ]
@@ -529,8 +530,8 @@ existentialOutputsInBoundsConstraints ff x layout =
   | q <- x ^. #formula . #quantifiers
             . #existentialQuantifiers
   , let bp = boundPolynomial ff layout 
-            . existentialQuantifierOutputBound $ q
-  , let y  = mapName . existentialQuantifierName $ q
+           $ existentialQuantifierOutputBound q
+  , let y  = mapName $ existentialQuantifierName q
   ]
   mempty
   where
@@ -542,10 +543,29 @@ existentialOutputsInBoundsConstraints ff x layout =
 
 
 existentialInputsInBoundsConstraints
-  :: Semicircuit
+  :: FiniteField
+  -> Semicircuit
   -> Layout
   -> LogicConstraints
-existentialInputsInBoundsConstraints = todo
+existentialInputsInBoundsConstraints ff x layout =
+  LogicConstraints
+  [ Atom (LessThan y bp)
+  | q <- x ^. #formula . #quantifiers
+            . #existentialQuantifiers
+  , (i, ib) <- zip [0..] (existentialQuantifierInputBounds q)
+  , let bp = boundPolynomial ff layout (ib ^. #bound)
+  , let y  = name (existentialQuantifierName q) i
+  ]
+  mempty
+  where
+    name :: Name -> Int -> Polynomial
+    name n i =
+      case Map.lookup n (layout ^. #nameMappings) of
+        Just nm ->
+          case (nm ^. #argMappings) !? i of
+            Just (ArgMapping j) -> var' j
+            Nothing -> die "existentialInputsInBoundsConstraints: failed arg mapping lookup (this is a compiler bug)"
+        Nothing -> die "existentialInputsInBoundsConstraints: failed name lookup (this is a compiler bug)"
 
 
 universalTableConstraints
