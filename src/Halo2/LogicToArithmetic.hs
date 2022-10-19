@@ -234,7 +234,7 @@ getSignRangeCheck ::
   Maybe LookupArgument
 getSignRangeCheck f layout c = do
   advice <- Map.lookup c (layout ^. #atomAdvice)
-  pure . LookupArgument $
+  pure . LookupArgument (P.constant 0) $
     [ ( InputExpression (signPoly f advice),
         LookupTableColumn $
           layout
@@ -260,7 +260,7 @@ getByteRangeAndTruthTableChecks layout c = do
           ^. #truthTable
             . #byteRangeColumnIndex
             . #unByteRangeColumnIndex
-  pure . LookupArgument $ do
+  pure . LookupArgument (P.constant 0) $ do
     (byteCol, truthValCol) <-
       zip
         (advice ^. #bytes)

@@ -26,7 +26,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Halo2.FiniteField (fieldMax)
-import Halo2.Polynomial (var, var', constant, plus, times)
+import Halo2.Polynomial (var, var', constant, plus, times, minus)
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnType (ColumnType (Fixed, Advice, Instance))
@@ -35,9 +35,12 @@ import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (.
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
 import Halo2.Types.FieldElement (FieldElement (..))
+import Halo2.Types.InputExpression (InputExpression (..))
 import Halo2.Types.LogicConstraint (LogicConstraint (Bottom, Top, Atom, And, Or, Not, Iff), AtomicLogicConstraint (LessThan, Equals))
 import Halo2.Types.LogicConstraints (LogicConstraints (..))
-import Halo2.Types.LookupArguments (LookupArguments)
+import Halo2.Types.LookupArguments (LookupArguments (..))
+import Halo2.Types.LookupArgument (LookupArgument (..))
+import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.FiniteField (FiniteField)
@@ -67,7 +70,7 @@ semicircuitToLogicCircuit ff rowCount x =
   (layout ^. #columnTypes)
   (equalityConstrainableColumns x layout)
   (gateConstraints ff x layout)
-  (lookupArguments x layout)
+  (lookupArguments ff x layout)
   rowCount
   (equalityConstraints x layout)
   (fixedValues rowCount layout)
@@ -648,21 +651,68 @@ universalTableConstraints ff x layout =
 
 
 lookupArguments
-  :: Semicircuit
+  :: FiniteField
+  -> Semicircuit
   -> Layout
   -> LookupArguments
-lookupArguments x layout =
-  mconcat
-  [ freeFunctionCallLookupArguments x layout
-  , existentialFunctionCallLookupArguments x layout
+lookupArguments = functionCallLookupArguments
+
+
+newtype FunctionIndex = FunctionIndex { unFunctionIndex :: Int }
+
+
+newtype FunctionCallIndex = FunctionCallIndex { unFunctionCallIndex :: Int }
+
+
+newtype ArgumentIndex = ArgumentIndex { unArgumentIndex :: Int}
+
+
+functionCallLookupArguments
+  :: FiniteField
+  -> Semicircuit
+  -> Layout
+  -> LookupArguments
+functionCallLookupArguments ff x layout =
+  LookupArguments
+  [ LookupArgument
+    (minus ff dummyRowIndicator (constant 1))
+    ( 
+      [ (o i j k, b i)
+      | k <- todo
+      ]
+      <>
+      [ (bound i j k, a i k)
+      | k <- argumentIndices i
+      ]
+    )
+  | i <- functionIndices,
+    j <- functionCallIndices i
   ]
+  where
+    functionIndices :: [FunctionIndex]
+    functionIndices = todo
 
+    functionCallIndices :: FunctionIndex -> [FunctionCallIndex]
+    functionCallIndices = todo
 
-freeFunctionCallLookupArguments
-  :: Semicircuit
-  -> Layout
-  -> LookupArguments
-freeFunctionCallLookupArguments = todo
+    argumentIndices :: FunctionIndex -> [ArgumentIndex]
+    argumentIndices = todo
+
+    o :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> InputExpression
+    o = todo
+
+    b :: FunctionIndex -> LookupTableColumn
+    b = todo
+
+    a :: FunctionIndex -> ArgumentIndex -> LookupTableColumn
+    a = todo
+
+    bound :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> InputExpression
+    bound = todo
+
+    dummyRowIndicator =
+      var' $ layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
+
 
 
 existentialFunctionCallLookupArguments
