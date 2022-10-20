@@ -43,7 +43,7 @@
               {
                 safe-coloured-text = hprev.callCabal2nix "safe-coloured-text" (safe-coloured-text-src + /safe-coloured-text) { };
                 autodocodec-yaml = hprev.callCabal2nix "autodocodec" (autodocodec-src + /autodocodec-yaml) { };
-                osl = disableLibraryProfiling (hprev.callCabal2nix "osl" ./. { });
+                osl = dontCheck (disableLibraryProfiling (hprev.callCabal2nix "osl" ./. { }));
                 osl-spec = disableLibraryProfiling (hprev.callCabal2nix "osl:spec" ./. { });
               };
           };
