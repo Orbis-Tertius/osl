@@ -21,8 +21,10 @@ import Control.Lens ((^.))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Data.List.Extra ((!?), foldl')
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Halo2.FiniteField (fieldMax)
@@ -52,7 +54,7 @@ import Die (die)
 import Semicircuit.Sigma11 (existentialQuantifierName, existentialQuantifierOutputBound, existentialQuantifierInputBounds)
 import Semicircuit.Types.PNFFormula (UniversalQuantifier, ExistentialQuantifier (Some, SomeP))
 import qualified Semicircuit.Types.QFFormula as QF
-import Semicircuit.Types.Semicircuit (Semicircuit, IndicatorFunctionCall (..))
+import Semicircuit.Types.Semicircuit (Semicircuit, IndicatorFunctionCall (..), FunctionCall (..))
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout (..), NameMapping (NameMapping), OutputMapping (..), TermMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), ArgMapping (..), ZeroVectorIndex (..), OneVectorIndex (..), LastRowIndicatorColumnIndex (..))
 import Semicircuit.Types.Sigma11 (Name, Term (App, AppInverse, Add, Mul, IndLess, Const), Bound (TermBound, FieldMaxBound))
 
@@ -658,13 +660,14 @@ lookupArguments
 lookupArguments = functionCallLookupArguments
 
 
-newtype FunctionIndex = FunctionIndex { unFunctionIndex :: Int }
+newtype FunctionIndex = FunctionIndex Int
+  deriving (Eq, Ord, Num)
 
 
-newtype FunctionCallIndex = FunctionCallIndex { unFunctionCallIndex :: Int }
+newtype FunctionCallIndex = FunctionCallIndex Int
 
 
-newtype ArgumentIndex = ArgumentIndex { unArgumentIndex :: Int}
+newtype ArgumentIndex = ArgumentIndex Int
 
 
 functionCallLookupArguments
@@ -677,11 +680,9 @@ functionCallLookupArguments ff x layout =
   [ LookupArgument
     (minus ff dummyRowIndicator (constant 1))
     ( 
-      [ (o i j k, b i)
-      | k <- todo
-      ]
+      [(outputEval i j, outputColumn i)]
       <>
-      [ (bound i j k, a i k)
+      [ (argEval i j k, inputColumn i k)
       | k <- argumentIndices i
       ]
     )
@@ -689,39 +690,71 @@ functionCallLookupArguments ff x layout =
     j <- functionCallIndices i
   ]
   where
+    functionSymbols :: [Name]
+    functionSymbols =
+      filter ((> 0) . (^. #arity))
+        . Map.keys $ layout ^. #nameMappings
+
+    functionSymbol :: FunctionIndex -> Name
+    functionSymbol (FunctionIndex i) =
+      fromMaybe (die "functionCallLookupArguments: functionSymbol: lookup failed (this is a compiler bug)")
+        (functionSymbols !? i)
+
     functionIndices :: [FunctionIndex]
-    functionIndices = todo
+    functionIndices =
+      FunctionIndex <$> [0 .. length functionSymbols - 1]
+
+    functionCalls :: FunctionIndex -> [FunctionCall]
+    functionCalls i =
+      filter ((== functionSymbol i) . (^. #name))
+        (Set.toList (x ^. #functionCalls . #unFunctionCalls))
+
+    functionCall :: FunctionIndex -> FunctionCallIndex -> FunctionCall
+    functionCall i (FunctionCallIndex j) =
+      fromMaybe (die "functionCallLookupArguments: functionCall: call index out of range (this is a compiler bug")
+        $ functionCalls i !? j
 
     functionCallIndices :: FunctionIndex -> [FunctionCallIndex]
-    functionCallIndices = todo
+    functionCallIndices i = FunctionCallIndex <$> [0 .. length (functionCalls i)]
 
     argumentIndices :: FunctionIndex -> [ArgumentIndex]
-    argumentIndices = todo
+    argumentIndices i = ArgumentIndex <$> [0 .. functionSymbol i ^. #arity . #unArity]
 
-    o :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> InputExpression
-    o = todo
+    functionCallArgument :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> Term
+    functionCallArgument i j (ArgumentIndex k) =
+      fromMaybe (die "functionCallLookupArguments: functionCallArgument: argument index out of range (this is a compiler bug)")
+        $ NonEmpty.toList (functionCall i j ^. #args) !? k
 
-    b :: FunctionIndex -> LookupTableColumn
-    b = todo
+    outputEval :: FunctionIndex -> FunctionCallIndex -> InputExpression
+    outputEval i j =
+      InputExpression . var' . (^. #unTermMapping)
+        . fromMaybe (die "functionCallLookupArguments: outputEval: term mapping lookup failed (this is a compiler bug)")
+        $ Map.lookup t (layout ^. #termMappings)
+      where
+        FunctionCall f xs = functionCall i j
+        t = App f (NonEmpty.toList xs)
 
-    a :: FunctionIndex -> ArgumentIndex -> LookupTableColumn
-    a = todo
+    argEval :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> InputExpression
+    argEval i j k =
+      InputExpression
+        . termToPolynomial ff layout
+        $ functionCallArgument i j k
 
-    bound :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> InputExpression
-    bound = todo
+    outputColumn :: FunctionIndex -> LookupTableColumn
+    outputColumn i =
+      case Map.lookup (functionSymbol i) (layout ^. #nameMappings) of
+        Just nm ->
+          LookupTableColumn $ nm ^. #outputMapping . #unOutputMapping
+        Nothing -> die "functionCallLookupArguments: outputColumn: lookup failed (this is a compiler bug)"
+
+    inputColumn :: FunctionIndex -> ArgumentIndex -> LookupTableColumn
+    inputColumn i (ArgumentIndex k) =
+      case Map.lookup (functionSymbol i) (layout ^. #nameMappings) of
+        Just nm ->
+          maybe (die "functionCallLookupArguments: inputColumn: argument index out of range (this is a compiler bug")
+            (LookupTableColumn . (^. #unArgMapping))
+            ((nm ^. #argMappings) !? k)
+        Nothing -> die "functionCallLookupArguments: inputColumn: name lookup failed (this is a compiler bug)"
 
     dummyRowIndicator =
       var' $ layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
-
-
-
-existentialFunctionCallLookupArguments
-  :: Semicircuit
-  -> Layout
-  -> LookupArguments
-existentialFunctionCallLookupArguments = todo
-
-
-
-todo :: a
-todo = todo

@@ -6,7 +6,7 @@ module Semicircuit.Types.Semicircuit
   ( Semicircuit (Semicircuit),
     FreeVariables (..),
     FunctionCalls (..),
-    FunctionCall (..),
+    FunctionCall (FunctionCall),
     IndicatorFunctionCalls (..),
     IndicatorFunctionCall (..),
     AdviceTerms (..),
@@ -43,6 +43,7 @@ newtype IndicatorFunctionCalls
 newtype FunctionCalls
   = FunctionCalls { unFunctionCalls :: Set FunctionCall }
   deriving newtype (Semigroup, Monoid)
+  deriving stock Generic
 
 newtype AdviceTerms
   = AdviceTerms { unAdviceTerms :: Set Term }
@@ -54,5 +55,8 @@ data IndicatorFunctionCall
   deriving (Eq, Ord)
 
 data FunctionCall
-  = FunctionCall Name (NonEmpty Term)
-  deriving (Eq, Ord)
+  = FunctionCall
+    { name :: Name
+    , args :: (NonEmpty Term)
+    }
+  deriving (Eq, Ord, Generic)
