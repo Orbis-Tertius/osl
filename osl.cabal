@@ -103,6 +103,7 @@ library
     cryptonite,
     either,
     extra,
+    fri-proofs,
     generic-lens,
     genvalidity,
     genvalidity-bytestring,
