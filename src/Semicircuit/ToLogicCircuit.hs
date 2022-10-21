@@ -384,7 +384,7 @@ termToPolynomial ff layout =
         Just (NameMapping (OutputMapping o) []) ->
           var' o
         Just (NameMapping _ _) -> die "termToPolynomial: encountered empty application with non-empty name mapping (this is a compiler bug)"
-        Nothing -> die "termToPolynomial: failed name mapping lookup (this is a compiler bug)"
+        Nothing -> die $ "termToPolynomial: failed name mapping lookup (this is a compiler bug)\n" <> pack (show x)
     t@(App {}) -> lookupTerm t
     t@(AppInverse {}) -> lookupTerm t
     Add x y -> plus ff (rec x) (rec y)
@@ -407,7 +407,7 @@ termToPolynomial ff layout =
     lookupTerm t =
       case Map.lookup t terms of
         Just (TermMapping i) -> var' i
-        Nothing -> die "termToPolynomial: failed term mapping lookup (this is a compiler bug)"
+        Nothing -> die $ "termToPolynomial: failed term mapping lookup (this is a compiler bug)\n" <> pack (show t)
 
 
 qfFormulaToLogicConstraint
@@ -569,7 +569,9 @@ existentialInputsInBoundsConstraints ff x layout =
         Just nm ->
           case (nm ^. #argMappings) !? i of
             Just (ArgMapping j) -> var' j
-            Nothing -> die "existentialInputsInBoundsConstraints: failed arg mapping lookup (this is a compiler bug)"
+            Nothing -> die $
+              "existentialInputsInBoundsConstraints: failed arg mapping lookup (this is a compiler bug)\n"
+                <> pack (show (n, i))
         Nothing -> die "existentialInputsInBoundsConstraints: failed name lookup (this is a compiler bug)"
 
 
@@ -722,7 +724,8 @@ functionCallLookupArguments ff x layout =
 
     functionCallArgument :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> Term
     functionCallArgument i j (ArgumentIndex k) =
-      fromMaybe (die "functionCallLookupArguments: functionCallArgument: argument index out of range (this is a compiler bug)")
+      fromMaybe (die $ "functionCallLookupArguments: functionCallArgument: argument index out of range (this is a compiler bug)\n"
+                  <> pack (show (functionSymbol i, functionCall i j, k)))
         $ NonEmpty.toList (functionCall i j ^. #args) !? k
 
     outputEval :: FunctionIndex -> FunctionCallIndex -> InputExpression

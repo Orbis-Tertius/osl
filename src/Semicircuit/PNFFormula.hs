@@ -184,7 +184,8 @@ functionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
                    Just xs' -> FunctionCalls (Set.singleton (FunctionCall f xs'))
                    Nothing -> mempty
                )
-        S11.AppInverse _ x -> term x
+        S11.AppInverse f x -> term x
+           <> FunctionCalls (Set.singleton (FunctionCall f [x])) -- TODO: invert
         S11.Add x y -> term x <> term y
         S11.Mul x y -> term x <> term y
         S11.IndLess x y -> term x <> term y
@@ -248,6 +249,13 @@ toSemicircuit f =
   let fvs = freeVariables f
       ifs = indicatorFunctionCalls f
       fs = functionCalls f
-      ts = indicatorFunctionCallsArguments ifs
+      ts = AdviceTerms (Set.fromList (functionCallToTerm
+             <$> Set.toList (unFunctionCalls fs)))
+        <> indicatorFunctionCallsArguments ifs
         <> functionCallsArguments fs
   in Semicircuit fvs ifs fs ts f
+
+
+functionCallToTerm :: FunctionCall -> S11.Term
+functionCallToTerm (FunctionCall f xs)
+  = S11.App f (NonEmpty.toList xs)

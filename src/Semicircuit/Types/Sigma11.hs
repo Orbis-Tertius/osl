@@ -34,7 +34,7 @@ import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.Sigma11 (PredicateName)
 
 data Name = Name {arity :: Arity, sym :: Int}
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord, Generic, Show)
 
 class MapNames a where
   mapNames :: (Name -> Name) -> a -> a
@@ -49,7 +49,7 @@ data Term
   | Mul Term Term
   | IndLess Term Term
   | Const Integer
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 var :: Name -> Term
 var x = App x []
@@ -78,28 +78,30 @@ data Formula
   | Iff Formula Formula
   | ForAll Name Bound Formula
   | ForSome ExistentialQuantifier Formula
+  deriving Show
 
 data ExistentialQuantifier
   = Some Name Cardinality [InputBound] OutputBound
   | SomeP Name Cardinality InputBound OutputBound
-  deriving (Eq)
+  deriving (Eq, Show)
 
 someFirstOrder :: Name -> Bound -> ExistentialQuantifier
 someFirstOrder x b =
   Some x (Cardinality 0) [] (OutputBound b)
 
 data Bound = TermBound Term | FieldMaxBound
-  deriving (Eq)
+  deriving (Eq, Show)
 
 data InputBound = InputBound
   { name :: Name,
     bound :: Bound
   }
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, Show)
 
 newtype OutputBound = OutputBound {unOutputBound :: Bound}
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, Show)
 
 data Quantifier
   = Universal Name Bound
   | Existential ExistentialQuantifier
+  deriving Show

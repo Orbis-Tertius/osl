@@ -14,6 +14,7 @@ data Formula
   | Or Formula Formula
   | Implies Formula Formula
   | Iff Formula Formula
+  deriving Show
 
 instance MapNames Formula where
   mapNames f =

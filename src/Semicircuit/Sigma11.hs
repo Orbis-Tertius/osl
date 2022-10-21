@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Semicircuit.Sigma11
@@ -11,8 +12,10 @@ module Semicircuit.Sigma11
   )
 where
 
+import Control.Lens ((%~))
 import Data.List (foldl')
 import Die (die)
+import OSL.Types.Arity (Arity (..))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
 
 prependBounds ::
@@ -20,7 +23,7 @@ prependBounds ::
   ExistentialQuantifier ->
   ExistentialQuantifier
 prependBounds bs' (Some x n bs b) =
-  Some x n (bs' <> bs) b
+  Some (#arity %~ (+ Arity (length bs')) $ x) n (bs' <> bs) b
 prependBounds _ (SomeP {}) =
   die "there is a compiler bug; applied prependBounds to SomeP"
 
@@ -59,7 +62,7 @@ prependArguments f xs =
       \case
         App g xs' ->
           if g == f
-            then App g ((var <$> xs) <> xs')
+            then App (#arity . #unArity %~ (+ length xs) $ g) ((var <$> xs) <> xs')
             else App g xs'
         AppInverse g x ->
           if g == f

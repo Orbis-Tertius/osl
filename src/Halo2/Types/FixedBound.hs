@@ -10,4 +10,4 @@ import Halo2.Prelude
 
 newtype FixedBound = FixedBound
   {unFixedBound :: Integer}
-  deriving (Generic)
+  deriving (Generic, Show)

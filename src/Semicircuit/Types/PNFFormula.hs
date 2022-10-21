@@ -16,13 +16,13 @@ data Formula = Formula
   { qfFormula :: QF.Formula,
     quantifiers :: Quantifiers
   }
-  deriving Generic
+  deriving (Generic, Show)
 
 data Quantifiers = Quantifiers
   { existentialQuantifiers :: [ExistentialQuantifier],
     universalQuantifiers :: [UniversalQuantifier]
   }
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, Show)
 
 instance Semigroup Quantifiers where
   (Quantifiers a b) <> (Quantifiers a' b') =
@@ -36,4 +36,4 @@ data UniversalQuantifier =
   { name :: Name
   , bound :: Bound
   }
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, Show)

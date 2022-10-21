@@ -111,5 +111,10 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
         "Translated OSL:\n"
           <> show translated
           <> (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
+          <> "\n\nPrenex normal form: " <> show pnf
+          <> "\n\nStrong prenex normal form: " <> show spnf
+          <> "\n\nPNF formula: " <> show pnff
+          <> "\n\nSemicircuit: " <> show semi
+          <> "\n\nLogic circuit: " <> show logic
           <> "\n\nArithmetic circuit:\n" <> show circuit
     _ -> Left . ErrorMessage $ "please provide the name of a defined term"
