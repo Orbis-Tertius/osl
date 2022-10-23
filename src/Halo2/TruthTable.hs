@@ -7,22 +7,26 @@ module Halo2.TruthTable
   )
 where
 
-import Cast (integerToInt)
+import Cast (intToInteger)
 import Data.Maybe (fromMaybe)
+import Data.Text (pack)
 import Die (die)
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.RowCount (RowCount (..))
-import Stark.Types.Scalar (scalarToInteger)
+import Stark.Types.Scalar (Scalar, integerToScalar)
 
 getByteRangeColumn :: BitsPerByte -> RowCount -> FixedColumn
 getByteRangeColumn (BitsPerByte b) (RowCount r) =
-  let m = (2 ^ b) - 1
-      m' =
-        fromMaybe (die "getByteRangeColumn: m > maxBound @Int") $
-          integerToInt (scalarToInteger m)
-   in FixedColumn ([0 .. m] <> replicate (r - m') m)
+  let m' = (2 ^ b) - 1
+      m = fromMaybe (die $ "getByteRangeColumn: " <> pack (show m') <> " out of range of scalar type")
+          (integerToScalar (intToInteger m'))
+   in FixedColumn ((f <$> [0 .. m']) <> replicate (r - m') m)
+  where
+    f :: Int -> Scalar
+    f = fromMaybe (die "getByteRangeColumn: f partiality")
+        . integerToScalar . intToInteger
 
 getZeroIndicatorColumn :: RowCount -> FixedColumn
 getZeroIndicatorColumn (RowCount n) =

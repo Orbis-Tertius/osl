@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.EqualityConstraints
@@ -11,4 +12,4 @@ import Halo2.Types.EqualityConstraint
 
 newtype EqualityConstraints = EqualityConstraints
   {getEqualityConstraints :: [EqualityConstraint]}
-  deriving (Eq, Ord, Generic, Show)
+  deriving (Eq, Ord, Generic, Show, Semigroup, Monoid)

@@ -288,7 +288,7 @@ logicToArithmeticCircuit bits rows lc = do
       (layout ^. #columnTypes)
       (lc ^. #equalityConstrainableColumns)
       (PolynomialConstraints polyGates degreeBound)
-      ( (lc ^. #lookupArguments)
+      ( mempty (lc ^. #lookupArguments)
           <> LookupArguments signChecks
           <> LookupArguments rangeAndTruthChecks
       )
