@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Cast
-  ( intToInteger
-  ) where
+  ( intToInteger,
+  )
+where
 
 import Data.Bits (toIntegralSized)
 import Data.Maybe (fromMaybe)

@@ -78,7 +78,7 @@ data Formula
   | Iff Formula Formula
   | ForAll Name Bound Formula
   | ForSome ExistentialQuantifier Formula
-  deriving Show
+  deriving (Show)
 
 data ExistentialQuantifier
   = Some Name Cardinality [InputBound] OutputBound
@@ -104,4 +104,4 @@ newtype OutputBound = OutputBound {unOutputBound :: Bound}
 data Quantifier
   = Universal Name Bound
   | Existential ExistentialQuantifier
-  deriving Show
+  deriving (Show)

@@ -120,9 +120,10 @@ eval f layout =
     Iff p q ->
       let a = rec p
           b = rec q
-          c = P.minus f (P.constant 1)
+          c =
+            P.minus f (P.constant 1)
               <$> (P.minus f <$> a <*> b)
-      in P.times f <$> c <*> c
+       in P.times f <$> c <*> c
     Top -> pure (P.constant 1)
     Bottom -> pure (P.constant 0)
   where

@@ -62,20 +62,25 @@ runMain (FileName fileName) (TargetName targetName) = do
   sourceBs <- readFile fileName
   case decodeUtf8' sourceBs of
     Right source ->
-      case calcMain (FileName fileName) (TargetName targetName) (Source source)
-                    (BitsPerByte 8) (FiniteField 18446744069414584321) (RowCount 8) of
+      case calcMain
+        (FileName fileName)
+        (TargetName targetName)
+        (Source source)
+        (BitsPerByte 8)
+        (FiniteField 18446744069414584321)
+        (RowCount 8) of
         Left (ErrorMessage err) -> pure (Output err)
         Right (SuccessfulOutput result) -> pure (Output result)
     _ -> pure (Output "could not decode source file; is it not UTF-8?")
 
-calcMain
-  :: FileName
-  -> TargetName
-  -> Source
-  -> BitsPerByte
-  -> FiniteField
-  -> RowCount
-  -> Either ErrorMessage SuccessfulOutput
+calcMain ::
+  FileName ->
+  TargetName ->
+  Source ->
+  BitsPerByte ->
+  FiniteField ->
+  RowCount ->
+  Either ErrorMessage SuccessfulOutput
 calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte finiteField rowCount = do
   toks <-
     mapLeft (ErrorMessage . ("Tokenizing error: " <>) . show) $
@@ -111,10 +116,16 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
         "Translated OSL:\n"
           <> show translated
           <> (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
-          <> "\n\nPrenex normal form: " <> show pnf
-          <> "\n\nStrong prenex normal form: " <> show spnf
-          <> "\n\nPNF formula: " <> show pnff
-          <> "\n\nSemicircuit: " <> show semi
-          <> "\n\nLogic circuit: " <> show logic
-          <> "\n\nArithmetic circuit:\n" <> show circuit
+          <> "\n\nPrenex normal form: "
+          <> show pnf
+          <> "\n\nStrong prenex normal form: "
+          <> show spnf
+          <> "\n\nPNF formula: "
+          <> show pnff
+          <> "\n\nSemicircuit: "
+          <> show semi
+          <> "\n\nLogic circuit: "
+          <> show logic
+          <> "\n\nArithmetic circuit:\n"
+          <> show circuit
     _ -> Left . ErrorMessage $ "please provide the name of a defined term"

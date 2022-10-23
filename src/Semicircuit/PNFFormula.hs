@@ -16,10 +16,10 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Data.Set (Set)
 import qualified Data.Set as Set
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Sigma11 (prependBounds, existentialQuantifierName)
+import Semicircuit.Sigma11 (existentialQuantifierName, prependBounds)
 import qualified Semicircuit.Types.PNFFormula as PNF
 import qualified Semicircuit.Types.QFFormula as QF
-import Semicircuit.Types.Semicircuit (FunctionCall (..), FunctionCalls (..), IndicatorFunctionCall (..), IndicatorFunctionCalls (..), Semicircuit (..), AdviceTerms (..), FreeVariables (..))
+import Semicircuit.Types.Semicircuit (AdviceTerms (..), FreeVariables (..), FunctionCall (..), FunctionCalls (..), IndicatorFunctionCall (..), IndicatorFunctionCalls (..), Semicircuit (..))
 import qualified Semicircuit.Types.Sigma11 as S11
 
 -- Turns a strong prenex normal form into a PNF formula.
@@ -184,21 +184,23 @@ functionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
                    Just xs' -> FunctionCalls (Set.singleton (FunctionCall f xs'))
                    Nothing -> mempty
                )
-        S11.AppInverse f x -> term x
-           <> FunctionCalls (Set.singleton (FunctionCall f [x])) -- TODO: invert
+        S11.AppInverse f x ->
+          term x
+            <> FunctionCalls (Set.singleton (FunctionCall f [x])) -- TODO: invert
         S11.Add x y -> term x <> term y
         S11.Mul x y -> term x <> term y
         S11.IndLess x y -> term x <> term y
         S11.Const _ -> mempty
 
-indicatorFunctionCallsArguments
-  :: IndicatorFunctionCalls -> AdviceTerms
+indicatorFunctionCallsArguments ::
+  IndicatorFunctionCalls -> AdviceTerms
 indicatorFunctionCallsArguments =
   mconcat . fmap indicatorFunctionCallArguments
-    . Set.toList . unIndicatorFunctionCalls
+    . Set.toList
+    . unIndicatorFunctionCalls
 
-indicatorFunctionCallArguments
-  :: IndicatorFunctionCall -> AdviceTerms
+indicatorFunctionCallArguments ::
+  IndicatorFunctionCall -> AdviceTerms
 indicatorFunctionCallArguments (IndicatorFunctionCall x y) =
   AdviceTerms [x, y]
 
@@ -217,7 +219,7 @@ freeVariables (PNF.Formula qf qs) =
 quantifiedVariables :: PNF.Quantifiers -> Set S11.Name
 quantifiedVariables (PNF.Quantifiers es us) =
   Set.fromList (existentialQuantifierName <$> es)
-  <> Set.fromList ((^. #name) <$> us)
+    <> Set.fromList ((^. #name) <$> us)
 
 allVariables :: QF.Formula -> Set S11.Name
 allVariables =
@@ -249,13 +251,17 @@ toSemicircuit f =
   let fvs = freeVariables f
       ifs = indicatorFunctionCalls f
       fs = functionCalls f
-      ts = AdviceTerms (Set.fromList (functionCallToTerm
-             <$> Set.toList (unFunctionCalls fs)))
-        <> indicatorFunctionCallsArguments ifs
-        <> functionCallsArguments fs
-  in Semicircuit fvs ifs fs ts f
-
+      ts =
+        AdviceTerms
+          ( Set.fromList
+              ( functionCallToTerm
+                  <$> Set.toList (unFunctionCalls fs)
+              )
+          )
+          <> indicatorFunctionCallsArguments ifs
+          <> functionCallsArguments fs
+   in Semicircuit fvs ifs fs ts f
 
 functionCallToTerm :: FunctionCall -> S11.Term
-functionCallToTerm (FunctionCall f xs)
-  = S11.App f (NonEmpty.toList xs)
+functionCallToTerm (FunctionCall f xs) =
+  S11.App f (NonEmpty.toList xs)

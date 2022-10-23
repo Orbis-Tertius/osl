@@ -8,4 +8,4 @@ import GHC.Generics (Generic)
 
 newtype Arity = Arity {unArity :: Int}
   deriving newtype (Eq, Ord, Num, Show)
-  deriving stock Generic
+  deriving stock (Generic)

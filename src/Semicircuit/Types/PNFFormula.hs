@@ -31,9 +31,8 @@ instance Semigroup Quantifiers where
 instance Monoid Quantifiers where
   mempty = Quantifiers [] []
 
-data UniversalQuantifier =
-  All
-  { name :: Name
-  , bound :: Bound
+data UniversalQuantifier = All
+  { name :: Name,
+    bound :: Bound
   }
   deriving (Eq, Generic, Show)

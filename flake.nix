@@ -50,7 +50,7 @@
             ${pkgs.git.outPath}/bin/git config user.email "foo@bar.com"
             ${pkgs.git.outPath}/bin/git config user.name "Foobar"
             ${pkgs.git.outPath}/bin/git commit -m "initial commit"
-            ${hsPkgs.ormolu.outPath}/bin/ormolu -m inplace $(find ./. -type f -name '*.hs')
+            ${pkgs.ormolu.outPath}/bin/ormolu -m inplace $(find ./. -type f -name '*.hs')
             if [ -z "$(${pkgs.git.outPath}/bin/git status --porcelain)" ]; then
               echo "ok"
             else
@@ -69,7 +69,7 @@
           hsPkgs.cabal-install
           pkgs.nixpkgs-fmt
           hsPkgs.ghcid
-          hsPkgs.ormolu
+          pkgs.ormolu
           hsPkgs.hlint
         ];
       });

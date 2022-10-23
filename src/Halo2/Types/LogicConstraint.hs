@@ -30,4 +30,4 @@ data LogicConstraint
   | Iff LogicConstraint LogicConstraint
   | Top
   | Bottom
-  deriving Show
+  deriving (Show)
