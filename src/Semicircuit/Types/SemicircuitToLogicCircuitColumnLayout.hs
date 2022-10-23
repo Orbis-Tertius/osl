@@ -32,7 +32,7 @@ data NameMapping = NameMapping
   }
   deriving (Generic)
 
-data TermMapping = TermMapping {unTermMapping :: ColumnIndex}
+newtype TermMapping = TermMapping {unTermMapping :: ColumnIndex}
   deriving (Generic)
 
 newtype ZeroVectorIndex = ZeroVectorIndex {unZeroVectorIndex :: ColumnIndex}

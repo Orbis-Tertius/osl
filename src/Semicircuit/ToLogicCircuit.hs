@@ -83,7 +83,7 @@ newtype S = S (ColumnIndex, ColumnTypes)
 nextCol :: ColumnType -> State S ColumnIndex
 nextCol t = do
   S (x, ts) <- get
-  put $ S (x + 1, (ts <> ColumnTypes (Map.singleton x t)))
+  put $ S (x + 1, ts <> ColumnTypes (Map.singleton x t))
   pure x
 
 columnLayout :: Semicircuit -> Layout
@@ -114,10 +114,8 @@ nameMappings x =
 universalVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
 universalVariableMappings x =
   Map.fromList
-    <$> sequence
-      ( universalVariableMapping
-          <$> x ^. #formula . #quantifiers . #universalQuantifiers
-      )
+    <$> mapM universalVariableMapping
+        (x ^. #formula . #quantifiers . #universalQuantifiers)
 
 universalVariableMapping ::
   UniversalQuantifier ->
@@ -133,10 +131,9 @@ existentialVariableMappings ::
   State S (Map Name NameMapping)
 existentialVariableMappings x =
   Map.fromList
-    <$> sequence
-      ( existentialVariableMapping
-          <$> x ^. #formula . #quantifiers . #existentialQuantifiers
-      )
+    <$> mapM
+      existentialVariableMapping
+      (x ^. #formula . #quantifiers . #existentialQuantifiers)
 
 existentialVariableMapping ::
   ExistentialQuantifier -> State S (Name, NameMapping)
@@ -154,35 +151,31 @@ existentialVariableMapping =
       (x,)
         <$> ( NameMapping
                 <$> (OutputMapping <$> nextCol Advice)
-                <*> (((: []) . ArgMapping) <$> nextCol Advice)
+                <*> ((: []) . ArgMapping <$> nextCol Advice)
             )
 
 freeVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
 freeVariableMappings x =
   Map.fromList
-    <$> sequence
-      ( freeVariableMapping
-          <$> Set.toList (x ^. #freeVariables . #unFreeVariables)
-      )
+    <$> mapM freeVariableMapping
+        (Set.toList (x ^. #freeVariables . #unFreeVariables))
 
 freeVariableMapping :: Name -> State S (Name, NameMapping)
 freeVariableMapping x =
   (x,)
     <$> ( NameMapping
             <$> (OutputMapping <$> nextCol Instance)
-            <*> ( replicateM
-                    (x ^. #arity . #unArity)
-                    (ArgMapping <$> nextCol Instance)
-                )
+            <*> replicateM
+              (x ^. #arity . #unArity)
+              (ArgMapping <$> nextCol Instance)
         )
 
 termMappings :: Semicircuit -> State S (Map Term TermMapping)
 termMappings x =
   Map.fromList
-    <$> sequence
-      ( termMapping
-          <$> Set.toList (x ^. #adviceTerms . #unAdviceTerms)
-      )
+    <$> mapM
+      termMapping
+      (Set.toList (x ^. #adviceTerms . #unAdviceTerms))
 
 termMapping :: Term -> State S (Term, TermMapping)
 termMapping t = (t,) . TermMapping <$> nextCol Advice
@@ -347,7 +340,7 @@ nextRowIsEqualConstraint layout v =
               i
               :
           )
-            $ (\c -> PolynomialVariable c i)
+            $ (`PolynomialVariable` i)
               . (^. #unArgMapping)
               <$> (nm ^. #argMappings)
         Nothing -> die "nextRowIsEqualConstraint: failed lookup (this is a compiler bug)"
@@ -364,7 +357,7 @@ nextInputRowIsLexicographicallyGreaterConstraint layout v =
     vars i =
       case Map.lookup v (layout ^. #nameMappings) of
         Just nm ->
-          (\c -> PolynomialVariable c i)
+          (`PolynomialVariable` i)
             . (^. #unArgMapping)
             <$> (nm ^. #argMappings)
         Nothing -> die "nextInputRowIsLexicographicallyGreaterConstraint: failed lookup (this is a compiler bug)"
@@ -493,7 +486,7 @@ someUniversalQuantifierBoundIsZeroConstraint ::
   LogicConstraint
 someUniversalQuantifierBoundIsZeroConstraint ff x layout =
   let boundPolys = universalQuantifierBoundPolynomials ff x layout
-   in foldl
+   in foldl'
         Or
         Top
         [Atom (p `Equals` constant 0) | p <- boundPolys]

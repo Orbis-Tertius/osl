@@ -52,6 +52,6 @@ data IndicatorFunctionCall
 
 data FunctionCall = FunctionCall
   { name :: Name,
-    args :: (NonEmpty Term)
+    args :: NonEmpty Term
   }
   deriving (Eq, Ord, Generic, Show)
