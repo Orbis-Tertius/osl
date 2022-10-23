@@ -14,15 +14,15 @@ import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Byte (Byte (..))
 import Halo2.Types.ByteDecomposition (ByteDecomposition (..))
 import Halo2.Types.FixedBound (FixedBound (..))
-import Stark.Types.Scalar (Scalar)
+import Stark.Types.Scalar (Scalar, scalarToInteger)
 
 decomposeBytes :: BitsPerByte -> Scalar -> ByteDecomposition
 decomposeBytes (BitsPerByte b) x =
-  case x `quotRem` (2 ^ b) of
-    (0, r) -> ByteDecomposition [Byte r]
+  case scalarToInteger x `quotRem` (2 ^ b) of
+    (0, r) -> ByteDecomposition [Byte (fromInteger r)]
     (x', r) ->
-      decomposeBytes (BitsPerByte b) x'
-        <> ByteDecomposition [Byte r]
+      decomposeBytes (BitsPerByte b) (fromInteger x')
+        <> ByteDecomposition [Byte (fromInteger r)]
 
 composeBytes :: BitsPerByte -> ByteDecomposition -> Scalar
 composeBytes _ (ByteDecomposition []) = 0

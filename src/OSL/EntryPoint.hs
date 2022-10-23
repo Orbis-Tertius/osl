@@ -64,7 +64,7 @@ runMain (FileName fileName) (TargetName targetName) = do
       case calcMain
         (FileName fileName)
         (TargetName targetName)
-        (Source source)
+        (Source source) -- TODO: specify BitsPerByte and RowCount with options
         (BitsPerByte 8)
         (RowCount 8) of
         Left (ErrorMessage err) -> pure (Output err)

@@ -729,10 +729,10 @@ functionCallLookupArguments x layout =
         functionCalls i !? j
 
     functionCallIndices :: FunctionIndex -> [FunctionCallIndex]
-    functionCallIndices i = FunctionCallIndex <$> [0 .. length (functionCalls i)]
+    functionCallIndices i = FunctionCallIndex <$> [0 .. length (functionCalls i) - 1]
 
     argumentIndices :: FunctionIndex -> [ArgumentIndex]
-    argumentIndices i = ArgumentIndex <$> [0 .. functionSymbol i ^. #arity . #unArity]
+    argumentIndices i = ArgumentIndex <$> [0 .. functionSymbol i ^. #arity . #unArity - 1]
 
     functionCallArgument :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> Term
     functionCallArgument i j (ArgumentIndex k) =
