@@ -111,8 +111,9 @@ nameMappings x =
 universalVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
 universalVariableMappings x =
   Map.fromList
-    <$> mapM universalVariableMapping
-        (x ^. #formula . #quantifiers . #universalQuantifiers)
+    <$> mapM
+      universalVariableMapping
+      (x ^. #formula . #quantifiers . #universalQuantifiers)
 
 universalVariableMapping ::
   UniversalQuantifier ->
@@ -154,8 +155,9 @@ existentialVariableMapping =
 freeVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
 freeVariableMappings x =
   Map.fromList
-    <$> mapM freeVariableMapping
-        (Set.toList (x ^. #freeVariables . #unFreeVariables))
+    <$> mapM
+      freeVariableMapping
+      (Set.toList (x ^. #freeVariables . #unFreeVariables))
 
 freeVariableMapping :: Name -> State S (Name, NameMapping)
 freeVariableMapping x =

@@ -31,7 +31,7 @@ getBytesPerWord (BitsPerByte bitsPerByte) =
 
 getByteDecompositionSize :: ArithmetizationConfig -> FixedBound -> ByteDecompositionSize
 getByteDecompositionSize config (FixedBound b) =
-  case numBits (scalarToInteger b) `quotRem`
-         (config ^. #bitsPerByte . #unBitsPerByte) of
+  case numBits (scalarToInteger b)
+    `quotRem` (config ^. #bitsPerByte . #unBitsPerByte) of
     (q, 0) -> ByteDecompositionSize q
     (q, _) -> ByteDecompositionSize (q + 1)

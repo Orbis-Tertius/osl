@@ -62,30 +62,28 @@ byteDecompositionGate layout c =
    in do
         advice <- Map.lookup c (layout ^. #atomAdvice)
         pure $
-            (a `P.minus` b)
-            `P.minus`
-            ( ( P.var
-                    ( PolynomialVariable
-                        (advice ^. #sign . #unSignColumnIndex)
-                        0
-                    )
-                )
-              `P.times`
-                ( P.sum
-                    [ (P.constant (2 ^ j)) `P.times` d
-                      | (j, d) :: (Integer, Polynomial) <-
-                          zip
-                            [0 ..]
-                            ( reverse
-                                ( P.var
-                                    . flip PolynomialVariable 0
-                                    . unByteColumnIndex
-                                    <$> (advice ^. #bytes)
-                                )
+          (a `P.minus` b)
+            `P.minus` ( ( P.var
+                            ( PolynomialVariable
+                                (advice ^. #sign . #unSignColumnIndex)
+                                0
                             )
-                    ]
-                )
-            )
+                        )
+                          `P.times` ( P.sum
+                                        [ (P.constant (2 ^ j)) `P.times` d
+                                          | (j, d) :: (Integer, Polynomial) <-
+                                              zip
+                                                [0 ..]
+                                                ( reverse
+                                                    ( P.var
+                                                        . flip PolynomialVariable 0
+                                                        . unByteColumnIndex
+                                                        <$> (advice ^. #bytes)
+                                                    )
+                                                )
+                                        ]
+                                    )
+                      )
 
 eval ::
   LogicToArithmeticColumnLayout ->
@@ -99,9 +97,8 @@ eval layout =
     Atom (LessThan p q) -> do
       advice <- Map.lookup (LessThan p q) (layout ^. #atomAdvice)
       pure $
-          signPoly advice
-          `P.times`
-          some (unTruthValueColumnIndex <$> advice ^. #truthValue)
+        signPoly advice
+          `P.times` some (unTruthValueColumnIndex <$> advice ^. #truthValue)
     Not p -> P.minus P.one <$> rec p
     And p q -> P.times <$> rec p <*> rec q
     Or p q ->
@@ -122,17 +119,14 @@ eval layout =
 
 signPoly :: AtomAdvice -> Polynomial
 signPoly advice =
-    P.constant half
-    `P.times`
-    (   P.one
-        `P.plus`
-         P.var
-            ( PolynomialVariable
-                (advice ^. #sign . #unSignColumnIndex)
-                0
-            )
-        
-    )
+  P.constant half
+    `P.times` ( P.one
+                  `P.plus` P.var
+                    ( PolynomialVariable
+                        (advice ^. #sign . #unSignColumnIndex)
+                        0
+                    )
+              )
 
 eqMono :: AtomAdvice -> Polynomial
 eqMono advice =

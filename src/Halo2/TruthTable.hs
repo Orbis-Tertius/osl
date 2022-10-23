@@ -1,5 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.TruthTable
   ( getByteRangeColumn,
@@ -19,8 +19,9 @@ import Stark.Types.Scalar (scalarToInteger)
 getByteRangeColumn :: BitsPerByte -> RowCount -> FixedColumn
 getByteRangeColumn (BitsPerByte b) (RowCount r) =
   let m = (2 ^ b) - 1
-      m' = fromMaybe (die "getByteRangeColumn: m > maxBound @Int")
-           $ integerToInt (scalarToInteger m)
+      m' =
+        fromMaybe (die "getByteRangeColumn: m > maxBound @Int") $
+          integerToInt (scalarToInteger m)
    in FixedColumn ([0 .. m] <> replicate (r - m') m)
 
 getZeroIndicatorColumn :: RowCount -> FixedColumn

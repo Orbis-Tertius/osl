@@ -3,7 +3,7 @@
 module Cast
   ( intToInteger,
     word64ToInteger,
-    integerToInt
+    integerToInt,
   )
 where
 
