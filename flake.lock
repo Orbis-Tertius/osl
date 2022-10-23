@@ -372,16 +372,16 @@
     "haskell-fri-proofs": {
       "flake": false,
       "locked": {
-        "lastModified": 1662736063,
-        "narHash": "sha256-TU0qEFohZu7W+E9FvYS1C7eekZBA6ZBaziPkg9NPZ8Q=",
+        "lastModified": 1666537727,
+        "narHash": "sha256-i3/aK1IBNuYBLJjP5L484dAIzVjZcZv1s0X1iw+44QE=",
         "owner": "Orbis-Tertius",
         "repo": "haskell-fri-proofs",
-        "rev": "2c42c0c75f56b96e79094f4bffd6549d32aac462",
+        "rev": "26649f1b10941be0ef55f0ac3556e8389c471a11",
         "type": "github"
       },
       "original": {
         "owner": "Orbis-Tertius",
-        "ref": "v0.0.0.1",
+        "ref": "v0.0.0.3",
         "repo": "haskell-fri-proofs",
         "type": "github"
       }
@@ -401,11 +401,11 @@
         "prover": "prover"
       },
       "locked": {
-        "lastModified": 1666098027,
-        "narHash": "sha256-cwZWFacLjK5+Ey6e71EqkN4IaL6iiyimxOC+r3ADXOs=",
+        "lastModified": 1666537834,
+        "narHash": "sha256-tDUs03tWS4B7WV6+h3ImobWbZkeQpKYM0QYBauuRzHw=",
         "ref": "refs/heads/main",
-        "rev": "c19fd8d2ed915d959788880370386c153da073c4",
-        "revCount": 12,
+        "rev": "b22f086239e4217dbb23296ebe6d4d641687d9ed",
+        "revCount": 16,
         "type": "git",
         "url": "ssh://git@github.com/Orbis-Tertius/horizon-orbis"
       },

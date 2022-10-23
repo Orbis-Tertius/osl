@@ -17,7 +17,6 @@ import Data.Text (Text, pack)
 import Data.Text.Encoding (decodeUtf8')
 import Halo2.LogicToArithmetic (logicToArithmeticCircuit)
 import Halo2.Types.BitsPerByte (BitsPerByte (BitsPerByte))
-import Halo2.Types.FiniteField (FiniteField (FiniteField))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.BuildTranslationContext (buildTranslationContext)
 import OSL.Parse (parseContext)
@@ -67,7 +66,6 @@ runMain (FileName fileName) (TargetName targetName) = do
         (TargetName targetName)
         (Source source)
         (BitsPerByte 8)
-        (FiniteField 18446744069414584321)
         (RowCount 8) of
         Left (ErrorMessage err) -> pure (Output err)
         Right (SuccessfulOutput result) -> pure (Output result)
@@ -78,10 +76,9 @@ calcMain ::
   TargetName ->
   Source ->
   BitsPerByte ->
-  FiniteField ->
   RowCount ->
   Either ErrorMessage SuccessfulOutput
-calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte finiteField rowCount = do
+calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte rowCount = do
   toks <-
     mapLeft (ErrorMessage . ("Tokenizing error: " <>) . show) $
       tokenize fileName source
@@ -110,8 +107,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
         mapLeft (ErrorMessage . ("Error converting to PNF formula: " <>) . show) $
           toPNFFormula () (uncurry prependQuantifiers spnf)
       let semi = toSemicircuit pnff
-          logic = semicircuitToLogicCircuit finiteField rowCount semi
-          circuit = logicToArithmeticCircuit bitsPerByte finiteField rowCount logic
+          logic = semicircuitToLogicCircuit rowCount semi
+          circuit = logicToArithmeticCircuit bitsPerByte rowCount logic
       pure . SuccessfulOutput $
         "Translated OSL:\n"
           <> show translated

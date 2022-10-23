@@ -17,6 +17,7 @@ module Semicircuit.ToLogicCircuit
   )
 where
 
+import Cast (word64ToInteger)
 import Control.Lens ((^.))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
@@ -28,7 +29,6 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
-import Halo2.FiniteField (fieldMax)
 import Halo2.Polynomial (constant, minus, plus, times, var, var')
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
@@ -37,8 +37,6 @@ import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
-import Halo2.Types.FieldElement (FieldElement (..))
-import Halo2.Types.FiniteField (FiniteField)
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
@@ -57,23 +55,22 @@ import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), IndicatorFunctionCall (..), Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul))
+import Stark.Types.Scalar (order)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
 -- TODO: fixed bounds
 semicircuitToLogicCircuit ::
-  FiniteField ->
   RowCount ->
   Semicircuit ->
   LogicCircuit
-semicircuitToLogicCircuit ff rowCount x =
+semicircuitToLogicCircuit rowCount x =
   let layout = columnLayout x
    in Circuit
-        ff
         (layout ^. #columnTypes)
         (equalityConstrainableColumns x layout)
-        (gateConstraints ff x layout)
-        (lookupArguments ff x layout)
+        (gateConstraints x layout)
+        (lookupArguments x layout)
         rowCount
         (equalityConstraints x layout)
         (fixedValues rowCount layout)
@@ -261,20 +258,19 @@ universalToColumnIndex layout v =
     Nothing -> die "universalToColumnIndex: failed lookup (this is a compiler bug)"
 
 gateConstraints ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   LogicConstraints
-gateConstraints ff x layout =
+gateConstraints x layout =
   mconcat
     [ instanceFunctionTablesDefineFunctionsConstraints x layout,
       existentialFunctionTablesDefineFunctionsConstraints x layout,
-      quantifierFreeFormulaIsTrueConstraints ff x layout,
-      dummyRowIndicatorConstraints ff x layout,
-      lessThanIndicatorFunctionCallConstraints ff x layout,
-      existentialOutputsInBoundsConstraints ff x layout,
-      existentialInputsInBoundsConstraints ff x layout,
-      universalTableConstraints ff x layout
+      quantifierFreeFormulaIsTrueConstraints x layout,
+      dummyRowIndicatorConstraints x layout,
+      lessThanIndicatorFunctionCallConstraints x layout,
+      existentialOutputsInBoundsConstraints x layout,
+      existentialInputsInBoundsConstraints x layout,
+      universalTableConstraints x layout
     ]
 
 lexicographicallyLessThanConstraint ::
@@ -385,11 +381,10 @@ existentialFunctionTablesDefineFunctionsConstraints x layout =
             . #unLastRowIndicatorColumnIndex
 
 termToPolynomial ::
-  FiniteField ->
   Layout ->
   Term ->
   Polynomial
-termToPolynomial ff layout =
+termToPolynomial layout =
   \case
     App x [] ->
       case Map.lookup x names of
@@ -399,15 +394,15 @@ termToPolynomial ff layout =
         Nothing -> die $ "termToPolynomial: failed name mapping lookup (this is a compiler bug)\n" <> pack (show x)
     t@(App {}) -> lookupTerm t
     t@(AppInverse {}) -> lookupTerm t
-    Add x y -> plus ff (rec x) (rec y)
-    Mul x y -> times ff (rec x) (rec y)
+    Add x y -> rec x `plus` rec y
+    Mul x y -> rec x `times` rec y
     t@(IndLess {}) -> lookupTerm t
     Const x ->
-      if x < ff ^. #order
-        then constant (FieldElement x)
-        else die $ "in termToPolynomial: constant term " <> pack (show x) <> " is greater than or equal to the field order " <> pack (show (ff ^. #order)) <> " (this is a compiler bug; should have been caught earlier)"
+      if x < word64ToInteger order
+        then constant (fromInteger x)
+        else die $ "in termToPolynomial: constant term " <> pack (show x) <> " is greater than or equal to the field order " <> pack (show order) <> " (this is a compiler bug; should have been caught earlier)"
   where
-    rec = termToPolynomial ff layout
+    rec = termToPolynomial layout
 
     names :: Map Name NameMapping
     names = layout ^. #nameMappings
@@ -422,11 +417,10 @@ termToPolynomial ff layout =
         Nothing -> die $ "termToPolynomial: failed term mapping lookup (this is a compiler bug)\n" <> pack (show t)
 
 qfFormulaToLogicConstraint ::
-  FiniteField ->
   Layout ->
   QF.Formula ->
   LogicConstraint
-qfFormulaToLogicConstraint ff layout =
+qfFormulaToLogicConstraint layout =
   \case
     QF.Equal x y ->
       Atom (term x `Equals` term y)
@@ -441,19 +435,17 @@ qfFormulaToLogicConstraint ff layout =
     QF.Implies p q -> Or (Not (rec p)) (rec q)
     QF.Iff p q -> Iff (rec p) (rec q)
   where
-    rec = qfFormulaToLogicConstraint ff layout
-    term = termToPolynomial ff layout
+    rec = qfFormulaToLogicConstraint layout
+    term = termToPolynomial layout
 
 quantifierFreeFormulaIsTrueConstraints ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   LogicConstraints
-quantifierFreeFormulaIsTrueConstraints ff x layout =
+quantifierFreeFormulaIsTrueConstraints x layout =
   LogicConstraints
     [ Atom (dummyRowIndicator `Equals` constant 1)
         `Or` qfFormulaToLogicConstraint
-          ff
           layout
           (x ^. #formula . #qfFormula)
     ]
@@ -463,16 +455,15 @@ quantifierFreeFormulaIsTrueConstraints ff x layout =
       var' $ layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
 
 dummyRowIndicatorConstraints ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   LogicConstraints
-dummyRowIndicatorConstraints ff x layout =
+dummyRowIndicatorConstraints x layout =
   LogicConstraints
     [ Atom (dummyRowIndicator `Equals` constant 0)
         `Or` Atom (dummyRowIndicator `Equals` constant 1),
       Atom (dummyRowIndicator `Equals` constant 0)
-        `Iff` someUniversalQuantifierBoundIsZeroConstraint ff x layout
+        `Iff` someUniversalQuantifierBoundIsZeroConstraint x layout
     ]
     mempty
   where
@@ -480,45 +471,41 @@ dummyRowIndicatorConstraints ff x layout =
       var' $ layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
 
 someUniversalQuantifierBoundIsZeroConstraint ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   LogicConstraint
-someUniversalQuantifierBoundIsZeroConstraint ff x layout =
-  let boundPolys = universalQuantifierBoundPolynomials ff x layout
+someUniversalQuantifierBoundIsZeroConstraint x layout =
+  let boundPolys = universalQuantifierBoundPolynomials x layout
    in foldl'
         Or
         Top
         [Atom (p `Equals` constant 0) | p <- boundPolys]
 
 universalQuantifierBoundPolynomials ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   [Polynomial]
-universalQuantifierBoundPolynomials ff x layout =
+universalQuantifierBoundPolynomials x layout =
   let bounds =
         (^. #bound) <$> x
           ^. #formula . #quantifiers
             . #universalQuantifiers
-   in boundPolynomial ff layout <$> bounds
+   in boundPolynomial layout <$> bounds
 
 boundPolynomial ::
-  FiniteField ->
   Layout ->
   Bound ->
   Polynomial
-boundPolynomial ff layout =
+boundPolynomial layout =
   \case
-    TermBound x -> termToPolynomial ff layout x
-    FieldMaxBound -> constant (fieldMax ff)
+    TermBound x -> termToPolynomial layout x
+    FieldMaxBound -> constant maxBound
 
 lessThanIndicatorFunctionCallConstraints ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   LogicConstraints
-lessThanIndicatorFunctionCallConstraints ff x layout =
+lessThanIndicatorFunctionCallConstraints x layout =
   LogicConstraints
     [ (Atom (a `Equals` constant 0) `Or` Atom (a `Equals` constant 1))
         `And` ( Atom (a `Equals` constant 1)
@@ -534,14 +521,13 @@ lessThanIndicatorFunctionCallConstraints ff x layout =
     ]
     mempty
   where
-    term = termToPolynomial ff layout
+    term = termToPolynomial layout
 
 existentialOutputsInBoundsConstraints ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   LogicConstraints
-existentialOutputsInBoundsConstraints ff x layout =
+existentialOutputsInBoundsConstraints x layout =
   LogicConstraints
     [ Atom (LessThan y bp)
       | q <-
@@ -549,7 +535,7 @@ existentialOutputsInBoundsConstraints ff x layout =
             ^. #formula . #quantifiers
               . #existentialQuantifiers,
         let bp =
-              boundPolynomial ff layout $
+              boundPolynomial layout $
                 existentialQuantifierOutputBound q,
         let y = mapName $ existentialQuantifierName q
     ]
@@ -562,11 +548,10 @@ existentialOutputsInBoundsConstraints ff x layout =
         Nothing -> die "existentialOutputsInBoundsConstraints: lookup failed (this is a compiler bug)"
 
 existentialInputsInBoundsConstraints ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   LogicConstraints
-existentialInputsInBoundsConstraints ff x layout =
+existentialInputsInBoundsConstraints x layout =
   LogicConstraints
     [ Atom (LessThan y bp)
       | q <-
@@ -574,7 +559,7 @@ existentialInputsInBoundsConstraints ff x layout =
             ^. #formula . #quantifiers
               . #existentialQuantifiers,
         (i, ib) <- zip [0 ..] (existentialQuantifierInputBounds q),
-        let bp = boundPolynomial ff layout (ib ^. #bound),
+        let bp = boundPolynomial layout (ib ^. #bound),
         let y = name (existentialQuantifierName q) i
     ]
     mempty
@@ -595,11 +580,10 @@ newtype UniQIndex = UniQIndex {unUniQIndex :: Int}
   deriving (Eq, Ord, Num, Enum)
 
 universalTableConstraints ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   LogicConstraints
-universalTableConstraints ff x layout =
+universalTableConstraints x layout =
   LogicConstraints
     [ foldl'
         Or
@@ -657,12 +641,12 @@ universalTableConstraints ff x layout =
     next j =
       ( foldl'
           And
-          (Atom (plus ff (u j 0) (constant 1) `Equals` u j 1))
+          (Atom (plus (u j 0) (constant 1) `Equals` u j 1))
           [ Atom (u i 0 `Equals` u i 1)
             | i <- [0 .. j - 2]
           ]
       )
-        `Or` ( Atom (plus ff (u j 0) (constant 1) `Equals` bound j)
+        `Or` ( Atom (plus (u j 0) (constant 1) `Equals` bound j)
                  `And` Atom (u j 1 `Equals` constant 0)
                  `And` next (j - 1)
              )
@@ -674,7 +658,7 @@ universalTableConstraints ff x layout =
                  . #universalQuantifiers
            )
         !? unUniQIndex i of
-        Just q -> boundPolynomial ff layout (q ^. #bound)
+        Just q -> boundPolynomial layout (q ^. #bound)
         Nothing ->
           die "universalTableConstraints: bound index out of range (this is a compiler bug)"
 
@@ -686,7 +670,6 @@ universalTableConstraints ff x layout =
             . #unLastRowIndicatorColumnIndex
 
 lookupArguments ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   LookupArguments
@@ -700,14 +683,13 @@ newtype FunctionCallIndex = FunctionCallIndex Int
 newtype ArgumentIndex = ArgumentIndex Int
 
 functionCallLookupArguments ::
-  FiniteField ->
   Semicircuit ->
   Layout ->
   LookupArguments
-functionCallLookupArguments ff x layout =
+functionCallLookupArguments x layout =
   LookupArguments
     [ LookupArgument
-        (minus ff dummyRowIndicator (constant 1))
+        (dummyRowIndicator `minus` constant 1)
         ( [(outputEval i j, outputColumn i)]
             <> [ (argEval i j k, inputColumn i k)
                  | k <- argumentIndices i
@@ -771,7 +753,7 @@ functionCallLookupArguments ff x layout =
     argEval :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> InputExpression
     argEval i j k =
       InputExpression
-        . termToPolynomial ff layout
+        . termToPolynomial layout
         $ functionCallArgument i j k
 
     outputColumn :: FunctionIndex -> LookupTableColumn

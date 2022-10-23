@@ -7,6 +7,7 @@ module Halo2.Types.Byte
 where
 
 import Halo2.Prelude
+import Stark.Types.Scalar (Scalar)
 
-newtype Byte = Byte {unByte :: Integer}
+newtype Byte = Byte {unByte :: Scalar}
   deriving (Generic)
