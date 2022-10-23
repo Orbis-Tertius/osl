@@ -97,16 +97,17 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
       (translated, aux) <-
         mapLeft (ErrorMessage . ("Error translating: " <>) . show) $
           runStateT (translateToFormula gc lc targetTerm) mempty
+      let (translatedGS, auxGS) = deBruijnToGensyms (translated, aux)
       pnf <-
         mapLeft (ErrorMessage . ("Error converting to prenex normal form: " <>) . show) $
-          toPrenexNormalForm () (deBruijnToGensyms translated)
+          toPrenexNormalForm () translatedGS
       spnf <-
         mapLeft (ErrorMessage . ("Error converting to strong prenex normal form: " <>) . show) $
           uncurry (toStrongPrenexNormalForm ()) pnf
       pnff <-
         mapLeft (ErrorMessage . ("Error converting to PNF formula: " <>) . show) $
           toPNFFormula () (uncurry prependQuantifiers spnf)
-      let semi = toSemicircuit pnff
+      let semi = toSemicircuit pnff auxGS
           logic = semicircuitToLogicCircuit rowCount semi
           circuit = logicToArithmeticCircuit bitsPerByte rowCount logic
       pure . SuccessfulOutput $

@@ -25,9 +25,12 @@ module Semicircuit.Types.Sigma11
     OutputBound (..),
     Quantifier (..),
     MapNames (..),
+    AuxTables (..),
   )
 where
 
+import Data.Map (Map)
+import Data.Set (Set)
 import GHC.Generics (Generic)
 import OSL.Types.Arity (Arity)
 import OSL.Types.Cardinality (Cardinality (..))
@@ -105,3 +108,15 @@ data Quantifier
   = Universal Name Bound
   | Existential ExistentialQuantifier
   deriving (Show)
+
+data AuxTables = AuxTables
+  { functionTables :: Map Name (Map [Integer] Integer),
+    predicateTables :: Map PredicateName (Set [Integer])
+  }
+  deriving (Eq, Show, Generic)
+
+instance Semigroup AuxTables where
+  (AuxTables ft0 pt0) <> (AuxTables ft1 pt1) = AuxTables (ft0 <> ft1) (pt0 <> pt1)
+
+instance Monoid AuxTables where
+  mempty = AuxTables mempty mempty

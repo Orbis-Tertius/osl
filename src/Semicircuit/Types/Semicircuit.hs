@@ -17,14 +17,15 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Set (Set)
 import GHC.Generics (Generic)
 import Semicircuit.Types.PNFFormula (Formula)
-import Semicircuit.Types.Sigma11 (Name, Term)
+import Semicircuit.Types.Sigma11 (Name, Term, AuxTables)
 
 data Semicircuit = Semicircuit
   { freeVariables :: FreeVariables,
     indicatorCalls :: IndicatorFunctionCalls,
     functionCalls :: FunctionCalls,
     adviceTerms :: AdviceTerms,
-    formula :: Formula
+    formula :: Formula,
+    auxTables :: AuxTables
   }
   deriving (Generic, Show)
 

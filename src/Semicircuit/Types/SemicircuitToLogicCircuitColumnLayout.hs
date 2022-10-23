@@ -8,7 +8,10 @@ module Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
     OneVectorIndex (OneVectorIndex),
     ZeroVectorIndex (ZeroVectorIndex),
     LastRowIndicatorColumnIndex (LastRowIndicatorColumnIndex),
+    FixedFunctionTable (FixedFunctionTable),
+    FixedSetTable (FixedSetTable),
     FixedColumns (FixedColumns),
+    SetMapping (SetMapping),
     DummyRowAdviceColumn (DummyRowAdviceColumn),
     SemicircuitToLogicCircuitColumnLayout (SemicircuitToLogicCircuitColumnLayout),
   )
@@ -18,6 +21,7 @@ import Data.Map (Map)
 import GHC.Generics (Generic)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnTypes (ColumnTypes)
+import OSL.Types.Sigma11 (PredicateName)
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 newtype OutputMapping = OutputMapping {unOutputMapping :: ColumnIndex}
@@ -45,11 +49,24 @@ newtype LastRowIndicatorColumnIndex = LastRowIndicatorColumnIndex
   {unLastRowIndicatorColumnIndex :: ColumnIndex}
   deriving (Generic)
 
+newtype FixedFunctionTable = FixedFunctionTable
+  { unFixedFunctionTable :: NameMapping }
+  deriving (Generic)
+
+newtype FixedSetTable = FixedSetTable
+  { unFixedSetTable :: [ColumnIndex] }
+  deriving Generic
+
 data FixedColumns = FixedColumns
   { zeroVector :: ZeroVectorIndex,
     oneVector :: OneVectorIndex,
-    lastRowIndicator :: LastRowIndicatorColumnIndex
+    lastRowIndicator :: LastRowIndicatorColumnIndex,
+    fixedFunctionTables :: Map Name FixedFunctionTable,
+    fixedSetTables :: Map PredicateName FixedSetTable
   }
+  deriving (Generic)
+
+newtype SetMapping = SetMapping { unSetMapping :: NameMapping }
   deriving (Generic)
 
 newtype DummyRowAdviceColumn = DummyRowAdviceColumn
@@ -60,6 +77,7 @@ data SemicircuitToLogicCircuitColumnLayout = SemicircuitToLogicCircuitColumnLayo
   { columnTypes :: ColumnTypes,
     nameMappings :: Map Name NameMapping,
     termMappings :: Map Term TermMapping,
+    setMappings :: Map PredicateName SetMapping,
     fixedColumns :: FixedColumns,
     dummyRowAdviceColumn :: DummyRowAdviceColumn
   }

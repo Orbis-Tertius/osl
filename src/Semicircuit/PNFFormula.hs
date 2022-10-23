@@ -212,9 +212,19 @@ functionCallArguments :: FunctionCall -> AdviceTerms
 functionCallArguments (FunctionCall _ ts) =
   AdviceTerms (Set.fromList (NonEmpty.toList ts))
 
-freeVariables :: PNF.Formula -> FreeVariables
-freeVariables (PNF.Formula qf qs) =
-  FreeVariables (Set.difference (allVariables qf) (quantifiedVariables qs))
+freeVariables :: PNF.Formula -> S11.AuxTables -> FreeVariables
+freeVariables (PNF.Formula qf qs) aux =
+  FreeVariables
+    (allVariables qf
+      `Set.difference`
+        (quantifiedVariables qs
+          `Set.union` constantFunctionVariables aux))
+
+constantFunctionVariables :: S11.AuxTables -> Set S11.Name
+constantFunctionVariables = todo
+
+todo :: a
+todo = todo
 
 quantifiedVariables :: PNF.Quantifiers -> Set S11.Name
 quantifiedVariables (PNF.Quantifiers es us) =
@@ -246,9 +256,9 @@ allVariables =
         S11.Const _ -> mempty
 
 -- Turns a PNF formula into a semicircuit.
-toSemicircuit :: PNF.Formula -> Semicircuit
-toSemicircuit f =
-  let fvs = freeVariables f
+toSemicircuit :: PNF.Formula -> S11.AuxTables -> Semicircuit
+toSemicircuit f aux =
+  let fvs = freeVariables f aux
       ifs = indicatorFunctionCalls f
       fs = functionCalls f
       ts =
@@ -260,7 +270,7 @@ toSemicircuit f =
           )
           <> indicatorFunctionCallsArguments ifs
           <> functionCallsArguments fs
-   in Semicircuit fvs ifs fs ts f
+   in Semicircuit fvs ifs fs ts f aux
 
 functionCallToTerm :: FunctionCall -> S11.Term
 functionCallToTerm (FunctionCall f xs) =

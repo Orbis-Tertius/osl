@@ -20,9 +20,11 @@ import qualified Semicircuit.Types.Sigma11 as GS
 
 -- Rename the de Bruijn indices in the given formula
 -- to gensyms.
-deBruijnToGensyms :: DB.Formula -> GS.Formula
-deBruijnToGensyms a =
-  evalState (deBruijnToGensyms' a) (S 0 mempty)
+deBruijnToGensyms :: (DB.Formula, DB.AuxTables) -> (GS.Formula, GS.AuxTables)
+deBruijnToGensyms (a, t) =
+  flip evalState (S 0 mempty) $
+    (,) <$> deBruijnToGensyms' a
+        <*> deBruijnToGensymsAux t
 
 newtype NextSym = NextSym Int
   deriving (Eq, Num)
@@ -88,6 +90,12 @@ deBruijnToGensyms' =
       pure r
   where
     rec = deBruijnToGensyms'
+
+deBruijnToGensymsAux :: DB.AuxTables -> State S GS.AuxTables
+deBruijnToGensymsAux = todo
+
+todo :: a
+todo = todo
 
 bound :: DB.Bound -> State S GS.Bound
 bound =

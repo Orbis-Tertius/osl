@@ -18,7 +18,7 @@ module Semicircuit.ToLogicCircuit
 where
 
 import Cast (word64ToInteger)
-import Control.Lens ((^.))
+import Control.Lens ((^.), (<&>))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Data.List.Extra (foldl', (!?))
@@ -49,15 +49,19 @@ import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..))
+import OSL.Types.Sigma11 (PredicateName)
 import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound)
 import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), UniversalQuantifier)
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), IndicatorFunctionCall (..), Semicircuit)
-import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul))
+import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..), FixedFunctionTable (..), FixedSetTable (..), SetMapping (..))
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul), AuxTables)
 import Stark.Types.Scalar (order)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
+
+todo :: a
+todo = todo
 
 -- TODO: fixed bounds
 semicircuitToLogicCircuit ::
@@ -73,7 +77,7 @@ semicircuitToLogicCircuit rowCount x =
         (lookupArguments x layout)
         rowCount
         (equalityConstraints x layout)
-        (fixedValues rowCount layout)
+        (fixedValues rowCount layout (x ^. #auxTables))
 
 newtype S = S (ColumnIndex, ColumnTypes)
 
@@ -86,27 +90,34 @@ nextCol t = do
 columnLayout :: Semicircuit -> Layout
 columnLayout x =
   flip evalState (S (0, mempty)) $ do
-    nm <- nameMappings x
+    fs <- fixedColumns (x ^. #auxTables)
+    nm <- nameMappings x fs
     tm <- termMappings x
+    sm <- setMappings (x ^. #auxTables)
     dr <- DummyRowAdviceColumn <$> nextCol Advice
-    fs <- fixedColumns
     S (_, colTypes) <- get
     pure $
       SemicircuitToLogicCircuitColumnLayout
         colTypes
         nm
         tm
+        sm
         fs
         dr
 
-nameMappings :: Semicircuit -> State S (Map Name NameMapping)
-nameMappings x =
+nameMappings :: Semicircuit -> FixedColumns -> State S (Map Name NameMapping)
+nameMappings x fs =
   mconcat
     <$> sequence
       [ freeVariableMappings x,
         universalVariableMappings x,
-        existentialVariableMappings x
+        existentialVariableMappings x,
+        pure (fixedFunctionMappings fs)
       ]
+
+fixedFunctionMappings :: FixedColumns -> Map Name NameMapping
+fixedFunctionMappings fs =
+  (fs ^. #fixedFunctionTables) <&> (^. #unFixedFunctionTable)
 
 universalVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
 universalVariableMappings x =
@@ -179,15 +190,50 @@ termMappings x =
 termMapping :: Term -> State S (Term, TermMapping)
 termMapping t = (t,) . TermMapping <$> nextCol Advice
 
-fixedColumns :: State S FixedColumns
-fixedColumns =
+setMappings :: AuxTables -> State S (Map PredicateName SetMapping)
+setMappings aux =
+  Map.fromList
+    <$> mapM
+      setMapping
+      (Map.keys (aux ^. #predicateTables))
+
+setMapping :: PredicateName -> State S (PredicateName, SetMapping)
+setMapping p = (p,) . SetMapping
+  <$> (NameMapping
+        <$> (OutputMapping <$> nextCol Advice)
+        <*> (replicateM (p ^. #arity . #unArity) (ArgMapping <$> nextCol Advice)))
+
+fixedColumns :: AuxTables -> State S FixedColumns
+fixedColumns aux =
   FixedColumns
     <$> (ZeroVectorIndex <$> nextCol Fixed)
     <*> (OneVectorIndex <$> nextCol Fixed)
     <*> (LastRowIndicatorColumnIndex <$> nextCol Fixed)
+    <*> fixedFunctionTables aux
+    <*> fixedSetTables aux
 
-fixedValues :: RowCount -> Layout -> FixedValues
-fixedValues (RowCount n) layout =
+fixedFunctionTables :: AuxTables -> State S (Map Name FixedFunctionTable)
+fixedFunctionTables = todo
+
+fixedSetTables :: AuxTables -> State S (Map PredicateName FixedSetTable)
+fixedSetTables = todo
+
+fixedValues :: RowCount -> Layout -> AuxTables -> FixedValues
+fixedValues n layout aux =
+  mconcat
+  [ fixedFixedValues n layout
+  , fixedFunctionTableValues n layout aux
+  , fixedSetTableValues n layout aux
+  ]
+
+fixedFunctionTableValues :: RowCount -> Layout -> AuxTables -> FixedValues
+fixedFunctionTableValues = todo
+
+fixedSetTableValues :: RowCount -> Layout -> AuxTables -> FixedValues
+fixedSetTableValues = todo
+
+fixedFixedValues :: RowCount -> Layout -> FixedValues
+fixedFixedValues (RowCount n) layout =
   FixedValues . Map.fromList $
     [ ( layout
           ^. #fixedColumns . #zeroVector
@@ -429,8 +475,10 @@ qfFormulaToLogicConstraint layout =
     QF.LessOrEqual x y ->
       Atom (term x `Equals` term y)
         `Or` Atom (term x `LessThan` term y)
-    QF.Predicate _ _ ->
-      die "not implemented: compiling predicates to circuits"
+    QF.Predicate p _xs ->
+      case Map.lookup p (layout ^. #fixedColumns . #fixedSetTables) of
+        Just _t -> todo
+        Nothing -> die "not implemented: compiling specs containing free predicate variables"
     QF.Not p -> Not (rec p)
     QF.And p q -> And (rec p) (rec q)
     QF.Or p q -> Or (rec p) (rec q)
@@ -675,7 +723,11 @@ lookupArguments ::
   Semicircuit ->
   Layout ->
   LookupArguments
-lookupArguments = functionCallLookupArguments
+lookupArguments x layout =
+  mconcat
+  [ functionCallLookupArguments x layout,
+    setLookupArguments x layout
+  ]
 
 newtype FunctionIndex = FunctionIndex Int
   deriving (Eq, Ord, Num)
@@ -777,3 +829,9 @@ functionCallLookupArguments x layout =
 
     dummyRowIndicator =
       var' $ layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
+
+setLookupArguments ::
+  Semicircuit ->
+  Layout ->
+  LookupArguments
+setLookupArguments = todo
