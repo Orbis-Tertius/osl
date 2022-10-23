@@ -161,7 +161,7 @@ getLayoutM bits lc = do
     $ \ac ->
       (ac,) <$> getAtomAdviceM bits
   let colTypes =
-        lc ^. #columnTypes
+        lc ^. #columnTypes -- TODO: include the remaining columns
           <> ColumnTypes.fromList [Fixed, Fixed]
       lcCols =
         Set.fromList . fmap ColumnIndex $
