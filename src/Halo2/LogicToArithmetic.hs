@@ -63,26 +63,24 @@ byteDecompositionGate layout c =
         advice <- Map.lookup c (layout ^. #atomAdvice)
         pure $
           (a `P.minus` b)
-            `P.minus` ( ( P.var
-                            ( PolynomialVariable
-                                (advice ^. #sign . #unSignColumnIndex)
-                                0
-                            )
-                        )
-                          `P.times` ( P.sum
-                                        [ (P.constant (2 ^ j)) `P.times` d
-                                          | (j, d) :: (Integer, Polynomial) <-
-                                              zip
-                                                [0 ..]
-                                                ( reverse
-                                                    ( P.var
-                                                        . flip PolynomialVariable 0
-                                                        . unByteColumnIndex
-                                                        <$> (advice ^. #bytes)
-                                                    )
-                                                )
-                                        ]
+            `P.minus` ( P.var
+                          ( PolynomialVariable
+                              (advice ^. #sign . #unSignColumnIndex)
+                              0
+                          )
+                          `P.times` P.sum
+                            [ P.constant (2 ^ j) `P.times` d
+                              | (j, d) :: (Integer, Polynomial) <-
+                                  zip
+                                    [0 ..]
+                                    ( reverse
+                                        ( P.var
+                                            . flip PolynomialVariable 0
+                                            . unByteColumnIndex
+                                            <$> (advice ^. #bytes)
+                                        )
                                     )
+                            ]
                       )
 
 eval ::
