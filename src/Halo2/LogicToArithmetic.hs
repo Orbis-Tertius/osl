@@ -19,7 +19,7 @@ import Cast (intToInteger)
 import Control.Monad (forM, replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Crypto.Number.Basic (numBits)
-import Data.List (foldl')
+import Data.List (foldl', sum)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.ByteDecomposition (countBytes)
@@ -29,7 +29,7 @@ import Halo2.TruthTable (getByteRangeColumn, getZeroIndicatorColumn)
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Circuit (ArithmeticCircuit, Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (..))
-import Halo2.Types.ColumnType (ColumnType (Fixed))
+import Halo2.Types.ColumnType (ColumnType (Fixed, Advice))
 import qualified Halo2.Types.ColumnTypes as ColumnTypes
 import Halo2.Types.FixedBound (FixedBound (..))
 import Halo2.Types.FixedValues (FixedValues (..))
@@ -162,6 +162,7 @@ getLayoutM bits lc = do
       (ac,) <$> getAtomAdviceM bits
   let colTypes =
         lc ^. #columnTypes -- TODO: include the remaining columns
+          <> ColumnTypes.fromList (replicate (sum (countAtomAdviceCols <$> atomAdvices)) Advice)
           <> ColumnTypes.fromList [Fixed, Fixed]
       lcCols =
         Set.fromList . fmap ColumnIndex $
@@ -175,6 +176,10 @@ getLayoutM bits lc = do
       lcCols
       atomAdvices
       (TruthTableColumnIndices tabi0 tabi1)
+
+countAtomAdviceCols :: AtomAdvice -> Int
+countAtomAdviceCols a =
+  1 + length (a ^. #bytes) + length (a ^. #truthValue)
 
 getAtomAdviceM ::
   BitsPerByte ->
