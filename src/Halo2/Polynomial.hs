@@ -14,6 +14,7 @@ module Halo2.Polynomial
     minus,
     sum,
     degree,
+    eval,
   )
 where
 
@@ -101,3 +102,10 @@ sum = foldl' plus zero
 degree :: Polynomial -> Int
 degree (Polynomial p) =
   foldl' max 0 (P.degree <$> Map.keys p)
+
+eval :: Polynomial -> (PolynomialVariable -> Scalar) -> Scalar
+eval (Polynomial p) f =
+  foldl' (+) 0
+  [ c * product [ f x ^ e | (x, e) <- Map.toList pp ]
+  | (PowerProduct pp, Coefficient c) <- Map.toList p
+  ]
