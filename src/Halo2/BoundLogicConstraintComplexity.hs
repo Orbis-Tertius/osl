@@ -50,24 +50,27 @@ boundLogicConstraintComplexity bound x =
 
 
 go :: ComplexityBound -> LogicConstraint -> State S ()
-go n p = addConstraint =<< go' n p
+go n p = addConstraint =<< go' n n p
 
 
-go' :: ComplexityBound -> LogicConstraint -> State S LogicConstraint
-go' 0 (Atom p) = pure (Atom p)
-go' 0 p = do
+go' :: ComplexityBound -> ComplexityBound -> LogicConstraint -> State S LogicConstraint
+go' _ 0 (Atom p) = pure (Atom p)
+go' n0 0 p = do
   i <- addCol
-  addConstraint (Atom (var' i `Equals` constant 1) `Iff` p)
+  p' <- go' n0 n0 p
+  addConstraint (Atom (var' i `Equals` constant 1) `Iff` p')
   pure (Atom (var' i `Equals` constant 1))
-go' n r =
+go' n0 n r =
   case r of
     Atom p -> pure (Atom p)
-    Not p -> Not <$> go' n p
-    And p q -> And <$> go' (n-1) p <*> go' (n-1) q
-    Or p q -> Or <$> go' (n-1) p <*> go' (n-1) q
-    Iff p q -> Iff <$> go' (n-1) p <*> go' (n-1) q
+    Not p -> Not <$> rec n p
+    And p q -> And <$> rec (n-1) p <*> rec (n-1) q
+    Or p q -> Or <$> rec (n-1) p <*> rec (n-1) q
+    Iff p q -> Iff <$> rec (n-1) p <*> rec (n-1) q
     Top -> pure Top
     Bottom -> pure Bottom
+  where
+    rec = go' n0
 
 
 addConstraint :: LogicConstraint -> State S ()
