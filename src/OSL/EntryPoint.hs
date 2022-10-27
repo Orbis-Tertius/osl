@@ -70,7 +70,7 @@ runMain (FileName fileName) (TargetName targetName) = do
         (FileName fileName)
         (TargetName targetName)
         (Source source) -- TODO: specify BitsPerByte and RowCount with options
-        (BitsPerByte 8)
+        (BitsPerByte 24)
         (RowCount 8) of
         Left (ErrorMessage err) -> pure (Output err)
         Right (SuccessfulOutput result) -> pure (Output result)
