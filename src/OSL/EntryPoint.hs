@@ -17,6 +17,7 @@ import Data.ByteString (readFile)
 import Data.Either.Extra (mapLeft)
 import Data.Text (Text, pack)
 import Data.Text.Encoding (decodeUtf8')
+import Halo2.BoundLogicConstraintComplexity (boundLogicConstraintComplexity, ComplexityBound (ComplexityBound))
 import Halo2.LogicToArithmetic (logicToArithmeticCircuit)
 import Halo2.Types.BitsPerByte (BitsPerByte (BitsPerByte))
 import Halo2.Types.RowCount (RowCount (RowCount))
@@ -112,7 +113,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
           toPNFFormula () (uncurry prependQuantifiers spnf)
       let dnf = fromDisjunctiveNormalForm (toDisjunctiveNormalForm (pnff ^. #qfFormula))
           semi = toSemicircuit (PNF.Formula dnf (pnff ^. #quantifiers))
-          logic = semicircuitToLogicCircuit rowCount semi
+          logic = boundLogicConstraintComplexity (ComplexityBound 2)
+                $ semicircuitToLogicCircuit rowCount semi
           circuit = logicToArithmeticCircuit bitsPerByte rowCount logic
       pure . SuccessfulOutput $
         "Translated OSL:\n"
