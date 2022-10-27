@@ -15,6 +15,7 @@ module Semicircuit.DNFFormula
 where
 
 import Control.Lens ((^.))
+import Data.List.Extra (foldl')
 import qualified Semicircuit.Types.DNFFormula as DNF
 import qualified Semicircuit.Types.QFFormula as QF
 import Prelude hiding (and, or, pi)
@@ -73,10 +74,10 @@ bottom = mempty
 
 fromDisjunctiveNormalForm :: DNF.Formula -> QF.Formula
 fromDisjunctiveNormalForm f =
-  foldl
+  foldl'
     QF.Or
     QF.Bottom
-    [ foldl
+    [ foldl'
         QF.And
         QF.Top
         [ case aa ^. #parity of

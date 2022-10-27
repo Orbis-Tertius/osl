@@ -9,6 +9,7 @@ module Halo2.LogicConstraint
   )
 where
 
+import Data.List.Extra (foldl')
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint, LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
 import Halo2.Types.LogicConstraints (LogicConstraints (LogicConstraints))
 import Prelude hiding (and, or)
@@ -32,10 +33,10 @@ toDisjunctiveNormalForm = fromDisjunction . toDisjunction
 
 fromDisjunction :: Disjunction -> LogicConstraint
 fromDisjunction (Disjunction disjuncts) =
-  foldl
+  foldl'
     Or
     Bottom
-    [ foldl
+    [ foldl'
         And
         Top
         [ case parity of

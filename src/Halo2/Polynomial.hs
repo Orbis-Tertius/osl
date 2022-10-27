@@ -108,6 +108,6 @@ eval (Polynomial p) f =
   foldl'
     (+)
     0
-    [ c * product [f x ^ e | (x, e) <- Map.toList pp]
+    [ c * foldl' (*) 1 [f x ^ e | (x, e) <- Map.toList pp]
       | (PowerProduct pp, Coefficient c) <- Map.toList p
     ]

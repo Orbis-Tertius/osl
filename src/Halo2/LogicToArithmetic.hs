@@ -19,7 +19,7 @@ import Cast (intToInteger)
 import Control.Monad (forM, replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Crypto.Number.Basic (numBits)
-import Data.List (foldl', sum)
+import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.ByteDecomposition (countBytes)
@@ -162,7 +162,7 @@ getLayoutM bits lc = do
       (ac,) <$> getAtomAdviceM bits
   let colTypes =
         lc ^. #columnTypes -- TODO: include the remaining columns
-          <> ColumnTypes.fromList (replicate (sum (countAtomAdviceCols <$> atomAdvices)) Advice)
+          <> ColumnTypes.fromList (replicate (foldl' (+) 0 (countAtomAdviceCols <$> atomAdvices)) Advice)
           <> ColumnTypes.fromList [Fixed, Fixed]
       lcCols =
         Set.fromList . fmap ColumnIndex $
@@ -293,7 +293,7 @@ logicToArithmeticCircuit bits rows lc = do
       (layout ^. #columnTypes)
       (lc ^. #equalityConstrainableColumns)
       (PolynomialConstraints polyGates degreeBound)
-      ( mempty (lc ^. #lookupArguments)
+      ( (lc ^. #lookupArguments)
           <> LookupArguments signChecks
           <> LookupArguments rangeAndTruthChecks
       )
