@@ -1,10 +1,17 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
-module Halo2.Types.RowIndex (RowIndex (RowIndex, getRowIndex)) where
+module Halo2.Types.RowIndex
+  ( RowIndex (RowIndex, getRowIndex)
+  , RowIndexType (Relative, Absolute)
+  ) where
 
 import Halo2.Prelude
 
-newtype RowIndex = RowIndex {getRowIndex :: Int}
+data RowIndexType = Relative | Absolute
+
+type RowIndex :: RowIndexType -> Type
+newtype RowIndex a = RowIndex {getRowIndex :: Int}
   deriving (Num, Enum, Real, Integral, Eq, Ord, Show, Generic)

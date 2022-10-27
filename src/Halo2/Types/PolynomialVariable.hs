@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -9,6 +10,6 @@ import Halo2.Types.RowIndex
 
 data PolynomialVariable = PolynomialVariable
   { colIndex :: ColumnIndex,
-    rowIndex :: RowIndex
+    rowIndex :: RowIndex 'Relative
   }
   deriving (Eq, Ord, Show, Generic)

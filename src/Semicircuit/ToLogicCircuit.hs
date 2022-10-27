@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
@@ -38,6 +39,7 @@ import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
 import Halo2.Polynomial (constant, minus, plus, times, var, var')
+import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnType (ColumnType (Advice, Fixed, Instance))
@@ -56,7 +58,7 @@ import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
-import Halo2.Types.RowIndex (RowIndex (..))
+import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative))
 import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound)
 import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), UniversalQuantifier)
 import qualified Semicircuit.Types.QFFormula as QF
@@ -221,7 +223,7 @@ equalityConstraints ::
 equalityConstraints x layout =
   EqualityConstraints
     [ EqualityConstraint $
-        [ PolynomialVariable
+        [ CellReference
             ( layout
                 ^. #fixedColumns . #zeroVector
                   . #unZeroVectorIndex
@@ -229,7 +231,7 @@ equalityConstraints x layout =
             0
         ]
           <> Set.fromList
-            [ PolynomialVariable u 0
+            [ CellReference u 0
               | u :: ColumnIndex <-
                   (^. #outputMapping . #unOutputMapping)
                     . flip
@@ -337,7 +339,7 @@ nextRowIsEqualConstraint ::
 nextRowIsEqualConstraint layout v =
   equalsConstraint (zip (vars 0) (vars 1))
   where
-    vars :: RowIndex -> [PolynomialVariable]
+    vars :: RowIndex 'Relative -> [PolynomialVariable]
     vars i =
       case Map.lookup v (layout ^. #nameMappings) of
         Just nm ->
@@ -359,7 +361,7 @@ nextInputRowIsLexicographicallyGreaterConstraint layout v =
   lexicographicallyLessThanConstraint
     (zip (vars 0) (vars 1))
   where
-    vars :: RowIndex -> [PolynomialVariable]
+    vars :: RowIndex 'Relative -> [PolynomialVariable]
     vars i =
       case Map.lookup v (layout ^. #nameMappings) of
         Just nm ->
@@ -626,7 +628,7 @@ universalTableConstraints x layout =
           )
           - 1
 
-    u :: UniQIndex -> RowIndex -> Polynomial
+    u :: UniQIndex -> RowIndex 'Relative -> Polynomial
     u i j =
       case ( x
                ^. #formula . #quantifiers
