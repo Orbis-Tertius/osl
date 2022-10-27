@@ -13,6 +13,14 @@ module Semicircuit.ToLogicCircuit
     equalityConstraints,
     equalityConstrainableColumns,
     gateConstraints,
+    instanceFunctionTablesDefineFunctionsConstraints,
+    existentialFunctionTablesDefineFunctionsConstraints,
+    quantifierFreeFormulaIsTrueConstraints,
+    dummyRowIndicatorConstraints,
+    lessThanIndicatorFunctionCallConstraints,
+    existentialOutputsInBoundsConstraints,
+    existentialInputsInBoundsConstraints,
+    universalTableConstraints,
     lookupArguments,
   )
 where
@@ -265,14 +273,14 @@ gateConstraints ::
   LogicConstraints
 gateConstraints x layout =
   mconcat
-    [ instanceFunctionTablesDefineFunctionsConstraints x layout,
-      existentialFunctionTablesDefineFunctionsConstraints x layout,
+    [ -- instanceFunctionTablesDefineFunctionsConstraints x layout,
+      -- existentialFunctionTablesDefineFunctionsConstraints x layout,
       quantifierFreeFormulaIsTrueConstraints x layout,
       dummyRowIndicatorConstraints x layout,
       lessThanIndicatorFunctionCallConstraints x layout,
       existentialOutputsInBoundsConstraints x layout,
-      existentialInputsInBoundsConstraints x layout,
-      universalTableConstraints x layout
+      existentialInputsInBoundsConstraints x layout
+      -- universalTableConstraints x layout
     ]
 
 lexicographicallyLessThanConstraint ::
@@ -436,6 +444,8 @@ qfFormulaToLogicConstraint layout =
     QF.Or p q -> Or (rec p) (rec q)
     QF.Implies p q -> Or (Not (rec p)) (rec q)
     QF.Iff p q -> Iff (rec p) (rec q)
+    QF.Top -> Top
+    QF.Bottom -> Bottom
   where
     rec = qfFormulaToLogicConstraint layout
     term = termToPolynomial layout

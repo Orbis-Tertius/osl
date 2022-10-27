@@ -1,5 +1,6 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 module OSL.EntryPoint
   ( main,
@@ -10,6 +11,7 @@ module OSL.EntryPoint
   )
 where
 
+import Control.Lens ((^.))
 import Control.Monad.Trans.State.Strict (runStateT)
 import Data.ByteString (readFile)
 import Data.Either.Extra (mapLeft)
@@ -26,10 +28,12 @@ import OSL.TranslationContext (toLocalTranslationContext)
 import OSL.Types.OSL (Declaration (Defined), Name (Sym))
 import OSL.ValidContext (getDeclaration)
 import OSL.ValidateContext (validateContext)
+import Semicircuit.DNFFormula (fromDisjunctiveNormalForm, toDisjunctiveNormalForm)
 import Semicircuit.Gensyms (deBruijnToGensyms)
 import Semicircuit.PNFFormula (toPNFFormula, toSemicircuit)
 import Semicircuit.PrenexNormalForm (toPrenexNormalForm, toStrongPrenexNormalForm)
 import Semicircuit.Sigma11 (prependQuantifiers)
+import qualified Semicircuit.Types.PNFFormula as PNF
 import Semicircuit.ToLogicCircuit (semicircuitToLogicCircuit)
 import System.Environment (getArgs)
 import Prelude hiding (readFile)
@@ -106,7 +110,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
       pnff <-
         mapLeft (ErrorMessage . ("Error converting to PNF formula: " <>) . show) $
           toPNFFormula () (uncurry prependQuantifiers spnf)
-      let semi = toSemicircuit pnff
+      let dnf = fromDisjunctiveNormalForm (toDisjunctiveNormalForm (pnff ^. #qfFormula))
+          semi = toSemicircuit (PNF.Formula dnf (pnff ^. #quantifiers))
           logic = semicircuitToLogicCircuit rowCount semi
           circuit = logicToArithmeticCircuit bitsPerByte rowCount logic
       pure . SuccessfulOutput $

@@ -91,6 +91,8 @@ indicatorFunctionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
         QF.Or p q -> qff p <> qff q
         QF.Implies p q -> qff p <> qff q
         QF.Iff p q -> qff p <> qff q
+        QF.Top -> mempty
+        QF.Bottom -> mempty
 
     eQ ::
       PNF.ExistentialQuantifier ->
@@ -147,6 +149,8 @@ functionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
         QF.Or p q -> qff p <> qff q
         QF.Implies p q -> qff p <> qff q
         QF.Iff p q -> qff p <> qff q
+        QF.Top -> mempty
+        QF.Bottom -> mempty
 
     eQ ::
       PNF.ExistentialQuantifier ->
@@ -232,6 +236,8 @@ allVariables =
     QF.Or p q -> rec p <> rec q
     QF.Implies p q -> rec p <> rec q
     QF.Iff p q -> rec p <> rec q
+    QF.Top -> mempty
+    QF.Bottom -> mempty
   where
     rec = allVariables
 

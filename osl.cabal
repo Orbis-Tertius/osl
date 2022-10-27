@@ -80,11 +80,13 @@ library
     OSL.Types.TranslationContext
     OSL.ValidContext
     OSL.ValidateContext
+    Semicircuit.DNFFormula
     Semicircuit.Gensyms
     Semicircuit.PrenexNormalForm
     Semicircuit.PNFFormula
     Semicircuit.Sigma11
     Semicircuit.ToLogicCircuit
+    Semicircuit.Types.DNFFormula
     Semicircuit.Types.PNFFormula
     Semicircuit.Types.QFFormula
     Semicircuit.Types.Semicircuit
