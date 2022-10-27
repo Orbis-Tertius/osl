@@ -17,6 +17,7 @@ library
     Halo2.Prelude
     Halo2.ArithmetizationConfig
     Halo2.ByteDecomposition
+    Halo2.LogicConstraint
     Halo2.LogicToArithmetic
     Halo2.Polynomial
     Halo2.PowerProduct
