@@ -16,6 +16,7 @@ library
     Die
     Halo2.Prelude
     Halo2.ArithmetizationConfig
+    Halo2.BoundLogicConstraintComplexity
     Halo2.ByteDecomposition
     Halo2.LogicConstraint
     Halo2.LogicToArithmetic
