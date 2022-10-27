@@ -29,7 +29,7 @@ import Halo2.TruthTable (getByteRangeColumn, getZeroIndicatorColumn)
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Circuit (ArithmeticCircuit, Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (..))
-import Halo2.Types.ColumnType (ColumnType (Fixed, Advice))
+import Halo2.Types.ColumnType (ColumnType (Advice, Fixed))
 import qualified Halo2.Types.ColumnTypes as ColumnTypes
 import Halo2.Types.FixedBound (FixedBound (..))
 import Halo2.Types.FixedValues (FixedValues (..))

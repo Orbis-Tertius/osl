@@ -1,25 +1,23 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 
-
 module Semicircuit.DNFFormula
-  ( toDisjunctiveNormalForm
-  , fromDisjunctiveNormalForm
-  , fromAtom
-  , and
-  , or
-  , atom
-  , negAtom
-  , top
-  , bottom
-  ) where
-
+  ( toDisjunctiveNormalForm,
+    fromDisjunctiveNormalForm,
+    fromAtom,
+    and,
+    or,
+    atom,
+    negAtom,
+    top,
+    bottom,
+  )
+where
 
 import Control.Lens ((^.))
-import qualified Semicircuit.Types.QFFormula as QF
 import qualified Semicircuit.Types.DNFFormula as DNF
+import qualified Semicircuit.Types.QFFormula as QF
 import Prelude hiding (and, or, pi)
-
 
 toDisjunctiveNormalForm :: QF.Formula -> DNF.Formula
 toDisjunctiveNormalForm =
@@ -50,48 +48,44 @@ toDisjunctiveNormalForm =
   where
     rec = toDisjunctiveNormalForm
 
-
 and :: DNF.Formula -> DNF.Formula -> DNF.Formula
 and p q =
   DNF.Formula
     [ pi <> qi
-    | pi <- p ^. #disjuncts
-    , qi <- q ^. #disjuncts
+      | pi <- p ^. #disjuncts,
+        qi <- q ^. #disjuncts
     ]
-
 
 or :: DNF.Formula -> DNF.Formula -> DNF.Formula
 or = (<>)
 
-
 atom :: DNF.Atom -> DNF.Formula
-atom = DNF.Formula . (:[]) . DNF.Conjunction . (:[]) . DNF.AlmostAtom DNF.Positive
-
+atom = DNF.Formula . (: []) . DNF.Conjunction . (: []) . DNF.AlmostAtom DNF.Positive
 
 negAtom :: DNF.Atom -> DNF.Formula
-negAtom = DNF.Formula . (:[]) . DNF.Conjunction . (:[]) . DNF.AlmostAtom DNF.Negative
-
+negAtom = DNF.Formula . (: []) . DNF.Conjunction . (: []) . DNF.AlmostAtom DNF.Negative
 
 top :: DNF.Formula
 top = DNF.Formula [mempty]
 
-
 bottom :: DNF.Formula
 bottom = mempty
 
-
 fromDisjunctiveNormalForm :: DNF.Formula -> QF.Formula
-fromDisjunctiveNormalForm  f =
-  foldl QF.Or QF.Bottom
-  [ foldl QF.And QF.Top
-    [ case aa ^. #parity of
-        DNF.Positive -> fromAtom (aa ^. #atom)
-        DNF.Negative -> QF.Not (fromAtom (aa ^. #atom))
-    | aa <- c ^. #conjuncts
+fromDisjunctiveNormalForm f =
+  foldl
+    QF.Or
+    QF.Bottom
+    [ foldl
+        QF.And
+        QF.Top
+        [ case aa ^. #parity of
+            DNF.Positive -> fromAtom (aa ^. #atom)
+            DNF.Negative -> QF.Not (fromAtom (aa ^. #atom))
+          | aa <- c ^. #conjuncts
+        ]
+      | c <- f ^. #disjuncts
     ]
-    | c <- f ^. #disjuncts
-  ]
-
 
 fromAtom :: DNF.Atom -> QF.Formula
 fromAtom =

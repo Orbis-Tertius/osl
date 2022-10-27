@@ -105,7 +105,9 @@ degree (Polynomial p) =
 
 eval :: Polynomial -> (PolynomialVariable -> Scalar) -> Scalar
 eval (Polynomial p) f =
-  foldl' (+) 0
-  [ c * product [ f x ^ e | (x, e) <- Map.toList pp ]
-  | (PowerProduct pp, Coefficient c) <- Map.toList p
-  ]
+  foldl'
+    (+)
+    0
+    [ c * product [f x ^ e | (x, e) <- Map.toList pp]
+      | (PowerProduct pp, Coefficient c) <- Map.toList p
+    ]

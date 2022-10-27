@@ -8,7 +8,7 @@ module OSL.EntryPoint
     FileName (..),
     TargetName (..),
     Output (..),
-    CompileToCircuit (CompileToCircuit, DONTCompileToCircuit)
+    CompileToCircuit (CompileToCircuit, DONTCompileToCircuit),
   )
 where
 
@@ -18,7 +18,7 @@ import Data.ByteString (readFile)
 import Data.Either.Extra (mapLeft)
 import Data.Text (Text, pack)
 import Data.Text.Encoding (decodeUtf8')
-import Halo2.BoundLogicConstraintComplexity (boundLogicConstraintComplexity, ComplexityBound (ComplexityBound))
+import Halo2.BoundLogicConstraintComplexity (ComplexityBound (ComplexityBound), boundLogicConstraintComplexity)
 import Halo2.LogicToArithmetic (logicToArithmeticCircuit)
 import Halo2.Types.BitsPerByte (BitsPerByte (BitsPerByte))
 import Halo2.Types.RowCount (RowCount (RowCount))
@@ -78,8 +78,8 @@ runMain (FileName fileName) (TargetName targetName) compileToCircuit = do
         Right (SuccessfulOutput result) -> pure (Output result)
     _ -> pure (Output "could not decode source file; is it not UTF-8?")
 
-data CompileToCircuit =
-    CompileToCircuit
+data CompileToCircuit
+  = CompileToCircuit
   | DONTCompileToCircuit
 
 calcMain ::
@@ -120,27 +120,29 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
           toPNFFormula () (uncurry prependQuantifiers spnf)
       let -- dnf = fromDisjunctiveNormalForm (toDisjunctiveNormalForm (pnff ^. #qfFormula))
           semi = toSemicircuit pnff -- (PNF.Formula dnf (pnff ^. #quantifiers))
-          logic = boundLogicConstraintComplexity (ComplexityBound 3)
-                $ semicircuitToLogicCircuit rowCount semi
+          logic =
+            boundLogicConstraintComplexity (ComplexityBound 3) $
+              semicircuitToLogicCircuit rowCount semi
           circuit = logicToArithmeticCircuit bitsPerByte rowCount logic
       pure . SuccessfulOutput $
         "Translated OSL:\n"
           <> show translated
           <> (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
-          <> (case compileToCircuit of
-                CompileToCircuit ->
-                     "\n\nPrenex normal form: "
-                  <> show pnf
-                  <> "\n\nStrong prenex normal form: "
-                  <> show spnf
-                  <> "\n\nPNF formula: "
-                  <> show pnff
-                  <> "\n\nSemicircuit: "
-                  <> show semi
-                  <> "\n\nLogic circuit: "
-                  <> show logic
-                  <> "\n\nArithmetic circuit:\n"
-                  <> show circuit
-                DONTCompileToCircuit ->
-                  mempty)
+          <> ( case compileToCircuit of
+                 CompileToCircuit ->
+                   "\n\nPrenex normal form: "
+                     <> show pnf
+                     <> "\n\nStrong prenex normal form: "
+                     <> show spnf
+                     <> "\n\nPNF formula: "
+                     <> show pnff
+                     <> "\n\nSemicircuit: "
+                     <> show semi
+                     <> "\n\nLogic circuit: "
+                     <> show logic
+                     <> "\n\nArithmetic circuit:\n"
+                     <> show circuit
+                 DONTCompileToCircuit ->
+                   mempty
+             )
     _ -> Left . ErrorMessage $ "please provide the name of a defined term"

@@ -6,7 +6,7 @@ module OSL.Spec.OSLSpec (spec) where
 
 import Control.Monad (forM_)
 import Data.String (IsString)
-import OSL.EntryPoint (FileName (..), Output (..), TargetName (..), CompileToCircuit (DONTCompileToCircuit), runMain)
+import OSL.EntryPoint (CompileToCircuit (DONTCompileToCircuit), FileName (..), Output (..), TargetName (..), runMain)
 import Test.Syd (Spec, describe, it, liftIO, shouldBe)
 import Text.RawString.QQ (r)
 

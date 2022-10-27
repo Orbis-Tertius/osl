@@ -1,12 +1,13 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.RowIndex
-  ( RowIndex (RowIndex, getRowIndex)
-  , RowIndexType (Relative, Absolute)
-  ) where
+  ( RowIndex (RowIndex, getRowIndex),
+    RowIndexType (Relative, Absolute),
+  )
+where
 
 import Halo2.Prelude
 
