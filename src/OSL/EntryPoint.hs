@@ -8,6 +8,7 @@ module OSL.EntryPoint
     FileName (..),
     TargetName (..),
     Output (..),
+    CompileToCircuit (CompileToCircuit, DONTCompileToCircuit)
   )
 where
 
@@ -45,7 +46,7 @@ main = do
   case args of
     [fileName, targetName] ->
       putStrLn . unOutput
-        =<< runMain (FileName fileName) (TargetName targetName)
+        =<< runMain (FileName fileName) (TargetName targetName) CompileToCircuit
     _ -> putStrLn "Error: please provide a filename and the name of a term and nothing else"
 
 newtype FileName = FileName String
@@ -61,8 +62,8 @@ newtype Source = Source Text
 newtype Output = Output {unOutput :: String}
   deriving newtype (Eq, Show)
 
-runMain :: FileName -> TargetName -> IO Output
-runMain (FileName fileName) (TargetName targetName) = do
+runMain :: FileName -> TargetName -> CompileToCircuit -> IO Output
+runMain (FileName fileName) (TargetName targetName) compileToCircuit = do
   sourceBs <- readFile fileName
   case decodeUtf8' sourceBs of
     Right source ->
@@ -71,10 +72,15 @@ runMain (FileName fileName) (TargetName targetName) = do
         (TargetName targetName)
         (Source source) -- TODO: specify BitsPerByte and RowCount with options
         (BitsPerByte 24)
-        (RowCount 8) of
+        (RowCount 8)
+        compileToCircuit of
         Left (ErrorMessage err) -> pure (Output err)
         Right (SuccessfulOutput result) -> pure (Output result)
     _ -> pure (Output "could not decode source file; is it not UTF-8?")
+
+data CompileToCircuit =
+    CompileToCircuit
+  | DONTCompileToCircuit
 
 calcMain ::
   FileName ->
@@ -82,8 +88,9 @@ calcMain ::
   Source ->
   BitsPerByte ->
   RowCount ->
+  CompileToCircuit ->
   Either ErrorMessage SuccessfulOutput
-calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte rowCount = do
+calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte rowCount compileToCircuit = do
   toks <-
     mapLeft (ErrorMessage . ("Tokenizing error: " <>) . show) $
       tokenize fileName source
@@ -120,16 +127,20 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
         "Translated OSL:\n"
           <> show translated
           <> (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
-          <> "\n\nPrenex normal form: "
-          <> show pnf
-          <> "\n\nStrong prenex normal form: "
-          <> show spnf
-          <> "\n\nPNF formula: "
-          <> show pnff
-          <> "\n\nSemicircuit: "
-          <> show semi
-          <> "\n\nLogic circuit: "
-          <> show logic
-          <> "\n\nArithmetic circuit:\n"
-          <> show circuit
+          <> (case compileToCircuit of
+                CompileToCircuit ->
+                     "\n\nPrenex normal form: "
+                  <> show pnf
+                  <> "\n\nStrong prenex normal form: "
+                  <> show spnf
+                  <> "\n\nPNF formula: "
+                  <> show pnff
+                  <> "\n\nSemicircuit: "
+                  <> show semi
+                  <> "\n\nLogic circuit: "
+                  <> show logic
+                  <> "\n\nArithmetic circuit:\n"
+                  <> show circuit
+                DONTCompileToCircuit ->
+                  mempty)
     _ -> Left . ErrorMessage $ "please provide the name of a defined term"
