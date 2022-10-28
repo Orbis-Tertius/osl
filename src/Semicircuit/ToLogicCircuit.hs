@@ -47,6 +47,7 @@ import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
+import Halo2.Types.FixedBound (boolBound)
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
@@ -79,7 +80,7 @@ semicircuitToLogicCircuit rowCount x =
    in Circuit
         (layout ^. #columnTypes)
         (equalityConstrainableColumns x layout)
-        (gateConstraints x layout)
+        (gateConstraints x layout <> columnBounds x layout)
         (lookupArguments x layout)
         rowCount
         (equalityConstraints x layout)
@@ -284,6 +285,67 @@ gateConstraints x layout =
       existentialInputsInBoundsConstraints x layout,
       universalTableConstraints x layout
     ]
+
+columnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints
+columnBounds x layout =
+  mconcat
+    [ existentialFunctionTableColumnBounds x layout,
+      indicatorCallOutputColumnBounds x layout,
+      functionCallOutputColumnBounds x layout,
+      adviceTermColumnBounds x layout,
+      dummyRowAdviceColumnBounds layout
+    ]
+
+existentialFunctionTableColumnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints
+existentialFunctionTableColumnBounds _ _ =
+  mempty -- TODO
+
+indicatorCallOutputColumnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints
+indicatorCallOutputColumnBounds x layout =
+  LogicConstraints mempty
+  (Map.fromList
+    [ (col, boolBound)
+    | col <- (^. #unTermMapping) <$> Map.elems
+       (Map.filterWithKey (const . isIndicatorCallTerm)
+         (layout ^. #termMappings))
+    ])
+  where
+    isIndicatorCallTerm :: Term -> Bool
+    isIndicatorCallTerm =
+      \case
+        IndLess y z -> IndicatorFunctionCall y z `Set.member`
+          (x ^. #indicatorCalls . #unIndicatorFunctionCalls)
+        _ -> False
+
+functionCallOutputColumnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints
+functionCallOutputColumnBounds _ _ =
+  mempty -- TODO
+
+adviceTermColumnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints
+adviceTermColumnBounds _ _ =
+  mempty -- TODO
+
+dummyRowAdviceColumnBounds ::
+  Layout ->
+  LogicConstraints
+dummyRowAdviceColumnBounds layout =
+  LogicConstraints mempty
+  (Map.singleton (layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn) boolBound)
 
 lexicographicallyLessThanConstraint ::
   -- the lists are zipped to document that they have

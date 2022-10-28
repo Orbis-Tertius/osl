@@ -18,6 +18,7 @@ import Halo2.Types.Circuit (Circuit (Circuit), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
+import Halo2.Types.FixedBound (boolBound)
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
 import Halo2.Types.LogicConstraints (LogicConstraints (LogicConstraints))
 
@@ -27,6 +28,7 @@ newtype ComplexityBound = ComplexityBound {unComplexityBound :: Int}
 data S = S ColumnTypes LogicConstraints
   deriving (Generic)
 
+-- TODO: add fixed bounds for newly introduced boolean columns
 boundLogicConstraintComplexity ::
   ComplexityBound ->
   LogicCircuit ->
@@ -77,5 +79,7 @@ addCol :: State S ColumnIndex
 addCol = do
   S colTypes constraints <- get
   let i = maybe 0 ((1 +) . fst) (Map.lookupMax (colTypes ^. #getColumnTypes))
-  put (S (colTypes <> ColumnTypes (Map.singleton i Advice)) constraints)
+      iBound = LogicConstraints mempty (Map.singleton i boolBound) 
+  put (S (colTypes <> ColumnTypes (Map.singleton i Advice))
+         (constraints <> iBound))
   pure i
