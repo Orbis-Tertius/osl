@@ -6,7 +6,7 @@ module OSL.Spec.OSLSpec (spec) where
 
 import Control.Monad (forM_)
 import Data.String (IsString)
-import OSL.EntryPoint (FileName (..), Output (..), TargetName (..), runMain)
+import OSL.EntryPoint (CompileToCircuit (DONTCompileToCircuit), FileName (..), Output (..), TargetName (..), runMain)
 import Test.Syd (Spec, describe, it, liftIO, shouldBe)
 import Text.RawString.QQ (r)
 
@@ -40,6 +40,7 @@ runTestCase (TestCase (TestFile fileName) (TestName testName) (Expectation expec
           runMain
             (FileName ("examples/" <> fileName <> ".osl"))
             (TargetName testName)
+            DONTCompileToCircuit
       result `shouldBe` Output expected
 
 testCases :: [TestCase]

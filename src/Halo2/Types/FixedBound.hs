@@ -7,7 +7,8 @@ module Halo2.Types.FixedBound
 where
 
 import Halo2.Prelude
+import Stark.Types.Scalar (Scalar)
 
 newtype FixedBound = FixedBound
-  {unFixedBound :: Int}
-  deriving (Generic)
+  {unFixedBound :: Scalar}
+  deriving (Generic, Show)

@@ -18,4 +18,4 @@ times (PowerProduct a) (PowerProduct b) =
 
 degree :: PowerProduct -> Int
 degree (PowerProduct m) =
-  foldl' (*) 0 (getExponent <$> Map.elems m)
+  foldl' (+) 0 (getExponent <$> Map.elems m)

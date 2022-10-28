@@ -1,15 +1,17 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 
-module Halo2.Types.PolynomialVariable (PolynomialVariable (PolynomialVariable)) where
+module Halo2.Types.CellReference
+  ( CellReference (CellReference),
+  )
+where
 
 import Halo2.Prelude
 import Halo2.Types.ColumnIndex
 import Halo2.Types.RowIndex
 
-data PolynomialVariable = PolynomialVariable
+data CellReference = CellReference
   { colIndex :: ColumnIndex,
-    rowIndex :: RowIndex 'Relative
+    rowIndex :: RowIndex 'Absolute
   }
   deriving (Eq, Ord, Show, Generic)

@@ -1,11 +1,14 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Semicircuit.Types.PNFFormula
   ( Formula (..),
-    Quantifiers (..),
+    Quantifiers (Quantifiers),
     ExistentialQuantifier (..),
-    UniversalQuantifier (..),
+    UniversalQuantifier (All),
   )
 where
 
+import GHC.Generics (Generic)
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier (..), Name)
 
@@ -13,12 +16,13 @@ data Formula = Formula
   { qfFormula :: QF.Formula,
     quantifiers :: Quantifiers
   }
+  deriving (Generic, Show)
 
 data Quantifiers = Quantifiers
   { existentialQuantifiers :: [ExistentialQuantifier],
     universalQuantifiers :: [UniversalQuantifier]
   }
-  deriving (Eq)
+  deriving (Eq, Generic, Show)
 
 instance Semigroup Quantifiers where
   (Quantifiers a b) <> (Quantifiers a' b') =
@@ -27,5 +31,8 @@ instance Semigroup Quantifiers where
 instance Monoid Quantifiers where
   mempty = Quantifiers [] []
 
-data UniversalQuantifier = All Name Bound
-  deriving (Eq)
+data UniversalQuantifier = All
+  { name :: Name,
+    bound :: Bound
+  }
+  deriving (Eq, Generic, Show)

@@ -5,7 +5,7 @@
 module Halo2.Types.Coefficient (Coefficient (Coefficient, getCoefficient)) where
 
 import Halo2.Prelude
-import Halo2.Types.FieldElement (FieldElement)
+import Stark.Types.Scalar (Scalar)
 
-newtype Coefficient = Coefficient {getCoefficient :: FieldElement}
-  deriving (Enum, Eq, Ord, Show, Generic)
+newtype Coefficient = Coefficient {getCoefficient :: Scalar}
+  deriving (Enum, Eq, Ord, Show, Generic, Num)

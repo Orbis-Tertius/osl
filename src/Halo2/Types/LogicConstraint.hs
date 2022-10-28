@@ -3,7 +3,7 @@
 
 module Halo2.Types.LogicConstraint
   ( AtomicLogicConstraint (Equals, LessThan),
-    LogicConstraint (Atom, Not, And, Or),
+    LogicConstraint (Atom, Not, And, Or, Iff, Top, Bottom),
     atomicConstraintArgs,
   )
 where
@@ -14,7 +14,7 @@ import Halo2.Types.Polynomial (Polynomial)
 data AtomicLogicConstraint
   = Equals Polynomial Polynomial
   | LessThan Polynomial Polynomial
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 atomicConstraintArgs :: AtomicLogicConstraint -> (Polynomial, Polynomial)
 atomicConstraintArgs =
@@ -27,3 +27,7 @@ data LogicConstraint
   | Not LogicConstraint
   | And LogicConstraint LogicConstraint
   | Or LogicConstraint LogicConstraint
+  | Iff LogicConstraint LogicConstraint
+  | Top
+  | Bottom
+  deriving (Show)

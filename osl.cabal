@@ -16,9 +16,9 @@ library
     Die
     Halo2.Prelude
     Halo2.ArithmetizationConfig
+    Halo2.BoundLogicConstraintComplexity
     Halo2.ByteDecomposition
-    Halo2.Coefficient
-    Halo2.FiniteField
+    Halo2.LogicConstraint
     Halo2.LogicToArithmetic
     Halo2.Polynomial
     Halo2.PowerProduct
@@ -30,6 +30,7 @@ library
     Halo2.Types.ByteDecomposition
     Halo2.Types.BitsPerByte
     Halo2.Types.BytesPerWord
+    Halo2.Types.CellReference
     Halo2.Types.Circuit
     Halo2.Types.CircuitWithWitnesses
     Halo2.Types.Coefficient
@@ -40,8 +41,6 @@ library
     Halo2.Types.EqualityConstraint
     Halo2.Types.EqualityConstraints
     Halo2.Types.Exponent
-    Halo2.Types.FieldElement
-    Halo2.Types.FiniteField
     Halo2.Types.FixedBound
     Halo2.Types.FixedColumn
     Halo2.Types.FixedValues
@@ -84,13 +83,17 @@ library
     OSL.Types.TranslationContext
     OSL.ValidContext
     OSL.ValidateContext
+    Semicircuit.DNFFormula
     Semicircuit.Gensyms
     Semicircuit.PrenexNormalForm
     Semicircuit.PNFFormula
     Semicircuit.Sigma11
+    Semicircuit.ToLogicCircuit
+    Semicircuit.Types.DNFFormula
     Semicircuit.Types.PNFFormula
     Semicircuit.Types.QFFormula
     Semicircuit.Types.Semicircuit
+    Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
     Semicircuit.Types.Sigma11
 
   build-depends:
@@ -101,6 +104,7 @@ library
     cryptonite,
     either,
     extra,
+    fri-proofs,
     generic-lens,
     genvalidity,
     genvalidity-bytestring,

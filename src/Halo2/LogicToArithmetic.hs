@@ -23,17 +23,14 @@ import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.ByteDecomposition (countBytes)
-import qualified Halo2.Coefficient as C
-import qualified Halo2.FiniteField as F
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.TruthTable (getByteRangeColumn, getZeroIndicatorColumn)
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Circuit (ArithmeticCircuit, Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (..))
-import Halo2.Types.ColumnType (ColumnType (Fixed))
-import Halo2.Types.ColumnTypes (ColumnTypes (..))
-import Halo2.Types.FiniteField (FiniteField (..))
+import Halo2.Types.ColumnType (ColumnType (Advice, Fixed))
+import qualified Halo2.Types.ColumnTypes as ColumnTypes
 import Halo2.Types.FixedBound (FixedBound (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
@@ -47,134 +44,126 @@ import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount)
+import Stark.Types.Scalar (half)
 
 translateLogicGate ::
-  FiniteField ->
   LogicToArithmeticColumnLayout ->
   LogicConstraint ->
   Maybe Polynomial
-translateLogicGate f layout p =
-  P.minus f <$> eval f layout p <*> pure P.one
+translateLogicGate layout p =
+  P.minus <$> eval layout p <*> pure P.one
 
 byteDecompositionGate ::
-  FiniteField ->
   LogicToArithmeticColumnLayout ->
   AtomicLogicConstraint ->
   Maybe Polynomial
-byteDecompositionGate f layout c =
+byteDecompositionGate layout c =
   let (a, b) = atomicConstraintArgs c
    in do
         advice <- Map.lookup c (layout ^. #atomAdvice)
         pure $
-          P.minus
-            f
-            (P.minus f a b)
-            ( P.times
-                f
-                ( P.var
+          (a `P.minus` b)
+            `P.minus` ( P.var
+                          ( PolynomialVariable
+                              (advice ^. #sign . #unSignColumnIndex)
+                              0
+                          )
+                          `P.times` P.sum
+                            [ P.constant (2 ^ j) `P.times` d
+                              | (j, d) :: (Integer, Polynomial) <-
+                                  zip
+                                    [0 ..]
+                                    ( reverse
+                                        ( P.var
+                                            . flip PolynomialVariable 0
+                                            . unByteColumnIndex
+                                            <$> (advice ^. #bytes)
+                                        )
+                                    )
+                            ]
+                      )
+
+eval ::
+  LogicToArithmeticColumnLayout ->
+  LogicConstraint ->
+  Maybe Polynomial
+eval layout =
+  \case
+    Atom (Equals p q) -> do
+      advice <- Map.lookup (Equals p q) (layout ^. #atomAdvice)
+      pure $ signPoly advice `P.times` eqMono advice
+    Atom (LessThan p q) -> do
+      advice <- Map.lookup (LessThan p q) (layout ^. #atomAdvice)
+      pure $
+        signPoly advice
+          `P.times` some (unTruthValueColumnIndex <$> advice ^. #truthValue)
+    Not p -> P.minus P.one <$> rec p
+    And p q -> P.times <$> rec p <*> rec q
+    Or p q ->
+      let a = rec p
+          b = rec q
+       in P.plus <$> a <*> (P.minus <$> b <*> (P.times <$> a <*> b))
+    Iff p q ->
+      let a = rec p
+          b = rec q
+          c =
+            P.minus P.one
+              <$> (P.minus <$> a <*> b)
+       in P.times <$> c <*> c
+    Top -> pure (P.constant 1)
+    Bottom -> pure (P.constant 0)
+  where
+    rec = eval layout
+
+signPoly :: AtomAdvice -> Polynomial
+signPoly advice =
+  P.constant half
+    `P.times` ( P.one
+                  `P.plus` P.var
                     ( PolynomialVariable
                         (advice ^. #sign . #unSignColumnIndex)
                         0
                     )
-                )
-                ( P.sum
-                    f
-                    [ P.times f (P.constant (2 ^ j)) d
-                      | (j, d) :: (Integer, Polynomial) <-
-                          zip
-                            [0 ..]
-                            ( reverse
-                                ( P.var
-                                    . flip PolynomialVariable 0
-                                    . unByteColumnIndex
-                                    <$> (advice ^. #bytes)
-                                )
-                            )
-                    ]
-                )
-            )
-
-eval ::
-  FiniteField ->
-  LogicToArithmeticColumnLayout ->
-  LogicConstraint ->
-  Maybe Polynomial
-eval f layout =
-  \case
-    Atom (Equals p q) -> do
-      advice <- Map.lookup (Equals p q) (layout ^. #atomAdvice)
-      pure $ P.times f (signPoly f advice) (eqMono advice)
-    Atom (LessThan p q) -> do
-      advice <- Map.lookup (LessThan p q) (layout ^. #atomAdvice)
-      pure $
-        P.times
-          f
-          (signPoly f advice)
-          (some f (unTruthValueColumnIndex <$> advice ^. #truthValue))
-    Not p -> P.minus f P.one <$> rec p
-    And p q -> P.times f <$> rec p <*> rec q
-    Or p q ->
-      let a = rec p
-          b = rec q
-       in P.plus f <$> a <*> (P.minus f <$> b <*> (P.times f <$> a <*> b))
-  where
-    rec = eval f layout
-
-signPoly :: FiniteField -> AtomAdvice -> Polynomial
-signPoly f advice =
-  P.times
-    f
-    (P.constant (F.half f))
-    ( P.plus
-        f
-        (P.constant F.one)
-        ( P.var
-            ( PolynomialVariable
-                (advice ^. #sign . #unSignColumnIndex)
-                0
-            )
-        )
-    )
+              )
 
 eqMono :: AtomAdvice -> Polynomial
 eqMono advice =
-  P.multilinearMonomial C.one $
+  P.multilinearMonomial 1 $
     flip PolynomialVariable 0 . unTruthValueColumnIndex
       <$> advice ^. #truthValue
 
-some :: FiniteField -> [ColumnIndex] -> Polynomial
-some _ [] = P.zero
-some f (x : xs) =
+some :: [ColumnIndex] -> Polynomial
+some [] = P.zero
+some (x : xs) =
   let a = P.var (PolynomialVariable x 0)
-      b = some f xs
-   in P.plus f a (P.minus f b (P.times f a b))
+      b = some xs
+   in a `P.plus` (b `P.minus` (a `P.times` b))
 
 getLayout ::
   BitsPerByte ->
-  FiniteField ->
   LogicCircuit ->
   LogicToArithmeticColumnLayout
-getLayout bits f lc =
+getLayout bits lc =
   let i0 =
         ColumnIndex . length $
           lc ^. #columnTypes . #getColumnTypes
-   in evalState (getLayoutM bits f lc) i0
+   in evalState (getLayoutM bits lc) i0
 
 getLayoutM ::
   BitsPerByte ->
-  FiniteField ->
   LogicCircuit ->
   State ColumnIndex LogicToArithmeticColumnLayout
-getLayoutM bits f lc = do
+getLayoutM bits lc = do
   tabi0 <- ByteRangeColumnIndex <$> nextColIndex
   tabi1 <- ZeroIndicatorColumnIndex <$> nextColIndex
   atomAdvices <- fmap Map.fromList
     . forM (Set.toList (getAtomicConstraints lc))
     $ \ac ->
-      (ac,) <$> getAtomAdviceM bits f
+      (ac,) <$> getAtomAdviceM bits
   let colTypes =
-        lc ^. #columnTypes
-          <> ColumnTypes [Fixed, Fixed]
+        lc ^. #columnTypes -- TODO: include the remaining columns
+          <> ColumnTypes.fromList (replicate (foldl' (+) 0 (countAtomAdviceCols <$> atomAdvices)) Advice)
+          <> ColumnTypes.fromList [Fixed, Fixed]
       lcCols =
         Set.fromList . fmap ColumnIndex $
           [ 0
@@ -188,17 +177,20 @@ getLayoutM bits f lc = do
       atomAdvices
       (TruthTableColumnIndices tabi0 tabi1)
 
+countAtomAdviceCols :: AtomAdvice -> Int
+countAtomAdviceCols a =
+  1 + length (a ^. #bytes) + length (a ^. #truthValue)
+
 getAtomAdviceM ::
   BitsPerByte ->
-  FiniteField ->
   State ColumnIndex AtomAdvice
-getAtomAdviceM bits (FiniteField fieldSize) = do
+getAtomAdviceM bits = do
   AtomAdvice
     <$> (SignColumnIndex <$> nextColIndex)
     <*> replicateM n (ByteColumnIndex <$> nextColIndex)
     <*> replicateM n (TruthValueColumnIndex <$> nextColIndex)
   where
-    n = countBytes bits (FixedBound fieldSize)
+    n = countBytes bits (FixedBound maxBound)
 
 getAtomicConstraints :: LogicCircuit -> Set AtomicLogicConstraint
 getAtomicConstraints lc =
@@ -213,18 +205,20 @@ getAtomicSubformulas =
     Not p -> rec p
     And p q -> rec p <> rec q
     Or p q -> rec p <> rec q
+    Iff p q -> rec p <> rec q
+    Top -> mempty
+    Bottom -> mempty
   where
     rec = getAtomicSubformulas
 
 getSignRangeCheck ::
-  FiniteField ->
   LogicToArithmeticColumnLayout ->
   AtomicLogicConstraint ->
   Maybe LookupArgument
-getSignRangeCheck f layout c = do
+getSignRangeCheck layout c = do
   advice <- Map.lookup c (layout ^. #atomAdvice)
-  pure . LookupArgument $
-    [ ( InputExpression (signPoly f advice),
+  pure . LookupArgument P.zero $
+    [ ( InputExpression (signPoly advice),
         LookupTableColumn $
           layout
             ^. #truthTable
@@ -249,7 +243,7 @@ getByteRangeAndTruthTableChecks layout c = do
           ^. #truthTable
             . #byteRangeColumnIndex
             . #unByteRangeColumnIndex
-  pure . LookupArgument $ do
+  pure . LookupArgument (P.constant 0) $ do
     (byteCol, truthValCol) <-
       zip
         (advice ^. #bytes)
@@ -273,18 +267,17 @@ getPolyDegreeBound p =
 
 logicToArithmeticCircuit ::
   BitsPerByte ->
-  FiniteField ->
   RowCount ->
   LogicCircuit ->
   Maybe ArithmeticCircuit
-logicToArithmeticCircuit bits f rows lc = do
-  let layout = getLayout bits f lc
+logicToArithmeticCircuit bits rows lc = do
+  let layout = getLayout bits lc
       atoms = Set.toList (getAtomicConstraints lc)
   translatedGates <-
     forM (lc ^. #gateConstraints . #constraints) $
-      translateLogicGate f layout
+      translateLogicGate layout
   decompositionGates <-
-    forM atoms $ byteDecompositionGate f layout
+    forM atoms $ byteDecompositionGate layout
   let polyGates = translatedGates <> decompositionGates
       degreeBound =
         foldl'
@@ -292,12 +285,11 @@ logicToArithmeticCircuit bits f rows lc = do
           0
           (getPolyDegreeBound <$> polyGates)
   signChecks <-
-    forM atoms $ getSignRangeCheck f layout
+    forM atoms $ getSignRangeCheck layout
   rangeAndTruthChecks <-
     forM atoms $ getByteRangeAndTruthTableChecks layout
   pure $
     Circuit
-      f
       (layout ^. #columnTypes)
       (lc ^. #equalityConstrainableColumns)
       (PolynomialConstraints polyGates degreeBound)

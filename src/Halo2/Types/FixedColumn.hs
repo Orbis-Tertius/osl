@@ -4,7 +4,7 @@
 module Halo2.Types.FixedColumn (FixedColumn (..)) where
 
 import Halo2.Prelude
-import Halo2.Types.FieldElement (FieldElement)
+import Stark.Types.Scalar (Scalar)
 
-newtype FixedColumn = FixedColumn {unFixedColumn :: [FieldElement]}
+newtype FixedColumn = FixedColumn {unFixedColumn :: [Scalar]}
   deriving (Eq, Ord, Generic, Show)

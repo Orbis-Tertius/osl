@@ -1,15 +1,21 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Semicircuit.Sigma11
   ( prependBounds,
     prependQuantifiers,
     prependArguments,
+    existentialQuantifierName,
+    existentialQuantifierOutputBound,
+    existentialQuantifierInputBounds,
   )
 where
 
+import Control.Lens ((%~))
 import Data.List (foldl')
 import Die (die)
+import OSL.Types.Arity (Arity (..))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
 
 prependBounds ::
@@ -17,7 +23,7 @@ prependBounds ::
   ExistentialQuantifier ->
   ExistentialQuantifier
 prependBounds bs' (Some x n bs b) =
-  Some x n (bs' <> bs) b
+  Some (#arity %~ (+ Arity (length bs')) $ x) n (bs' <> bs) b
 prependBounds _ (SomeP {}) =
   die "there is a compiler bug; applied prependBounds to SomeP"
 
@@ -56,7 +62,7 @@ prependArguments f xs =
       \case
         App g xs' ->
           if g == f
-            then App g ((var <$> xs) <> xs')
+            then App (#arity . #unArity %~ (+ length xs) $ g) ((var <$> xs) <> xs')
             else App g xs'
         AppInverse g x ->
           if g == f
@@ -96,3 +102,21 @@ mapExistentialQuantifierBounds f =
       Some x n (mapInputBound f <$> bs) (mapOutputBound f b)
     SomeP x n b0 b1 ->
       SomeP x n (mapInputBound f b0) (mapOutputBound f b1)
+
+existentialQuantifierName :: ExistentialQuantifier -> Name
+existentialQuantifierName =
+  \case
+    Some x _ _ _ -> x
+    SomeP x _ _ _ -> x
+
+existentialQuantifierOutputBound :: ExistentialQuantifier -> Bound
+existentialQuantifierOutputBound =
+  \case
+    Some _ _ _ (OutputBound b) -> b
+    SomeP _ _ _ (OutputBound b) -> b
+
+existentialQuantifierInputBounds :: ExistentialQuantifier -> [InputBound]
+existentialQuantifierInputBounds =
+  \case
+    Some _ _ ibs _ -> ibs
+    SomeP _ _ ib _ -> [ib]

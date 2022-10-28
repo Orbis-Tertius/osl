@@ -14,6 +14,9 @@ data Formula
   | Or Formula Formula
   | Implies Formula Formula
   | Iff Formula Formula
+  | Top
+  | Bottom
+  deriving (Show)
 
 instance MapNames Formula where
   mapNames f =
@@ -26,3 +29,5 @@ instance MapNames Formula where
       Not p -> Not (mapNames f p)
       Implies p q -> Implies (mapNames f p) (mapNames f q)
       Iff p q -> Iff (mapNames f p) (mapNames f q)
+      Top -> Top
+      Bottom -> Bottom
