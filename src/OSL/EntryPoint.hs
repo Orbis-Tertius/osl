@@ -70,7 +70,7 @@ runMain (FileName fileName) (TargetName targetName) compileToCircuit = do
         (FileName fileName)
         (TargetName targetName)
         (Source source) -- TODO: specify BitsPerByte and RowCount with options
-        (BitsPerByte 24)
+        (BitsPerByte 16)
         (RowCount 8)
         compileToCircuit of
         Left (ErrorMessage err) -> pure (Output err)
@@ -120,7 +120,7 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
       let -- dnf = fromDisjunctiveNormalForm (toDisjunctiveNormalForm (pnff ^. #qfFormula))
           semi = toSemicircuit pnff -- (PNF.Formula dnf (pnff ^. #quantifiers))
           logic = semicircuitToLogicCircuit rowCount semi
-          logic' = boundLogicConstraintComplexity (ComplexityBound 3) logic
+          logic' = boundLogicConstraintComplexity (ComplexityBound 2) logic
           circuit = logicToArithmeticCircuit bitsPerByte rowCount logic'
       pure . SuccessfulOutput $
         "Translated OSL:\n"
