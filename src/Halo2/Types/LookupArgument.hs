@@ -1,8 +1,10 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.LookupArgument (LookupArgument (LookupArgument)) where
 
+import Data.List (intercalate)
 import Halo2.Prelude
 import Halo2.Types.InputExpression (InputExpression)
 import Halo2.Types.LookupTableColumn (LookupTableColumn)
@@ -12,4 +14,14 @@ data LookupArgument = LookupArgument
   { gate :: Polynomial,
     tableMap :: [(InputExpression, LookupTableColumn)]
   }
-  deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Ord, Generic)
+
+instance Show LookupArgument where
+  show arg =
+    show (arg ^. #gate) <> " = 0 => ("
+      <> intercalate ", " (show <$> inputs)
+      <> " ∈ ("
+      <> intercalate ", " (show <$> cols)
+      <> ")"
+    where
+      (inputs, cols) = unzip (arg ^. #tableMap)

@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -10,4 +11,5 @@ where
 import Halo2.Prelude
 
 newtype ColumnIndex = ColumnIndex {getColumnIndex :: Int}
-  deriving (Eq, Ord, Num, Enum, Real, Integral, Show, Generic)
+  deriving stock (Eq, Ord, Generic)
+  deriving newtype (Num, Enum, Real, Integral, Show)

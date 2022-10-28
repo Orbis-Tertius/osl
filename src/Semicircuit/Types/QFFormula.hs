@@ -2,6 +2,7 @@
 
 module Semicircuit.Types.QFFormula (Formula (..)) where
 
+import Data.List (intercalate)
 import OSL.Types.Sigma11 (PredicateName)
 import Semicircuit.Types.Sigma11 (MapNames (..), Term)
 
@@ -16,7 +17,25 @@ data Formula
   | Iff Formula Formula
   | Top
   | Bottom
-  deriving (Show)
+
+instance Show Formula where
+  show (Equal x y) =
+    "(" <> show x <> " = " <> show y <> ")"
+  show (LessOrEqual x y) =
+    "(" <> show x <> " <= " <> show y <> ")"
+  show (Not p) = "!" <> show p
+  show (And p q) =
+    "(" <> show p <> " & " <> show q <> ")"
+  show (Or p q) =
+    "(" <> show p <> " | " <> show q <> ")"
+  show (Implies p q) =
+    "(" <> show p <> " -> " <> show q <> ")"
+  show (Iff p q) =
+    "(" <> show p <> " <-> " <> show q <> ")"
+  show (Predicate p qs) =
+    show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
+  show Top = "⊤"
+  show Bottom = "⊥"
 
 instance MapNames Formula where
   mapNames f =

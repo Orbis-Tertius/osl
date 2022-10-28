@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 module Semicircuit.Types.PNFFormula
   ( Formula (..),
@@ -8,6 +9,8 @@ module Semicircuit.Types.PNFFormula
   )
 where
 
+import Control.Lens ((^.))
+import Data.List (intercalate)
 import GHC.Generics (Generic)
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier (..), Name)
@@ -16,13 +19,24 @@ data Formula = Formula
   { qfFormula :: QF.Formula,
     quantifiers :: Quantifiers
   }
-  deriving (Generic, Show)
+  deriving (Generic)
+
+instance Show Formula where
+  show f = show (f ^. #quantifiers) <> ", " <> show (f ^. #qfFormula)
 
 data Quantifiers = Quantifiers
   { existentialQuantifiers :: [ExistentialQuantifier],
     universalQuantifiers :: [UniversalQuantifier]
   }
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Generic)
+
+instance Show Quantifiers where
+  show qs =
+    intercalate
+      ", "
+      (("∃" <>) . show <$> (qs ^. #existentialQuantifiers))
+      <> ", "
+      <> intercalate ", " (("∀" <>) . show <$> (qs ^. #universalQuantifiers))
 
 instance Semigroup Quantifiers where
   (Quantifiers a b) <> (Quantifiers a' b') =
@@ -35,4 +49,7 @@ data UniversalQuantifier = All
   { name :: Name,
     bound :: Bound
   }
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Generic)
+
+instance Show UniversalQuantifier where
+  show q = "all " <> show (q ^. #name) <> "<" <> show (q ^. #bound)

@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.PolynomialVariable (PolynomialVariable (PolynomialVariable)) where
@@ -12,4 +13,7 @@ data PolynomialVariable = PolynomialVariable
   { colIndex :: ColumnIndex,
     rowIndex :: RowIndex 'Relative
   }
-  deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Ord, Generic)
+
+instance Show PolynomialVariable where
+  show x = "x" <> show (x ^. #colIndex) <> "," <> show (x ^. #rowIndex)
