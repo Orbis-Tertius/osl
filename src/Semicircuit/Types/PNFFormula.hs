@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedLabels #-}
 
-
 module Semicircuit.Types.PNFFormula
   ( Formula (..),
     Quantifiers (Quantifiers),
@@ -32,9 +31,12 @@ data Quantifiers = Quantifiers
   deriving (Eq, Generic)
 
 instance Show Quantifiers where
-  show qs = intercalate ", "
-            (("∃" <>) . show <$> (qs ^. #existentialQuantifiers))
-            <> ", " <> intercalate ", " (("∀" <>) . show <$> (qs ^. #universalQuantifiers))
+  show qs =
+    intercalate
+      ", "
+      (("∃" <>) . show <$> (qs ^. #existentialQuantifiers))
+      <> ", "
+      <> intercalate ", " (("∀" <>) . show <$> (qs ^. #universalQuantifiers))
 
 instance Semigroup Quantifiers where
   (Quantifiers a b) <> (Quantifiers a' b') =

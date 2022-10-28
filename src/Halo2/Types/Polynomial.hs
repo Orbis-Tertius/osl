@@ -13,6 +13,9 @@ newtype Polynomial = Polynomial {monos :: Map PowerProduct Coefficient}
   deriving (Eq, Ord, Generic)
 
 instance Show Polynomial where
-  show xs = intercalate " + "
-    ((\(p,c) -> show c <> show p)
-    <$> Map.toList (monos xs))
+  show xs =
+    intercalate
+      " + "
+      ( (\(p, c) -> show c <> show p)
+          <$> Map.toList (monos xs)
+      )

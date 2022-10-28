@@ -13,6 +13,9 @@ newtype PowerProduct = PowerProduct {getPowerProduct :: Map PolynomialVariable E
   deriving (Eq, Ord, Generic)
 
 instance Show PowerProduct where
-  show xs = intercalate "*"
-    ((\(x,e) -> show x <> "^" <> show e)
-     <$> toList (getPowerProduct xs))
+  show xs =
+    intercalate
+      "*"
+      ( (\(x, e) -> show x <> "^" <> show e)
+          <$> toList (getPowerProduct xs)
+      )

@@ -10,4 +10,4 @@ import Halo2.Types.ColumnIndex (ColumnIndex)
 
 newtype LookupTableColumn = LookupTableColumn {unLookupTableColumn :: ColumnIndex}
   deriving stock (Eq, Ord, Generic)
-  deriving newtype Show
+  deriving newtype (Show)

@@ -168,7 +168,7 @@ instance Show InputBound where
 
 newtype OutputBound = OutputBound {unOutputBound :: Bound}
   deriving stock (Eq, Generic)
-  deriving newtype Show
+  deriving newtype (Show)
 
 data Quantifier
   = Universal Name Bound

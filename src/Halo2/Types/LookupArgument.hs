@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.LookupArgument (LookupArgument (LookupArgument)) where
 
@@ -20,6 +20,8 @@ instance Show LookupArgument where
   show arg =
     show (arg ^. #gate) <> " = 0 => ("
       <> intercalate ", " (show <$> inputs)
-      <> " ∈ (" <> intercalate ", " (show <$> cols) <> ")"
+      <> " ∈ ("
+      <> intercalate ", " (show <$> cols)
+      <> ")"
     where
       (inputs, cols) = unzip (arg ^. #tableMap)

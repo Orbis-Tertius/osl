@@ -10,4 +10,4 @@ import Halo2.Types.Polynomial (Polynomial)
 
 newtype InputExpression = InputExpression {getInputExpression :: Polynomial}
   deriving stock (Eq, Ord, Generic)
-  deriving newtype Show
+  deriving newtype (Show)
