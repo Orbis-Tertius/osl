@@ -54,6 +54,7 @@ go' n0 0 p = do
   i <- addCol
   p' <- go' n0 n0 p
   addConstraint (Atom (var' i `Equals` constant 1) `Iff` p')
+  addConstraint (Atom (var' i `Equals` constant 1) `Or` Atom (var' i `Equals` constant 0))
   pure (Atom (var' i `Equals` constant 1))
 go' n0 n r =
   case r of
@@ -74,7 +75,6 @@ addConstraint p = do
 
 addCol :: State S ColumnIndex
 addCol = do
-  -- TODO: add a range check for the new column
   S colTypes constraints <- get
   let i = maybe 0 ((1 +) . fst) (Map.lookupMax (colTypes ^. #getColumnTypes))
   put (S (colTypes <> ColumnTypes (Map.singleton i Advice)) constraints)
