@@ -92,9 +92,9 @@ instance Show Formula where
   show (Iff p q) =
     "(" <> show p <> " <-> " <> show q <> ")"
   show (ForAll b p) =
-    "(all <" <> show b <> ", " <> show p <> ")"
+    "(∀<" <> show b <> ", " <> show p <> ")"
   show (ForSome q p) =
-    "(some " <> show q <> ", " <> show p <> ")"
+    "(∃" <> show q <> ", " <> show p <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
 
