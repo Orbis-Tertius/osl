@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -15,4 +16,5 @@ data RowIndexType = Relative | Absolute
 
 type RowIndex :: RowIndexType -> Type
 newtype RowIndex a = RowIndex {getRowIndex :: Int}
-  deriving (Num, Enum, Real, Integral, Eq, Ord, Show, Generic)
+  deriving stock (Eq, Ord, Generic)
+  deriving newtype (Num, Enum, Real, Integral, Show)

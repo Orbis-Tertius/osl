@@ -14,4 +14,7 @@ data CellReference = CellReference
   { colIndex :: ColumnIndex,
     rowIndex :: RowIndex 'Absolute
   }
-  deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Ord, Generic)
+
+instance Show CellReference where
+  show ref = "x" <> show (colIndex ref) <> "," <> show (rowIndex ref)

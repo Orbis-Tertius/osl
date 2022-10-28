@@ -14,7 +14,13 @@ import Halo2.Types.Polynomial (Polynomial)
 data AtomicLogicConstraint
   = Equals Polynomial Polynomial
   | LessThan Polynomial Polynomial
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show AtomicLogicConstraint where
+  show (Equals x y) =
+    "(" <> show x <> " = " <> show y <> ")"
+  show (LessThan x y) =
+    "(" <> show x <> " < " <> show y <> ")"
 
 atomicConstraintArgs :: AtomicLogicConstraint -> (Polynomial, Polynomial)
 atomicConstraintArgs =
@@ -30,4 +36,15 @@ data LogicConstraint
   | Iff LogicConstraint LogicConstraint
   | Top
   | Bottom
-  deriving (Show)
+
+instance Show LogicConstraint where
+  show (Atom x) = show x
+  show (Not p) = "!" <> show p
+  show (And p q) =
+    "(" <> show p <> " & " <> show q <> ")"
+  show (Or p q) =
+    "(" <> show p <> " | " <> show q <> ")"
+  show (Iff p q) =
+    "(" <> show p <> " <-> " <> show q <> ")"
+  show Top = "⊤"
+  show Bottom = "⊥"
