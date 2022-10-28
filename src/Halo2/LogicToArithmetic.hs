@@ -159,7 +159,7 @@ getLayoutM bits lc = do
   atomAdvices <- fmap Map.fromList
     . forM (Set.toList (getAtomicConstraints lc))
     $ \ac ->
-      (ac,) <$> getAtomAdviceM bits
+      (ac,) <$> getAtomAdviceM bits (getAtomicConstraintFixedBound lc ac)
   let colTypes =
         lc ^. #columnTypes -- TODO: include the remaining columns
           <> ColumnTypes.fromList (replicate (foldl' (+) 0 (countAtomAdviceCols <$> atomAdvices)) Advice)
@@ -183,20 +183,32 @@ countAtomAdviceCols a =
 
 getAtomAdviceM ::
   BitsPerByte ->
+  FixedBound ->
   State ColumnIndex AtomAdvice
-getAtomAdviceM bits = do
+getAtomAdviceM bits bound = do
   AtomAdvice
     <$> (SignColumnIndex <$> nextColIndex)
     <*> replicateM n (ByteColumnIndex <$> nextColIndex)
     <*> replicateM n (TruthValueColumnIndex <$> nextColIndex)
   where
-    n = countBytes bits (FixedBound maxBound)
+    n = countBytes bits bound
 
 getAtomicConstraints :: LogicCircuit -> Set AtomicLogicConstraint
 getAtomicConstraints lc =
   Set.unions $
     getAtomicSubformulas
       <$> lc ^. #gateConstraints . #constraints
+
+getAtomicConstraintFixedBound :: LogicCircuit -> AtomicLogicConstraint -> FixedBound
+getAtomicConstraintFixedBound lc =
+  getPolynomialFixedBound lc . uncurry P.minus . atomicConstraintArgs
+
+-- Gets a fixed bound on the absolute value of the given polynomial.
+getPolynomialFixedBound :: LogicCircuit -> Polynomial -> FixedBound
+getPolynomialFixedBound = todo
+
+todo :: a
+todo = todo
 
 getAtomicSubformulas :: LogicConstraint -> Set AtomicLogicConstraint
 getAtomicSubformulas =
