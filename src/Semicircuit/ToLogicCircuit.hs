@@ -80,7 +80,7 @@ semicircuitToLogicCircuit rowCount x =
    in Circuit
         (layout ^. #columnTypes)
         (equalityConstrainableColumns x layout)
-        (gateConstraints x layout <> columnBounds x layout)
+        (columnBounds x layout (gateConstraints x layout))
         (lookupArguments x layout)
         rowCount
         (equalityConstraints x layout)
@@ -289,28 +289,46 @@ gateConstraints x layout =
 columnBounds ::
   Semicircuit ->
   Layout ->
+  LogicConstraints ->
   LogicConstraints
 columnBounds x layout =
-  mconcat
-    [ existentialFunctionTableColumnBounds x layout,
-      indicatorCallOutputColumnBounds x layout,
-      functionCallOutputColumnBounds x layout,
-      adviceTermColumnBounds x layout,
-      dummyRowAdviceColumnBounds layout
-    ]
+    indicatorCallOutputColumnBounds x layout
+  . functionCallOutputColumnBounds x layout
+  . adviceTermColumnBounds x layout
+  . dummyRowAdviceColumnBounds layout
+  . existentialFunctionTableColumnBounds x layout
+  . universalTableBounds x layout
+  . instanceColumnBounds x layout
+
+instanceColumnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+instanceColumnBounds _ _ = mempty -- TODO
 
 existentialFunctionTableColumnBounds ::
   Semicircuit ->
   Layout ->
+  LogicConstraints ->
   LogicConstraints
 existentialFunctionTableColumnBounds _ _ =
   mempty -- TODO
 
+universalTableBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+universalTableBounds _ _ = mempty -- TODO
+
 indicatorCallOutputColumnBounds ::
   Semicircuit ->
   Layout ->
+  LogicConstraints ->
   LogicConstraints
-indicatorCallOutputColumnBounds x layout =
+indicatorCallOutputColumnBounds x layout constraints =
+  constraints <>
   LogicConstraints mempty
   (Map.fromList
     [ (col, boolBound)
@@ -329,6 +347,7 @@ indicatorCallOutputColumnBounds x layout =
 functionCallOutputColumnBounds ::
   Semicircuit ->
   Layout ->
+  LogicConstraints ->
   LogicConstraints
 functionCallOutputColumnBounds _ _ =
   mempty -- TODO
@@ -336,14 +355,17 @@ functionCallOutputColumnBounds _ _ =
 adviceTermColumnBounds ::
   Semicircuit ->
   Layout ->
+  LogicConstraints ->
   LogicConstraints
 adviceTermColumnBounds _ _ =
   mempty -- TODO
 
 dummyRowAdviceColumnBounds ::
   Layout ->
+  LogicConstraints ->
   LogicConstraints
-dummyRowAdviceColumnBounds layout =
+dummyRowAdviceColumnBounds layout constraints =
+  constraints <>
   LogicConstraints mempty
   (Map.singleton (layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn) boolBound)
 
