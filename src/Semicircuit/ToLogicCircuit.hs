@@ -42,7 +42,7 @@ import Halo2.Polynomial (constant, minus, plus, times, var, var')
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
-import Halo2.Types.ColumnType (ColumnType (Advice, Fixed, Instance))
+import qualified Halo2.Types.ColumnType as ColType
 import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
@@ -61,16 +61,15 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative))
 import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound)
-import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), UniversalQuantifier)
+import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), UniversalQuantifier, InstanceQuantifier (Instance))
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), IndicatorFunctionCall (..), Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul))
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul), InputBound, OutputBound)
 import Stark.Types.Scalar (order)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
--- TODO: fixed bounds
 semicircuitToLogicCircuit ::
   RowCount ->
   Semicircuit ->
@@ -88,7 +87,7 @@ semicircuitToLogicCircuit rowCount x =
 
 newtype S = S (ColumnIndex, ColumnTypes)
 
-nextCol :: ColumnType -> State S ColumnIndex
+nextCol :: ColType.ColumnType -> State S ColumnIndex
 nextCol t = do
   S (x, ts) <- get
   put $ S (x + 1, ts <> ColumnTypes (Map.singleton x t))
@@ -99,7 +98,7 @@ columnLayout x =
   flip evalState (S (0, mempty)) $ do
     nm <- nameMappings x
     tm <- termMappings x
-    dr <- DummyRowAdviceColumn <$> nextCol Advice
+    dr <- DummyRowAdviceColumn <$> nextCol ColType.Advice
     fs <- fixedColumns
     S (_, colTypes) <- get
     pure $
@@ -131,7 +130,7 @@ universalVariableMapping ::
   State S (Name, NameMapping)
 universalVariableMapping v =
   (v ^. #name,)
-    <$> ( NameMapping <$> (OutputMapping <$> nextCol Advice)
+    <$> ( NameMapping <$> (OutputMapping <$> nextCol ColType.Advice)
             <*> pure []
         )
 
@@ -151,16 +150,16 @@ existentialVariableMapping =
     Some x _ _ _ ->
       (x,)
         <$> ( NameMapping
-                <$> (OutputMapping <$> nextCol Advice)
+                <$> (OutputMapping <$> nextCol ColType.Advice)
                 <*> replicateM
                   (x ^. #arity . #unArity)
-                  (ArgMapping <$> nextCol Advice)
+                  (ArgMapping <$> nextCol ColType.Advice)
             )
     SomeP x _ _ _ ->
       (x,)
         <$> ( NameMapping
-                <$> (OutputMapping <$> nextCol Advice)
-                <*> ((: []) . ArgMapping <$> nextCol Advice)
+                <$> (OutputMapping <$> nextCol ColType.Advice)
+                <*> ((: []) . ArgMapping <$> nextCol ColType.Advice)
             )
 
 freeVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
@@ -174,10 +173,10 @@ freeVariableMapping :: Name -> State S (Name, NameMapping)
 freeVariableMapping x =
   (x,)
     <$> ( NameMapping
-            <$> (OutputMapping <$> nextCol Instance)
+            <$> (OutputMapping <$> nextCol ColType.Instance)
             <*> replicateM
               (x ^. #arity . #unArity)
-              (ArgMapping <$> nextCol Instance)
+              (ArgMapping <$> nextCol ColType.Instance)
         )
 
 termMappings :: Semicircuit -> State S (Map Term TermMapping)
@@ -188,14 +187,14 @@ termMappings x =
       (Set.toList (x ^. #adviceTerms . #unAdviceTerms))
 
 termMapping :: Term -> State S (Term, TermMapping)
-termMapping t = (t,) . TermMapping <$> nextCol Advice
+termMapping t = (t,) . TermMapping <$> nextCol ColType.Advice
 
 fixedColumns :: State S FixedColumns
 fixedColumns =
   FixedColumns
-    <$> (ZeroVectorIndex <$> nextCol Fixed)
-    <*> (OneVectorIndex <$> nextCol Fixed)
-    <*> (LastRowIndicatorColumnIndex <$> nextCol Fixed)
+    <$> (ZeroVectorIndex <$> nextCol ColType.Fixed)
+    <*> (OneVectorIndex <$> nextCol ColType.Fixed)
+    <*> (LastRowIndicatorColumnIndex <$> nextCol ColType.Fixed)
 
 fixedValues :: RowCount -> Layout -> FixedValues
 fixedValues (RowCount n) layout =
@@ -305,7 +304,48 @@ instanceColumnBounds ::
   Layout ->
   LogicConstraints ->
   LogicConstraints
-instanceColumnBounds _ _ = mempty -- TODO
+instanceColumnBounds x layout =
+  foldl (.) id
+    (instanceQuantifierBounds x layout
+      <$> (x ^. #formula . #quantifiers . #instanceQuantifiers))
+
+instanceQuantifierBounds ::
+  Semicircuit ->
+  Layout ->
+  InstanceQuantifier ->
+  LogicConstraints ->
+  LogicConstraints
+instanceQuantifierBounds x layout (Instance name inBounds outBound) =
+    outputBoundToFixedBound x layout outputCol outBound
+    . foldl (.) id (uncurry (inputBoundToFixedBound x layout)
+                     <$> (zip inputCols inBounds))
+  where
+    outputCol :: ColumnIndex
+    outputCol = todo name
+
+    inputCols :: [ColumnIndex]
+    inputCols = todo name
+
+inputBoundToFixedBound ::
+  Semicircuit ->
+  Layout ->
+  ColumnIndex ->
+  InputBound ->
+  LogicConstraints ->
+  LogicConstraints
+inputBoundToFixedBound = todo
+
+outputBoundToFixedBound ::
+  Semicircuit ->
+  Layout ->
+  ColumnIndex ->
+  OutputBound ->
+  LogicConstraints ->
+  LogicConstraints
+outputBoundToFixedBound = todo
+
+todo :: a
+todo = todo
 
 existentialFunctionTableColumnBounds ::
   Semicircuit ->
