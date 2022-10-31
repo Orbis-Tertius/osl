@@ -100,6 +100,7 @@ data Formula
   | Iff Formula Formula
   | ForAll Name Bound Formula
   | ForSome ExistentialQuantifier Formula
+  | Given Name [InputBound] OutputBound Formula
 
 instance Show Formula where
   show (Equal x y) =
@@ -119,6 +120,11 @@ instance Show Formula where
     "(∀" <> show x <> "<" <> show b <> ", " <> show p <> ")"
   show (ForSome q p) =
     "(∃" <> show q <> ", " <> show p <> ")"
+  show (Given x [] ob p) =
+    "(λ" <> show x <> "<" <> show ob <> "," <> show p <> ")"
+  show (Given x ibs ob p) =
+    "(λ" <> show x <> "(" <> intercalate ", " (show <$> ibs)
+      <> ")<" <> show ob <> ", " <> show p <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
 
@@ -164,7 +170,7 @@ data InputBound = InputBound
   deriving (Eq, Generic)
 
 instance Show InputBound where
-  show x = show (x ^. #name) <> ":" <> show (x ^. #bound)
+  show x = show (x ^. #name) <> "<" <> show (x ^. #bound)
 
 newtype OutputBound = OutputBound {unOutputBound :: Bound}
   deriving stock (Eq, Generic)
@@ -173,7 +179,12 @@ newtype OutputBound = OutputBound {unOutputBound :: Bound}
 data Quantifier
   = Universal Name Bound
   | Existential ExistentialQuantifier
+  | Instance Name [InputBound] OutputBound
 
 instance Show Quantifier where
   show (Universal x b) = "∀" <> show x <> "<" <> show b
   show (Existential q) = "∃" <> show q
+  show (Instance x ibs ob) = "λ" <> show x <>
+    (if null ibs then ""
+     else "(" <> intercalate ", " (show <$> ibs) <> ")")
+    <> "<" <> show ob

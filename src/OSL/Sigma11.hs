@@ -24,7 +24,7 @@ import Die (die)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate), InputBound (..), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Mul))
+import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Given, Predicate), InputBound (..), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Mul))
 import OSL.Types.TranslationContext (Mapping (..))
 
 class MapNames a where
@@ -59,6 +59,8 @@ instance MapNames Formula where
         ForSome (Some n (mapNames f inBounds) (mapNames f outBound)) (mapNames f p)
       ForSome (SomeP n inBound outBound) p ->
         ForSome (SomeP n (mapNames f inBound) (mapNames f outBound)) (mapNames f p)
+      Given ibs ob p ->
+        Given (mapNames f ibs) (mapNames f ob) (mapNames f p)
 
 instance MapNames Bound where
   mapNames f =

@@ -76,6 +76,7 @@ data Formula
   | Iff Formula Formula
   | ForAll Bound Formula
   | ForSome ExistentialQuantifier Formula
+  | Given [InputBound] OutputBound Formula
 
 instance Show Formula where
   show (Equal x y) =
@@ -95,6 +96,10 @@ instance Show Formula where
     "(∀<" <> show b <> ", " <> show p <> ")"
   show (ForSome q p) =
     "(∃" <> show q <> ", " <> show p <> ")"
+  show (Given [] ob p) =
+    "(λ<" <> show ob <> ", " <> show p <> ")"
+  show (Given ibs ob p) =
+    "(λ<" <> show ob <> "(<" <> intercalate ", <" (show <$> ibs) <> "), " <> show p <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
 
@@ -125,11 +130,11 @@ instance Show ExistentialQuantifier where
   show (Some (Cardinality n) bs b) =
     "^"
       <> show n
-      <> "<"
-      <> show b
       <> "("
       <> intercalate ", " (("<" <>) . show <$> bs)
       <> ")"
+      <> "<"
+      <> show b
   show (SomeP (Cardinality n) b0 b1) =
     "^"
       <> show n

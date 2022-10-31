@@ -45,23 +45,28 @@ toPNFFormula ann =
     S11.Predicate p args ->
       pure $ PNF.Formula (QF.Predicate p args) mempty
     S11.ForAll x b a -> do
-      PNF.Formula a' (PNF.Quantifiers aqE aqU) <-
+      PNF.Formula a' (PNF.Quantifiers aqE aqU aqG) <-
         rec a
-      let qNew = PNF.Quantifiers [] [PNF.All x b]
+      let qNew = PNF.Quantifiers [] [PNF.All x b] []
           aq' =
             PNF.Quantifiers
               ( prependBounds [S11.InputBound x b]
                   <$> aqE
               )
               aqU
+              aqG
       pure (PNF.Formula a' (qNew <> aq'))
     S11.ForSome (S11.Some x c bs b) a -> do
       PNF.Formula a' aq <- rec a
-      let qNew = PNF.Quantifiers [PNF.Some x c bs b] []
+      let qNew = PNF.Quantifiers [PNF.Some x c bs b] [] []
       pure $ PNF.Formula a' (qNew <> aq)
     S11.ForSome (S11.SomeP x c b0 b1) a -> do
       PNF.Formula a' aq <- rec a
-      let qNew = PNF.Quantifiers [PNF.SomeP x c b0 b1] []
+      let qNew = PNF.Quantifiers [PNF.SomeP x c b0 b1] [] []
+      pure $ PNF.Formula a' (qNew <> aq)
+    S11.Given x ibs ob a -> do
+      PNF.Formula a' aq <- rec a
+      let qNew = PNF.Quantifiers [] [] [PNF.Instance x ibs ob]
       pure $ PNF.Formula a' (qNew <> aq)
   where
     rec = toPNFFormula ann
@@ -77,8 +82,8 @@ toPNFFormula ann =
 
 -- Gets the indicator function calls in the given PNF formula.
 indicatorFunctionCalls :: PNF.Formula -> IndicatorFunctionCalls
-indicatorFunctionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
-  qff qf <> mconcat (eQ <$> es) <> mconcat (uQ <$> us)
+indicatorFunctionCalls (PNF.Formula qf (PNF.Quantifiers es us gs)) =
+  qff qf <> mconcat (eQ <$> es) <> mconcat (uQ <$> us) <> mconcat (gQ <$> gs)
   where
     qff :: QF.Formula -> IndicatorFunctionCalls
     qff =
@@ -111,6 +116,11 @@ indicatorFunctionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
       IndicatorFunctionCalls
     uQ (PNF.All _ b) = bound b
 
+    gQ :: PNF.InstanceQuantifier -> IndicatorFunctionCalls
+    gQ (PNF.Instance _ inBounds outBound) =
+      mconcat (bound . (^. #bound) <$> inBounds)
+        <> bound (outBound ^. #unOutputBound)
+
     bound ::
       S11.Bound ->
       IndicatorFunctionCalls
@@ -135,8 +145,8 @@ indicatorFunctionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
         S11.Const _ -> mempty
 
 functionCalls :: PNF.Formula -> FunctionCalls
-functionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
-  qff qf <> mconcat (eQ <$> es) <> mconcat (uQ <$> us)
+functionCalls (PNF.Formula qf (PNF.Quantifiers es us gs)) =
+  qff qf <> mconcat (eQ <$> es) <> mconcat (uQ <$> us) <> mconcat (gQ <$> gs)
   where
     qff :: QF.Formula -> FunctionCalls
     qff =
@@ -168,6 +178,10 @@ functionCalls (PNF.Formula qf (PNF.Quantifiers es us)) =
       PNF.UniversalQuantifier ->
       FunctionCalls
     uQ (PNF.All _ b) = bound b
+
+    gQ :: PNF.InstanceQuantifier -> FunctionCalls
+    gQ (PNF.Instance _ ibs ob) =
+      mconcat (bound . (^. #bound) <$> ibs) <> bound (ob ^. #unOutputBound)
 
     bound ::
       S11.Bound ->
@@ -221,7 +235,7 @@ freeVariables (PNF.Formula qf qs) =
   FreeVariables (Set.difference (allVariables qf) (quantifiedVariables qs))
 
 quantifiedVariables :: PNF.Quantifiers -> Set S11.Name
-quantifiedVariables (PNF.Quantifiers es us) =
+quantifiedVariables (PNF.Quantifiers es us _gs) =
   Set.fromList (existentialQuantifierName <$> es)
     <> Set.fromList ((^. #name) <$> us)
 

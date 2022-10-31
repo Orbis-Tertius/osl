@@ -16,7 +16,7 @@ import Control.Lens ((%~))
 import Data.List (foldl')
 import Die (die)
 import OSL.Types.Arity (Arity (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Given, Predicate), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal, Instance), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
 
 prependBounds ::
   [InputBound] ->
@@ -36,6 +36,8 @@ prependQuantifier (Universal x b) f =
   ForAll x b f
 prependQuantifier (Existential q) f =
   ForSome q f
+prependQuantifier (Instance x ibs ob) f =
+  Given x ibs ob f
 
 -- Prepends the given arguments to all applications
 -- of the given name. This substitution does not need
@@ -55,6 +57,11 @@ prependArguments f xs =
     ForAll x b p -> ForAll x (mapBound term b) (rec p)
     ForSome q p ->
       ForSome (mapExistentialQuantifierBounds term q) (rec p)
+    Given x ibs ob p ->
+      Given x
+      (mapInputBound term <$> ibs)
+      (mapOutputBound term ob)
+      (rec p)
   where
     rec = prependArguments f xs
 
