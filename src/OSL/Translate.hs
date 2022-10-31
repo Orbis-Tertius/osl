@@ -21,6 +21,7 @@ import Control.Monad.Trans.State.Strict (StateT, execStateT, get, put)
 import Data.Functor.Identity (runIdentity)
 import Data.List (foldl')
 import qualified Data.Map as Map
+import Data.Monoid (Last (Last, getLast))
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
@@ -1213,7 +1214,8 @@ translateToFormula ::
   OSL.Term ann ->
   StateT S11.AuxTables (Either (ErrorMessage ann)) S11.Formula
 translateToFormula gc lc@(TranslationContext decls mappings) t = do
-  trans <- translate gc lc (OSL.Prop (termAnnotation t)) t
+  tType <- lift $ inferType decls t
+  trans <- translate gc lc tType t
   case trans of
     Formula f -> pure f
     Mapping (PropMapping f) -> pure f
@@ -1225,7 +1227,14 @@ translateToFormula gc lc@(TranslationContext decls mappings) t = do
           lc'' <-
             lift . runIdentity . runExceptT $
               execStateT (addFreeVariableMapping varName) lc'
-          translateToFormula gc lc'' body
+          bs <- translateBound gc lc varType Nothing
+          ob <- case getLast (mconcat (Last . Just <$> bs)) of
+            Just ob -> pure (S11.OutputBound ob)
+            Nothing -> lift . Left .  ErrorMessage (termAnnotation t)
+              $ "empty list of bounds (this is a compiler bug): "
+                  <> pack (show varType)
+          let ibs = S11.InputBound <$> take (length bs - 1) bs
+          S11.Given ibs ob <$> translateToFormula gc lc'' body
         _ ->
           lift . Left $
             ErrorMessage
