@@ -45,6 +45,8 @@ deBruijnToGensyms' =
     DB.Or p q -> GS.Or <$> rec p <*> rec q
     DB.Implies p q -> GS.Implies <$> rec p <*> rec q
     DB.Iff p q -> GS.Iff <$> rec p <*> rec q
+    DB.Top -> pure GS.Top
+    DB.Bottom -> pure GS.Bottom
     DB.ForAll b p -> do
       b' <- bound b
       pushIndices (Arity 0)

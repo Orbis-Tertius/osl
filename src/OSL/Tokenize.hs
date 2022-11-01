@@ -94,6 +94,8 @@ token =
             T.LessOrEqual <$ string "<=",
             T.LessOrEqual <$ string "≤",
             T.Caret <$ string "^",
+            T.Top <$ string "⊤",
+            T.Bottom <$ string "⊥",
             T.Less <$ string "<", -- NOTICE: must come after ascii LessOrEqual case
             T.And <$ string "&",
             T.And <$ string "∧",

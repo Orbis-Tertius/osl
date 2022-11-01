@@ -44,4 +44,6 @@ data Token
   | CloseBracket
   | OpenBrace
   | CloseBrace
+  | Top
+  | Bottom
   deriving (Eq, Show)

@@ -140,6 +140,8 @@ data Term ann
   | Iff ann (Term ann) (Term ann)
   | ForAll ann Name (Type ann) (Maybe (Bound ann)) (Term ann)
   | ForSome ann Name (Type ann) (Maybe (Bound ann)) (Term ann)
+  | Top ann
+  | Bottom ann
   deriving (Show)
 
 data Bound ann
