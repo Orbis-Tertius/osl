@@ -24,7 +24,7 @@ import Die (die)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top, Bottom), InputBound (..), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Mul))
+import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Mul))
 import OSL.Types.TranslationContext (Mapping (..))
 
 class MapNames a where

@@ -16,7 +16,7 @@ import Control.Lens ((%~))
 import Data.List (foldl')
 import Die (die)
 import OSL.Types.Arity (Arity (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top, Bottom), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
 
 prependBounds ::
   [InputBound] ->
