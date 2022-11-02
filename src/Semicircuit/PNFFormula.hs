@@ -31,6 +31,8 @@ toPNFFormula ann =
   \case
     S11.Equal a b -> pure $ PNF.Formula (QF.Equal a b) mempty
     S11.LessOrEqual a b -> pure $ PNF.Formula (QF.LessOrEqual a b) mempty
+    S11.Top -> pure $ PNF.Formula QF.Top mempty
+    S11.Bottom -> pure $ PNF.Formula QF.Bottom mempty
     S11.And a b -> rec' QF.And a b
     S11.Or a b -> rec' QF.Or a b
     S11.Not a -> do

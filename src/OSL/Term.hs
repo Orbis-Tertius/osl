@@ -74,3 +74,5 @@ termAnnotation =
     Iff ann _ _ -> ann
     ForAll ann _ _ _ _ -> ann
     ForSome ann _ _ _ _ -> ann
+    Top ann -> ann
+    Bottom ann -> ann

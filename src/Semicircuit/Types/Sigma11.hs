@@ -100,6 +100,8 @@ data Formula
   | Iff Formula Formula
   | ForAll Name Bound Formula
   | ForSome ExistentialQuantifier Formula
+  | Top
+  | Bottom
 
 instance Show Formula where
   show (Equal x y) =
@@ -121,6 +123,8 @@ instance Show Formula where
     "(∃" <> show q <> ", " <> show p <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
+  show Top = "⊤"
+  show Bottom = "⊥"
 
 data ExistentialQuantifier
   = Some Name Cardinality [InputBound] OutputBound
