@@ -931,6 +931,10 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls _) varType
               (\cM' aM' bM' -> CoproductMapping (ChoiceMapping cM')
                   (LeftMapping aM') (RightMapping bM'))
               cM aM bM)
+    OSL.NamedType ann name ->
+      case getDeclaration decls name of
+        Just (OSL.Data a) -> rec a
+        Nothing -> lift . Left $ ErrorMessage ann "expected the name of a type"
   where
     rec = getInstanceQuantifierStringAndMapping gc lc
 
