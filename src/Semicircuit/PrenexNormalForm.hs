@@ -99,6 +99,8 @@ toPrenexNormalForm ann =
     Equal a b -> pure ([], Equal a b)
     LessOrEqual a b -> pure ([], LessOrEqual a b)
     Predicate p xs -> pure ([], Predicate p xs)
+    Top -> pure ([], Top)
+    Bottom -> pure ([], Bottom)
     Not p -> do
       (qs, p') <- rec p
       (,Not p') <$> flipQuantifiers ann qs

@@ -654,6 +654,14 @@ checkTerm c t x =
       case t of
         Prop _ -> checkTerm c (Prop ann) p
         _ -> genericErrorMessage
+    Top _ ->
+      case t of
+        Prop _ -> pure ()
+        _ -> genericErrorMessage
+    Bottom _ ->
+      case t of
+        Prop _ -> pure ()
+        _ -> genericErrorMessage
     Implies ann p q -> do
       case t of
         Prop _ -> do
@@ -1160,6 +1168,8 @@ inferType c t =
     Not ann p -> do
       checkTerm c (Prop ann) p
       pure (Prop ann)
+    Top ann -> pure (Prop ann)
+    Bottom ann -> pure (Prop ann)
     Implies ann p q -> do
       checkTerm c (Prop ann) p
       checkTerm c (Prop ann) q

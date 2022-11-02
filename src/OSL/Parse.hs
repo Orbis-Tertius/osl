@@ -584,6 +584,8 @@ constant =
       (T.ConstZ i, p) -> pure (ConstZ p i)
       (T.ConstF i, p) -> pure (ConstFp p i)
       (T.ConstFin i, p) -> pure (ConstFin p i)
+      (T.Top, p) -> pure (Top p)
+      (T.Bottom, p) -> pure (Bottom p)
       _ -> Nothing
 
 builtin ::

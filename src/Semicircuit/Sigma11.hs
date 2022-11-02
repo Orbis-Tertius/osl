@@ -16,7 +16,7 @@ import Control.Lens ((%~))
 import Data.List (foldl')
 import Die (die)
 import OSL.Types.Arity (Arity (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Given, Predicate), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal, Instance), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Top, Bottom, Given, Predicate), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal, Instance), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
 
 prependBounds ::
   [InputBound] ->
@@ -54,6 +54,8 @@ prependArguments f xs =
     Or p q -> Or (rec p) (rec q)
     Implies p q -> Implies (rec p) (rec q)
     Iff p q -> Iff (rec p) (rec q)
+    Top -> Top
+    Bottom -> Bottom
     ForAll x b p -> ForAll x (mapBound term b) (rec p)
     ForSome q p ->
       ForSome (mapExistentialQuantifierBounds term q) (rec p)

@@ -813,6 +813,10 @@ translate
               )
       OSL.Not _ p ->
         Formula . S11.Not <$> translateToFormula gc lc p
+      OSL.Top _ ->
+        pure (Formula S11.Top)
+      OSL.Bottom _ ->
+        pure (Formula S11.Bottom)
       OSL.Implies _ p q ->
         Formula
           <$> ( S11.Implies
