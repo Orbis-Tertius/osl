@@ -65,7 +65,7 @@ import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), Univer
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), IndicatorFunctionCall (..), Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul))
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul), InputBound, OutputBound)
 import Stark.Types.Scalar (order)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
@@ -316,6 +316,17 @@ instanceQuantifierBounds ::
   LogicConstraints ->
   LogicConstraints
 instanceQuantifierBounds x layout (Instance name inBounds outBound) =
+  quantifierBounds x layout name inBounds outBound
+
+quantifierBounds ::
+  Semicircuit ->
+  Layout ->
+  Name ->
+  [InputBound] ->
+  OutputBound ->
+  LogicConstraints ->
+  LogicConstraints
+quantifierBounds x layout name inBounds outBound =
     boundToFixedBound x layout outputCol
       (outBound ^. #unOutputBound)
     . foldl (.) id (uncurry (boundToFixedBound x layout)
