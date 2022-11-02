@@ -65,7 +65,7 @@ import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), Univer
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), IndicatorFunctionCall (..), Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul), InputBound, OutputBound)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul))
 import Stark.Types.Scalar (order)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
@@ -316,9 +316,10 @@ instanceQuantifierBounds ::
   LogicConstraints ->
   LogicConstraints
 instanceQuantifierBounds x layout (Instance name inBounds outBound) =
-    outputBoundToFixedBound x layout outputCol outBound
-    . foldl (.) id (uncurry (inputBoundToFixedBound x layout)
-                     <$> zip inputCols inBounds)
+    boundToFixedBound x layout outputCol
+      (outBound ^. #unOutputBound)
+    . foldl (.) id (uncurry (boundToFixedBound x layout)
+        <$> zip inputCols (inBounds <&> (^. #bound)))
   where
     outputCol :: ColumnIndex
     outputCol = mapping ^. #outputMapping . #unOutputMapping
@@ -331,23 +332,14 @@ instanceQuantifierBounds x layout (Instance name inBounds outBound) =
     mapping = fromMaybe (die "instanceQuantifierBounds: mapping lookup failed (this is a compiler bug)")
       $ Map.lookup name (layout ^. #nameMappings)
 
-inputBoundToFixedBound ::
+boundToFixedBound ::
   Semicircuit ->
   Layout ->
   ColumnIndex ->
-  InputBound ->
+  Bound ->
   LogicConstraints ->
   LogicConstraints
-inputBoundToFixedBound = todo
-
-outputBoundToFixedBound ::
-  Semicircuit ->
-  Layout ->
-  ColumnIndex ->
-  OutputBound ->
-  LogicConstraints ->
-  LogicConstraints
-outputBoundToFixedBound = todo
+boundToFixedBound = todo
 
 todo :: a
 todo = todo
