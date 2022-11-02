@@ -17,7 +17,7 @@ import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Byte (Byte (..))
 import Halo2.Types.ByteDecomposition (ByteDecomposition (..))
 import Halo2.Types.FixedBound (FixedBound (..))
-import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInteger)
+import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInteger, fromWord64)
 
 decomposeBytes :: BitsPerByte -> Scalar -> ByteDecomposition
 decomposeBytes (BitsPerByte b) x =
@@ -42,4 +42,6 @@ composeBytes (BitsPerByte b) (ByteDecomposition (Byte x : xs)) =
 countBytes :: BitsPerByte -> FixedBound -> Int
 countBytes bits (FixedBound b) =
   length . (^. #unByteDecomposition) $
-    decomposeBytes bits (b - 1)
+    decomposeBytes bits
+      (fromMaybe (die "countBytes: bound out of range (this is a compiler bug)")
+         (fromWord64 (b - 1)))

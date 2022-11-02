@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.FixedBound
@@ -7,12 +9,13 @@ module Halo2.Types.FixedBound
   )
 where
 
+import Data.Word (Word64)
 import Halo2.Prelude
-import Stark.Types.Scalar (Scalar)
 
 newtype FixedBound = FixedBound
-  {unFixedBound :: Scalar}
-  deriving (Generic, Show)
+  {unFixedBound :: Word64}
+  deriving stock (Generic, Show)
+  deriving newtype Num
 
 boolBound :: FixedBound
 boolBound = FixedBound 2

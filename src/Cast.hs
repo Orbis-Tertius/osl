@@ -4,6 +4,7 @@ module Cast
   ( intToInteger,
     word64ToInteger,
     integerToInt,
+    integerToWord64,
   )
 where
 
@@ -20,3 +21,6 @@ word64ToInteger = fromMaybe (die "word64ToInteger partiality") . toIntegralSized
 
 integerToInt :: Integer -> Maybe Int
 integerToInt = toIntegralSized
+
+integerToWord64 :: Integer -> Maybe Word64
+integerToWord64 = toIntegralSized

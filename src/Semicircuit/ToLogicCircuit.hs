@@ -26,7 +26,7 @@ module Semicircuit.ToLogicCircuit
   )
 where
 
-import Cast (word64ToInteger)
+import Cast (word64ToInteger, integerToWord64)
 import Control.Lens ((^.), (<&>))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
@@ -47,7 +47,7 @@ import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
-import Halo2.Types.FixedBound (boolBound)
+import Halo2.Types.FixedBound (boolBound, FixedBound (FixedBound))
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
@@ -339,10 +339,46 @@ boundToFixedBound ::
   Bound ->
   LogicConstraints ->
   LogicConstraints
-boundToFixedBound = todo
+boundToFixedBound x layout i =
+  \case
+    FieldMaxBound ->
+      (<> LogicConstraints mempty
+        (Map.singleton i (FixedBound order)))
+    TermBound b ->
+      \constraints -> constraints
+        <> LogicConstraints mempty
+           (Map.singleton i
+             (termToFixedBound x layout constraints b))
 
-todo :: a
-todo = todo
+termToFixedBound ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  Term ->
+  FixedBound
+termToFixedBound x layout constraints =
+  \case
+    Const k ->
+      case integerToWord64 (k `mod` word64ToInteger order) of
+        Just w -> FixedBound w
+        Nothing -> die "termToFixedBound: constant term mod field size out of range of Word64 (this is a compiler bug)"
+    App f _ -> outputBound f
+    AppInverse f _ -> outputBound f
+    Add y z -> rec y + rec z
+    Mul y z -> rec y * rec z
+    IndLess _ _ -> boolBound
+  where
+    rec = termToFixedBound x layout constraints
+
+    outputBound :: Name -> FixedBound
+    outputBound f =
+      case Map.lookup f (layout ^. #nameMappings) of
+        Just f' ->
+          case Map.lookup (f' ^. #outputMapping . #unOutputMapping) (constraints ^. #bounds) of
+            Just b -> b
+            Nothing -> die "termToFixedBound: outputBound: output bound lookup failed (this is a compiler bug)"
+        Nothing -> die "termToFixedBound: outputBound: name mapping lookup failed (this is a compiler bug)"
+
 
 existentialFunctionTableColumnBounds ::
   Semicircuit ->
