@@ -61,11 +61,11 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative))
 import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound)
-import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), UniversalQuantifier, InstanceQuantifier (Instance))
+import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), UniversalQuantifier (All), InstanceQuantifier (Instance))
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), IndicatorFunctionCall (..), Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul), InputBound, OutputBound)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul), InputBound, OutputBound (OutputBound))
 import Stark.Types.Scalar (order)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
@@ -419,7 +419,19 @@ universalTableBounds ::
   Layout ->
   LogicConstraints ->
   LogicConstraints
-universalTableBounds _ _ = mempty -- TODO
+universalTableBounds x layout =
+  foldl (.) id
+    (universalQuantifierBounds x layout
+      <$> (x ^. #formula . #quantifiers . #universalQuantifiers))
+
+universalQuantifierBounds ::
+  Semicircuit ->
+  Layout ->
+  UniversalQuantifier ->
+  LogicConstraints ->
+  LogicConstraints
+universalQuantifierBounds x layout (All name bound) =
+  quantifierBounds x layout name [] (OutputBound bound)
 
 indicatorCallOutputColumnBounds ::
   Semicircuit ->
