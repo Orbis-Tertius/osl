@@ -73,17 +73,18 @@ type Layout = SemicircuitToLogicCircuitColumnLayout
 semicircuitToLogicCircuit ::
   RowCount ->
   Semicircuit ->
-  LogicCircuit
+  (LogicCircuit, Layout)
 semicircuitToLogicCircuit rowCount x =
   let layout = columnLayout x
-   in Circuit
+   in (Circuit
         (layout ^. #columnTypes)
         (equalityConstrainableColumns x layout)
         (columnBounds x layout (gateConstraints x layout))
         (lookupArguments x layout)
         rowCount
         (equalityConstraints x layout)
-        (fixedValues rowCount layout)
+        (fixedValues rowCount layout),
+       layout)
 
 newtype S = S (ColumnIndex, ColumnTypes)
 
@@ -315,6 +316,7 @@ columnBounds x layout =
   . functionCallOutputColumnBounds x layout
   . adviceTermColumnBounds x layout
   . dummyRowAdviceColumnBounds layout
+  . fixedColumnBounds layout
   . universalTableBounds x layout
   . existentialFunctionTableColumnBounds x layout
   . instanceColumnBounds x layout
@@ -524,6 +526,19 @@ dummyRowAdviceColumnBounds layout constraints =
   constraints <>
   LogicConstraints mempty
   (Map.singleton (layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn) boolBound)
+
+fixedColumnBounds ::
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+fixedColumnBounds layout constraints =
+  constraints <>
+  LogicConstraints mempty
+  (Map.fromList
+    [ (layout ^. #fixedColumns . #lastRowIndicator . #unLastRowIndicatorColumnIndex, boolBound)
+    , (layout ^. #fixedColumns . #oneVector . #unOneVectorIndex, boolBound)
+    , (layout ^. #fixedColumns . #zeroVector . #unZeroVectorIndex, boolBound)
+    ])
 
 lexicographicallyLessThanConstraint ::
   -- the lists are zipped to document that they have

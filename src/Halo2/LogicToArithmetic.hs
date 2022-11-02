@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Halo2.LogicToArithmetic
   ( eval,
@@ -16,21 +17,25 @@ module Halo2.LogicToArithmetic
 where
 
 import Cast (intToInteger)
+import Die (die)
 import Control.Monad (forM, replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Crypto.Number.Basic (numBits)
 import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Text (pack)
 import Halo2.ByteDecomposition (countBytes)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.TruthTable (getByteRangeColumn, getZeroIndicatorColumn)
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Circuit (ArithmeticCircuit, Circuit (..), LogicCircuit)
+import Halo2.Types.Coefficient (Coefficient (Coefficient))
 import Halo2.Types.ColumnIndex (ColumnIndex (..))
 import Halo2.Types.ColumnType (ColumnType (Advice, Fixed))
 import qualified Halo2.Types.ColumnTypes as ColumnTypes
+import Halo2.Types.Exponent (Exponent)
 import Halo2.Types.FixedBound (FixedBound (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
@@ -43,8 +48,9 @@ import Halo2.Types.Polynomial (Polynomial (..))
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
+import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount)
-import Stark.Types.Scalar (half)
+import Stark.Types.Scalar (half, inverseScalar, toWord64, normalize)
 
 translateLogicGate ::
   LogicToArithmeticColumnLayout ->
@@ -205,10 +211,31 @@ getAtomicConstraintFixedBound lc =
 
 -- Gets a fixed bound on the absolute value of the given polynomial.
 getPolynomialFixedBound :: LogicCircuit -> Polynomial -> FixedBound
-getPolynomialFixedBound = todo
+getPolynomialFixedBound lc poly =
+  foldl' (+) 0 (getMonomialFixedBound lc <$> Map.toList (poly ^. #monos))
 
-todo :: a
-todo = todo
+getMonomialFixedBound :: LogicCircuit -> (PowerProduct, Coefficient) -> FixedBound
+getMonomialFixedBound lc (pp, coef) =
+  getCoefficientFixedBound coef * getPowerProductFixedBound lc pp
+
+getCoefficientFixedBound :: Coefficient -> FixedBound
+getCoefficientFixedBound (Coefficient c) =
+  case inverseScalar c of
+    Nothing -> 1 -- c == 0
+    Just c' -> FixedBound (min (toWord64 (normalize c)) (toWord64 (normalize c')))
+
+getPowerProductFixedBound :: LogicCircuit -> PowerProduct -> FixedBound
+getPowerProductFixedBound lc pp =
+  foldl (*) 1 (getPowerFixedBound lc <$> Map.toList (pp ^. #getPowerProduct))
+
+getPowerFixedBound :: LogicCircuit -> (PolynomialVariable, Exponent) -> FixedBound
+getPowerFixedBound lc (v, e) = x ^ e
+  where
+    x = case Map.lookup (v ^. #colIndex) (lc ^. #gateConstraints . #bounds) of
+          Just x' -> x'
+          Nothing -> die $
+            "getPowerFixedBound: bound lookup failed (this is a compiler bug)\n"
+            <> pack (show (v ^. #colIndex))
 
 getAtomicSubformulas :: LogicConstraint -> Set AtomicLogicConstraint
 getAtomicSubformulas =

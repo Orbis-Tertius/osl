@@ -35,10 +35,9 @@ fixedBoundToInteger = word64ToInteger . unFixedBound
 
 integerToFixedBound :: Integer -> FixedBound
 integerToFixedBound k =
-  case integerToWord64 (abs k `mod` word64ToInteger order) of
-    Just w -> FixedBound w
-    Nothing -> die "integerToFixedBound: constant term mod field size out of range of Word64 (this is a compiler bug)"
-
+  case integerToWord64 k of
+    Just w -> if w < order then FixedBound w else FixedBound order
+    Nothing -> FixedBound order
 
 boolBound :: FixedBound
 boolBound = FixedBound 2

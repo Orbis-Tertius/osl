@@ -119,7 +119,7 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
           toPNFFormula () (uncurry prependQuantifiers spnf)
       let -- dnf = fromDisjunctiveNormalForm (toDisjunctiveNormalForm (pnff ^. #qfFormula))
           semi = toSemicircuit pnff -- (PNF.Formula dnf (pnff ^. #quantifiers))
-          logic = semicircuitToLogicCircuit rowCount semi
+          (logic, layout) = semicircuitToLogicCircuit rowCount semi
           logic' = boundLogicConstraintComplexity (ComplexityBound 2) logic
           circuit = logicToArithmeticCircuit bitsPerByte rowCount logic'
       pure . SuccessfulOutput $
@@ -136,6 +136,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
                      <> show pnff
                      <> "\n\nSemicircuit: "
                      <> show semi
+                     <> "\n\nLayout: "
+                     <> show layout
                      <> "\n\nLogic circuit: "
                      <> show logic
                      <> "\n\nLogic circuit (constraint complexity bounded): "

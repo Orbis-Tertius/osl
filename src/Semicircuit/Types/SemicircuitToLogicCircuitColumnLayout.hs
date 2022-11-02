@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
   ( OutputMapping (OutputMapping),
@@ -21,10 +23,12 @@ import Halo2.Types.ColumnTypes (ColumnTypes)
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 newtype OutputMapping = OutputMapping {unOutputMapping :: ColumnIndex}
-  deriving (Generic, Show)
+  deriving stock Generic
+  deriving newtype Show
 
 newtype ArgMapping = ArgMapping {unArgMapping :: ColumnIndex}
-  deriving (Generic, Show)
+  deriving stock Generic
+  deriving newtype Show
 
 data NameMapping = NameMapping
   { outputMapping :: OutputMapping,
@@ -33,28 +37,33 @@ data NameMapping = NameMapping
   deriving (Generic, Show)
 
 newtype TermMapping = TermMapping {unTermMapping :: ColumnIndex}
-  deriving (Generic)
+  deriving stock Generic
+  deriving newtype Show
 
 newtype ZeroVectorIndex = ZeroVectorIndex {unZeroVectorIndex :: ColumnIndex}
-  deriving (Generic)
+  deriving stock Generic
+  deriving newtype Show
 
 newtype OneVectorIndex = OneVectorIndex {unOneVectorIndex :: ColumnIndex}
-  deriving (Generic)
+  deriving stock Generic
+  deriving newtype Show
 
 newtype LastRowIndicatorColumnIndex = LastRowIndicatorColumnIndex
   {unLastRowIndicatorColumnIndex :: ColumnIndex}
-  deriving (Generic)
+  deriving stock Generic
+  deriving newtype Show
 
 data FixedColumns = FixedColumns
   { zeroVector :: ZeroVectorIndex,
     oneVector :: OneVectorIndex,
     lastRowIndicator :: LastRowIndicatorColumnIndex
   }
-  deriving (Generic)
+  deriving stock (Generic, Show)
 
 newtype DummyRowAdviceColumn = DummyRowAdviceColumn
   {unDummyRowAdviceColumn :: ColumnIndex}
-  deriving (Generic)
+  deriving Generic
+  deriving newtype Show
 
 data SemicircuitToLogicCircuitColumnLayout = SemicircuitToLogicCircuitColumnLayout
   { columnTypes :: ColumnTypes,
@@ -63,4 +72,4 @@ data SemicircuitToLogicCircuitColumnLayout = SemicircuitToLogicCircuitColumnLayo
     fixedColumns :: FixedColumns,
     dummyRowAdviceColumn :: DummyRowAdviceColumn
   }
-  deriving (Generic)
+  deriving stock (Generic, Show)
