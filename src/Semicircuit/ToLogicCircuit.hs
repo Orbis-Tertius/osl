@@ -114,6 +114,7 @@ nameMappings x =
   mconcat
     <$> sequence
       [ freeVariableMappings x,
+        instanceVariableMappings x,
         universalVariableMappings x,
         existentialVariableMappings x
       ]
@@ -132,6 +133,25 @@ universalVariableMapping v =
   (v ^. #name,)
     <$> ( NameMapping <$> (OutputMapping <$> nextCol ColType.Advice)
             <*> pure []
+        )
+
+instanceVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
+instanceVariableMappings x =
+  Map.fromList
+    <$> mapM
+      instanceVariableMapping
+      (x ^. #formula . #quantifiers . #instanceQuantifiers)
+
+instanceVariableMapping ::
+  InstanceQuantifier ->
+  State S (Name, NameMapping)
+instanceVariableMapping q =
+  (q ^. #name,)
+    <$> ( NameMapping
+            <$> (OutputMapping <$> nextCol ColType.Instance)
+            <*> replicateM
+              (q ^. #name . #arity . #unArity)
+              (ArgMapping <$> nextCol ColType.Instance)
         )
 
 existentialVariableMappings ::
@@ -341,7 +361,9 @@ quantifierBounds what x layout name inBounds outBound =
       <&> (^. #unArgMapping)
 
     mapping :: NameMapping
-    mapping = fromMaybe (die (what <> " quantifierBounds: mapping lookup failed (this is a compiler bug)"))
+    mapping = fromMaybe (die $ what
+        <> " quantifierBounds: mapping lookup failed (this is a compiler bug)\n"
+        <> pack (show (name, (layout ^. #nameMappings))))
       $ Map.lookup name (layout ^. #nameMappings)
 
 boundToFixedBound ::
@@ -385,7 +407,9 @@ termToFixedBound x layout constraints =
         Just f' ->
           case Map.lookup (f' ^. #outputMapping . #unOutputMapping) (constraints ^. #bounds) of
             Just b -> b
-            Nothing -> die "termToFixedBound: outputBound: output bound lookup failed (this is a compiler bug)"
+            Nothing ->
+              die $ "termToFixedBound: outputBound: output bound lookup failed (this is a compiler bug)\n"
+                <> pack (show (f, f', constraints ^. #bounds))
         Nothing -> die "termToFixedBound: outputBound: name mapping lookup failed (this is a compiler bug)"
 
 
@@ -474,7 +498,9 @@ functionCallOutputColumnBound layout (FunctionCall name _) constraints =
       case Map.lookup i (constraints ^. #bounds) of
         Just b ->
           constraints <> LogicConstraints mempty (Map.singleton i b)
-        Nothing -> die "functionCallOutputColumnBound: output bound lookup failed (this is a compiler bug)"
+        Nothing -> die $
+          "functionCallOutputColumnBound: output bound lookup failed (this is a compiler bug)"
+          <> pack (show (name, i, constraints ^. #bounds))
     Nothing -> die "functionCallOutputColumnBound: name mapping lookup failed (this is a compiler bug)"
 
 adviceTermColumnBounds ::

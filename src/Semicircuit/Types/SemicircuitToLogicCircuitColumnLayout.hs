@@ -21,16 +21,16 @@ import Halo2.Types.ColumnTypes (ColumnTypes)
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 newtype OutputMapping = OutputMapping {unOutputMapping :: ColumnIndex}
-  deriving (Generic)
+  deriving (Generic, Show)
 
 newtype ArgMapping = ArgMapping {unArgMapping :: ColumnIndex}
-  deriving (Generic)
+  deriving (Generic, Show)
 
 data NameMapping = NameMapping
   { outputMapping :: OutputMapping,
     argMappings :: [ArgMapping]
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 newtype TermMapping = TermMapping {unTermMapping :: ColumnIndex}
   deriving (Generic)

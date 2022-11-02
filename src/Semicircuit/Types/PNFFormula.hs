@@ -37,9 +37,11 @@ instance Show Quantifiers where
   show qs =
     intercalate
       ", "
-      (("∃" <>) . show <$> (qs ^. #existentialQuantifiers))
-      <> ", "
-      <> intercalate ", " (("∀" <>) . show <$> (qs ^. #universalQuantifiers))
+      (
+         (("λ" <>) . show <$> (qs ^. #instanceQuantifiers))
+      <> (("∃" <>) . show <$> (qs ^. #existentialQuantifiers))
+      <> (("∀" <>) . show <$> (qs ^. #universalQuantifiers))
+      )
 
 instance Semigroup Quantifiers where
   (Quantifiers a b c) <> (Quantifiers a' b' c') =
@@ -55,7 +57,7 @@ data UniversalQuantifier = All
   deriving (Eq, Generic)
 
 instance Show UniversalQuantifier where
-  show q = "∀" <> show (q ^. #name) <> "<" <> show (q ^. #bound)
+  show q = show (q ^. #name) <> "<" <> show (q ^. #bound)
 
 data InstanceQuantifier =
   Instance
@@ -66,7 +68,7 @@ data InstanceQuantifier =
   deriving (Eq, Generic)
 
 instance Show InstanceQuantifier where
-  show g = "λ" <> show (g ^. #name) <>
+  show g = show (g ^. #name) <>
     (if null (g ^. #inputBounds) then ""
      else "(" <> intercalate ", " (show <$> (g ^. #inputBounds)) <> ")")
     <> "<" <> show (g ^. #outputBound)

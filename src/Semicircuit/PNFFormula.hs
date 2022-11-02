@@ -16,7 +16,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Data.Set (Set)
 import qualified Data.Set as Set
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Sigma11 (existentialQuantifierName, prependBounds)
+import Semicircuit.Sigma11 (existentialQuantifierName)
 import qualified Semicircuit.Types.PNFFormula as PNF
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (AdviceTerms (..), FreeVariables (..), FunctionCall (..), FunctionCalls (..), IndicatorFunctionCall (..), IndicatorFunctionCalls (..), Semicircuit (..))
@@ -47,17 +47,9 @@ toPNFFormula ann =
     S11.Predicate p args ->
       pure $ PNF.Formula (QF.Predicate p args) mempty
     S11.ForAll x b a -> do
-      PNF.Formula a' (PNF.Quantifiers aqE aqU aqG) <-
-        rec a
+      PNF.Formula a' aq <- rec a
       let qNew = PNF.Quantifiers [] [PNF.All x b] []
-          aq' =
-            PNF.Quantifiers
-              ( prependBounds [S11.InputBound x b]
-                  <$> aqE
-              )
-              aqU
-              aqG
-      pure (PNF.Formula a' (qNew <> aq'))
+      pure (PNF.Formula a' (qNew <> aq))
     S11.ForSome (S11.Some x c bs b) a -> do
       PNF.Formula a' aq <- rec a
       let qNew = PNF.Quantifiers [PNF.Some x c bs b] [] []
@@ -237,9 +229,10 @@ freeVariables (PNF.Formula qf qs) =
   FreeVariables (Set.difference (allVariables qf) (quantifiedVariables qs))
 
 quantifiedVariables :: PNF.Quantifiers -> Set S11.Name
-quantifiedVariables (PNF.Quantifiers es us _gs) =
+quantifiedVariables (PNF.Quantifiers es us gs) =
   Set.fromList (existentialQuantifierName <$> es)
     <> Set.fromList ((^. #name) <$> us)
+    <> Set.fromList ((^. #name) <$> gs)
 
 allVariables :: QF.Formula -> Set S11.Name
 allVariables =
