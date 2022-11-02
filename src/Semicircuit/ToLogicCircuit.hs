@@ -36,7 +36,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
-import Data.Text (pack)
+import Data.Text (Text, pack)
 import Die (die)
 import Halo2.Polynomial (constant, minus, plus, times, var, var')
 import Halo2.Types.CellReference (CellReference (CellReference))
@@ -295,8 +295,8 @@ columnBounds x layout =
   . functionCallOutputColumnBounds x layout
   . adviceTermColumnBounds x layout
   . dummyRowAdviceColumnBounds layout
-  . existentialFunctionTableColumnBounds x layout
   . universalTableBounds x layout
+  . existentialFunctionTableColumnBounds x layout
   . instanceColumnBounds x layout
 
 instanceColumnBounds ::
@@ -306,7 +306,7 @@ instanceColumnBounds ::
   LogicConstraints
 instanceColumnBounds x layout =
   foldl (.) id
-    (instanceQuantifierBounds x layout
+    (reverse $ instanceQuantifierBounds x layout
       <$> (x ^. #formula . #quantifiers . #instanceQuantifiers))
 
 instanceQuantifierBounds ::
@@ -316,9 +316,10 @@ instanceQuantifierBounds ::
   LogicConstraints ->
   LogicConstraints
 instanceQuantifierBounds x layout (Instance name inBounds outBound) =
-  quantifierBounds x layout name inBounds outBound
+  quantifierBounds "instance" x layout name inBounds outBound
 
 quantifierBounds ::
+  Text ->
   Semicircuit ->
   Layout ->
   Name ->
@@ -326,7 +327,7 @@ quantifierBounds ::
   OutputBound ->
   LogicConstraints ->
   LogicConstraints
-quantifierBounds x layout name inBounds outBound =
+quantifierBounds what x layout name inBounds outBound =
     boundToFixedBound x layout outputCol
       (outBound ^. #unOutputBound)
     . foldl (.) id (uncurry (boundToFixedBound x layout)
@@ -340,7 +341,7 @@ quantifierBounds x layout name inBounds outBound =
       <&> (^. #unArgMapping)
 
     mapping :: NameMapping
-    mapping = fromMaybe (die "instanceQuantifierBounds: mapping lookup failed (this is a compiler bug)")
+    mapping = fromMaybe (die (what <> " quantifierBounds: mapping lookup failed (this is a compiler bug)"))
       $ Map.lookup name (layout ^. #nameMappings)
 
 boundToFixedBound ::
@@ -395,7 +396,7 @@ existentialFunctionTableColumnBounds ::
   LogicConstraints
 existentialFunctionTableColumnBounds x layout =
   foldl (.) id
-    (existentialQuantifierBounds x layout
+    (reverse $ existentialQuantifierBounds x layout
       <$> (x ^. #formula . #quantifiers . #existentialQuantifiers))
 
 existentialQuantifierBounds ::
@@ -407,9 +408,9 @@ existentialQuantifierBounds ::
 existentialQuantifierBounds x layout =
   \case
     Some name _ inBounds outBound ->
-      quantifierBounds x layout name inBounds outBound
+      quantifierBounds "existential" x layout name inBounds outBound
     SomeP name _ inBound outBound ->
-      quantifierBounds x layout name [inBound] outBound
+      quantifierBounds "existential" x layout name [inBound] outBound
 
 universalTableBounds ::
   Semicircuit ->
@@ -428,7 +429,7 @@ universalQuantifierBounds ::
   LogicConstraints ->
   LogicConstraints
 universalQuantifierBounds x layout (All name bound) =
-  quantifierBounds x layout name [] (OutputBound bound)
+  quantifierBounds "universal" x layout name [] (OutputBound bound)
 
 indicatorCallOutputColumnBounds ::
   Semicircuit ->
