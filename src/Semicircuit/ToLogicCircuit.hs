@@ -27,7 +27,7 @@ module Semicircuit.ToLogicCircuit
 where
 
 import Cast (word64ToInteger)
-import Control.Lens ((^.))
+import Control.Lens ((^.), (<&>))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Data.List.Extra (foldl', (!?))
@@ -318,13 +318,18 @@ instanceQuantifierBounds ::
 instanceQuantifierBounds x layout (Instance name inBounds outBound) =
     outputBoundToFixedBound x layout outputCol outBound
     . foldl (.) id (uncurry (inputBoundToFixedBound x layout)
-                     <$> (zip inputCols inBounds))
+                     <$> zip inputCols inBounds)
   where
     outputCol :: ColumnIndex
-    outputCol = todo name
+    outputCol = mapping ^. #outputMapping . #unOutputMapping
 
     inputCols :: [ColumnIndex]
-    inputCols = todo name
+    inputCols = (mapping ^. #argMappings)
+      <&> (^. #unArgMapping)
+
+    mapping :: NameMapping
+    mapping = fromMaybe (die "instanceQuantifierBounds: mapping lookup failed (this is a compiler bug)")
+      $ Map.lookup name (layout ^. #nameMappings)
 
 inputBoundToFixedBound ::
   Semicircuit ->
