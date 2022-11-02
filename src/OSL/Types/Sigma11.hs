@@ -11,6 +11,7 @@ module OSL.Types.Sigma11
     Formula (..),
     ExistentialQuantifier (..),
     someFirstOrder,
+    InstanceQuantifier (..),
     InputBound (..),
     OutputBound (..),
     Bound (..),
@@ -76,7 +77,7 @@ data Formula
   | Iff Formula Formula
   | ForAll Bound Formula
   | ForSome ExistentialQuantifier Formula
-  | Given [InputBound] OutputBound Formula
+  | Given Cardinality [InputBound] OutputBound Formula
   | Top
   | Bottom
 
@@ -98,10 +99,10 @@ instance Show Formula where
     "(∀<" <> show b <> ", " <> show p <> ")"
   show (ForSome q p) =
     "(∃" <> show q <> ", " <> show p <> ")"
-  show (Given [] ob p) =
+  show (Given _ [] ob p) =
     "(λ<" <> show ob <> ", " <> show p <> ")"
-  show (Given ibs ob p) =
-    "(λ<" <> show ob <> "(<" <> intercalate ", <" (show <$> ibs) <> "), " <> show p <> ")"
+  show (Given n ibs ob p) =
+    "(λ^" <> show n <> "<" <> show ob <> "(<" <> intercalate ", <" (show <$> ibs) <> "), " <> show p <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
   show Top = "⊤"
@@ -147,6 +148,9 @@ instance Show ExistentialQuantifier where
       <> "(<"
       <> show b1
       <> ")"
+
+data InstanceQuantifier
+  = Instance Cardinality [InputBound] OutputBound
 
 data Bound = TermBound Term | FieldMaxBound
   deriving (Eq)

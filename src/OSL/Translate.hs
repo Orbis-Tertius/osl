@@ -21,15 +21,14 @@ import Control.Monad.Trans.State.Strict (StateT, execStateT, get, put)
 import Data.Functor.Identity (runIdentity)
 import Data.List (foldl')
 import qualified Data.Map as Map
-import Data.Monoid (Last (Last, getLast))
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
 import OSL.Bound (boundAnnotation)
 import OSL.BuildTranslationContext (addFreeVariableMapping, addTermMapping, buildTranslationContext', getBoundS11NamesInContext, getFreeOSLName, getFreeS11Name)
-import OSL.Sigma11 (incrementArities, incrementDeBruijnIndices, prependBounds)
+import OSL.Sigma11 (incrementArities, incrementDeBruijnIndices, prependBounds, prependInstanceQuantifiers)
 import OSL.Term (termAnnotation)
-import OSL.TranslationContext (linearizeMapping, mergeMapping, mergeMappings)
+import OSL.TranslationContext (linearizeMapping, mergeMapping, mergeMappings, mergeMapping3)
 import OSL.Type (typeAnnotation)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
@@ -885,6 +884,66 @@ getExplicitOrInferredBound ::
 getExplicitOrInferredBound ctx t =
   maybe (inferBound ctx t) pure
 
+getInstanceQuantifierStringAndMapping ::
+  Show ann =>
+  TranslationContext 'OSL.Global ann ->
+  TranslationContext 'OSL.Local ann ->
+  OSL.Type ann ->
+  StateT
+    S11.AuxTables
+    (Either (ErrorMessage ann))
+    ([S11.InstanceQuantifier], Mapping ann S11.Term)
+getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls _) varType =
+  case varType of
+    OSL.Prop ann -> lift . Left $ ErrorMessage ann "cannot have Prop as instance data"
+    OSL.N _ -> scalarResult
+    OSL.Z _ -> scalarResult
+    OSL.Fp _ -> scalarResult
+    OSL.Fin _ _ -> scalarResult
+    OSL.F ann mCardinality a b -> do
+      aDim <- lift $ getMappingDimensions decls a
+      case aDim of
+        FiniteDimensions n -> do
+          cardinality <- case mCardinality of
+            Just m -> pure m
+            Nothing -> lift . Left $ ErrorMessage ann "missing function type cardinality (required for instance data)"
+          (bQs, bM) <- rec b
+          aBounds <- fmap S11.InputBound <$> translateBound gc lc a Nothing
+          let fM = incrementArities n bM
+          let fQs = prependBounds cardinality aBounds <$> bQs
+          pure (fQs, fM)
+    OSL.P ann _ _ _ -> lift . Left $ ErrorMessage ann "not implemented: permutations as instance data"
+    OSL.Product ann a b -> do
+      (aQs, aM) <- rec a
+      (bQs, bM) <- rec b
+      pure ( aQs <> bQs,
+             mergeMapping
+             (\aM' bM' -> ProductMapping (LeftMapping aM') (RightMapping bM'))
+             aM
+             bM
+           )
+    OSL.Coproduct ann a b -> do
+      (aQs, aM) <- rec a
+      (bQs, bM) <- rec b
+      (cQs, cM) <- rec (OSL.Fin ann 2)
+      pure (cQs <> aQs <> bQs,
+            mergeMapping3
+              (\cM' aM' bM' -> CoproductMapping (ChoiceMapping cM')
+                  (LeftMapping aM') (RightMapping bM'))
+              cM aM bM)
+  where
+    rec = getInstanceQuantifierStringAndMapping gc lc
+
+    scalarResult = do
+      bTs <- translateBound gc lc varType Nothing
+      case bTs of
+        [bT] ->
+          pure ( [S11.Instance 1 [] (S11.OutputBound bT)]
+               , ScalarMapping (S11.var (S11.Name 0 0)) )
+
+todo :: a
+todo = todo
+
 getExistentialQuantifierStringAndMapping ::
   Show ann =>
   TranslationContext 'OSL.Global ann ->
@@ -1226,19 +1285,10 @@ translateToFormula gc lc@(TranslationContext decls mappings) t = do
     Mapping (LambdaMapping {}) ->
       case t of
         OSL.Lambda _ varName varType body -> do
+          (qs, mapping) <- getInstanceQuantifierStringAndMapping gc lc varType
           let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
-              lc' = TranslationContext decls' mappings
-          lc'' <-
-            lift . runIdentity . runExceptT $
-              execStateT (addFreeVariableMapping varName) lc'
-          bs <- translateBound gc lc varType Nothing
-          ob <- case getLast (mconcat (Last . Just <$> bs)) of
-            Just ob -> pure (S11.OutputBound ob)
-            Nothing -> lift . Left .  ErrorMessage (termAnnotation t)
-              $ "empty list of bounds (this is a compiler bug): "
-                  <> pack (show varType)
-          let ibs = S11.InputBound <$> take (length bs - 1) bs
-          S11.Given ibs ob <$> translateToFormula gc lc'' body
+              lc' = TranslationContext decls' (Map.insert varName mapping mappings)
+          prependInstanceQuantifiers qs <$> translateToFormula gc lc' body
         _ ->
           lift . Left $
             ErrorMessage

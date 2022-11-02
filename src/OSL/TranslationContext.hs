@@ -4,6 +4,7 @@ module OSL.TranslationContext
   ( toLocalTranslationContext,
     mergeMappings,
     mergeMapping,
+    mergeMapping3,
     mappingIndices,
     highestIndicesInMappings,
     linearizeMapping,
@@ -61,6 +62,32 @@ mergeMapping f a b =
             | (arity, DeBruijnIndex m) <- Map.toList aMaxes
           ]
    in f a (g b)
+
+mergeMapping3 ::
+  (Mapping ann Term -> Mapping ann Term -> Mapping ann Term -> Mapping ann Term) ->
+  Mapping ann Term ->
+  Mapping ann Term ->
+  Mapping ann Term ->
+  Mapping ann Term
+mergeMapping3 f a b c =
+  let aMaxes = highestIndicesInMapping a
+      g =
+        foldl'
+          (.)
+          id
+          [ incrementDeBruijnIndices arity (m + 1)
+            | (arity, DeBruijnIndex m) <- Map.toList aMaxes
+          ]
+      b' = g b
+      bMaxes = highestIndicesInMapping b'
+      h =
+        foldl'
+          (.)
+          id
+          [ incrementDeBruijnIndices arity (m + 1)
+            | (arity, DeBruijnIndex m) <- Map.toList bMaxes
+          ]
+  in f a b' (h c)
 
 mappingIndices ::
   Mapping ann Term ->

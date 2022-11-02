@@ -11,7 +11,8 @@ module OSL.Sigma11
     incrementArities,
     unionIndices,
     termIndices,
-    prependBounds,
+    PrependBounds (prependBounds),
+    prependInstanceQuantifiers,
   )
 where
 
@@ -24,7 +25,7 @@ import Die (die)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Given, Predicate, Top, Bottom), InputBound (..), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Mul))
+import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Given, Predicate, Top, Bottom), InputBound (..), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Mul), InstanceQuantifier (Instance))
 import OSL.Types.TranslationContext (Mapping (..))
 
 class MapNames a where
@@ -59,8 +60,8 @@ instance MapNames Formula where
         ForSome (Some n (mapNames f inBounds) (mapNames f outBound)) (mapNames f p)
       ForSome (SomeP n inBound outBound) p ->
         ForSome (SomeP n (mapNames f inBound) (mapNames f outBound)) (mapNames f p)
-      Given ibs ob p ->
-        Given (mapNames f ibs) (mapNames f ob) (mapNames f p)
+      Given n ibs ob p ->
+        Given n (mapNames f ibs) (mapNames f ob) (mapNames f p)
       Top -> Top
       Bottom -> Bottom
 
@@ -119,14 +120,25 @@ termIndices =
     IndLess x y -> termIndices x `unionIndices` termIndices y
     Const _ -> mempty
 
-prependBounds ::
-  Cardinality ->
-  [InputBound] ->
-  ExistentialQuantifier ->
-  ExistentialQuantifier
-prependBounds n bs (Some _ [] b) =
-  Some n bs b
-prependBounds _ bs' (Some n bs b) =
-  Some n (bs' <> bs) b
-prependBounds _ _ (SomeP {}) =
-  die "there is a compiler bug; applied prependBounds to SomeP"
+class PrependBounds a where
+  prependBounds :: Cardinality -> [InputBound] -> a -> a
+
+instance PrependBounds ExistentialQuantifier where
+  prependBounds n bs (Some _ [] b) =
+    Some n bs b
+  prependBounds _ bs' (Some n bs b) =
+    Some n (bs' <> bs) b
+  prependBounds _ _ (SomeP {}) =
+    die "there is a compiler bug; applied prependBounds to SomeP"
+
+instance PrependBounds InstanceQuantifier where
+  prependBounds n bs (Instance _ [] b) =
+    Instance n bs b
+  prependBounds _ bs' (Instance n bs b) = -- TODO: does the cardinality multiply?
+    Instance n (bs' <> bs) b
+
+prependInstanceQuantifiers :: [InstanceQuantifier] -> Formula -> Formula
+prependInstanceQuantifiers = foldl (.) id . fmap prependInstanceQuantifier
+
+prependInstanceQuantifier :: InstanceQuantifier -> Formula -> Formula
+prependInstanceQuantifier (Instance n bs b) = Given n bs b
