@@ -26,7 +26,7 @@ module Semicircuit.ToLogicCircuit
   )
 where
 
-import Cast (word64ToInteger, integerToWord64)
+import Cast (word64ToInteger)
 import Control.Lens ((^.), (<&>))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
@@ -47,7 +47,7 @@ import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
-import Halo2.Types.FixedBound (boolBound, FixedBound (FixedBound))
+import Halo2.Types.FixedBound (boolBound, FixedBound (FixedBound), integerToFixedBound)
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
@@ -369,10 +369,7 @@ termToFixedBound ::
   FixedBound
 termToFixedBound x layout constraints =
   \case
-    Const k ->
-      case integerToWord64 (abs k `mod` word64ToInteger order) of
-        Just w -> FixedBound w
-        Nothing -> die "termToFixedBound: constant term mod field size out of range of Word64 (this is a compiler bug)"
+    Const k -> integerToFixedBound (abs k)
     App f _ -> outputBound f
     AppInverse f _ -> outputBound f
     Add y z -> rec y + rec z
@@ -460,8 +457,24 @@ functionCallOutputColumnBounds ::
   Layout ->
   LogicConstraints ->
   LogicConstraints
-functionCallOutputColumnBounds _ _ =
-  mempty -- TODO
+functionCallOutputColumnBounds x layout =
+  foldl (.) id
+    (functionCallOutputColumnBound layout
+      <$> Set.toList (x ^. #functionCalls . #unFunctionCalls))
+
+functionCallOutputColumnBound ::
+  Layout ->
+  FunctionCall ->
+  LogicConstraints ->
+  LogicConstraints
+functionCallOutputColumnBound layout (FunctionCall name _) constraints =
+  case Map.lookup name (layout ^. #nameMappings) of
+    Just (NameMapping (OutputMapping i) _) ->
+      case Map.lookup i (constraints ^. #bounds) of
+        Just b ->
+          constraints <> LogicConstraints mempty (Map.singleton i b)
+        Nothing -> die "functionCallOutputColumnBound: output bound lookup failed (this is a compiler bug)"
+    Nothing -> die "functionCallOutputColumnBound: name mapping lookup failed (this is a compiler bug)"
 
 adviceTermColumnBounds ::
   Semicircuit ->
