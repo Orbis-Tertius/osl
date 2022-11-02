@@ -396,8 +396,23 @@ existentialFunctionTableColumnBounds ::
   Layout ->
   LogicConstraints ->
   LogicConstraints
-existentialFunctionTableColumnBounds _ _ =
-  mempty -- TODO
+existentialFunctionTableColumnBounds x layout =
+  foldl (.) id
+    (existentialQuantifierBounds x layout
+      <$> (x ^. #formula . #quantifiers . #existentialQuantifiers))
+
+existentialQuantifierBounds ::
+  Semicircuit ->
+  Layout ->
+  ExistentialQuantifier ->
+  LogicConstraints ->
+  LogicConstraints
+existentialQuantifierBounds x layout =
+  \case
+    Some name _ inBounds outBound ->
+      quantifierBounds x layout name inBounds outBound
+    SomeP name _ inBound outBound ->
+      quantifierBounds x layout name [inBound] outBound
 
 universalTableBounds ::
   Semicircuit ->
