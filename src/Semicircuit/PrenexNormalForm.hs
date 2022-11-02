@@ -34,7 +34,7 @@ toStrongPrenexNormalForm ann qs f =
     Existential q : qs' -> do
       (qs'', f') <- rec qs' f
       case qs'' of
-        Instance _ _ _ : _ ->
+        Instance {} : _ ->
           pure $ (pushExistentialQuantifierDown q qs'', f')
         _ -> pure (Existential q : qs'', f')
     Universal x b : qs' -> do
@@ -45,9 +45,9 @@ toStrongPrenexNormalForm ann qs f =
           pure (Universal x b : qs'', f')
         _ ->
           pushUniversalQuantifiersDown ann [(x, b)] qs'' f'
-    Instance x ibs ob : qs' -> do
+    Instance x n ibs ob : qs' -> do
       (qs'', f') <- rec qs' f
-      pure (Instance x ibs ob : qs'', f')
+      pure (Instance x n ibs ob : qs'', f')
   where
     rec = toStrongPrenexNormalForm ann
 
@@ -62,8 +62,8 @@ pushExistentialQuantifierDown q =
       Existential q : Universal x b : qs
     Existential q' : qs ->
       Existential q : Existential q' : qs
-    Instance x ibs obs : qs ->
-      Instance x ibs obs : pushExistentialQuantifierDown q qs
+    Instance x n ibs obs : qs ->
+      Instance x n ibs obs : pushExistentialQuantifierDown q qs
 
 pushUniversalQuantifiersDown ::
   ann ->
@@ -86,9 +86,9 @@ pushUniversalQuantifiersDown ann us qs f =
         SomeP {} ->
           Left . ErrorMessage ann $
             "unsupported: permutation quantifier inside a universal quantifier"
-    Instance x ibs ob : qs' -> do
+    Instance x n ibs ob : qs' -> do
       (qs'', f') <- pushUniversalQuantifiersDown ann us qs' f
-      pure (Instance x ibs ob : qs'', f')
+      pure (Instance x n ibs ob : qs'', f')
 
 toPrenexNormalForm ::
   ann ->
@@ -131,9 +131,9 @@ toPrenexNormalForm ann =
     ForSome q p -> do
       (pQs, p') <- rec p
       pure (Existential q : pQs, p')
-    Given x ibs ob p -> do
+    Given x n ibs ob p -> do
       (pQs, p') <- rec p
-      pure (Instance x ibs ob : pQs, p')
+      pure (Instance x n ibs ob : pQs, p')
   where
     rec = toPrenexNormalForm ann
 
@@ -156,5 +156,5 @@ flipQuantifier ann =
     Existential _ ->
       Left . ErrorMessage ann $
         "not supported: second-order quantification in negative position"
-    Instance x ibs ob ->
-      pure (Instance x ibs ob)
+    Instance x n ibs ob ->
+      pure (Instance x n ibs ob)

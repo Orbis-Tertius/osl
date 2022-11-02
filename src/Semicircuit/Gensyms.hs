@@ -88,7 +88,7 @@ deBruijnToGensyms' =
           <$> rec p
       popIndices (Arity 1)
       pure r
-    DB.Given ibs ob p -> do
+    DB.Given n ibs ob p -> do
       ibs' <-
         mapM
           ( \b'' ->
@@ -103,7 +103,7 @@ deBruijnToGensyms' =
       let arity = Arity (length ibs')
       pushIndices arity
       x <- mapName (DB.Name arity (DeBruijnIndex 0))
-      r <- GS.Given x ibs' ob' <$> rec p
+      r <- GS.Given x n ibs' ob' <$> rec p
       popIndices arity
       pure r
   where

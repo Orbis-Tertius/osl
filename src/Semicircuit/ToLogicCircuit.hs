@@ -335,7 +335,7 @@ instanceQuantifierBounds ::
   InstanceQuantifier ->
   LogicConstraints ->
   LogicConstraints
-instanceQuantifierBounds x layout (Instance name inBounds outBound) =
+instanceQuantifierBounds x layout (Instance name _ inBounds outBound) =
   quantifierBounds "instance" x layout name inBounds outBound
 
 quantifierBounds ::

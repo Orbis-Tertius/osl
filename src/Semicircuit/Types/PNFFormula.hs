@@ -14,6 +14,7 @@ where
 import Control.Lens ((^.))
 import Data.List (intercalate)
 import GHC.Generics (Generic)
+import OSL.Types.Cardinality (Cardinality)
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier (..), Name, InputBound, OutputBound)
 
@@ -62,6 +63,7 @@ instance Show UniversalQuantifier where
 data InstanceQuantifier =
   Instance
   { name :: Name
+  , cardinality :: Cardinality
   , inputBounds :: [InputBound]
   , outputBound :: OutputBound
   }

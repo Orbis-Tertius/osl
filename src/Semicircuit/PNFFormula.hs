@@ -58,9 +58,9 @@ toPNFFormula ann =
       PNF.Formula a' aq <- rec a
       let qNew = PNF.Quantifiers [PNF.SomeP x c b0 b1] [] []
       pure $ PNF.Formula a' (qNew <> aq)
-    S11.Given x ibs ob a -> do
+    S11.Given x n ibs ob a -> do
       PNF.Formula a' aq <- rec a
-      let qNew = PNF.Quantifiers [] [] [PNF.Instance x ibs ob]
+      let qNew = PNF.Quantifiers [] [] [PNF.Instance x n ibs ob]
       pure $ PNF.Formula a' (qNew <> aq)
   where
     rec = toPNFFormula ann
@@ -111,7 +111,7 @@ indicatorFunctionCalls (PNF.Formula qf (PNF.Quantifiers es us gs)) =
     uQ (PNF.All _ b) = bound b
 
     gQ :: PNF.InstanceQuantifier -> IndicatorFunctionCalls
-    gQ (PNF.Instance _ inBounds outBound) =
+    gQ (PNF.Instance _ _ inBounds outBound) =
       mconcat (bound . (^. #bound) <$> inBounds)
         <> bound (outBound ^. #unOutputBound)
 
@@ -174,7 +174,7 @@ functionCalls (PNF.Formula qf (PNF.Quantifiers es us gs)) =
     uQ (PNF.All _ b) = bound b
 
     gQ :: PNF.InstanceQuantifier -> FunctionCalls
-    gQ (PNF.Instance _ ibs ob) =
+    gQ (PNF.Instance _ _ ibs ob) =
       mconcat (bound . (^. #bound) <$> ibs) <> bound (ob ^. #unOutputBound)
 
     bound ::

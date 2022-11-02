@@ -36,8 +36,8 @@ prependQuantifier (Universal x b) f =
   ForAll x b f
 prependQuantifier (Existential q) f =
   ForSome q f
-prependQuantifier (Instance x ibs ob) f =
-  Given x ibs ob f
+prependQuantifier (Instance x n ibs ob) f =
+  Given x n ibs ob f
 
 -- Prepends the given arguments to all applications
 -- of the given name. This substitution does not need
@@ -59,8 +59,8 @@ prependArguments f xs =
     ForAll x b p -> ForAll x (mapBound term b) (rec p)
     ForSome q p ->
       ForSome (mapExistentialQuantifierBounds term q) (rec p)
-    Given x ibs ob p ->
-      Given x
+    Given x n ibs ob p ->
+      Given x n
       (mapInputBound term <$> ibs)
       (mapOutputBound term ob)
       (rec p)

@@ -893,7 +893,7 @@ getInstanceQuantifierStringAndMapping ::
     S11.AuxTables
     (Either (ErrorMessage ann))
     ([S11.InstanceQuantifier], Mapping ann S11.Term)
-getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls _) varType =
+getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) varType =
   case varType of
     OSL.Prop ann -> lift . Left $ ErrorMessage ann "cannot have Prop as instance data"
     OSL.N _ -> scalarResult
@@ -907,15 +907,17 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls _) varType
           cardinality <- case mCardinality of
             Just m -> pure m
             Nothing -> lift . Left $ ErrorMessage ann "missing function type cardinality (required for instance data)"
-          (bQs, bM) <- rec b
+          (bQs, bM) <- rec lc b
           aBounds <- fmap S11.InputBound <$> translateBound gc lc a Nothing
           let fM = incrementArities n bM
           let fQs = prependBounds cardinality aBounds <$> bQs
           pure (fQs, fM)
+        InfiniteDimensions -> lift . Left $ ErrorMessage ann
+          "domain of function type in instance data must be finite-dimensional"
     OSL.P ann _ _ _ -> lift . Left $ ErrorMessage ann "not implemented: permutations as instance data"
-    OSL.Product ann a b -> do
-      (aQs, aM) <- rec a
-      (bQs, bM) <- rec b
+    OSL.Product _ a b -> do
+      (aQs, aM) <- rec lc a
+      (bQs, bM) <- rec lc b
       pure ( aQs <> bQs,
              mergeMapping
              (\aM' bM' -> ProductMapping (LeftMapping aM') (RightMapping bM'))
@@ -923,9 +925,9 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls _) varType
              bM
            )
     OSL.Coproduct ann a b -> do
-      (aQs, aM) <- rec a
-      (bQs, bM) <- rec b
-      (cQs, cM) <- rec (OSL.Fin ann 2)
+      (aQs, aM) <- rec lc a
+      (bQs, bM) <- rec lc b
+      (cQs, cM) <- rec lc (OSL.Fin ann 2)
       pure (cQs <> aQs <> bQs,
             mergeMapping3
               (\cM' aM' bM' -> CoproductMapping (ChoiceMapping cM')
@@ -933,10 +935,41 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls _) varType
               cM aM bM)
     OSL.NamedType ann name ->
       case getDeclaration decls name of
-        Just (OSL.Data a) -> rec a
-        Nothing -> lift . Left $ ErrorMessage ann "expected the name of a type"
+        Just (OSL.Data a) -> rec lc a
+        _ -> lift . Left $ ErrorMessage ann "expected the name of a type"
+    OSL.Maybe ann a -> do
+      (aQs, aM) <- rec lc a
+      (cQs, cM) <- rec lc (OSL.Fin ann 2)
+      pure (cQs <> aQs,
+            mergeMapping
+              (\cM' aM' -> MaybeMapping (ChoiceMapping cM') (ValuesMapping aM'))
+              cM
+              aM)
+    OSL.List ann (OSL.Cardinality n) a -> do
+      (lQs, lM) <- rec lc (OSL.N ann)
+      let decls' = addDeclaration lSym (OSL.FreeVariable (OSL.N ann)) decls
+          lSym = getFreeOSLName lc
+          lc' = TranslationContext decls' 
+              $ mappings <> Map.singleton lSym lM
+      (vQs, vM) <- rec lc' (OSL.F ann (Just (OSL.Cardinality n)) (OSL.N ann) a)
+      pure (lQs <> vQs, ListMapping (LengthMapping lM) (ValuesMapping vM))
+    OSL.Map ann (OSL.Cardinality n) a b -> do
+      (kQs, kM) <- rec lc (OSL.List ann (OSL.Cardinality n) a)
+      (vQs, vM) <- rec lc (OSL.F ann (Just (OSL.Cardinality n)) a b)
+      pure (kQs <> vQs,
+            mergeMapping
+            ( curry
+                ( \case
+                    ( ListMapping (LengthMapping lM) (ValuesMapping kM'), vM') ->
+                      MapMapping (LengthMapping lM) (KeysMapping kM') (ValuesMapping vM')
+                    d -> die $ "logical impossibility in map quantifier translation: " <> pack (show d)
+                )
+            )
+            kM
+            vM
+           )
   where
-    rec = getInstanceQuantifierStringAndMapping gc lc
+    rec = getInstanceQuantifierStringAndMapping gc
 
     scalarResult = do
       bTs <- translateBound gc lc varType Nothing
@@ -944,9 +977,8 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls _) varType
         [bT] ->
           pure ( [S11.Instance 1 [] (S11.OutputBound bT)]
                , ScalarMapping (S11.var (S11.Name 0 0)) )
-
-todo :: a
-todo = todo
+        _ -> lift . Left $ ErrorMessage (typeAnnotation varType)
+          "expected a scalar bound"
 
 getExistentialQuantifierStringAndMapping ::
   Show ann =>

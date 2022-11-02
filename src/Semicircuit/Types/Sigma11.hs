@@ -100,7 +100,7 @@ data Formula
   | Iff Formula Formula
   | ForAll Name Bound Formula
   | ForSome ExistentialQuantifier Formula
-  | Given Name [InputBound] OutputBound Formula
+  | Given Name Cardinality [InputBound] OutputBound Formula
   | Top
   | Bottom
 
@@ -122,10 +122,10 @@ instance Show Formula where
     "(∀" <> show x <> "<" <> show b <> ", " <> show p <> ")"
   show (ForSome q p) =
     "(∃" <> show q <> ", " <> show p <> ")"
-  show (Given x [] ob p) =
+  show (Given x _ [] ob p) =
     "(λ" <> show x <> "<" <> show ob <> "," <> show p <> ")"
-  show (Given x ibs ob p) =
-    "(λ" <> show x <> "(" <> intercalate ", " (show <$> ibs)
+  show (Given x n ibs ob p) =
+    "(λ" <> show x <> "^" <> show n <> "(" <> intercalate ", " (show <$> ibs)
       <> ")<" <> show ob <> ", " <> show p <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
@@ -183,12 +183,12 @@ newtype OutputBound = OutputBound {unOutputBound :: Bound}
 data Quantifier
   = Universal Name Bound
   | Existential ExistentialQuantifier
-  | Instance Name [InputBound] OutputBound
+  | Instance Name Cardinality [InputBound] OutputBound
 
 instance Show Quantifier where
   show (Universal x b) = "∀" <> show x <> "<" <> show b
   show (Existential q) = "∃" <> show q
-  show (Instance x ibs ob) = "λ" <> show x <>
+  show (Instance x n ibs ob) = "λ" <> show x <>
     (if null ibs then ""
-     else "(" <> intercalate ", " (show <$> ibs) <> ")")
+     else "^" <> show n <> "(" <> intercalate ", " (show <$> ibs) <> ")")
     <> "<" <> show ob
