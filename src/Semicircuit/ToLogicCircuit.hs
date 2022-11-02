@@ -359,7 +359,7 @@ termToFixedBound ::
 termToFixedBound x layout constraints =
   \case
     Const k ->
-      case integerToWord64 (k `mod` word64ToInteger order) of
+      case integerToWord64 (abs k `mod` word64ToInteger order) of
         Just w -> FixedBound w
         Nothing -> die "termToFixedBound: constant term mod field size out of range of Word64 (this is a compiler bug)"
     App f _ -> outputBound f
