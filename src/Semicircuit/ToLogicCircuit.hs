@@ -481,8 +481,13 @@ adviceTermColumnBounds ::
   Layout ->
   LogicConstraints ->
   LogicConstraints
-adviceTermColumnBounds _ _ =
-  mempty -- TODO
+adviceTermColumnBounds x layout constraints =
+  constraints <>
+    mconcat
+    [ LogicConstraints mempty
+      (Map.singleton i (termToFixedBound x layout constraints term))
+    | (term, TermMapping i) <- Map.toList (layout ^. #termMappings)
+    ]
 
 dummyRowAdviceColumnBounds ::
   Layout ->
