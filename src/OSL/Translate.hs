@@ -947,11 +947,11 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
               aM)
     OSL.List ann (OSL.Cardinality n) a -> do
       (lQs, lM) <- rec lc (OSL.N ann)
-      let decls' = addDeclaration lSym (OSL.FreeVariable (OSL.N ann)) decls
+      let decls' = addDeclaration lSym (OSL.FreeVariable (OSL.Fin ann n)) decls
           lSym = getFreeOSLName lc
           lc' = TranslationContext decls' 
               $ mappings <> Map.singleton lSym lM
-      (vQs, vM) <- rec lc' (OSL.F ann (Just (OSL.Cardinality n)) (OSL.N ann) a)
+      (vQs, vM) <- rec lc' (OSL.F ann (Just (OSL.Cardinality n)) (OSL.Fin ann n) a)
       pure (lQs <> vQs, ListMapping (LengthMapping lM) (ValuesMapping vM))
     OSL.Map ann (OSL.Cardinality n) a b -> do
       (kQs, kM) <- rec lc (OSL.List ann (OSL.Cardinality n) a)
@@ -1575,8 +1575,8 @@ inferBound ctx =
       OSL.FunctionBound ann
         <$> (OSL.DomainBound <$> inferBound ctx a)
         <*> (OSL.CodomainBound <$> inferBound ctx b)
-    OSL.N ann -> Left (ErrorMessage ann "cannot infer bound for N")
-    OSL.Z ann -> Left (ErrorMessage ann "cannot infer bound for Z")
+    OSL.N ann -> pure (OSL.FieldMaxBound ann)
+    OSL.Z ann -> pure (OSL.FieldMaxBound ann)
     OSL.Fp ann -> pure (OSL.FieldMaxBound ann)
     OSL.Fin ann n -> pure (OSL.ScalarBound ann (OSL.ConstN ann n))
     OSL.Product ann a b ->

@@ -157,7 +157,7 @@ data Bound = TermBound Term | FieldMaxBound
 
 instance Show Bound where
   show (TermBound t) = show t
-  show FieldMaxBound = show "|F|"
+  show FieldMaxBound = "|F|"
 
 data AuxTables = AuxTables
   { functionTables :: Map Name (Map [Integer] Integer),

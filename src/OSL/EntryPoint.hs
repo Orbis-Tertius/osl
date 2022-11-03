@@ -46,7 +46,10 @@ main = do
     [fileName, targetName] ->
       putStrLn . unOutput
         =<< runMain (FileName fileName) (TargetName targetName) CompileToCircuit
-    _ -> putStrLn "Error: please provide a filename and the name of a term and nothing else"
+    [fileName, targetName, "--test"] ->
+      putStrLn . unOutput
+        =<< runMain (FileName fileName) (TargetName targetName) DONTCompileToCircuit
+    _ -> putStrLn "Usage: osl FILE TARGET [--test]"
 
 newtype FileName = FileName String
 
