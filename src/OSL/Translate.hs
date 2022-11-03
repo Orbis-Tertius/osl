@@ -914,7 +914,22 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
           pure (fQs, fM)
         InfiniteDimensions -> lift . Left $ ErrorMessage ann
           "domain of function type in instance data must be finite-dimensional"
-    OSL.P ann _ _ _ -> lift . Left $ ErrorMessage ann "not implemented: permutations as instance data"
+    OSL.P ann mCardinality a b -> do
+      aDim <- lift $ getMappingDimensions decls a
+      case aDim of
+        FiniteDimensions _ -> do
+          cardinality <- case mCardinality of
+            Just m -> pure m
+            Nothing -> lift . Left $ ErrorMessage ann "missing permutation type cardinality (required for instance data)"
+          (_, aM) <- rec lc a
+          let fM = incrementArities 1 aM
+          aBoundTs <- fmap S11.InputBound <$> translateBound gc lc a Nothing
+          bBoundTs <- fmap S11.OutputBound <$> translateBound gc lc b Nothing
+          case (aBoundTs, bBoundTs) of
+            ([aBoundT], [bBoundT]) ->
+              pure ([S11.Instance cardinality [aBoundT] bBoundT], fM)
+            _ -> lift . Left $ ErrorMessage ann "non-scalar bounds for a permutation; this a compiler bug"
+        InfiniteDimensions -> lift . Left $ ErrorMessage ann "expected a finite-dimensional type"
     OSL.Product _ a b -> do
       (aQs, aM) <- rec lc a
       (bQs, bM) <- rec lc b

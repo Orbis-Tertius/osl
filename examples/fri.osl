@@ -207,11 +207,11 @@ data Commitment ~= Hash.
 
 data Index ~= Fin(16).
 
-data Codeword ~= Index -> F.
+data Codeword ~= Index ->^16 F.
 
 data DepthIndex ~= Fin(8).
 
-data AuthPath ~= DepthIndex -> Hash.
+data AuthPath ~= DepthIndex ->^8 Hash.
 
 -- TODO: is this secure?
 def mergeHashes : Map^4096(PlaintextKey, Hash)
@@ -332,7 +332,7 @@ def numRounds : N := 4N.
 
 def maxDegree : N := 8N.
 
-data Commitments ~= Fin(4) -> Commitment.
+data Commitments ~= Fin(4) ->^4 Commitment.
 
 data A ~= F.
 
@@ -369,7 +369,7 @@ def bOpening : IndexOpenings -> BOpening
 def cOpening : IndexOpenings -> COpening
   := \qs : IndexOpenings => pi2(pi2(from(IndexOpenings)(qs))).
 
-data Openings ~= QueryRound -> IndexNumber -> IndexOpenings.
+data Openings ~= QueryRound ->^3 IndexNumber ->^4 IndexOpenings.
 
 data Proof ~= Commitments * Codeword * Openings.
 
