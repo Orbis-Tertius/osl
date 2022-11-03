@@ -27,7 +27,7 @@ module Semicircuit.ToLogicCircuit
 where
 
 import Cast (word64ToInteger)
-import Control.Lens ((^.))
+import Control.Lens ((<&>), (^.))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Data.List.Extra (foldl', (!?))
@@ -36,17 +36,18 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
-import Data.Text (pack)
+import Data.Text (Text, pack)
 import Die (die)
 import Halo2.Polynomial (constant, minus, plus, times, var, var')
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
-import Halo2.Types.ColumnType (ColumnType (Advice, Fixed, Instance))
+import qualified Halo2.Types.ColumnType as ColType
 import Halo2.Types.ColumnTypes (ColumnTypes (..))
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
+import Halo2.Types.FixedBound (FixedBound (FixedBound), boolBound, integerToFixedBound)
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
@@ -60,34 +61,35 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative))
 import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound)
-import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), UniversalQuantifier)
+import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), InstanceQuantifier (Instance), UniversalQuantifier (All))
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), IndicatorFunctionCall (..), Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), Name, Term (Add, App, AppInverse, Const, IndLess, Mul))
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), InputBound, Name, OutputBound (OutputBound), Term (Add, App, AppInverse, Const, IndLess, Mul))
 import Stark.Types.Scalar (order)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
--- TODO: fixed bounds
 semicircuitToLogicCircuit ::
   RowCount ->
   Semicircuit ->
-  LogicCircuit
+  (LogicCircuit, Layout)
 semicircuitToLogicCircuit rowCount x =
   let layout = columnLayout x
-   in Circuit
-        (layout ^. #columnTypes)
-        (equalityConstrainableColumns x layout)
-        (gateConstraints x layout)
-        (lookupArguments x layout)
-        rowCount
-        (equalityConstraints x layout)
-        (fixedValues rowCount layout)
+   in ( Circuit
+          (layout ^. #columnTypes)
+          (equalityConstrainableColumns x layout)
+          (columnBounds x layout (gateConstraints x layout))
+          (lookupArguments x layout)
+          rowCount
+          (equalityConstraints x layout)
+          (fixedValues rowCount layout),
+        layout
+      )
 
 newtype S = S (ColumnIndex, ColumnTypes)
 
-nextCol :: ColumnType -> State S ColumnIndex
+nextCol :: ColType.ColumnType -> State S ColumnIndex
 nextCol t = do
   S (x, ts) <- get
   put $ S (x + 1, ts <> ColumnTypes (Map.singleton x t))
@@ -98,7 +100,7 @@ columnLayout x =
   flip evalState (S (0, mempty)) $ do
     nm <- nameMappings x
     tm <- termMappings x
-    dr <- DummyRowAdviceColumn <$> nextCol Advice
+    dr <- DummyRowAdviceColumn <$> nextCol ColType.Advice
     fs <- fixedColumns
     S (_, colTypes) <- get
     pure $
@@ -114,6 +116,7 @@ nameMappings x =
   mconcat
     <$> sequence
       [ freeVariableMappings x,
+        instanceVariableMappings x,
         universalVariableMappings x,
         existentialVariableMappings x
       ]
@@ -130,8 +133,27 @@ universalVariableMapping ::
   State S (Name, NameMapping)
 universalVariableMapping v =
   (v ^. #name,)
-    <$> ( NameMapping <$> (OutputMapping <$> nextCol Advice)
+    <$> ( NameMapping <$> (OutputMapping <$> nextCol ColType.Advice)
             <*> pure []
+        )
+
+instanceVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
+instanceVariableMappings x =
+  Map.fromList
+    <$> mapM
+      instanceVariableMapping
+      (x ^. #formula . #quantifiers . #instanceQuantifiers)
+
+instanceVariableMapping ::
+  InstanceQuantifier ->
+  State S (Name, NameMapping)
+instanceVariableMapping q =
+  (q ^. #name,)
+    <$> ( NameMapping
+            <$> (OutputMapping <$> nextCol ColType.Instance)
+            <*> replicateM
+              (q ^. #name . #arity . #unArity)
+              (ArgMapping <$> nextCol ColType.Instance)
         )
 
 existentialVariableMappings ::
@@ -150,16 +172,16 @@ existentialVariableMapping =
     Some x _ _ _ ->
       (x,)
         <$> ( NameMapping
-                <$> (OutputMapping <$> nextCol Advice)
+                <$> (OutputMapping <$> nextCol ColType.Advice)
                 <*> replicateM
                   (x ^. #arity . #unArity)
-                  (ArgMapping <$> nextCol Advice)
+                  (ArgMapping <$> nextCol ColType.Advice)
             )
     SomeP x _ _ _ ->
       (x,)
         <$> ( NameMapping
-                <$> (OutputMapping <$> nextCol Advice)
-                <*> ((: []) . ArgMapping <$> nextCol Advice)
+                <$> (OutputMapping <$> nextCol ColType.Advice)
+                <*> ((: []) . ArgMapping <$> nextCol ColType.Advice)
             )
 
 freeVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
@@ -173,10 +195,10 @@ freeVariableMapping :: Name -> State S (Name, NameMapping)
 freeVariableMapping x =
   (x,)
     <$> ( NameMapping
-            <$> (OutputMapping <$> nextCol Instance)
+            <$> (OutputMapping <$> nextCol ColType.Instance)
             <*> replicateM
               (x ^. #arity . #unArity)
-              (ArgMapping <$> nextCol Instance)
+              (ArgMapping <$> nextCol ColType.Instance)
         )
 
 termMappings :: Semicircuit -> State S (Map Term TermMapping)
@@ -187,14 +209,14 @@ termMappings x =
       (Set.toList (x ^. #adviceTerms . #unAdviceTerms))
 
 termMapping :: Term -> State S (Term, TermMapping)
-termMapping t = (t,) . TermMapping <$> nextCol Advice
+termMapping t = (t,) . TermMapping <$> nextCol ColType.Advice
 
 fixedColumns :: State S FixedColumns
 fixedColumns =
   FixedColumns
-    <$> (ZeroVectorIndex <$> nextCol Fixed)
-    <*> (OneVectorIndex <$> nextCol Fixed)
-    <*> (LastRowIndicatorColumnIndex <$> nextCol Fixed)
+    <$> (ZeroVectorIndex <$> nextCol ColType.Fixed)
+    <*> (OneVectorIndex <$> nextCol ColType.Fixed)
+    <*> (LastRowIndicatorColumnIndex <$> nextCol ColType.Fixed)
 
 fixedValues :: RowCount -> Layout -> FixedValues
 fixedValues (RowCount n) layout =
@@ -284,6 +306,285 @@ gateConstraints x layout =
       existentialInputsInBoundsConstraints x layout,
       universalTableConstraints x layout
     ]
+
+columnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+columnBounds x layout =
+  indicatorCallOutputColumnBounds x layout
+    . functionCallOutputColumnBounds x layout
+    . adviceTermColumnBounds x layout
+    . dummyRowAdviceColumnBounds layout
+    . fixedColumnBounds layout
+    . universalTableBounds x layout
+    . existentialFunctionTableColumnBounds x layout
+    . instanceColumnBounds x layout
+
+instanceColumnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+instanceColumnBounds x layout =
+  foldl'
+    (.)
+    id
+    ( reverse $
+        instanceQuantifierBounds x layout
+          <$> (x ^. #formula . #quantifiers . #instanceQuantifiers)
+    )
+
+instanceQuantifierBounds ::
+  Semicircuit ->
+  Layout ->
+  InstanceQuantifier ->
+  LogicConstraints ->
+  LogicConstraints
+instanceQuantifierBounds x layout (Instance name _ inBounds outBound) =
+  quantifierBounds "instance" x layout name inBounds outBound
+
+quantifierBounds ::
+  Text ->
+  Semicircuit ->
+  Layout ->
+  Name ->
+  [InputBound] ->
+  OutputBound ->
+  LogicConstraints ->
+  LogicConstraints
+quantifierBounds what x layout name inBounds outBound =
+  boundToFixedBound
+    x
+    layout
+    outputCol
+    (outBound ^. #unOutputBound)
+    . foldl'
+      (.)
+      id
+      ( uncurry (boundToFixedBound x layout)
+          <$> zip inputCols (inBounds <&> (^. #bound))
+      )
+  where
+    outputCol :: ColumnIndex
+    outputCol = mapping ^. #outputMapping . #unOutputMapping
+
+    inputCols :: [ColumnIndex]
+    inputCols =
+      (mapping ^. #argMappings)
+        <&> (^. #unArgMapping)
+
+    mapping :: NameMapping
+    mapping =
+      fromMaybe
+        ( die $
+            what
+              <> " quantifierBounds: mapping lookup failed (this is a compiler bug)\n"
+              <> pack (show (name, layout ^. #nameMappings))
+        )
+        $ Map.lookup name (layout ^. #nameMappings)
+
+boundToFixedBound ::
+  Semicircuit ->
+  Layout ->
+  ColumnIndex ->
+  Bound ->
+  LogicConstraints ->
+  LogicConstraints
+boundToFixedBound x layout i =
+  \case
+    FieldMaxBound ->
+      ( <>
+          LogicConstraints
+            mempty
+            (Map.singleton i (FixedBound order))
+      )
+    TermBound b ->
+      \constraints ->
+        constraints
+          <> LogicConstraints
+            mempty
+            ( Map.singleton
+                i
+                (termToFixedBound x layout constraints b)
+            )
+
+termToFixedBound ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  Term ->
+  FixedBound
+termToFixedBound x layout constraints =
+  \case
+    Const k -> integerToFixedBound (abs k)
+    App f _ -> outputBound f
+    AppInverse f _ -> outputBound f
+    Add y z -> rec y + rec z
+    Mul y z -> rec y * rec z
+    IndLess _ _ -> boolBound
+  where
+    rec = termToFixedBound x layout constraints
+
+    outputBound :: Name -> FixedBound
+    outputBound f =
+      case Map.lookup f (layout ^. #nameMappings) of
+        Just f' ->
+          case Map.lookup (f' ^. #outputMapping . #unOutputMapping) (constraints ^. #bounds) of
+            Just b -> b
+            Nothing ->
+              die $
+                "termToFixedBound: outputBound: output bound lookup failed (this is a compiler bug)\n"
+                  <> pack (show (f, f', constraints ^. #bounds))
+        Nothing -> die "termToFixedBound: outputBound: name mapping lookup failed (this is a compiler bug)"
+
+existentialFunctionTableColumnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+existentialFunctionTableColumnBounds x layout =
+  foldl'
+    (.)
+    id
+    ( reverse $
+        existentialQuantifierBounds x layout
+          <$> (x ^. #formula . #quantifiers . #existentialQuantifiers)
+    )
+
+existentialQuantifierBounds ::
+  Semicircuit ->
+  Layout ->
+  ExistentialQuantifier ->
+  LogicConstraints ->
+  LogicConstraints
+existentialQuantifierBounds x layout =
+  \case
+    Some name _ inBounds outBound ->
+      quantifierBounds "existential" x layout name inBounds outBound
+    SomeP name _ inBound outBound ->
+      quantifierBounds "existential" x layout name [inBound] outBound
+
+universalTableBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+universalTableBounds x layout =
+  foldl'
+    (.)
+    id
+    ( universalQuantifierBounds x layout
+        <$> (x ^. #formula . #quantifiers . #universalQuantifiers)
+    )
+
+universalQuantifierBounds ::
+  Semicircuit ->
+  Layout ->
+  UniversalQuantifier ->
+  LogicConstraints ->
+  LogicConstraints
+universalQuantifierBounds x layout (All name bound) =
+  quantifierBounds "universal" x layout name [] (OutputBound bound)
+
+indicatorCallOutputColumnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+indicatorCallOutputColumnBounds x layout constraints =
+  constraints
+    <> LogicConstraints
+      mempty
+      ( Map.fromList
+          [ (col, boolBound)
+            | col <-
+                (^. #unTermMapping)
+                  <$> Map.elems
+                    ( Map.filterWithKey
+                        (const . isIndicatorCallTerm)
+                        (layout ^. #termMappings)
+                    )
+          ]
+      )
+  where
+    isIndicatorCallTerm :: Term -> Bool
+    isIndicatorCallTerm =
+      \case
+        IndLess y z ->
+          IndicatorFunctionCall y z
+            `Set.member` (x ^. #indicatorCalls . #unIndicatorFunctionCalls)
+        _ -> False
+
+functionCallOutputColumnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+functionCallOutputColumnBounds x layout =
+  foldl'
+    (.)
+    id
+    ( functionCallOutputColumnBound layout
+        <$> Set.toList (x ^. #functionCalls . #unFunctionCalls)
+    )
+
+functionCallOutputColumnBound ::
+  Layout ->
+  FunctionCall ->
+  LogicConstraints ->
+  LogicConstraints
+functionCallOutputColumnBound layout (FunctionCall name _) constraints =
+  case Map.lookup name (layout ^. #nameMappings) of
+    Just (NameMapping (OutputMapping i) _) ->
+      case Map.lookup i (constraints ^. #bounds) of
+        Just b ->
+          constraints <> LogicConstraints mempty (Map.singleton i b)
+        Nothing ->
+          die $
+            "functionCallOutputColumnBound: output bound lookup failed (this is a compiler bug)"
+              <> pack (show (name, i, constraints ^. #bounds))
+    Nothing -> die "functionCallOutputColumnBound: name mapping lookup failed (this is a compiler bug)"
+
+adviceTermColumnBounds ::
+  Semicircuit ->
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+adviceTermColumnBounds x layout constraints =
+  constraints
+    <> mconcat
+      [ LogicConstraints
+          mempty
+          (Map.singleton i (termToFixedBound x layout constraints term))
+        | (term, TermMapping i) <- Map.toList (layout ^. #termMappings)
+      ]
+
+dummyRowAdviceColumnBounds ::
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+dummyRowAdviceColumnBounds layout constraints =
+  constraints
+    <> LogicConstraints
+      mempty
+      (Map.singleton (layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn) boolBound)
+
+fixedColumnBounds ::
+  Layout ->
+  LogicConstraints ->
+  LogicConstraints
+fixedColumnBounds layout constraints =
+  constraints
+    <> LogicConstraints
+      mempty
+      ( Map.fromList
+          [ (layout ^. #fixedColumns . #lastRowIndicator . #unLastRowIndicatorColumnIndex, boolBound),
+            (layout ^. #fixedColumns . #oneVector . #unOneVectorIndex, boolBound),
+            (layout ^. #fixedColumns . #zeroVector . #unZeroVectorIndex, boolBound)
+          ]
+      )
 
 lexicographicallyLessThanConstraint ::
   -- the lists are zipped to document that they have

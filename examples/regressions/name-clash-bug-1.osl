@@ -1,8 +1,8 @@
-def bar : (N -> N) -> N
-  := \f : N -> N
-  => f(0N).
+def bar : (F -> F) -> F
+  := \f : F -> F
+  => f(0F).
 
 
-def foo : (N -> N) -> Prop
-  := \f : N -> N
+def foo : (F ->^1 F) -> Prop
+  := \f : F ->^1 F
   => bar(f) = 0N.

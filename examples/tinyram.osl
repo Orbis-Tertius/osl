@@ -97,13 +97,13 @@ data Address ~= Word.
 def addrToN : Address -> N
   := \a : Address => toN(from(Address)(a)).
 
-data Memory ~= Address -> Word.
+data Memory ~= Address ->^65536 Word.
 
 def getMemoryValue : Memory -> Address -> Word
   := \m : Memory => \a : Address
   => from(Memory)(m, a).
 
-data Program ~= Address -> Instruction.
+data Program ~= Address ->^65536 Instruction.
 
 def getProgramInstruction : Program -> Address -> Instruction
   := \p : Program => \a : Address

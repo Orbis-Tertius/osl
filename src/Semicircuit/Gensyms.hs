@@ -55,9 +55,6 @@ deBruijnToGensyms' =
       popIndices (Arity 0)
       pure r
     DB.ForSome (DB.Some n bs b) p -> do
-      b' <-
-        GS.OutputBound
-          <$> bound (b ^. #unOutputBound)
       bs' <-
         mapM
           ( \b'' ->
@@ -66,6 +63,9 @@ deBruijnToGensyms' =
                 <*> bound b''
           )
           (bs <&> (^. #unInputBound))
+      b' <-
+        GS.OutputBound
+          <$> bound (b ^. #unOutputBound)
       let arity = Arity (length bs)
       pushIndices arity
       x <- mapName (DB.Name arity (DeBruijnIndex 0))
@@ -87,6 +87,24 @@ deBruijnToGensyms' =
           (GS.SomeP x n b0' b1')
           <$> rec p
       popIndices (Arity 1)
+      pure r
+    DB.Given n ibs ob p -> do
+      ibs' <-
+        mapM
+          ( \b'' ->
+              GS.InputBound
+                <$> (GS.Name (Arity 0) <$> nextSym)
+                <*> bound b''
+          )
+          (ibs <&> (^. #unInputBound))
+      ob' <-
+        GS.OutputBound
+          <$> bound (ob ^. #unOutputBound)
+      let arity = Arity (length ibs')
+      pushIndices arity
+      x <- mapName (DB.Name arity (DeBruijnIndex 0))
+      r <- GS.Given x n ibs' ob' <$> rec p
+      popIndices arity
       pure r
   where
     rec = deBruijnToGensyms'

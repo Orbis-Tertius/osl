@@ -13,7 +13,8 @@ import Semicircuit.Sigma11 (prependArguments, prependBounds)
 import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), someFirstOrder)
 
 -- Assumes input is in prenex normal form.
--- Bring all second-order quantifiers to the front,
+-- Brings all instance quantifiers to the front.
+-- Brings all second-order quantifiers next up,
 -- along with any first-order existential quantifiers
 -- preceding them. Said first-order existential
 -- quantifiers become second-order existential
@@ -32,17 +33,37 @@ toStrongPrenexNormalForm ann qs f =
     [] -> pure ([], f)
     Existential q : qs' -> do
       (qs'', f') <- rec qs' f
-      pure (Existential q : qs'', f')
+      case qs'' of
+        Instance {} : _ ->
+          pure (pushExistentialQuantifierDown q qs'', f')
+        _ -> pure (Existential q : qs'', f')
     Universal x b : qs' -> do
       (qs'', f') <- rec qs' f
       case qs'' of
         [] -> pure ([Universal x b], f')
         Universal _ _ : _ ->
           pure (Universal x b : qs'', f')
-        Existential _ : _ ->
+        _ ->
           pushUniversalQuantifiersDown ann [(x, b)] qs'' f'
+    Instance x n ibs ob : qs' -> do
+      (qs'', f') <- rec qs' f
+      pure (Instance x n ibs ob : qs'', f')
   where
     rec = toStrongPrenexNormalForm ann
+
+pushExistentialQuantifierDown ::
+  ExistentialQuantifier ->
+  [Quantifier] ->
+  [Quantifier]
+pushExistentialQuantifierDown q =
+  \case
+    [] -> [Existential q]
+    Universal x b : qs ->
+      Existential q : Universal x b : qs
+    Existential q' : qs ->
+      Existential q : Existential q' : qs
+    Instance x n ibs obs : qs ->
+      Instance x n ibs obs : pushExistentialQuantifierDown q qs
 
 pushUniversalQuantifiersDown ::
   ann ->
@@ -65,6 +86,9 @@ pushUniversalQuantifiersDown ann us qs f =
         SomeP {} ->
           Left . ErrorMessage ann $
             "unsupported: permutation quantifier inside a universal quantifier"
+    Instance x n ibs ob : qs' -> do
+      (qs'', f') <- pushUniversalQuantifiersDown ann us qs' f
+      pure (Instance x n ibs ob : qs'', f')
 
 toPrenexNormalForm ::
   ann ->
@@ -107,6 +131,9 @@ toPrenexNormalForm ann =
     ForSome q p -> do
       (pQs, p') <- rec p
       pure (Existential q : pQs, p')
+    Given x n ibs ob p -> do
+      (pQs, p') <- rec p
+      pure (Instance x n ibs ob : pQs, p')
   where
     rec = toPrenexNormalForm ann
 
@@ -129,3 +156,5 @@ flipQuantifier ann =
     Existential _ ->
       Left . ErrorMessage ann $
         "not supported: second-order quantification in negative position"
+    Instance x n ibs ob ->
+      pure (Instance x n ibs ob)

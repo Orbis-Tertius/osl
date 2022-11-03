@@ -26,9 +26,9 @@ import Data.Text (pack)
 import Die (die)
 import OSL.Bound (boundAnnotation)
 import OSL.BuildTranslationContext (addFreeVariableMapping, addTermMapping, buildTranslationContext', getBoundS11NamesInContext, getFreeOSLName, getFreeS11Name)
-import OSL.Sigma11 (incrementArities, incrementDeBruijnIndices, prependBounds)
+import OSL.Sigma11 (incrementArities, incrementDeBruijnIndices, prependBounds, prependInstanceQuantifiers)
 import OSL.Term (termAnnotation)
-import OSL.TranslationContext (linearizeMapping, mergeMapping, mergeMappings)
+import OSL.TranslationContext (linearizeMapping, mergeMapping, mergeMapping3, mergeMappings)
 import OSL.Type (typeAnnotation)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
@@ -884,6 +884,138 @@ getExplicitOrInferredBound ::
 getExplicitOrInferredBound ctx t =
   maybe (inferBound ctx t) pure
 
+getInstanceQuantifierStringAndMapping ::
+  Show ann =>
+  TranslationContext 'OSL.Global ann ->
+  TranslationContext 'OSL.Local ann ->
+  OSL.Type ann ->
+  StateT
+    S11.AuxTables
+    (Either (ErrorMessage ann))
+    ([S11.InstanceQuantifier], Mapping ann S11.Term)
+getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) varType =
+  case varType of
+    OSL.Prop ann -> lift . Left $ ErrorMessage ann "cannot have Prop as instance data"
+    OSL.N _ -> scalarResult
+    OSL.Z _ -> scalarResult
+    OSL.Fp _ -> scalarResult
+    OSL.Fin _ _ -> scalarResult
+    OSL.F ann mCardinality a b -> do
+      aDim <- lift $ getMappingDimensions decls a
+      case aDim of
+        FiniteDimensions n -> do
+          cardinality <- case mCardinality of
+            Just m -> pure m
+            Nothing -> lift . Left $ ErrorMessage ann "missing function type cardinality (required for instance data)"
+          (bQs, bM) <- rec lc b
+          aBounds <- fmap S11.InputBound <$> translateBound gc lc a Nothing
+          let fM = incrementArities n bM
+          let fQs = prependBounds cardinality aBounds <$> bQs
+          pure (fQs, fM)
+        InfiniteDimensions ->
+          lift . Left $
+            ErrorMessage
+              ann
+              "domain of function type in instance data must be finite-dimensional"
+    OSL.P ann mCardinality a b -> do
+      aDim <- lift $ getMappingDimensions decls a
+      case aDim of
+        FiniteDimensions _ -> do
+          cardinality <- case mCardinality of
+            Just m -> pure m
+            Nothing -> lift . Left $ ErrorMessage ann "missing permutation type cardinality (required for instance data)"
+          (_, aM) <- rec lc a
+          let fM = incrementArities 1 aM
+          aBoundTs <- fmap S11.InputBound <$> translateBound gc lc a Nothing
+          bBoundTs <- fmap S11.OutputBound <$> translateBound gc lc b Nothing
+          case (aBoundTs, bBoundTs) of
+            ([aBoundT], [bBoundT]) ->
+              pure ([S11.Instance cardinality [aBoundT] bBoundT], fM)
+            _ -> lift . Left $ ErrorMessage ann "non-scalar bounds for a permutation; this a compiler bug"
+        InfiniteDimensions -> lift . Left $ ErrorMessage ann "expected a finite-dimensional type"
+    OSL.Product _ a b -> do
+      (aQs, aM) <- rec lc a
+      (bQs, bM) <- rec lc b
+      pure
+        ( aQs <> bQs,
+          mergeMapping
+            (\aM' bM' -> ProductMapping (LeftMapping aM') (RightMapping bM'))
+            aM
+            bM
+        )
+    OSL.Coproduct ann a b -> do
+      (aQs, aM) <- rec lc a
+      (bQs, bM) <- rec lc b
+      (cQs, cM) <- rec lc (OSL.Fin ann 2)
+      pure
+        ( cQs <> aQs <> bQs,
+          mergeMapping3
+            ( \cM' aM' bM' ->
+                CoproductMapping
+                  (ChoiceMapping cM')
+                  (LeftMapping aM')
+                  (RightMapping bM')
+            )
+            cM
+            aM
+            bM
+        )
+    OSL.NamedType ann name ->
+      case getDeclaration decls name of
+        Just (OSL.Data a) -> rec lc a
+        _ -> lift . Left $ ErrorMessage ann "expected the name of a type"
+    OSL.Maybe ann a -> do
+      (aQs, aM) <- rec lc a
+      (cQs, cM) <- rec lc (OSL.Fin ann 2)
+      pure
+        ( cQs <> aQs,
+          mergeMapping
+            (\cM' aM' -> MaybeMapping (ChoiceMapping cM') (ValuesMapping aM'))
+            cM
+            aM
+        )
+    OSL.List ann (OSL.Cardinality n) a -> do
+      (lQs, lM) <- rec lc (OSL.N ann)
+      let decls' = addDeclaration lSym (OSL.FreeVariable (OSL.Fin ann n)) decls
+          lSym = getFreeOSLName lc
+          lc' =
+            TranslationContext decls' $
+              mappings <> Map.singleton lSym lM
+      (vQs, vM) <- rec lc' (OSL.F ann (Just (OSL.Cardinality n)) (OSL.Fin ann n) a)
+      pure (lQs <> vQs, ListMapping (LengthMapping lM) (ValuesMapping vM))
+    OSL.Map ann (OSL.Cardinality n) a b -> do
+      (kQs, kM) <- rec lc (OSL.List ann (OSL.Cardinality n) a)
+      (vQs, vM) <- rec lc (OSL.F ann (Just (OSL.Cardinality n)) a b)
+      pure
+        ( kQs <> vQs,
+          mergeMapping
+            ( curry
+                ( \case
+                    (ListMapping (LengthMapping lM) (ValuesMapping kM'), vM') ->
+                      MapMapping (LengthMapping lM) (KeysMapping kM') (ValuesMapping vM')
+                    d -> die $ "logical impossibility in map quantifier translation: " <> pack (show d)
+                )
+            )
+            kM
+            vM
+        )
+  where
+    rec = getInstanceQuantifierStringAndMapping gc
+
+    scalarResult = do
+      bTs <- translateBound gc lc varType Nothing
+      case bTs of
+        [bT] ->
+          pure
+            ( [S11.Instance 1 [] (S11.OutputBound bT)],
+              ScalarMapping (S11.var (S11.Name 0 0))
+            )
+        _ ->
+          lift . Left $
+            ErrorMessage
+              (typeAnnotation varType)
+              "expected a scalar bound"
+
 getExistentialQuantifierStringAndMapping ::
   Show ann =>
   TranslationContext 'OSL.Global ann ->
@@ -1217,19 +1349,18 @@ translateToFormula ::
   OSL.Term ann ->
   StateT S11.AuxTables (Either (ErrorMessage ann)) S11.Formula
 translateToFormula gc lc@(TranslationContext decls mappings) t = do
-  trans <- translate gc lc (OSL.Prop (termAnnotation t)) t
+  tType <- lift $ inferType decls t
+  trans <- translate gc lc tType t
   case trans of
     Formula f -> pure f
     Mapping (PropMapping f) -> pure f
     Mapping (LambdaMapping {}) ->
       case t of
         OSL.Lambda _ varName varType body -> do
+          (qs, mapping) <- getInstanceQuantifierStringAndMapping gc lc varType
           let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
-              lc' = TranslationContext decls' mappings
-          lc'' <-
-            lift . runIdentity . runExceptT $
-              execStateT (addFreeVariableMapping varName) lc'
-          translateToFormula gc lc'' body
+              lc' = TranslationContext decls' (Map.insert varName mapping mappings)
+          prependInstanceQuantifiers qs <$> translateToFormula gc lc' body
         _ ->
           lift . Left $
             ErrorMessage
@@ -1480,8 +1611,8 @@ inferBound ctx =
       OSL.FunctionBound ann
         <$> (OSL.DomainBound <$> inferBound ctx a)
         <*> (OSL.CodomainBound <$> inferBound ctx b)
-    OSL.N ann -> Left (ErrorMessage ann "cannot infer bound for N")
-    OSL.Z ann -> Left (ErrorMessage ann "cannot infer bound for Z")
+    OSL.N ann -> pure (OSL.FieldMaxBound ann)
+    OSL.Z ann -> pure (OSL.FieldMaxBound ann)
     OSL.Fp ann -> pure (OSL.FieldMaxBound ann)
     OSL.Fin ann n -> pure (OSL.ScalarBound ann (OSL.ConstN ann n))
     OSL.Product ann a b ->

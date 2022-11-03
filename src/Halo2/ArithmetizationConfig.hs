@@ -15,7 +15,7 @@ import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.ByteDecompositionSize (ByteDecompositionSize (..))
 import Halo2.Types.BytesPerWord (BytesPerWord (..))
 import Halo2.Types.FixedBound (FixedBound (..))
-import Stark.Types.Scalar (order, scalarToInteger)
+import Stark.Types.Scalar (order)
 
 getArithmetizationConfig :: BitsPerByte -> ArithmetizationConfig
 getArithmetizationConfig bitsPerByte =
@@ -31,7 +31,7 @@ getBytesPerWord (BitsPerByte bitsPerByte) =
 
 getByteDecompositionSize :: ArithmetizationConfig -> FixedBound -> ByteDecompositionSize
 getByteDecompositionSize config (FixedBound b) =
-  case numBits (scalarToInteger b)
+  case numBits (word64ToInteger b)
     `quotRem` (config ^. #bitsPerByte . #unBitsPerByte) of
     (q, 0) -> ByteDecompositionSize q
     (q, _) -> ByteDecompositionSize (q + 1)

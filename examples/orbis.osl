@@ -552,11 +552,11 @@ def txBalances
 
 
 def spendingScriptsAcceptTx
-   : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
+   : ((ScriptAddress * TxId) ->^524288 (ScriptSize * Steps))
   -> TxId
   -> Tx
   -> Prop
-  := \scriptLimits : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
+  := \scriptLimits : ((ScriptAddress * TxId) ->^524288 (ScriptSize * Steps))
   => \x : TxId
   => \t : Tx
   => all i : Fin(128) < (length(outputs(t))),
@@ -576,11 +576,11 @@ def spendingScriptsAcceptTx
 
 
 def mintingScriptsAcceptTx
-   : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
+   : ((ScriptAddress * TxId) ->^524288 (ScriptSize * Steps))
   -> TxId
   -> Tx
   -> Prop
-  := \scriptLimits : (ScriptAddress * TxId) -> (ScriptSize * Steps)
+  := \scriptLimits : (ScriptAddress * TxId) ->^524288 (ScriptSize * Steps)
   => \x : TxId
   => \t : Tx
   => let v : Map^128(AssetClass, MintQuantity) := mintValue(mint(t));
@@ -599,11 +599,11 @@ def mintingScriptsAcceptTx
 
 
 def scriptsAcceptTx
-   : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
+   : ((ScriptAddress * TxId) ->^524288 (ScriptSize * Steps))
   -> TxId
   -> Tx
   -> Prop
-  := \scriptLimits : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
+  := \scriptLimits : ((ScriptAddress * TxId) ->^524288 (ScriptSize * Steps))
   => \x : TxId
   => \t : Tx
   => spendingScriptsAcceptTx(scriptLimits, x, t)
@@ -682,7 +682,7 @@ def txIsValid
    : (Time -> FeeParams)
   -> (TxId -> List^128(Value))
   -> List^4096(AssetClass)
-  -> ((ScriptAddress * TxId) -> (ScriptSize * Steps))
+  -> ((ScriptAddress * TxId) ->^524288 (ScriptSize * Steps))
   -> (TxId -> List^128(ScriptSize * Steps))
   -> Rollup
   -> TxId
@@ -691,7 +691,7 @@ def txIsValid
   := \feeParams : Time -> FeeParams
   => \inputValues : TxId -> List^128(Value)
   => \assetClasses : List^4096(AssetClass)
-  => \scriptLimits : (ScriptAddress * TxId) -> (ScriptSize * Steps)
+  => \scriptLimits : (ScriptAddress * TxId) ->^524288 (ScriptSize * Steps)
   => \txScriptLimits : TxId -> List^128(ScriptSize * Steps)
   => \R : Rollup
   => \x : TxId
@@ -864,12 +864,12 @@ def assetClassesCohere
 
 
 def scriptLimitsCohere
-   : ((ScriptAddress * TxId) -> (ScriptSize * Steps))
-  -> (TxId -> List^128(ScriptSize * Steps))
+   : ((ScriptAddress * TxId) ->^524288 (ScriptSize * Steps))
+  -> (TxId ->^4096 List^128(ScriptSize * Steps))
   -> Rollup
   -> Prop
-  := \scriptLimits : (ScriptAddress * TxId) -> (ScriptSize * Steps)
-  => \txScriptLimits : TxId -> List^128(ScriptSize * Steps)
+  := \scriptLimits : (ScriptAddress * TxId) ->^524288 (ScriptSize * Steps)
+  => \txScriptLimits : TxId ->^4096 List^128(ScriptSize * Steps)
   => \R : Rollup
   => all i : N < length(keys(txs(R))),
      let x : TxId := nth(keys(txs(R)), i);
@@ -905,11 +905,11 @@ def valuesEqual
 
 
 def inputValuesCohere
-   : (TxId -> List^128(Value))
+   : (TxId ->^4096 List^128(Value))
   -> List^4096(AssetClass)
   -> Rollup
   -> Prop
-  := \inputValues : TxId -> List^128(Value)
+  := \inputValues : TxId ->^4096 List^128(Value)
   => \assetClasses : List^4096(AssetClass)
   => \R : Rollup
   => all i : N < length(keys(txs(R))),
@@ -973,9 +973,12 @@ def rollupHashUpToTimeIs : Rollup -> Time -> RollupHash -> Prop
   := \R : Rollup => \t : Time => \h : RollupHash => 0N = 0N. -- TODO: make into a free variable.
 
 
-def checkFeeParamUnrolling : Map^4096(Time, FeeParams) -> (Time -> FeeParams) -> Prop
+def checkFeeParamUnrolling
+   : Map^4096(Time, FeeParams)
+  -> (Time ->^4096 FeeParams)
+  -> Prop
   := \m : Map^4096(Time, FeeParams)
-  => \f : Time -> FeeParams
+  => \f : Time ->^4096 FeeParams
   => let t0 : Time := toTime(0N);
      (some i : N < length(keys(m)),
         (nth(keys(m), i) = t0)

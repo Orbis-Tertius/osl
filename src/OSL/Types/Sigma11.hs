@@ -11,6 +11,7 @@ module OSL.Types.Sigma11
     Formula (..),
     ExistentialQuantifier (..),
     someFirstOrder,
+    InstanceQuantifier (..),
     InputBound (..),
     OutputBound (..),
     Bound (..),
@@ -76,6 +77,7 @@ data Formula
   | Iff Formula Formula
   | ForAll Bound Formula
   | ForSome ExistentialQuantifier Formula
+  | Given Cardinality [InputBound] OutputBound Formula
   | Top
   | Bottom
 
@@ -97,6 +99,10 @@ instance Show Formula where
     "(∀<" <> show b <> ", " <> show p <> ")"
   show (ForSome q p) =
     "(∃" <> show q <> ", " <> show p <> ")"
+  show (Given _ [] ob p) =
+    "(λ<" <> show ob <> ", " <> show p <> ")"
+  show (Given n ibs ob p) =
+    "(λ^" <> show n <> "<" <> show ob <> "(<" <> intercalate ", <" (show <$> ibs) <> "), " <> show p <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
   show Top = "⊤"
@@ -129,11 +135,11 @@ instance Show ExistentialQuantifier where
   show (Some (Cardinality n) bs b) =
     "^"
       <> show n
-      <> "<"
-      <> show b
       <> "("
       <> intercalate ", " (("<" <>) . show <$> bs)
       <> ")"
+      <> "<"
+      <> show b
   show (SomeP (Cardinality n) b0 b1) =
     "^"
       <> show n
@@ -143,12 +149,15 @@ instance Show ExistentialQuantifier where
       <> show b1
       <> ")"
 
+data InstanceQuantifier
+  = Instance Cardinality [InputBound] OutputBound
+
 data Bound = TermBound Term | FieldMaxBound
   deriving (Eq)
 
 instance Show Bound where
   show (TermBound t) = show t
-  show FieldMaxBound = show "|F|"
+  show FieldMaxBound = "|F|"
 
 data AuxTables = AuxTables
   { functionTables :: Map Name (Map [Integer] Integer),

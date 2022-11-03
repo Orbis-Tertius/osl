@@ -18,6 +18,7 @@ import Halo2.Types.Circuit (Circuit (Circuit), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
+import Halo2.Types.FixedBound (FixedBound, boolBound)
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
 import Halo2.Types.LogicConstraints (LogicConstraints (LogicConstraints))
 
@@ -55,6 +56,7 @@ go' n0 0 p = do
   p' <- go' n0 n0 p
   addConstraint (Atom (var' i `Equals` constant 1) `Iff` p')
   addConstraint (Atom (var' i `Equals` constant 1) `Or` Atom (var' i `Equals` constant 0))
+  addBound i 2
   pure (Atom (var' i `Equals` constant 1))
 go' n0 n r =
   case r of
@@ -73,9 +75,19 @@ addConstraint p = do
   S colTypes constraints <- get
   put (S colTypes (constraints <> LogicConstraints [p] mempty))
 
+addBound :: ColumnIndex -> FixedBound -> State S ()
+addBound i b = do
+  S colTypes constraints <- get
+  put (S colTypes (constraints <> LogicConstraints mempty (Map.singleton i b)))
+
 addCol :: State S ColumnIndex
 addCol = do
   S colTypes constraints <- get
   let i = maybe 0 ((1 +) . fst) (Map.lookupMax (colTypes ^. #getColumnTypes))
-  put (S (colTypes <> ColumnTypes (Map.singleton i Advice)) constraints)
+      iBound = LogicConstraints mempty (Map.singleton i boolBound)
+  put
+    ( S
+        (colTypes <> ColumnTypes (Map.singleton i Advice))
+        (constraints <> iBound)
+    )
   pure i

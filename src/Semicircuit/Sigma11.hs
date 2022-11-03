@@ -12,11 +12,11 @@ module Semicircuit.Sigma11
   )
 where
 
-import Control.Lens ((%~))
+import Control.Lens ((%~), (^.))
 import Data.List (foldl')
 import Die (die)
 import OSL.Types.Arity (Arity (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name, OutputBound (..), Quantifier (Existential, Universal), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Instance, Universal), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
 
 prependBounds ::
   [InputBound] ->
@@ -36,6 +36,8 @@ prependQuantifier (Universal x b) f =
   ForAll x b f
 prependQuantifier (Existential q) f =
   ForSome q f
+prependQuantifier (Instance x n ibs ob) f =
+  Given x n ibs ob f
 
 -- Prepends the given arguments to all applications
 -- of the given name. This substitution does not need
@@ -57,22 +59,32 @@ prependArguments f xs =
     ForAll x b p -> ForAll x (mapBound term b) (rec p)
     ForSome q p ->
       ForSome (mapExistentialQuantifierBounds term q) (rec p)
+    Given x n ibs ob p ->
+      Given
+        x
+        n
+        (mapInputBound term <$> ibs)
+        (mapOutputBound term ob)
+        (rec p)
   where
     rec = prependArguments f xs
 
     term =
       \case
         App g xs' ->
-          if g == f
-            then App (#arity . #unArity %~ (+ length xs) $ g) ((var <$> xs) <> xs')
-            else App g xs'
+          if (g ^. #sym) == (f ^. #sym)
+            then
+              App
+                (Name ((g ^. #arity) + Arity (length xs)) (g ^. #sym))
+                ((var <$> xs) <> (term <$> xs'))
+            else App g (term <$> xs')
         AppInverse g x ->
-          if g == f
+          if (g ^. #sym) == (f ^. #sym)
             then
               die $
                 "prependArguments of AppInverse f: "
                   <> "this is a compiler bug"
-            else AppInverse g x
+            else AppInverse g (term x)
         Add x y ->
           Add (term x) (term y)
         Mul x y ->

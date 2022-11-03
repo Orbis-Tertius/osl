@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -22,15 +23,19 @@ import Crypto.Number.Basic (numBits)
 import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Text (pack)
+import Die (die)
 import Halo2.ByteDecomposition (countBytes)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.TruthTable (getByteRangeColumn, getZeroIndicatorColumn)
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Circuit (ArithmeticCircuit, Circuit (..), LogicCircuit)
+import Halo2.Types.Coefficient (Coefficient (Coefficient))
 import Halo2.Types.ColumnIndex (ColumnIndex (..))
 import Halo2.Types.ColumnType (ColumnType (Advice, Fixed))
 import qualified Halo2.Types.ColumnTypes as ColumnTypes
+import Halo2.Types.Exponent (Exponent)
 import Halo2.Types.FixedBound (FixedBound (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
@@ -43,8 +48,9 @@ import Halo2.Types.Polynomial (Polynomial (..))
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
+import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount)
-import Stark.Types.Scalar (half)
+import Stark.Types.Scalar (half, inverseScalar, normalize, toWord64)
 
 translateLogicGate ::
   LogicToArithmeticColumnLayout ->
@@ -159,7 +165,7 @@ getLayoutM bits lc = do
   atomAdvices <- fmap Map.fromList
     . forM (Set.toList (getAtomicConstraints lc))
     $ \ac ->
-      (ac,) <$> getAtomAdviceM bits
+      (ac,) <$> getAtomAdviceM bits (getAtomicConstraintFixedBound lc ac)
   let colTypes =
         lc ^. #columnTypes -- TODO: include the remaining columns
           <> ColumnTypes.fromList (replicate (foldl' (+) 0 (countAtomAdviceCols <$> atomAdvices)) Advice)
@@ -183,20 +189,54 @@ countAtomAdviceCols a =
 
 getAtomAdviceM ::
   BitsPerByte ->
+  FixedBound ->
   State ColumnIndex AtomAdvice
-getAtomAdviceM bits = do
+getAtomAdviceM bits bound = do
   AtomAdvice
     <$> (SignColumnIndex <$> nextColIndex)
     <*> replicateM n (ByteColumnIndex <$> nextColIndex)
     <*> replicateM n (TruthValueColumnIndex <$> nextColIndex)
   where
-    n = countBytes bits (FixedBound maxBound)
+    n = countBytes bits bound
 
 getAtomicConstraints :: LogicCircuit -> Set AtomicLogicConstraint
 getAtomicConstraints lc =
   Set.unions $
     getAtomicSubformulas
       <$> lc ^. #gateConstraints . #constraints
+
+getAtomicConstraintFixedBound :: LogicCircuit -> AtomicLogicConstraint -> FixedBound
+getAtomicConstraintFixedBound lc =
+  getPolynomialFixedBound lc . uncurry P.minus . atomicConstraintArgs
+
+-- Gets a fixed bound on the absolute value of the given polynomial.
+getPolynomialFixedBound :: LogicCircuit -> Polynomial -> FixedBound
+getPolynomialFixedBound lc poly =
+  foldl' (+) 0 (getMonomialFixedBound lc <$> Map.toList (poly ^. #monos))
+
+getMonomialFixedBound :: LogicCircuit -> (PowerProduct, Coefficient) -> FixedBound
+getMonomialFixedBound lc (pp, coef) =
+  getCoefficientFixedBound coef * getPowerProductFixedBound lc pp
+
+getCoefficientFixedBound :: Coefficient -> FixedBound
+getCoefficientFixedBound (Coefficient c) =
+  case inverseScalar c of
+    Nothing -> 1 -- c == 0
+    Just c' -> FixedBound (min (toWord64 (normalize c)) (toWord64 (normalize c')))
+
+getPowerProductFixedBound :: LogicCircuit -> PowerProduct -> FixedBound
+getPowerProductFixedBound lc pp =
+  foldl' (*) 1 (getPowerFixedBound lc <$> Map.toList (pp ^. #getPowerProduct))
+
+getPowerFixedBound :: LogicCircuit -> (PolynomialVariable, Exponent) -> FixedBound
+getPowerFixedBound lc (v, e) = x ^ e
+  where
+    x = case Map.lookup (v ^. #colIndex) (lc ^. #gateConstraints . #bounds) of
+      Just x' -> x'
+      Nothing ->
+        die $
+          "getPowerFixedBound: bound lookup failed (this is a compiler bug)\n"
+            <> pack (show (v ^. #colIndex))
 
 getAtomicSubformulas :: LogicConstraint -> Set AtomicLogicConstraint
 getAtomicSubformulas =

@@ -1,7 +1,7 @@
-def c : N -> N := \x : N => x.
+def c : F -> F := \x : F => x.
 
-def foo : N -> Prop
-  := \x : N => c(x) = x.
+def foo : F -> Prop
+  := \x : F => c(x) = x.
 
-def bar : N -> Prop
-  := \c : N => foo(c).
+def bar : F -> Prop
+  := \c : F => foo(c).
