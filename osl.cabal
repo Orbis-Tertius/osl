@@ -90,11 +90,13 @@ library
     Semicircuit.Sigma11
     Semicircuit.ToLogicCircuit
     Semicircuit.Types.DNFFormula
+    Semicircuit.Types.NameMapping
     Semicircuit.Types.PNFFormula
     Semicircuit.Types.QFFormula
     Semicircuit.Types.Semicircuit
     Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
     Semicircuit.Types.Sigma11
+    Trace.Types
 
   build-depends:
     base >= 4.9 && < 5,
