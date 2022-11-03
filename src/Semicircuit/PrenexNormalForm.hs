@@ -35,7 +35,7 @@ toStrongPrenexNormalForm ann qs f =
       (qs'', f') <- rec qs' f
       case qs'' of
         Instance {} : _ ->
-          pure $ (pushExistentialQuantifierDown q qs'', f')
+          pure (pushExistentialQuantifierDown q qs'', f')
         _ -> pure (Existential q : qs'', f')
     Universal x b : qs' -> do
       (qs'', f') <- rec qs' f

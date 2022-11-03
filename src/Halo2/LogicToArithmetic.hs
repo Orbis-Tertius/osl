@@ -226,7 +226,7 @@ getCoefficientFixedBound (Coefficient c) =
 
 getPowerProductFixedBound :: LogicCircuit -> PowerProduct -> FixedBound
 getPowerProductFixedBound lc pp =
-  foldl (*) 1 (getPowerFixedBound lc <$> Map.toList (pp ^. #getPowerProduct))
+  foldl' (*) 1 (getPowerFixedBound lc <$> Map.toList (pp ^. #getPowerProduct))
 
 getPowerFixedBound :: LogicCircuit -> (PolynomialVariable, Exponent) -> FixedBound
 getPowerFixedBound lc (v, e) = x ^ e

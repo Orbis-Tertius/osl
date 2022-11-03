@@ -139,7 +139,7 @@ instance PrependBounds InstanceQuantifier where
     Instance n (bs' <> bs) b
 
 prependInstanceQuantifiers :: [InstanceQuantifier] -> Formula -> Formula
-prependInstanceQuantifiers = foldl (.) id . fmap prependInstanceQuantifier
+prependInstanceQuantifiers = foldl' (.) id . fmap prependInstanceQuantifier
 
 prependInstanceQuantifier :: InstanceQuantifier -> Formula -> Formula
 prependInstanceQuantifier (Instance n bs b) = Given n bs b

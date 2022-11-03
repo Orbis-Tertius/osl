@@ -328,7 +328,7 @@ instanceColumnBounds ::
   LogicConstraints ->
   LogicConstraints
 instanceColumnBounds x layout =
-  foldl
+  foldl'
     (.)
     id
     ( reverse $
@@ -360,7 +360,7 @@ quantifierBounds what x layout name inBounds outBound =
     layout
     outputCol
     (outBound ^. #unOutputBound)
-    . foldl
+    . foldl'
       (.)
       id
       ( uncurry (boundToFixedBound x layout)
@@ -381,7 +381,7 @@ quantifierBounds what x layout name inBounds outBound =
         ( die $
             what
               <> " quantifierBounds: mapping lookup failed (this is a compiler bug)\n"
-              <> pack (show (name, (layout ^. #nameMappings)))
+              <> pack (show (name, layout ^. #nameMappings))
         )
         $ Map.lookup name (layout ^. #nameMappings)
 
@@ -445,7 +445,7 @@ existentialFunctionTableColumnBounds ::
   LogicConstraints ->
   LogicConstraints
 existentialFunctionTableColumnBounds x layout =
-  foldl
+  foldl'
     (.)
     id
     ( reverse $
@@ -472,7 +472,7 @@ universalTableBounds ::
   LogicConstraints ->
   LogicConstraints
 universalTableBounds x layout =
-  foldl
+  foldl'
     (.)
     id
     ( universalQuantifierBounds x layout
@@ -523,7 +523,7 @@ functionCallOutputColumnBounds ::
   LogicConstraints ->
   LogicConstraints
 functionCallOutputColumnBounds x layout =
-  foldl
+  foldl'
     (.)
     id
     ( functionCallOutputColumnBound layout
