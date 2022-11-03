@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.FixedBound
   ( FixedBound (FixedBound),
@@ -12,9 +12,9 @@ module Halo2.Types.FixedBound
   )
 where
 
-import Cast (word64ToInteger, integerToWord64)
-import Die (die)
+import Cast (integerToWord64, word64ToInteger)
 import Data.Word (Word64)
+import Die (die)
 import Halo2.Prelude
 import Stark.Types.Scalar (order)
 

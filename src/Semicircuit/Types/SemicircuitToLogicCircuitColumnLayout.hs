@@ -23,12 +23,12 @@ import Halo2.Types.ColumnTypes (ColumnTypes)
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 newtype OutputMapping = OutputMapping {unOutputMapping :: ColumnIndex}
-  deriving stock Generic
-  deriving newtype Show
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 newtype ArgMapping = ArgMapping {unArgMapping :: ColumnIndex}
-  deriving stock Generic
-  deriving newtype Show
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 data NameMapping = NameMapping
   { outputMapping :: OutputMapping,
@@ -37,21 +37,21 @@ data NameMapping = NameMapping
   deriving (Generic, Show)
 
 newtype TermMapping = TermMapping {unTermMapping :: ColumnIndex}
-  deriving stock Generic
-  deriving newtype Show
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 newtype ZeroVectorIndex = ZeroVectorIndex {unZeroVectorIndex :: ColumnIndex}
-  deriving stock Generic
-  deriving newtype Show
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 newtype OneVectorIndex = OneVectorIndex {unOneVectorIndex :: ColumnIndex}
-  deriving stock Generic
-  deriving newtype Show
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 newtype LastRowIndicatorColumnIndex = LastRowIndicatorColumnIndex
   {unLastRowIndicatorColumnIndex :: ColumnIndex}
-  deriving stock Generic
-  deriving newtype Show
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 data FixedColumns = FixedColumns
   { zeroVector :: ZeroVectorIndex,
@@ -62,8 +62,8 @@ data FixedColumns = FixedColumns
 
 newtype DummyRowAdviceColumn = DummyRowAdviceColumn
   {unDummyRowAdviceColumn :: ColumnIndex}
-  deriving Generic
-  deriving newtype Show
+  deriving (Generic)
+  deriving newtype (Show)
 
 data SemicircuitToLogicCircuitColumnLayout = SemicircuitToLogicCircuitColumnLayout
   { columnTypes :: ColumnTypes,

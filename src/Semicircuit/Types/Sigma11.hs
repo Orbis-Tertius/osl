@@ -126,7 +126,11 @@ instance Show Formula where
     "(λ" <> show x <> "<" <> show ob <> "," <> show p <> ")"
   show (Given x n ibs ob p) =
     "(λ" <> show x <> "^" <> show n <> "(" <> intercalate ", " (show <$> ibs)
-      <> ")<" <> show ob <> ", " <> show p <> ")"
+      <> ")<"
+      <> show ob
+      <> ", "
+      <> show p
+      <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
   show Top = "⊤"
@@ -188,7 +192,11 @@ data Quantifier
 instance Show Quantifier where
   show (Universal x b) = "∀" <> show x <> "<" <> show b
   show (Existential q) = "∃" <> show q
-  show (Instance x n ibs ob) = "λ" <> show x <>
-    (if null ibs then ""
-     else "^" <> show n <> "(" <> intercalate ", " (show <$> ibs) <> ")")
-    <> "<" <> show ob
+  show (Instance x n ibs ob) =
+    "λ" <> show x
+      <> ( if null ibs
+             then ""
+             else "^" <> show n <> "(" <> intercalate ", " (show <$> ibs) <> ")"
+         )
+      <> "<"
+      <> show ob

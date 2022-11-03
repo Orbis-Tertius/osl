@@ -25,7 +25,7 @@ import Die (die)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Given, Predicate, Top, Bottom), InputBound (..), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Mul), InstanceQuantifier (Instance))
+import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Mul))
 import OSL.Types.TranslationContext (Mapping (..))
 
 class MapNames a where
@@ -134,7 +134,8 @@ instance PrependBounds ExistentialQuantifier where
 instance PrependBounds InstanceQuantifier where
   prependBounds n bs (Instance _ [] b) =
     Instance n bs b
-  prependBounds _ bs' (Instance n bs b) = -- TODO: does the cardinality multiply?
+  prependBounds _ bs' (Instance n bs b) =
+    -- TODO: does the cardinality multiply?
     Instance n (bs' <> bs) b
 
 prependInstanceQuantifiers :: [InstanceQuantifier] -> Formula -> Formula

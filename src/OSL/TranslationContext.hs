@@ -87,7 +87,7 @@ mergeMapping3 f a b c =
           [ incrementDeBruijnIndices arity (m + 1)
             | (arity, DeBruijnIndex m) <- Map.toList bMaxes
           ]
-  in f a b' (h c)
+   in f a b' (h c)
 
 mappingIndices ::
   Mapping ann Term ->

@@ -84,7 +84,10 @@ addCol :: State S ColumnIndex
 addCol = do
   S colTypes constraints <- get
   let i = maybe 0 ((1 +) . fst) (Map.lookupMax (colTypes ^. #getColumnTypes))
-      iBound = LogicConstraints mempty (Map.singleton i boolBound) 
-  put (S (colTypes <> ColumnTypes (Map.singleton i Advice))
-         (constraints <> iBound))
+      iBound = LogicConstraints mempty (Map.singleton i boolBound)
+  put
+    ( S
+        (colTypes <> ColumnTypes (Map.singleton i Advice))
+        (constraints <> iBound)
+    )
   pure i

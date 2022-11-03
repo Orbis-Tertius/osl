@@ -28,7 +28,7 @@ import OSL.Bound (boundAnnotation)
 import OSL.BuildTranslationContext (addFreeVariableMapping, addTermMapping, buildTranslationContext', getBoundS11NamesInContext, getFreeOSLName, getFreeS11Name)
 import OSL.Sigma11 (incrementArities, incrementDeBruijnIndices, prependBounds, prependInstanceQuantifiers)
 import OSL.Term (termAnnotation)
-import OSL.TranslationContext (linearizeMapping, mergeMapping, mergeMappings, mergeMapping3)
+import OSL.TranslationContext (linearizeMapping, mergeMapping, mergeMapping3, mergeMappings)
 import OSL.Type (typeAnnotation)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
@@ -912,8 +912,11 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
           let fM = incrementArities n bM
           let fQs = prependBounds cardinality aBounds <$> bQs
           pure (fQs, fM)
-        InfiniteDimensions -> lift . Left $ ErrorMessage ann
-          "domain of function type in instance data must be finite-dimensional"
+        InfiniteDimensions ->
+          lift . Left $
+            ErrorMessage
+              ann
+              "domain of function type in instance data must be finite-dimensional"
     OSL.P ann mCardinality a b -> do
       aDim <- lift $ getMappingDimensions decls a
       case aDim of
@@ -933,21 +936,30 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
     OSL.Product _ a b -> do
       (aQs, aM) <- rec lc a
       (bQs, bM) <- rec lc b
-      pure ( aQs <> bQs,
-             mergeMapping
-             (\aM' bM' -> ProductMapping (LeftMapping aM') (RightMapping bM'))
-             aM
-             bM
-           )
+      pure
+        ( aQs <> bQs,
+          mergeMapping
+            (\aM' bM' -> ProductMapping (LeftMapping aM') (RightMapping bM'))
+            aM
+            bM
+        )
     OSL.Coproduct ann a b -> do
       (aQs, aM) <- rec lc a
       (bQs, bM) <- rec lc b
       (cQs, cM) <- rec lc (OSL.Fin ann 2)
-      pure (cQs <> aQs <> bQs,
-            mergeMapping3
-              (\cM' aM' bM' -> CoproductMapping (ChoiceMapping cM')
-                  (LeftMapping aM') (RightMapping bM'))
-              cM aM bM)
+      pure
+        ( cQs <> aQs <> bQs,
+          mergeMapping3
+            ( \cM' aM' bM' ->
+                CoproductMapping
+                  (ChoiceMapping cM')
+                  (LeftMapping aM')
+                  (RightMapping bM')
+            )
+            cM
+            aM
+            bM
+        )
     OSL.NamedType ann name ->
       case getDeclaration decls name of
         Just (OSL.Data a) -> rec lc a
@@ -955,34 +967,38 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
     OSL.Maybe ann a -> do
       (aQs, aM) <- rec lc a
       (cQs, cM) <- rec lc (OSL.Fin ann 2)
-      pure (cQs <> aQs,
-            mergeMapping
-              (\cM' aM' -> MaybeMapping (ChoiceMapping cM') (ValuesMapping aM'))
-              cM
-              aM)
+      pure
+        ( cQs <> aQs,
+          mergeMapping
+            (\cM' aM' -> MaybeMapping (ChoiceMapping cM') (ValuesMapping aM'))
+            cM
+            aM
+        )
     OSL.List ann (OSL.Cardinality n) a -> do
       (lQs, lM) <- rec lc (OSL.N ann)
       let decls' = addDeclaration lSym (OSL.FreeVariable (OSL.Fin ann n)) decls
           lSym = getFreeOSLName lc
-          lc' = TranslationContext decls' 
-              $ mappings <> Map.singleton lSym lM
+          lc' =
+            TranslationContext decls' $
+              mappings <> Map.singleton lSym lM
       (vQs, vM) <- rec lc' (OSL.F ann (Just (OSL.Cardinality n)) (OSL.Fin ann n) a)
       pure (lQs <> vQs, ListMapping (LengthMapping lM) (ValuesMapping vM))
     OSL.Map ann (OSL.Cardinality n) a b -> do
       (kQs, kM) <- rec lc (OSL.List ann (OSL.Cardinality n) a)
       (vQs, vM) <- rec lc (OSL.F ann (Just (OSL.Cardinality n)) a b)
-      pure (kQs <> vQs,
-            mergeMapping
+      pure
+        ( kQs <> vQs,
+          mergeMapping
             ( curry
                 ( \case
-                    ( ListMapping (LengthMapping lM) (ValuesMapping kM'), vM') ->
+                    (ListMapping (LengthMapping lM) (ValuesMapping kM'), vM') ->
                       MapMapping (LengthMapping lM) (KeysMapping kM') (ValuesMapping vM')
                     d -> die $ "logical impossibility in map quantifier translation: " <> pack (show d)
                 )
             )
             kM
             vM
-           )
+        )
   where
     rec = getInstanceQuantifierStringAndMapping gc
 
@@ -990,10 +1006,15 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
       bTs <- translateBound gc lc varType Nothing
       case bTs of
         [bT] ->
-          pure ( [S11.Instance 1 [] (S11.OutputBound bT)]
-               , ScalarMapping (S11.var (S11.Name 0 0)) )
-        _ -> lift . Left $ ErrorMessage (typeAnnotation varType)
-          "expected a scalar bound"
+          pure
+            ( [S11.Instance 1 [] (S11.OutputBound bT)],
+              ScalarMapping (S11.var (S11.Name 0 0))
+            )
+        _ ->
+          lift . Left $
+            ErrorMessage
+              (typeAnnotation varType)
+              "expected a scalar bound"
 
 getExistentialQuantifierStringAndMapping ::
   Show ann =>

@@ -16,7 +16,7 @@ import Control.Lens ((%~), (^.))
 import Data.List (foldl')
 import Die (die)
 import OSL.Types.Arity (Arity (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Equal, ForAll, ForSome, Iff, Implies, LessOrEqual, Not, Or, Top, Bottom, Given, Predicate), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Universal, Instance), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Instance, Universal), Term (Add, App, AppInverse, Const, IndLess, Mul), var)
 
 prependBounds ::
   [InputBound] ->
@@ -60,10 +60,12 @@ prependArguments f xs =
     ForSome q p ->
       ForSome (mapExistentialQuantifierBounds term q) (rec p)
     Given x n ibs ob p ->
-      Given x n
-      (mapInputBound term <$> ibs)
-      (mapOutputBound term ob)
-      (rec p)
+      Given
+        x
+        n
+        (mapInputBound term <$> ibs)
+        (mapOutputBound term ob)
+        (rec p)
   where
     rec = prependArguments f xs
 
@@ -71,8 +73,10 @@ prependArguments f xs =
       \case
         App g xs' ->
           if (g ^. #sym) == (f ^. #sym)
-            then App (Name ((g ^. #arity) + Arity (length xs)) (g ^. #sym))
-                 ((var <$> xs) <> (term <$> xs'))
+            then
+              App
+                (Name ((g ^. #arity) + Arity (length xs)) (g ^. #sym))
+                ((var <$> xs) <> (term <$> xs'))
             else App g (term <$> xs')
         AppInverse g x ->
           if (g ^. #sym) == (f ^. #sym)

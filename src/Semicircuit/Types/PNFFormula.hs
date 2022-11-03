@@ -16,7 +16,7 @@ import Data.List (intercalate)
 import GHC.Generics (Generic)
 import OSL.Types.Cardinality (Cardinality)
 import qualified Semicircuit.Types.QFFormula as QF
-import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier (..), Name, InputBound, OutputBound)
+import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier (..), InputBound, Name, OutputBound)
 
 data Formula = Formula
   { qfFormula :: QF.Formula,
@@ -38,10 +38,9 @@ instance Show Quantifiers where
   show qs =
     intercalate
       ", "
-      (
-         (("λ" <>) . show <$> (qs ^. #instanceQuantifiers))
-      <> (("∃" <>) . show <$> (qs ^. #existentialQuantifiers))
-      <> (("∀" <>) . show <$> (qs ^. #universalQuantifiers))
+      ( (("λ" <>) . show <$> (qs ^. #instanceQuantifiers))
+          <> (("∃" <>) . show <$> (qs ^. #existentialQuantifiers))
+          <> (("∀" <>) . show <$> (qs ^. #universalQuantifiers))
       )
 
 instance Semigroup Quantifiers where
@@ -60,17 +59,20 @@ data UniversalQuantifier = All
 instance Show UniversalQuantifier where
   show q = show (q ^. #name) <> "<" <> show (q ^. #bound)
 
-data InstanceQuantifier =
-  Instance
-  { name :: Name
-  , cardinality :: Cardinality
-  , inputBounds :: [InputBound]
-  , outputBound :: OutputBound
+data InstanceQuantifier = Instance
+  { name :: Name,
+    cardinality :: Cardinality,
+    inputBounds :: [InputBound],
+    outputBound :: OutputBound
   }
   deriving (Eq, Generic)
 
 instance Show InstanceQuantifier where
-  show g = show (g ^. #name) <>
-    (if null (g ^. #inputBounds) then ""
-     else "(" <> intercalate ", " (show <$> (g ^. #inputBounds)) <> ")")
-    <> "<" <> show (g ^. #outputBound)
+  show g =
+    show (g ^. #name)
+      <> ( if null (g ^. #inputBounds)
+             then ""
+             else "(" <> intercalate ", " (show <$> (g ^. #inputBounds)) <> ")"
+         )
+      <> "<"
+      <> show (g ^. #outputBound)

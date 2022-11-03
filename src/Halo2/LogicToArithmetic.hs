@@ -1,9 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Halo2.LogicToArithmetic
   ( eval,
@@ -17,7 +17,6 @@ module Halo2.LogicToArithmetic
 where
 
 import Cast (intToInteger)
-import Die (die)
 import Control.Monad (forM, replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Crypto.Number.Basic (numBits)
@@ -25,6 +24,7 @@ import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (pack)
+import Die (die)
 import Halo2.ByteDecomposition (countBytes)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
@@ -50,7 +50,7 @@ import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount)
-import Stark.Types.Scalar (half, inverseScalar, toWord64, normalize)
+import Stark.Types.Scalar (half, inverseScalar, normalize, toWord64)
 
 translateLogicGate ::
   LogicToArithmeticColumnLayout ->
@@ -232,9 +232,10 @@ getPowerFixedBound :: LogicCircuit -> (PolynomialVariable, Exponent) -> FixedBou
 getPowerFixedBound lc (v, e) = x ^ e
   where
     x = case Map.lookup (v ^. #colIndex) (lc ^. #gateConstraints . #bounds) of
-          Just x' -> x'
-          Nothing -> die $
-            "getPowerFixedBound: bound lookup failed (this is a compiler bug)\n"
+      Just x' -> x'
+      Nothing ->
+        die $
+          "getPowerFixedBound: bound lookup failed (this is a compiler bug)\n"
             <> pack (show (v ^. #colIndex))
 
 getAtomicSubformulas :: LogicConstraint -> Set AtomicLogicConstraint
