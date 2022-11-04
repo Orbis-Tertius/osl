@@ -96,6 +96,7 @@ library
     Semicircuit.Types.Semicircuit
     Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
     Semicircuit.Types.Sigma11
+    Trace.FromLogicConstraints
     Trace.Types
 
   build-depends:

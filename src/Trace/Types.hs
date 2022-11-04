@@ -9,18 +9,19 @@ module Trace.Types
   , StepTypeId (StepTypeId)
   , SubexpressionId (SubexpressionId)
   , SubexpressionLink (SubexpressionLink)
+  , ResultExpressionId (ResultExpressionId)
+  , NumberOfCases (NumberOfCases)
   , TraceType (TraceType)
   ) where
 
 
 import Halo2.Prelude
 import Halo2.Types.ColumnIndex (ColumnIndex)
+import Halo2.Types.ColumnTypes (ColumnTypes)
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.FixedValues (FixedValues)
-import Semicircuit.Types.Sigma11 (Name)
-import Semicircuit.Types.PNFFormula (Quantifiers)
-import Semicircuit.Types.NameMapping (NameMapping)
+import Halo2.Types.RowCount (RowCount)
 
 
 newtype InputColumnIndex =
@@ -66,13 +67,19 @@ newtype ResultExpressionId =
   deriving Generic
 
 
+newtype NumberOfCases =
+  NumberOfCases { unNumberOfCases :: Int }
+  deriving Generic
+
+
 data TraceType =
   TraceType
-  { stepTypes :: Map StepTypeId StepType
+  { columnTypes :: ColumnTypes
+  , stepTypes :: Map StepTypeId StepType
   , subexpressions :: Set SubexpressionId
   , links :: Set SubexpressionLink
   , result :: ResultExpressionId
-  , quantifiers :: Quantifiers
-  , nameMappings :: Map Name NameMapping
+  , numCases :: NumberOfCases
+  , rowCount :: RowCount
   }
   deriving Generic
