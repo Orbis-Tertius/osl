@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.EqualityConstrainableColumns
@@ -13,4 +15,5 @@ import Halo2.Prelude
 import Halo2.Types.ColumnIndex (ColumnIndex)
 
 newtype EqualityConstrainableColumns = EqualityConstrainableColumns {getEqualityConstrainableColumns :: Set ColumnIndex}
-  deriving (Eq, Ord, Show, Generic)
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving newtype (Semigroup, Monoid)

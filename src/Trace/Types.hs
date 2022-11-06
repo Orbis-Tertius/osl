@@ -55,9 +55,9 @@ data SubexpressionId = SubexpressionId { unSubexpressionId :: Int }
 
 data SubexpressionLink =
   SubexpressionLink
-  { inputs :: [SubexpressionId]
+  { stepType :: StepTypeId
+  , inputs :: [SubexpressionId]
   , outputs :: [SubexpressionId]
-  , stepType :: StepTypeId
   }
   deriving Generic
 

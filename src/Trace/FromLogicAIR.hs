@@ -1,23 +1,21 @@
 {-# LANGUAGE OverloadedLabels #-}
 
-module Trace.FromLogicConstraints
-  ( logicConstraintsToTraceType
+module Trace.FromLogicAIR
+  ( logicAIRToTraceType
   ) where
 
 
 import Halo2.Prelude
+import Halo2.Types.AIR (LogicAIR)
 import Halo2.Types.ColumnTypes (ColumnTypes)
-import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Trace.Types (TraceType (TraceType), NumberOfCases (NumberOfCases), StepTypeId, StepType, SubexpressionId, SubexpressionLink, ResultExpressionId)
 
 
-logicConstraintsToTraceType
-  :: ColumnTypes
-  -> RowCount
-  -> LogicConstraints
+logicAIRToTraceType
+  :: LogicAIR
   -> TraceType
-logicConstraintsToTraceType colTypes rowCount constraints =
+logicAIRToTraceType air =
   TraceType
   colTypes'
   stepTypes
@@ -27,8 +25,10 @@ logicConstraintsToTraceType colTypes rowCount constraints =
   (NumberOfCases (rowCount ^. #getRowCount))
   (rowCount * RowCount (maxStepsPerCase colTypes' stepTypes subexprs links resultId))
   where
+    rowCount = air ^. #rowCount
+
     (colTypes', stepTypes, subexprs, links, resultId) =
-      todo colTypes constraints
+      todo air
 
 
 maxStepsPerCase

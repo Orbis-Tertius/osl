@@ -14,6 +14,7 @@ library
   exposed-modules:
     Cast
     Die
+    Halo2.AIR
     Halo2.Prelude
     Halo2.ArithmetizationConfig
     Halo2.BoundLogicConstraintComplexity
@@ -23,7 +24,7 @@ library
     Halo2.Polynomial
     Halo2.PowerProduct
     Halo2.TruthTable
-    Halo2.Types
+    Halo2.Types.AIR
     Halo2.Types.ArithmetizationConfig
     Halo2.Types.Byte
     Halo2.Types.ByteDecompositionSize
@@ -96,7 +97,7 @@ library
     Semicircuit.Types.Semicircuit
     Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
     Semicircuit.Types.Sigma11
-    Trace.FromLogicConstraints
+    Trace.FromLogicAIR
     Trace.Types
 
   build-depends:
