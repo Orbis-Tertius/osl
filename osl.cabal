@@ -98,6 +98,8 @@ library
     Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
     Semicircuit.Types.Sigma11
     Trace.FromLogicAIR
+    Trace.LogicToArithmetic
+    Trace.ToArithmeticCircuit
     Trace.Types
 
   build-depends:
