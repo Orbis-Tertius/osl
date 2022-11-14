@@ -14,5 +14,20 @@ traceTypeToArithmeticCircuit
   -> LookupArguments
   -> EqualityConstraints
   -> ArithmeticCircuit
-traceTypeToArithmeticCircuit traceType =
-  toCircuit (traceTypeToArithmeticAIR traceType)
+traceTypeToArithmeticCircuit traceType eqcs lookups eqs =
+  toCircuit
+  (traceTypeToArithmeticAIR traceType)
+  eqcs
+  (lookups <> traceTypeLookupArguments traceType)
+  eqs
+
+-- Trace type lookup arguments entail that for each step
+-- of each case, for each input to the step, there is a step
+-- of the same case which outputs that input.
+traceTypeLookupArguments
+  :: TraceType
+  -> LookupArguments
+traceTypeLookupArguments = todo
+
+todo :: a
+todo = todo
