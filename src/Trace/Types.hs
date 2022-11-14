@@ -95,6 +95,8 @@ data TraceType =
   , links :: Set SubexpressionLink
   , result :: ResultExpressionId
   , stepTypeColumnIndex :: StepTypeColumnIndex
+  , inputColumnIndices :: [InputColumnIndex]
+  , outputColumnIndices :: [OutputColumnIndex]
   , numCases :: NumberOfCases
   , rowCount :: RowCount
   }
