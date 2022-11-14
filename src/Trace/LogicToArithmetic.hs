@@ -18,5 +18,5 @@ logicCircuitToArithmeticCircuit lc =
   traceTypeToArithmeticCircuit
   (logicAIRToTraceType (fromCircuit lc))
   (lc ^. #equalityConstrainableColumns)
-  (lc ^. #lookupArguments)
+  (lc ^. #lookupArguments) -- TODO: do these change in any way?
   (lc ^. #equalityConstraints)
