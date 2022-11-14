@@ -90,7 +90,22 @@ data FixedValueMappings =
   deriving Generic
 
 fixedValueMappings :: TraceType -> FixedValueMappings
-fixedValueMappings = todo
+fixedValueMappings t =
+  FixedValueMappings
+  (Mapping i :: Mapping StepTypeId)
+  (Mapping <$> [i+1..j] :: [Mapping InputSubexpressionId])
+  (Mapping (j+1) :: Mapping OutputSubexpressionId)
+  (Mapping (j+2) :: Mapping CaseNumber)
+  (Mapping (j+3) :: Mapping One)
+  where
+    i :: ColumnIndex
+    i = ColumnIndex (length (Map.keys (t ^. #columnTypes . #getColumnTypes)))
+
+    j :: ColumnIndex
+    j = i + 1
+      + ColumnIndex (Map.foldl' max 0
+                       (length . (^. #inputs)
+                         <$> (t ^. #stepTypes)))
 
 additionalFixedValues
   :: TraceType
