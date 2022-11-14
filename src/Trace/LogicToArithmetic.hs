@@ -25,7 +25,7 @@ logicCircuitToArithmeticCircuit lc =
 -- Each lookup argument in the logic circuit results in a
 -- step type, and a lookup argument, gated to the step type
 -- corresponding, which is the same lookup argument with the
--- column indices substituted for input and output column
+-- column indices substituted for input column
 -- indices in the trace type.
 lookupArguments
   :: LogicCircuit
