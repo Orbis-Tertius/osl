@@ -3,6 +3,7 @@
 
 module Trace.ToArithmeticAIR (traceTypeToArithmeticAIR) where
 
+import Data.List.Extra (mconcatMap)
 import qualified Data.Map as Map
 import Halo2.Prelude
 import Halo2.Types.AIR (AIR (AIR), ArithmeticAIR)
@@ -11,7 +12,7 @@ import Halo2.Types.ColumnType (ColumnType (Fixed))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.FixedValues (FixedValues)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
-import Trace.Types (TraceType, StepTypeId, InputSubexpressionId, OutputSubexpressionId)
+import Trace.Types (TraceType, StepTypeId, InputSubexpressionId, OutputSubexpressionId, StepType)
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -43,7 +44,12 @@ columnTypes t m =
          (replicate (4 + length (m ^. #inputs)) Fixed)))
 
 gateConstraints :: TraceType -> PolynomialConstraints
-gateConstraints = todo
+gateConstraints t =
+  mconcatMap stepTypeGateConstraints
+    (Map.elems (t ^. #stepTypes))
+
+stepTypeGateConstraints :: StepType -> PolynomialConstraints
+stepTypeGateConstraints = todo
 
 newtype Mapping a =
   Mapping { unMapping :: ColumnIndex }
