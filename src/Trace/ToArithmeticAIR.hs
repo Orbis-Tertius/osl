@@ -12,6 +12,7 @@ module Trace.ToArithmeticAIR
 
 import Data.List.Extra (mconcatMap)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Halo2.Prelude
 import qualified Halo2.Polynomial as P
 import Halo2.Types.AIR (AIR (AIR), ArithmeticAIR)
@@ -21,7 +22,7 @@ import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.FixedValues (FixedValues)
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
-import Trace.Types (TraceType, StepTypeId, InputSubexpressionId, OutputSubexpressionId, StepType, StepTypeColumnIndex)
+import Trace.Types (TraceType, StepTypeId, InputSubexpressionId, OutputSubexpressionId, StepType, StepTypeColumnIndex, SubexpressionLink)
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -112,13 +113,23 @@ additionalFixedValues
   -> FixedValueMappings
   -> FixedValues
 additionalFixedValues t m =
-  linksTable t m <> caseFixedColumn t m <> oneFixedColumn t m
+  linksTableFixedColumns (linksTable t) m <> caseFixedColumn t m <> oneFixedColumn t m
+
+newtype LinksTable =
+  LinksTable
+    { unLinksTable :: [SubexpressionLink] }
+  deriving Generic
 
 linksTable
   :: TraceType
+  -> LinksTable
+linksTable = LinksTable . Set.toList . (^. #links)
+
+linksTableFixedColumns
+  :: LinksTable
   -> FixedValueMappings
   -> FixedValues
-linksTable = todo
+linksTableFixedColumns t m = todo t m
 
 caseFixedColumn
   :: TraceType
