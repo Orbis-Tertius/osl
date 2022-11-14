@@ -12,6 +12,7 @@ module Trace.Types
   , OutputSubexpressionId (OutputSubexpressionId)
   , SubexpressionLink (SubexpressionLink)
   , ResultExpressionId (ResultExpressionId)
+  , StepTypeColumnIndex (StepTypeColumnIndex)
   , NumberOfCases (NumberOfCases)
   , TraceType (TraceType)
   ) where
@@ -24,6 +25,7 @@ import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
 import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.FixedValues (FixedValues)
 import Halo2.Types.RowCount (RowCount)
+import Stark.Types.Scalar (Scalar)
 
 
 newtype InputColumnIndex =
@@ -47,11 +49,11 @@ data StepType =
   deriving Generic
 
 
-newtype StepTypeId = StepTypeId { unStepTypeId :: Int }
+newtype StepTypeId = StepTypeId { unStepTypeId :: Scalar }
   deriving Generic
 
 
-newtype SubexpressionId = SubexpressionId { unSubexpressionId :: Int }
+newtype SubexpressionId = SubexpressionId { unSubexpressionId :: Scalar }
   deriving Generic
 
 newtype InputSubexpressionId = InputSubexpressionId { unInputSubexpressionId :: SubexpressionId }
@@ -76,7 +78,7 @@ newtype ResultExpressionId =
 
 
 newtype StepTypeColumnIndex =
-  StepTypeColumnId { unStepTypeColumnId :: ColumnIndex }
+  StepTypeColumnIndex { unStepTypeColumnIndex :: ColumnIndex }
   deriving Generic
 
 

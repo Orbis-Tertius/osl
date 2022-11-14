@@ -13,6 +13,7 @@ module Trace.ToArithmeticAIR
 import Data.List.Extra (mconcatMap)
 import qualified Data.Map as Map
 import Halo2.Prelude
+import qualified Halo2.Polynomial as P
 import Halo2.Types.AIR (AIR (AIR), ArithmeticAIR)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Fixed))
@@ -20,7 +21,7 @@ import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.FixedValues (FixedValues)
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
-import Trace.Types (TraceType, StepTypeId, InputSubexpressionId, OutputSubexpressionId, StepType)
+import Trace.Types (TraceType, StepTypeId, InputSubexpressionId, OutputSubexpressionId, StepType, StepTypeColumnIndex)
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -53,17 +54,22 @@ columnTypes t m =
 
 gateConstraints :: TraceType -> PolynomialConstraints
 gateConstraints t =
-  mconcatMap stepTypeGateConstraints
-    (Map.elems (t ^. #stepTypes))
+  mconcatMap
+    (stepTypeGateConstraints (t ^. #stepTypeColumnIndex))
+    (Map.toList (t ^. #stepTypes))
 
-stepTypeGateConstraints :: StepType -> PolynomialConstraints
-stepTypeGateConstraints t =
+stepTypeGateConstraints :: StepTypeColumnIndex -> (StepTypeId, StepType) -> PolynomialConstraints
+stepTypeGateConstraints i (tId, t) =
   PolynomialConstraints
-  (gateOnStepType t <$> (t ^. #gateConstraints . #constraints))
+  (gateOnStepType i tId <$> (t ^. #gateConstraints . #constraints))
   (t ^. #gateConstraints . #degreeBound)
 
-gateOnStepType :: StepType -> Polynomial -> Polynomial
-gateOnStepType = todo
+gateOnStepType :: StepTypeColumnIndex -> StepTypeId -> Polynomial -> Polynomial
+gateOnStepType i tId =
+  P.times
+    (P.minus
+      (P.var' (i ^. #unStepTypeColumnIndex))
+      (P.constant (tId ^. #unStepTypeId)))
 
 newtype Mapping a =
   Mapping { unMapping :: ColumnIndex }
