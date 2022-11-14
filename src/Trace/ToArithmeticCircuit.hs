@@ -2,8 +2,6 @@ module Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit) where
 
 import Halo2.AIR (toCircuit)
 import Halo2.Types.Circuit (ArithmeticCircuit)
-import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
-import Halo2.Types.EqualityConstraints (EqualityConstraints)
 import Halo2.Types.LookupArguments (LookupArguments)
 import Trace.ToArithmeticAIR (traceTypeToArithmeticAIR)
 import Trace.Types (TraceType)
@@ -14,9 +12,9 @@ traceTypeToArithmeticCircuit
 traceTypeToArithmeticCircuit traceType =
   toCircuit
   (traceTypeToArithmeticAIR traceType)
-  (equalityConstrainableColumns traceType)
+  mempty
   (traceTypeLookupArguments traceType)
-  (equalityConstraints traceType)
+  mempty
 
 -- Trace type lookup arguments entail that:
 --  * For each step of each case, for each input to the step,
@@ -30,16 +28,6 @@ traceTypeLookupArguments
   :: TraceType
   -> LookupArguments
 traceTypeLookupArguments = todo
-
-equalityConstrainableColumns
-  :: TraceType
-  -> EqualityConstrainableColumns
-equalityConstrainableColumns = todo
-
-equalityConstraints
-  :: TraceType
-  -> EqualityConstraints
-equalityConstraints = todo
 
 todo :: a
 todo = todo
