@@ -1,7 +1,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedLabels #-}
 
-module Trace.ToArithmeticAIR (traceTypeToArithmeticAIR) where
+module Trace.ToArithmeticAIR
+  ( traceTypeToArithmeticAIR
+  , Mapping (Mapping)
+  , CaseNumber
+  , One
+  , FixedValueMappings (FixedValueMappings)
+  , fixedValueMappings
+  ) where
 
 import Data.List.Extra (mconcatMap)
 import qualified Data.Map as Map
