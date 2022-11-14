@@ -111,7 +111,26 @@ additionalFixedValues
   :: TraceType
   -> FixedValueMappings
   -> FixedValues
-additionalFixedValues = todo
+additionalFixedValues t m =
+  linksTable t m <> caseFixedColumn t m <> oneFixedColumn t m
+
+linksTable
+  :: TraceType
+  -> FixedValueMappings
+  -> FixedValues
+linksTable = todo
+
+caseFixedColumn
+  :: TraceType
+  -> FixedValueMappings
+  -> FixedValues
+caseFixedColumn = todo
+
+oneFixedColumn
+  :: TraceType
+  -> FixedValueMappings
+  -> FixedValues
+oneFixedColumn = todo
 
 todo :: a
 todo = todo
