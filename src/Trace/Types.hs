@@ -20,7 +20,7 @@ module Trace.Types
 import Halo2.Prelude
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnTypes (ColumnTypes)
-import Halo2.Types.Polynomial (Polynomial)
+import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
 import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.FixedValues (FixedValues)
 import Halo2.Types.RowCount (RowCount)
@@ -40,7 +40,7 @@ data StepType =
   StepType
   { inputs :: [InputColumnIndex]
   , output :: OutputColumnIndex
-  , gateConstraints :: [Polynomial]
+  , gateConstraints :: PolynomialConstraints
   , lookupArguments :: LookupArguments
   , fixedValues :: FixedValues
   }
@@ -54,10 +54,10 @@ newtype StepTypeId = StepTypeId { unStepTypeId :: Int }
 newtype SubexpressionId = SubexpressionId { unSubexpressionId :: Int }
   deriving Generic
 
-newtype InputSubexpressionId = InputSubexpressionId { unInputSubexpressionId :: Int }
+newtype InputSubexpressionId = InputSubexpressionId { unInputSubexpressionId :: SubexpressionId }
   deriving Generic
 
-newtype OutputSubexpressionId = OutputSubexpressionId { unOutputSubexpressionId :: Int }
+newtype OutputSubexpressionId = OutputSubexpressionId { unOutputSubexpressionId :: SubexpressionId }
   deriving Generic
 
 
@@ -75,6 +75,11 @@ newtype ResultExpressionId =
   deriving Generic
 
 
+newtype StepTypeColumnIndex =
+  StepTypeColumnId { unStepTypeColumnId :: ColumnIndex }
+  deriving Generic
+
+
 newtype NumberOfCases =
   NumberOfCases { unNumberOfCases :: Int }
   deriving Generic
@@ -87,6 +92,7 @@ data TraceType =
   , subexpressions :: Set SubexpressionId
   , links :: Set SubexpressionLink
   , result :: ResultExpressionId
+  , stepTypeColumnIndex :: StepTypeColumnIndex
   , numCases :: NumberOfCases
   , rowCount :: RowCount
   }

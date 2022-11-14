@@ -22,12 +22,13 @@ logicAIRToTraceType air =
   subexprs
   links
   resultId
+  stepTypeColIdx
   (NumberOfCases (rowCount ^. #getRowCount))
   (rowCount * RowCount (maxStepsPerCase colTypes' stepTypes subexprs links resultId))
   where
     rowCount = air ^. #rowCount
 
-    (colTypes', stepTypes, subexprs, links, resultId) =
+    (colTypes', stepTypes, subexprs, links, resultId, stepTypeColIdx) =
       todo air
 
 
