@@ -99,6 +99,7 @@ library
     Semicircuit.Types.Sigma11
     Trace.FromLogicAIR
     Trace.LogicToArithmetic
+    Trace.ToArithmeticAIR
     Trace.ToArithmeticCircuit
     Trace.Types
 

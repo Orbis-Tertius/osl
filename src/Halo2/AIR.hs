@@ -9,22 +9,26 @@ module Halo2.AIR
 import Halo2.Prelude
 import Halo2.Types.AIR (AIR (AIR))
 import Halo2.Types.Circuit (Circuit (Circuit))
+import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
+import Halo2.Types.EqualityConstraints (EqualityConstraints)
+import Halo2.Types.LookupArguments (LookupArguments)
 
--- Each AIR defines a circuit, which has no lookup arguments or equality
--- constraints.
-toCircuit :: AIR a -> Circuit a
-toCircuit a =
+toCircuit
+  :: AIR a
+  -> EqualityConstrainableColumns
+  -> LookupArguments
+  -> EqualityConstraints
+  -> Circuit a
+toCircuit a eqcs lookups eqs =
   Circuit
   (a ^. #columnTypes)
-  mempty
+  eqcs
   (a ^. #gateConstraints)
-  mempty
+  lookups
   (a ^. #rowCount)
-  mempty
+  eqs
   (a ^. #fixedValues)
 
--- Each circuit defines an AIR, by forgetting its lookup arguments and
--- equality constraints.
 fromCircuit :: Circuit a -> AIR a
 fromCircuit c =
   AIR
