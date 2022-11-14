@@ -21,9 +21,14 @@ traceTypeToArithmeticCircuit traceType eqcs lookups eqs =
   (lookups <> traceTypeLookupArguments traceType)
   eqs
 
--- Trace type lookup arguments entail that for each step
--- of each case, for each input to the step, there is a step
--- of the same case which outputs that input.
+-- Trace type lookup arguments entail that:
+--  * For each step of each case, for each input to the step,
+--    there is a step of the same case which outputs that input.
+--  * For each step of each case, its vector of input and
+--    output subexpression ids is in the links table.
+--  * For each case, there is a step of the result
+--    subexpression id and its output is 1.
+-- They also include the lookup arguments for each step type.
 traceTypeLookupArguments
   :: TraceType
   -> LookupArguments
