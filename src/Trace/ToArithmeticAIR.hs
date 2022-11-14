@@ -10,8 +10,10 @@ module Trace.ToArithmeticAIR
   , fixedValueMappings
   ) where
 
-import Data.List.Extra (mconcatMap)
+import Control.Lens ((<&>))
+import Data.List.Extra (mconcatMap, (!?))
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Halo2.Prelude
 import qualified Halo2.Polynomial as P
@@ -19,10 +21,11 @@ import Halo2.Types.AIR (AIR (AIR), ArithmeticAIR)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Fixed))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
-import Halo2.Types.FixedValues (FixedValues)
+import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
+import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
-import Trace.Types (TraceType, StepTypeId, InputSubexpressionId, OutputSubexpressionId, StepType, StepTypeColumnIndex, SubexpressionLink)
+import Trace.Types (TraceType, StepTypeId, InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, StepType, StepTypeColumnIndex, SubexpressionLink, SubexpressionId (SubexpressionId))
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -129,7 +132,21 @@ linksTableFixedColumns
   :: LinksTable
   -> FixedValueMappings
   -> FixedValues
-linksTableFixedColumns t m = todo t m
+linksTableFixedColumns (LinksTable ls) m =
+  FixedValues . Map.fromList $
+  [ (m ^. #stepType . #unMapping,
+      FixedColumn $ ls <&> (^. #stepType . #unStepTypeId))
+  , (m ^. #output . #unMapping,
+      FixedColumn $ ls <&> (^. #output . #unOutputSubexpressionId . #unSubexpressionId))
+  ]
+  <>
+  zip ((m ^. #inputs) <&> (^. #unMapping))
+      [ FixedColumn $
+          fromMaybe (replicate (length ls) (InputSubexpressionId (SubexpressionId 0)))
+          ((ls <&> (^. #inputs)) !? i)
+          <&> (^. #unInputSubexpressionId . #unSubexpressionId)
+      | i <- [0 .. length (m ^. #inputs) - 1]
+      ]
 
 caseFixedColumn
   :: TraceType
