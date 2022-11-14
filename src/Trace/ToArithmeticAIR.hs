@@ -11,7 +11,8 @@ import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Fixed))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.FixedValues (FixedValues)
-import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
+import Halo2.Types.Polynomial (Polynomial)
+import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
 import Trace.Types (TraceType, StepTypeId, InputSubexpressionId, OutputSubexpressionId, StepType)
 
 -- Trace type arithmetic AIRs have the columnar structure
@@ -49,7 +50,13 @@ gateConstraints t =
     (Map.elems (t ^. #stepTypes))
 
 stepTypeGateConstraints :: StepType -> PolynomialConstraints
-stepTypeGateConstraints = todo
+stepTypeGateConstraints t =
+  PolynomialConstraints
+  (gateOnStepType t <$> (t ^. #gateConstraints . #constraints))
+  (t ^. #gateConstraints . #degreeBound)
+
+gateOnStepType :: StepType -> Polynomial -> Polynomial
+gateOnStepType = todo
 
 newtype Mapping a =
   Mapping { unMapping :: ColumnIndex }
