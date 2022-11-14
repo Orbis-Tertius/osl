@@ -8,6 +8,8 @@ module Trace.Types
   , StepType (StepType)
   , StepTypeId (StepTypeId)
   , SubexpressionId (SubexpressionId)
+  , InputSubexpressionId (InputSubexpressionId)
+  , OutputSubexpressionId (OutputSubexpressionId)
   , SubexpressionLink (SubexpressionLink)
   , ResultExpressionId (ResultExpressionId)
   , NumberOfCases (NumberOfCases)
@@ -37,7 +39,7 @@ newtype OutputColumnIndex =
 data StepType =
   StepType
   { inputs :: [InputColumnIndex]
-  , outputs :: [OutputColumnIndex]
+  , output :: OutputColumnIndex
   , gateConstraints :: [Polynomial]
   , lookupArguments :: LookupArguments
   , fixedValues :: FixedValues
@@ -49,15 +51,21 @@ newtype StepTypeId = StepTypeId { unStepTypeId :: Int }
   deriving Generic
 
 
-data SubexpressionId = SubexpressionId { unSubexpressionId :: Int }
+newtype SubexpressionId = SubexpressionId { unSubexpressionId :: Int }
+  deriving Generic
+
+newtype InputSubexpressionId = InputSubexpressionId { unInputSubexpressionId :: Int }
+  deriving Generic
+
+newtype OutputSubexpressionId = OutputSubexpressionId { unOutputSubexpressionId :: Int }
   deriving Generic
 
 
 data SubexpressionLink =
   SubexpressionLink
   { stepType :: StepTypeId
-  , inputs :: [SubexpressionId]
-  , output :: SubexpressionId
+  , inputs :: [InputSubexpressionId]
+  , output :: OutputSubexpressionId
   }
   deriving Generic
 
