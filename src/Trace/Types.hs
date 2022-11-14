@@ -83,7 +83,7 @@ newtype StepTypeColumnIndex =
 
 
 newtype NumberOfCases =
-  NumberOfCases { unNumberOfCases :: Int }
+  NumberOfCases { unNumberOfCases :: Scalar }
   deriving Generic
 
 

@@ -7,7 +7,7 @@ module Halo2.TruthTable
   )
 where
 
-import Cast (intToInteger)
+import Cast (intToInteger, scalarToInt)
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Die (die)
@@ -24,7 +24,7 @@ getByteRangeColumn (BitsPerByte b) (RowCount r) =
         fromMaybe
           (die $ "getByteRangeColumn: " <> pack (show m') <> " out of range of scalar type")
           (integerToScalar (intToInteger m'))
-   in FixedColumn ((f <$> [0 .. m']) <> replicate (r - m') m)
+   in FixedColumn ((f <$> [0 .. m']) <> replicate (scalarToInt r - m') m)
   where
     f :: Int -> Scalar
     f =
@@ -34,4 +34,4 @@ getByteRangeColumn (BitsPerByte b) (RowCount r) =
 
 getZeroIndicatorColumn :: RowCount -> FixedColumn
 getZeroIndicatorColumn (RowCount n) =
-  FixedColumn (1 : replicate (n - 1) 0)
+  FixedColumn (1 : replicate (scalarToInt n - 1) 0)

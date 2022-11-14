@@ -9,6 +9,7 @@ import Halo2.Prelude
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnTypes (ColumnTypes)
 import Halo2.Types.RowCount (RowCount (RowCount))
+import Stark.Types.Scalar (Scalar)
 import Trace.Types (TraceType (TraceType), NumberOfCases (NumberOfCases), StepTypeId, StepType, SubexpressionId, SubexpressionLink, ResultExpressionId)
 
 
@@ -40,7 +41,7 @@ maxStepsPerCase
   -> Set SubexpressionId
   -> Set SubexpressionLink
   -> ResultExpressionId
-  -> Int
+  -> Scalar
 maxStepsPerCase = todo
 
 

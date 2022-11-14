@@ -26,7 +26,7 @@ module Semicircuit.ToLogicCircuit
   )
 where
 
-import Cast (word64ToInteger)
+import Cast (word64ToInteger, scalarToInt)
 import Control.Lens ((<&>), (^.))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
@@ -224,17 +224,17 @@ fixedValues (RowCount n) layout =
     [ ( layout
           ^. #fixedColumns . #zeroVector
             . #unZeroVectorIndex,
-        FixedColumn $ replicate n 0
+        FixedColumn $ replicate (scalarToInt n) 0
       ),
       ( layout
           ^. #fixedColumns . #oneVector
             . #unOneVectorIndex,
-        FixedColumn $ replicate n 1
+        FixedColumn $ replicate (scalarToInt n) 1
       ),
       ( layout
           ^. #fixedColumns . #lastRowIndicator
             . #unLastRowIndicatorColumnIndex,
-        FixedColumn $ replicate (n - 1) 0 <> [1]
+        FixedColumn $ replicate (scalarToInt n - 1) 0 <> [1]
       )
     ]
 

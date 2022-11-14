@@ -10,6 +10,7 @@ module Trace.ToArithmeticAIR
   , fixedValueMappings
   ) where
 
+import Cast (scalarToInt)
 import Control.Lens ((<&>))
 import Data.List.Extra (mconcatMap, (!?))
 import qualified Data.Map as Map
@@ -152,13 +153,21 @@ caseFixedColumn
   :: TraceType
   -> FixedValueMappings
   -> FixedValues
-caseFixedColumn = todo
+caseFixedColumn t m =
+  FixedValues $
+  Map.singleton
+    (m ^. #caseNumber . #unMapping)
+    . FixedColumn $
+      [0 .. (t ^. #numCases . #unNumberOfCases) - 1] <>
+      (replicate (scalarToInt (t ^. #rowCount . #getRowCount)
+                   - scalarToInt (t ^. #numCases . #unNumberOfCases)) 0)
 
 oneFixedColumn
   :: TraceType
   -> FixedValueMappings
   -> FixedValues
-oneFixedColumn = todo
-
-todo :: a
-todo = todo
+oneFixedColumn t m =
+  FixedValues $
+  Map.singleton
+    (m ^. #one . #unMapping)
+    (FixedColumn (replicate (scalarToInt (t ^. #rowCount . #getRowCount)) 1))
