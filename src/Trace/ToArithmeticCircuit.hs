@@ -10,16 +10,13 @@ import Trace.Types (TraceType)
 
 traceTypeToArithmeticCircuit
   :: TraceType
-  -> EqualityConstrainableColumns
-  -> LookupArguments
-  -> EqualityConstraints
   -> ArithmeticCircuit
-traceTypeToArithmeticCircuit traceType eqcs lookups eqs =
+traceTypeToArithmeticCircuit traceType =
   toCircuit
   (traceTypeToArithmeticAIR traceType)
-  eqcs
-  (lookups <> traceTypeLookupArguments traceType)
-  eqs
+  (equalityConstrainableColumns traceType)
+  (traceTypeLookupArguments traceType)
+  (equalityConstraints traceType)
 
 -- Trace type lookup arguments entail that:
 --  * For each step of each case, for each input to the step,
@@ -33,6 +30,16 @@ traceTypeLookupArguments
   :: TraceType
   -> LookupArguments
 traceTypeLookupArguments = todo
+
+equalityConstrainableColumns
+  :: TraceType
+  -> EqualityConstrainableColumns
+equalityConstrainableColumns = todo
+
+equalityConstraints
+  :: TraceType
+  -> EqualityConstraints
+equalityConstraints = todo
 
 todo :: a
 todo = todo
