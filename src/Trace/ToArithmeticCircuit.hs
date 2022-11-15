@@ -1,10 +1,15 @@
+{-# LANGUAGE OverloadedLabels #-}
+
 module Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit) where
 
+import Data.List.Extra (mconcatMap)
+import qualified Data.Map as Map
 import Halo2.AIR (toCircuit)
+import Halo2.Prelude
 import Halo2.Types.Circuit (ArithmeticCircuit)
 import Halo2.Types.LookupArguments (LookupArguments)
 import Trace.ToArithmeticAIR (traceTypeToArithmeticAIR)
-import Trace.Types (TraceType)
+import Trace.Types (TraceType, StepTypeId, StepType)
 
 traceTypeToArithmeticCircuit
   :: TraceType
@@ -54,7 +59,14 @@ resultChecks = todo
 traceStepTypeLookupArguments
   :: TraceType
   -> LookupArguments
-traceStepTypeLookupArguments = todo
+traceStepTypeLookupArguments t =
+  mconcatMap (gatedStepTypeLookupArguments t) (Map.toList (t ^. #stepTypes))
+
+gatedStepTypeLookupArguments
+  :: TraceType
+  -> (StepTypeId, StepType)
+  -> LookupArguments
+gatedStepTypeLookupArguments = todo
 
 todo :: a
 todo = todo
