@@ -39,11 +39,15 @@ newtype OutputColumnIndex =
   deriving Generic
 
 
+-- All step types for a trace type should have the same number of inputs. When
+-- a step type has fewer ``real'' inputs than the total number of inputs,
+-- the extra inputs in its links table entries should be wired to a special
+-- subexpression id called void. The step type of void has no constraints.
+-- The links table entry outputting void has all its inputs set to void.
+-- Void's value can legally be set to anything. Each trace type features void.
 data StepType =
   StepType
-  { inputs :: [InputColumnIndex]
-  , output :: OutputColumnIndex
-  , gateConstraints :: PolynomialConstraints
+  { gateConstraints :: PolynomialConstraints
   , lookupArguments :: LookupArguments
   , fixedValues :: FixedValues
   }

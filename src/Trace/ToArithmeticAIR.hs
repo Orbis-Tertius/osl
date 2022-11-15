@@ -107,10 +107,7 @@ fixedValueMappings t =
     i = ColumnIndex (length (Map.keys (t ^. #columnTypes . #getColumnTypes)))
 
     j :: ColumnIndex
-    j = i + 1
-      + ColumnIndex (Map.foldl' max 0
-                       (length . (^. #inputs)
-                         <$> (t ^. #stepTypes)))
+    j = i + ColumnIndex (length (t ^. #inputColumnIndices))
 
 additionalFixedValues
   :: TraceType

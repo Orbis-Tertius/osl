@@ -28,7 +28,33 @@ traceTypeToArithmeticCircuit traceType =
 traceTypeLookupArguments
   :: TraceType
   -> LookupArguments
-traceTypeLookupArguments = todo
+traceTypeLookupArguments t =
+  mconcat
+  [ inputChecks t,
+    linkChecks t,
+    resultChecks t,
+    traceStepTypeLookupArguments t
+  ]
+
+inputChecks
+  :: TraceType
+  -> LookupArguments
+inputChecks = todo
+
+linkChecks
+  :: TraceType
+  -> LookupArguments
+linkChecks = todo
+
+resultChecks
+  :: TraceType
+  -> LookupArguments
+resultChecks = todo
+
+traceStepTypeLookupArguments
+  :: TraceType
+  -> LookupArguments
+traceStepTypeLookupArguments = todo
 
 todo :: a
 todo = todo
