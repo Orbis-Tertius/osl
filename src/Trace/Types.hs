@@ -55,7 +55,7 @@ data StepType =
 
 
 newtype StepTypeId = StepTypeId { unStepTypeId :: Scalar }
-  deriving Generic
+  deriving (Generic, Eq)
 
 
 newtype SubexpressionId = SubexpressionId { unSubexpressionId :: Scalar }

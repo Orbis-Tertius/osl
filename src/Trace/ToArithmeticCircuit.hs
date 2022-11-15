@@ -2,7 +2,7 @@
 
 module Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit) where
 
-import Data.List.Extra (mconcatMap)
+import Data.List.Extra (mconcatMap, foldl')
 import qualified Data.Map as Map
 import Halo2.AIR (toCircuit)
 import qualified Halo2.Polynomial as P
@@ -87,14 +87,19 @@ stepIndicatorGate
   :: TraceType
   -> Polynomial
 stepIndicatorGate t =
-  P.minus (P.constant 1)
-    (P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex))
+  P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex)
 
 stepTypeGate
   :: TraceType
   -> StepTypeId
   -> Polynomial
-stepTypeGate = todo
+stepTypeGate t sId =
+  foldl' P.times P.one
+  [ P.minus (P.constant (sId' ^. #unStepTypeId))
+      (P.var' (t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex))
+  | sId' <- Map.keys (t ^. #stepTypes),
+    sId' /= sId
+  ]
 
 todo :: a
 todo = todo
