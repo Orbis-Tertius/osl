@@ -13,6 +13,7 @@ module Trace.Types
   , SubexpressionLink (SubexpressionLink)
   , ResultExpressionId (ResultExpressionId)
   , StepTypeColumnIndex (StepTypeColumnIndex)
+  , StepIndicatorColumnIndex (StepIndicatorColumnIndex)
   , NumberOfCases (NumberOfCases)
   , TraceType (TraceType)
   ) where
@@ -82,6 +83,11 @@ newtype StepTypeColumnIndex =
   deriving Generic
 
 
+newtype StepIndicatorColumnIndex =
+  StepIndicatorColumnIndex { unStepIndicatorColumnIndex :: ColumnIndex }
+  deriving Generic
+
+
 newtype NumberOfCases =
   NumberOfCases { unNumberOfCases :: Scalar }
   deriving Generic
@@ -95,6 +101,7 @@ data TraceType =
   , links :: Set SubexpressionLink
   , result :: ResultExpressionId
   , stepTypeColumnIndex :: StepTypeColumnIndex
+  , stepIndicatorColumnIndex :: StepIndicatorColumnIndex
   , inputColumnIndices :: [InputColumnIndex]
   , outputColumnIndices :: [OutputColumnIndex]
   , numCases :: NumberOfCases

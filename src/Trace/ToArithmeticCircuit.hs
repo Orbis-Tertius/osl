@@ -23,7 +23,8 @@ traceTypeToArithmeticCircuit traceType =
 --    output subexpression ids is in the links table.
 --  * For each case, there is a step of the result
 --    subexpression id and its output is 1.
--- They also include the lookup arguments for each step type.
+-- They also include the lookup arguments for each step type,
+-- gated by the step type.
 traceTypeLookupArguments
   :: TraceType
   -> LookupArguments

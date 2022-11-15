@@ -24,6 +24,7 @@ logicCircuitToTraceType c =
   links
   resultId
   stepTypeColIdx
+  stepIndColIdx
   inputColIdxs
   outputColIdxs
   (NumberOfCases (rowCount ^. #getRowCount))
@@ -31,7 +32,7 @@ logicCircuitToTraceType c =
   where
     rowCount = c ^. #rowCount
 
-    (colTypes', stepTypes, subexprs, links, resultId, stepTypeColIdx, inputColIdxs, outputColIdxs) =
+    (colTypes', stepTypes, subexprs, links, resultId, stepTypeColIdx, stepIndColIdx, inputColIdxs, outputColIdxs) =
       todo c
 
 
