@@ -45,7 +45,7 @@ traceTypeLookupArguments t m =
   mconcat
   [ inputChecks t m,
     linkChecks t m,
-    resultChecks t,
+    resultChecks t m,
     traceStepTypeLookupArguments t
   ]
 
@@ -96,8 +96,25 @@ linkChecks t m =
 
 resultChecks
   :: TraceType
+  -> Mappings
   -> LookupArguments
-resultChecks = todo
+resultChecks t m =
+  LookupArguments
+  [ LookupArgument
+    P.zero
+    [(InputExpression i, LookupTableColumn sigma),
+     (InputExpression r, LookupTableColumn tau),
+     (InputExpression one, LookupTableColumn y)]
+  ]
+  where
+    i, r, one :: Polynomial
+    sigma, tau, y :: ColumnIndex
+    i = P.var' $ m ^. #fixed . #caseNumber . #unMapping
+    r = P.constant (t ^. #result . #unResultExpressionId . #unSubexpressionId)
+    one = P.var' $ m ^. #fixed . #one . #unMapping
+    sigma = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
+    tau = t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex
+    y = t ^. #outputColumnIndex . #unOutputColumnIndex
 
 traceStepTypeLookupArguments
   :: TraceType
@@ -140,6 +157,3 @@ stepTypeGate t sId =
   | sId' <- Map.keys (t ^. #stepTypes),
     sId' /= sId
   ]
-
-todo :: a
-todo = todo

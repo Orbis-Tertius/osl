@@ -109,7 +109,7 @@ data FixedMappings =
   , inputs :: [Mapping InputSubexpressionId]
   , output :: Mapping OutputSubexpressionId
   , caseNumber :: Mapping CaseNumber
-  , one :: Mapping One
+  , one :: Mapping One -- TODO: not needed; get rid of it
   }
   deriving Generic
 
