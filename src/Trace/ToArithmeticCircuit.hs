@@ -5,10 +5,12 @@ module Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit) where
 import Data.List.Extra (mconcatMap)
 import qualified Data.Map as Map
 import Halo2.AIR (toCircuit)
+import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.Circuit (ArithmeticCircuit)
-import Halo2.Types.LookupArgument (LookupArgument)
+import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
+import Halo2.Types.Polynomial (Polynomial)
 import Trace.ToArithmeticAIR (traceTypeToArithmeticAIR)
 import Trace.Types (TraceType, StepTypeId, StepType)
 
@@ -76,7 +78,21 @@ gateStepTypeLookupArgument
   -> StepTypeId
   -> LookupArgument
   -> LookupArgument
-gateStepTypeLookupArgument = todo
+gateStepTypeLookupArgument t sId arg =
+  LookupArgument
+  (P.times (stepIndicatorGate t) (P.times (stepTypeGate t sId) (arg ^. #gate)))
+  (arg ^. #tableMap)
+
+stepIndicatorGate
+  :: TraceType
+  -> Polynomial
+stepIndicatorGate = todo
+
+stepTypeGate
+  :: TraceType
+  -> StepTypeId
+  -> Polynomial
+stepTypeGate = todo
 
 todo :: a
 todo = todo
