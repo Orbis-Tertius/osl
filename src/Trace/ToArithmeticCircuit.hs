@@ -7,7 +7,8 @@ import qualified Data.Map as Map
 import Halo2.AIR (toCircuit)
 import Halo2.Prelude
 import Halo2.Types.Circuit (ArithmeticCircuit)
-import Halo2.Types.LookupArguments (LookupArguments)
+import Halo2.Types.LookupArgument (LookupArgument)
+import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Trace.ToArithmeticAIR (traceTypeToArithmeticAIR)
 import Trace.Types (TraceType, StepTypeId, StepType)
 
@@ -66,7 +67,16 @@ gatedStepTypeLookupArguments
   :: TraceType
   -> (StepTypeId, StepType)
   -> LookupArguments
-gatedStepTypeLookupArguments = todo
+gatedStepTypeLookupArguments t (sId, s) =
+  mconcatMap (LookupArguments . (:[]) . gateStepTypeLookupArgument t sId)
+    (s ^. #lookupArguments . #getLookupArguments)
+
+gateStepTypeLookupArgument
+  :: TraceType
+  -> StepTypeId
+  -> LookupArgument
+  -> LookupArgument
+gateStepTypeLookupArgument = todo
 
 todo :: a
 todo = todo
