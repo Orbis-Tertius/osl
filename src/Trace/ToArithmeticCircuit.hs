@@ -2,16 +2,19 @@
 
 module Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit) where
 
+import Control.Lens ((<&>))
 import Data.List.Extra (mconcatMap, foldl')
 import qualified Data.Map as Map
 import Halo2.AIR (toCircuit)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.Circuit (ArithmeticCircuit)
+import Halo2.Types.InputExpression (InputExpression (InputExpression))
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
+import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
 import Halo2.Types.Polynomial (Polynomial)
-import Trace.ToArithmeticAIR (traceTypeToArithmeticAIR)
+import Trace.ToArithmeticAIR (traceTypeToArithmeticAIR, Mappings, mappings)
 import Trace.Types (TraceType, StepTypeId, StepType)
 
 traceTypeToArithmeticCircuit
@@ -21,7 +24,7 @@ traceTypeToArithmeticCircuit traceType =
   toCircuit
   (traceTypeToArithmeticAIR traceType)
   mempty
-  (traceTypeLookupArguments traceType)
+  (traceTypeLookupArguments traceType (mappings traceType))
   mempty
 
 -- Trace type lookup arguments entail that:
@@ -35,10 +38,11 @@ traceTypeToArithmeticCircuit traceType =
 -- gated by the step type.
 traceTypeLookupArguments
   :: TraceType
+  -> Mappings
   -> LookupArguments
-traceTypeLookupArguments t =
+traceTypeLookupArguments t m =
   mconcat
-  [ inputChecks t,
+  [ inputChecks t m,
     linkChecks t,
     resultChecks t,
     traceStepTypeLookupArguments t
@@ -46,8 +50,26 @@ traceTypeLookupArguments t =
 
 inputChecks
   :: TraceType
+  -> Mappings
   -> LookupArguments
-inputChecks = todo
+inputChecks t m =
+  LookupArguments
+  [ LookupArgument
+    (stepIndicatorGate t)
+    [(InputExpression alpha, LookupTableColumn beta),
+     (InputExpression sigma', LookupTableColumn sigma),
+     (InputExpression x, LookupTableColumn y)]
+  | (iIdCol, iCol) <-
+      zip
+      ((m ^. #advice . #inputs) <&> (^. #unMapping))
+      ((t ^. #inputColumnIndices) <&> (^. #unInputColumnIndex)),
+    let alpha = P.var' iIdCol,
+    let beta = m ^. #advice . #output . #unMapping,
+    let sigma = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex,
+    let sigma' = P.var' sigma,
+    let x = P.var' iCol,
+    let y = t ^. #outputColumnIndex . #unOutputColumnIndex
+  ]
 
 linkChecks
   :: TraceType

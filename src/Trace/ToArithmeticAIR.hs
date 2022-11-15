@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedLabels #-}
 
 module Trace.ToArithmeticAIR
@@ -6,8 +7,9 @@ module Trace.ToArithmeticAIR
   , Mapping (Mapping)
   , CaseNumber
   , One
-  , FixedValueMappings (FixedValueMappings)
-  , fixedValueMappings
+  , Mappings (Mappings)
+  , FixedMappings (FixedMappings)
+  , mappings
   ) where
 
 import Cast (scalarToInt)
@@ -20,7 +22,7 @@ import Halo2.Prelude
 import qualified Halo2.Polynomial as P
 import Halo2.Types.AIR (AIR (AIR), ArithmeticAIR)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
-import Halo2.Types.ColumnType (ColumnType (Fixed))
+import Halo2.Types.ColumnType (ColumnType (Fixed, Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
@@ -39,23 +41,33 @@ import Trace.Types (TraceType, StepTypeId, InputSubexpressionId (InputSubexpress
 traceTypeToArithmeticAIR :: TraceType -> ArithmeticAIR
 traceTypeToArithmeticAIR t =
   AIR
-  (columnTypes t m)
+  (columnTypes t)
   (gateConstraints t)
   (t ^. #rowCount)
-  (additionalFixedValues t m)
+  (additionalFixedValues t (m ^. #fixed))
   where
-    m = fixedValueMappings t
+    m = mappings t
 
-columnTypes :: TraceType -> FixedValueMappings -> ColumnTypes
-columnTypes t m =
+columnTypes :: TraceType -> ColumnTypes
+columnTypes t =
   (t ^. #columnTypes)
   <> ColumnTypes
      (Map.fromList
-       (zip
-         (ColumnIndex <$>
-           [length . Map.keys 
-             $ t ^. #columnTypes . #getColumnTypes])
-         (replicate (4 + length (m ^. #inputs)) Fixed)))
+       (zip [i..]
+         (replicate (4 + n) Fixed)))
+  <> ColumnTypes
+     (Map.fromList
+       (zip [j..] (replicate (n+1) Advice)))
+  where
+    i :: ColumnIndex
+    i = ColumnIndex . length . Map.keys 
+          $ t ^. #columnTypes . #getColumnTypes
+
+    j :: ColumnIndex
+    j = ColumnIndex $ (i ^. #getColumnIndex) + 4 + n
+
+    n :: Int
+    n = length (t ^. #inputColumnIndices)
 
 gateConstraints :: TraceType -> PolynomialConstraints
 gateConstraints t =
@@ -84,8 +96,15 @@ data CaseNumber
 
 data One
 
-data FixedValueMappings =
-  FixedValueMappings
+data Mappings =
+  Mappings
+  { fixed :: FixedMappings
+  , advice :: AdviceMappings
+  }
+  deriving Generic
+
+data FixedMappings =
+  FixedMappings
   { stepType :: Mapping StepTypeId
   , inputs :: [Mapping InputSubexpressionId]
   , output :: Mapping OutputSubexpressionId
@@ -94,24 +113,41 @@ data FixedValueMappings =
   }
   deriving Generic
 
-fixedValueMappings :: TraceType -> FixedValueMappings
-fixedValueMappings t =
-  FixedValueMappings
-  (Mapping i :: Mapping StepTypeId)
-  (Mapping <$> [i+1..j] :: [Mapping InputSubexpressionId])
-  (Mapping (j+1) :: Mapping OutputSubexpressionId)
-  (Mapping (j+2) :: Mapping CaseNumber)
-  (Mapping (j+3) :: Mapping One)
+data AdviceMappings =
+  AdviceMappings
+  { inputs :: [Mapping InputSubexpressionId]
+  , output :: Mapping OutputSubexpressionId
+  }
+  deriving Generic
+
+mappings :: TraceType -> Mappings
+mappings t =
+  Mappings
+    (FixedMappings
+      (Mapping i :: Mapping StepTypeId)
+      (Mapping <$> [i+1..j] :: [Mapping InputSubexpressionId])
+      (Mapping (j+1) :: Mapping OutputSubexpressionId)
+      (Mapping (j+2) :: Mapping CaseNumber)
+      (Mapping (j+3) :: Mapping One))
+    (AdviceMappings
+      (Mapping <$> [j+4..k] :: [Mapping InputSubexpressionId])
+      (Mapping (k+1) :: Mapping OutputSubexpressionId))
   where
     i :: ColumnIndex
     i = ColumnIndex (length (Map.keys (t ^. #columnTypes . #getColumnTypes)))
 
     j :: ColumnIndex
-    j = i + ColumnIndex (length (t ^. #inputColumnIndices))
+    j = i + ColumnIndex n
+
+    k :: ColumnIndex
+    k = j + 4 + ColumnIndex n
+
+    n :: Int
+    n = length (t ^. #inputColumnIndices)
 
 additionalFixedValues
   :: TraceType
-  -> FixedValueMappings
+  -> FixedMappings
   -> FixedValues
 additionalFixedValues t m =
   linksTableFixedColumns (linksTable t) m <> caseFixedColumn t m <> oneFixedColumn t m
@@ -128,7 +164,7 @@ linksTable = LinksTable . Set.toList . (^. #links)
 
 linksTableFixedColumns
   :: LinksTable
-  -> FixedValueMappings
+  -> FixedMappings
   -> FixedValues
 linksTableFixedColumns (LinksTable ls) m =
   FixedValues . Map.fromList $
@@ -148,7 +184,7 @@ linksTableFixedColumns (LinksTable ls) m =
 
 caseFixedColumn
   :: TraceType
-  -> FixedValueMappings
+  -> FixedMappings
   -> FixedValues
 caseFixedColumn t m =
   FixedValues $
@@ -161,7 +197,7 @@ caseFixedColumn t m =
 
 oneFixedColumn
   :: TraceType
-  -> FixedValueMappings
+  -> FixedMappings
   -> FixedValues
 oneFixedColumn t m =
   FixedValues $

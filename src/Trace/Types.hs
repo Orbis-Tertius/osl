@@ -82,6 +82,11 @@ newtype ResultExpressionId =
   deriving Generic
 
 
+newtype CaseNumberColumnIndex =
+  CaseNumberColumnIndex { unCaseNumberColumnIndex :: ColumnIndex }
+  deriving Generic
+
+
 newtype StepTypeColumnIndex =
   StepTypeColumnIndex { unStepTypeColumnIndex :: ColumnIndex }
   deriving Generic
@@ -104,10 +109,11 @@ data TraceType =
   , subexpressions :: Set SubexpressionId
   , links :: Set SubexpressionLink
   , result :: ResultExpressionId
+  , caseNumberColumnIndex :: CaseNumberColumnIndex
   , stepTypeColumnIndex :: StepTypeColumnIndex
   , stepIndicatorColumnIndex :: StepIndicatorColumnIndex
   , inputColumnIndices :: [InputColumnIndex]
-  , outputColumnIndices :: [OutputColumnIndex]
+  , outputColumnIndex :: OutputColumnIndex
   , numCases :: NumberOfCases
   , rowCount :: RowCount
   }
