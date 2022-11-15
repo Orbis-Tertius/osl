@@ -9,6 +9,7 @@ import Halo2.AIR (toCircuit)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.Circuit (ArithmeticCircuit)
+import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
@@ -43,7 +44,7 @@ traceTypeLookupArguments
 traceTypeLookupArguments t m =
   mconcat
   [ inputChecks t m,
-    linkChecks t,
+    linkChecks t m,
     resultChecks t,
     traceStepTypeLookupArguments t
   ]
@@ -73,8 +74,25 @@ inputChecks t m =
 
 linkChecks
   :: TraceType
+  -> Mappings
   -> LookupArguments
-linkChecks = todo
+linkChecks t m =
+  LookupArguments
+  [ LookupArgument
+    (stepIndicatorGate t)
+    (zip (InputExpression <$> ([tau] <> alphas <> [beta]))
+         (LookupTableColumn <$> links))
+  ]
+  where
+    tau, beta :: Polynomial
+    alphas :: [Polynomial]
+    links :: [ColumnIndex]
+    tau = P.var' $ t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex
+    alphas = P.var' <$> ((m ^. #advice . #inputs) <&> (^. #unMapping))
+    beta = P.var' $ m ^. #advice . #output . #unMapping
+    links = [m ^. #fixed . #stepType . #unMapping]
+         <> ((m ^. #fixed . #inputs) <&> (^. #unMapping))
+         <> [m ^. #fixed . #output . #unMapping]
 
 resultChecks
   :: TraceType
