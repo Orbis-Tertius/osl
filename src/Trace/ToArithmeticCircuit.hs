@@ -86,7 +86,9 @@ gateStepTypeLookupArgument t sId arg =
 stepIndicatorGate
   :: TraceType
   -> Polynomial
-stepIndicatorGate = todo
+stepIndicatorGate t =
+  P.minus (P.constant 1)
+    (P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex))
 
 stepTypeGate
   :: TraceType
