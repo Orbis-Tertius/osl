@@ -14,6 +14,7 @@ module Trace.Types
   , ResultExpressionId (ResultExpressionId)
   , StepTypeColumnIndex (StepTypeColumnIndex)
   , StepIndicatorColumnIndex (StepIndicatorColumnIndex)
+  , CaseNumberColumnIndex (CaseNumberColumnIndex)
   , NumberOfCases (NumberOfCases)
   , TraceType (TraceType)
   ) where
