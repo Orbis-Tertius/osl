@@ -13,6 +13,7 @@ import Data.List (foldl')
 import qualified Data.Map as Map
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte)
+import Halo2.ByteDecomposition (countBytes)
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnTypes (ColumnTypes)
@@ -104,7 +105,9 @@ getLookupArgumentsArity =
     . (^. #getLookupArguments)
 
 getByteDecompositionLength :: BitsPerByte -> LogicCircuit -> Int
-getByteDecompositionLength = todo
+getByteDecompositionLength bitsPerByte c =
+  foldl' max 1 . fmap (countBytes bitsPerByte)
+    . Map.elems $ c ^. #gateConstraints . #bounds
 
 newtype S = S { unS :: ColumnIndex }
 
