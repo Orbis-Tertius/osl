@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE TupleSections #-}
 
 module Trace.FromLogicCircuit
   ( logicCircuitToTraceType
@@ -7,6 +8,7 @@ module Trace.FromLogicCircuit
   ) where
 
 
+import Control.Lens ((<&>))
 import Control.Monad (replicateM)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (foldl')
@@ -16,7 +18,8 @@ import Halo2.Types.BitsPerByte (BitsPerByte)
 import Halo2.ByteDecomposition (countBytes)
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
-import Halo2.Types.ColumnTypes (ColumnTypes)
+import Halo2.Types.ColumnType (ColumnType (Advice))
+import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Stark.Types.Scalar (Scalar)
@@ -141,7 +144,28 @@ getMapping bitsPerByte c =
               <*> (ZeroIndicatorColumnIndex <$> next))
 
 getColumnTypes :: LogicCircuit -> Mapping -> ColumnTypes
-getColumnTypes = todo
+getColumnTypes c mapping =
+  (c ^. #columnTypes) <>
+  (ColumnTypes . Map.fromList
+    $ (,Advice) <$> getMappingIndices mapping)
+
+getMappingIndices :: Mapping -> [ColumnIndex]
+getMappingIndices m =
+  [ m ^. #caseNumber . #unCaseNumberColumnIndex,
+    m ^. #stepType . #unStepTypeColumnIndex,
+    m ^. #stepIndicator . #unStepIndicatorColumnIndex
+  ] <> ((m ^. #inputs) <&> (^. #unInputColumnIndex)) <>
+  [ m ^. #output . #unOutputColumnIndex,
+    m ^. #byteDecomposition . #sign . #unSignColumnIndex
+  ] <>
+    concatMap
+    (\(i, j) ->
+      [i ^. #unByteColumnIndex,
+       j ^. #unTruthValueColumnIndex])
+    (m ^. #byteDecomposition . #bytes) <>
+  [ m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex,
+    m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex
+  ]
 
 getStepTypes
   :: LogicCircuit
