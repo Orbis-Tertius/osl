@@ -7,13 +7,17 @@ module Trace.FromLogicCircuit
   ) where
 
 
+import Control.Monad (replicateM)
+import Control.Monad.Trans.State (State, evalState, get, put)
+import qualified Data.Map as Map
 import Halo2.Prelude
 import Halo2.Types.Circuit (LogicCircuit)
-import Halo2.Types.ColumnIndex (ColumnIndex)
+import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnTypes (ColumnTypes)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Stark.Types.Scalar (Scalar)
-import Trace.Types (TraceType (TraceType), NumberOfCases (NumberOfCases), StepTypeId, StepType, SubexpressionId, SubexpressionLink, ResultExpressionId, CaseNumberColumnIndex, StepTypeColumnIndex, InputColumnIndex, OutputColumnIndex, StepIndicatorColumnIndex)
+import OSL.Types.Arity (Arity)
+import Trace.Types (TraceType (TraceType), NumberOfCases (NumberOfCases), StepTypeId, StepType, SubexpressionId, SubexpressionLink, ResultExpressionId, CaseNumberColumnIndex (..), StepTypeColumnIndex (..), InputColumnIndex (..), OutputColumnIndex (..), StepIndicatorColumnIndex (..))
 
 
 logicCircuitToTraceType
@@ -87,13 +91,50 @@ data TruthTableColumnIndices = TruthTableColumnIndices
   }
   deriving (Generic)
 
+newtype S = S { unS :: ColumnIndex }
+
+getStepArity :: LogicCircuit -> Arity
+getStepArity = todo
+
+getByteDecompositionLength :: LogicCircuit -> Int
+getByteDecompositionLength = todo
+
 getMapping :: LogicCircuit -> Mapping
-getMapping = todo
+getMapping c =
+  evalState go (S (ColumnIndex (length (Map.keys (c ^. #columnTypes . #getColumnTypes)))))
+  where
+    next :: State S ColumnIndex
+    next = do
+      i <- unS <$> get
+      put (S (i+1))
+      pure i
+
+    go :: State S Mapping
+    go =
+      Mapping
+        <$> (CaseNumberColumnIndex <$> next)
+        <*> (StepTypeColumnIndex <$> next)
+        <*> (StepIndicatorColumnIndex <$> next)
+        <*> replicateM (getStepArity c ^. #unArity)
+            (InputColumnIndex <$> next)
+        <*> (OutputColumnIndex <$> next)
+        <*> (ByteDecompositionMapping
+              <$> (SignColumnIndex <$> next)
+              <*> replicateM
+                  (getByteDecompositionLength c)
+                  ((,) <$> (ByteColumnIndex <$> next)
+                       <*> (TruthValueColumnIndex <$> next)))
+        <*> (TruthTableColumnIndices
+              <$> (ByteRangeColumnIndex <$> next)
+              <*> (ZeroIndicatorColumnIndex <$> next))
 
 getColumnTypes :: LogicCircuit -> Mapping -> ColumnTypes
 getColumnTypes = todo
 
-getStepTypes :: LogicCircuit -> Mapping -> Map StepTypeId StepType
+getStepTypes
+  :: LogicCircuit
+  -> Mapping
+  -> Map StepTypeId StepType
 getStepTypes = todo
 
 getSubexpressions
