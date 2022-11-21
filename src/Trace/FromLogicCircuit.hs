@@ -3,6 +3,7 @@
 
 module Trace.FromLogicCircuit
   ( logicCircuitToTraceType
+  , getMapping
   ) where
 
 
@@ -25,19 +26,23 @@ logicCircuitToTraceType c =
   subexprs
   links
   resultId
-  caseNumColIdx
-  stepTypeColIdx
-  stepIndColIdx
-  inputColIdxs
-  outputColIdxs
+  (mapping ^. #caseNumber)
+  (mapping ^. #stepType)
+  (mapping ^. #stepIndicator)
+  (mapping ^. #inputs)
+  (mapping ^. #output)
   (NumberOfCases (rowCount ^. #getRowCount))
   (rowCount * RowCount (maxStepsPerCase colTypes' stepTypes subexprs links resultId))
   where
     rowCount = c ^. #rowCount
 
-    (colTypes', stepTypes, subexprs, links, resultId, caseNumColIdx, stepTypeColIdx, stepIndColIdx, inputColIdxs, outputColIdxs) =
-      todo c
+    mapping = getMapping c
 
+    colTypes' = getColumnTypes c mapping
+
+    stepTypes = getStepTypes c mapping
+
+    (subexprs, links, resultId) = getSubexpressions c mapping stepTypes
 
 data Mapping =
   Mapping
@@ -82,6 +87,24 @@ data TruthTableColumnIndices = TruthTableColumnIndices
   }
   deriving (Generic)
 
+getMapping :: LogicCircuit -> Mapping
+getMapping = todo
+
+getColumnTypes :: LogicCircuit -> Mapping -> ColumnTypes
+getColumnTypes = todo
+
+getStepTypes :: LogicCircuit -> Mapping -> Map StepTypeId StepType
+getStepTypes = todo
+
+getSubexpressions
+  :: LogicCircuit
+  -> Mapping
+  -> Map StepTypeId StepType
+  -> (Set SubexpressionId,
+      Set SubexpressionLink,
+      ResultExpressionId)
+getSubexpressions = todo
+
 maxStepsPerCase
   :: ColumnTypes
   -> Map StepTypeId StepType
@@ -90,7 +113,6 @@ maxStepsPerCase
   -> ResultExpressionId
   -> Scalar
 maxStepsPerCase = todo
-
 
 todo :: a
 todo = todo
