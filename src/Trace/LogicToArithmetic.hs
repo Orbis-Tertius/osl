@@ -4,12 +4,14 @@ module Trace.LogicToArithmetic
   ( logicCircuitToArithmeticCircuit
   ) where
 
+import Halo2.Types.BitsPerByte (BitsPerByte)
 import Halo2.Types.Circuit (LogicCircuit, ArithmeticCircuit)
 import Trace.FromLogicCircuit (logicCircuitToTraceType)
 import Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit)
 
 logicCircuitToArithmeticCircuit
-  :: LogicCircuit
+  :: BitsPerByte
+  -> LogicCircuit
   -> ArithmeticCircuit
-logicCircuitToArithmeticCircuit =
-  traceTypeToArithmeticCircuit . logicCircuitToTraceType
+logicCircuitToArithmeticCircuit bitsPerByte =
+  traceTypeToArithmeticCircuit . logicCircuitToTraceType bitsPerByte

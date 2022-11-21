@@ -12,6 +12,7 @@ import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (foldl')
 import qualified Data.Map as Map
 import Halo2.Prelude
+import Halo2.Types.BitsPerByte (BitsPerByte)
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnTypes (ColumnTypes)
@@ -23,9 +24,10 @@ import Trace.Types (TraceType (TraceType), NumberOfCases (NumberOfCases), StepTy
 
 
 logicCircuitToTraceType
-  :: LogicCircuit
+  :: BitsPerByte
+  -> LogicCircuit
   -> TraceType
-logicCircuitToTraceType c =
+logicCircuitToTraceType bitsPerByte c =
   TraceType
   colTypes'
   stepTypes
@@ -42,7 +44,7 @@ logicCircuitToTraceType c =
   where
     rowCount = c ^. #rowCount
 
-    mapping = getMapping c
+    mapping = getMapping bitsPerByte c
 
     colTypes' = getColumnTypes c mapping
 
@@ -101,13 +103,13 @@ getLookupArgumentsArity =
   foldl' max 0 . fmap (Arity . length . (^. #tableMap))
     . (^. #getLookupArguments)
 
-getByteDecompositionLength :: LogicCircuit -> Int
+getByteDecompositionLength :: BitsPerByte -> LogicCircuit -> Int
 getByteDecompositionLength = todo
 
 newtype S = S { unS :: ColumnIndex }
 
-getMapping :: LogicCircuit -> Mapping
-getMapping c =
+getMapping :: BitsPerByte -> LogicCircuit -> Mapping
+getMapping bitsPerByte c =
   evalState go (S (ColumnIndex (length (Map.keys (c ^. #columnTypes . #getColumnTypes)))))
   where
     next :: State S ColumnIndex
@@ -128,7 +130,7 @@ getMapping c =
         <*> (ByteDecompositionMapping
               <$> (SignColumnIndex <$> next)
               <*> replicateM
-                  (getByteDecompositionLength c)
+                  (getByteDecompositionLength bitsPerByte c)
                   ((,) <$> (ByteColumnIndex <$> next)
                        <*> (TruthValueColumnIndex <$> next)))
         <*> (TruthTableColumnIndices
