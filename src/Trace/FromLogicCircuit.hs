@@ -9,14 +9,16 @@ module Trace.FromLogicCircuit
 
 import Control.Monad (replicateM)
 import Control.Monad.Trans.State (State, evalState, get, put)
+import Data.List (foldl')
 import qualified Data.Map as Map
 import Halo2.Prelude
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnTypes (ColumnTypes)
+import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Stark.Types.Scalar (Scalar)
-import OSL.Types.Arity (Arity)
+import OSL.Types.Arity (Arity (Arity))
 import Trace.Types (TraceType (TraceType), NumberOfCases (NumberOfCases), StepTypeId, StepType, SubexpressionId, SubexpressionLink, ResultExpressionId, CaseNumberColumnIndex (..), StepTypeColumnIndex (..), InputColumnIndex (..), OutputColumnIndex (..), StepIndicatorColumnIndex (..))
 
 
@@ -91,13 +93,18 @@ data TruthTableColumnIndices = TruthTableColumnIndices
   }
   deriving (Generic)
 
-newtype S = S { unS :: ColumnIndex }
-
 getStepArity :: LogicCircuit -> Arity
-getStepArity = todo
+getStepArity = max 2 . getLookupArgumentsArity . (^. #lookupArguments)
+
+getLookupArgumentsArity :: LookupArguments -> Arity
+getLookupArgumentsArity =
+  foldl' max 0 . fmap (Arity . length . (^. #tableMap))
+    . (^. #getLookupArguments)
 
 getByteDecompositionLength :: LogicCircuit -> Int
 getByteDecompositionLength = todo
+
+newtype S = S { unS :: ColumnIndex }
 
 getMapping :: LogicCircuit -> Mapping
 getMapping c =
