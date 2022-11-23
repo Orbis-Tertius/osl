@@ -23,6 +23,8 @@ module Trace.Types
 import Halo2.Prelude
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnTypes (ColumnTypes)
+import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
+import Halo2.Types.EqualityConstraints (EqualityConstraints)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
 import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.FixedValues (FixedValues)
@@ -56,7 +58,7 @@ data StepType =
 
 
 newtype StepTypeId = StepTypeId { unStepTypeId :: Scalar }
-  deriving (Generic, Eq)
+  deriving (Generic, Eq, Ord)
 
 
 newtype SubexpressionId = SubexpressionId { unSubexpressionId :: Scalar }
@@ -106,6 +108,8 @@ newtype NumberOfCases =
 data TraceType =
   TraceType
   { columnTypes :: ColumnTypes
+  , equalityConstrainableColumns :: EqualityConstrainableColumns
+  , equalityConstraints :: EqualityConstraints
   , stepTypes :: Map StepTypeId StepType
   , subexpressions :: Set SubexpressionId
   , links :: Set SubexpressionLink

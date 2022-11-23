@@ -1,5 +1,7 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TupleSections #-}
 
 module Trace.FromLogicCircuit
@@ -21,6 +23,8 @@ import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.LookupArguments (LookupArguments)
+import Halo2.Types.LookupTableColumn (LookupTableColumn)
+import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Stark.Types.Scalar (Scalar)
 import OSL.Types.Arity (Arity (Arity))
@@ -34,6 +38,8 @@ logicCircuitToTraceType
 logicCircuitToTraceType bitsPerByte c =
   TraceType
   colTypes'
+  (c ^. #equalityConstrainableColumns)
+  (c ^. #equalityConstraints)
   stepTypes
   subexprs
   links
@@ -64,7 +70,8 @@ data Mapping =
     inputs :: [InputColumnIndex],
     output :: OutputColumnIndex,
     byteDecomposition :: ByteDecompositionMapping,
-    truthTable :: TruthTableColumnIndices
+    truthTable :: TruthTableColumnIndices,
+    stepTypeIds :: StepTypeIdMapping
   }
   deriving Generic
 
@@ -99,6 +106,27 @@ data TruthTableColumnIndices = TruthTableColumnIndices
   }
   deriving (Generic)
 
+data Operator =
+  Plus | Times | And | Or | Not | Iff | Equals | LessThan
+
+type StepTypeIdOf :: Operator -> Type
+newtype StepTypeIdOf a = StepTypeIdOf { unOf :: StepTypeId }
+
+data StepTypeIdMapping = StepTypeIdMapping
+  { loads :: Map PolynomialVariable StepTypeId,
+    lookups :: Map [LookupTableColumn] StepTypeId,
+    constants :: Map Scalar StepTypeId,
+    plus :: StepTypeIdOf Plus,
+    times :: StepTypeIdOf Times,
+    and :: StepTypeIdOf And,
+    or :: StepTypeIdOf Or,
+    not :: StepTypeIdOf Not,
+    iff :: StepTypeIdOf Iff,
+    equals :: StepTypeIdOf Equals,
+    lessThan :: StepTypeIdOf LessThan
+  }
+  deriving (Generic)
+
 getStepArity :: LogicCircuit -> Arity
 getStepArity = max 2 . getLookupArgumentsArity . (^. #lookupArguments)
 
@@ -112,36 +140,52 @@ getByteDecompositionLength bitsPerByte c =
   foldl' max 1 . fmap (countBytes bitsPerByte)
     . Map.elems $ c ^. #gateConstraints . #bounds
 
-newtype S = S { unS :: ColumnIndex }
+data S = S
+  { nextColumnIndex :: ColumnIndex,
+    nextStepTypeId :: StepTypeId
+  }
 
 getMapping :: BitsPerByte -> LogicCircuit -> Mapping
 getMapping bitsPerByte c =
   evalState go (S (ColumnIndex (length (Map.keys (c ^. #columnTypes . #getColumnTypes)))))
   where
-    next :: State S ColumnIndex
-    next = do
-      i <- unS <$> get
-      put (S (i+1))
+    nextCol :: State S ColumnIndex
+    nextCol = do
+      S i j <- get
+      put (S (i+1) j)
       pure i
+
+    nextSid :: State S StepTypeId
+    nextSid = do
+      S i j <- get
+      put (S i (j+1))
+      pure j
 
     go :: State S Mapping
     go =
       Mapping
-        <$> (CaseNumberColumnIndex <$> next)
-        <*> (StepTypeColumnIndex <$> next)
-        <*> (StepIndicatorColumnIndex <$> next)
+        <$> (CaseNumberColumnIndex <$> nextCol)
+        <*> (StepTypeColumnIndex <$> nextCol)
+        <*> (StepIndicatorColumnIndex <$> nextCol)
         <*> replicateM (getStepArity c ^. #unArity)
-            (InputColumnIndex <$> next)
-        <*> (OutputColumnIndex <$> next)
+            (InputColumnIndex <$> nextCol)
+        <*> (OutputColumnIndex <$> nextCol)
         <*> (ByteDecompositionMapping
-              <$> (SignColumnIndex <$> next)
+              <$> (SignColumnIndex <$> nextCol)
               <*> replicateM
                   (getByteDecompositionLength bitsPerByte c)
-                  ((,) <$> (ByteColumnIndex <$> next)
-                       <*> (TruthValueColumnIndex <$> next)))
+                  ((,) <$> (ByteColumnIndex <$> nextCol)
+                       <*> (TruthValueColumnIndex <$> nextCol)))
         <*> (TruthTableColumnIndices
-              <$> (ByteRangeColumnIndex <$> next)
-              <*> (ZeroIndicatorColumnIndex <$> next))
+              <$> (ByteRangeColumnIndex <$> nextCol)
+              <*> (ZeroIndicatorColumnIndex <$> nextCol))
+        <*> (StepTypeIdMapping
+              <$> (Map.fromList . zip polyVars
+                    <$> replicateM (length polyVars) nextSid)
+              <*> (Map.fromList . zip lookupTables
+                    <$> replicateM (length lookupTables nextSid))
+              <*> (Map.fromList 
+                    
 
 getColumnTypes :: LogicCircuit -> Mapping -> ColumnTypes
 getColumnTypes c mapping =
@@ -171,7 +215,37 @@ getStepTypes
   :: LogicCircuit
   -> Mapping
   -> Map StepTypeId StepType
-getStepTypes = todo
+getStepTypes c m =
+  mconcat
+  [ loadStepTypes c m
+  , lookupStepTypes c m
+  , constantStepTypes c m
+  , operatorStepTypes c m
+  ] 
+
+loadStepTypes
+  :: LogicCircuit
+  -> Mapping
+  -> Map StepTypeId StepType
+loadStepTypes = todo
+
+lookupStepTypes
+  :: LogicCircuit
+  -> Mapping
+  -> Map StepTypeId StepType
+lookupStepTypes = todo
+
+constantStepTypes
+  :: LogicCircuit
+  -> Mapping
+  -> Map StepTypeId StepType
+constantStepTypes = todo
+
+operatorStepTypes
+  :: LogicCircuit
+  -> Mapping
+  -> Map StepTypeId StepType
+operatorStepTypes = todo
 
 getSubexpressions
   :: LogicCircuit
