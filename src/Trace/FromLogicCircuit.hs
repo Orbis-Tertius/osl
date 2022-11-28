@@ -60,7 +60,7 @@ logicCircuitToTraceType bitsPerByte c =
     (mapping ^. #inputs)
     (mapping ^. #output)
     (NumberOfCases (rowCount ^. #getRowCount))
-    (rowCount * RowCount (maxStepsPerCase colTypes' stepTypes subexprs links resultId))
+    (rowCount * RowCount (maxStepsPerCase subexprs))
   where
     rowCount = c ^. #rowCount
 
@@ -494,13 +494,11 @@ getSubexpressions ::
 getSubexpressions = todo
 
 maxStepsPerCase ::
-  ColumnTypes ->
-  Map StepTypeId StepType ->
   Set SubexpressionId ->
-  Set SubexpressionLink ->
-  ResultExpressionId ->
   Scalar
-maxStepsPerCase = todo
+maxStepsPerCase =
+  fromMaybe (die "maxStepsPerCase: out of range of scalar (this is a compiler bug)")
+    . integerToScalar . intToInteger . Set.size
 
 todo :: a
 todo = todo
