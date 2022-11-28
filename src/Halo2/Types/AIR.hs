@@ -1,10 +1,11 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Halo2.Types.AIR
-  ( AIR (AIR)
-  , ArithmeticAIR
-  , LogicAIR
-  ) where
+  ( AIR (AIR),
+    ArithmeticAIR,
+    LogicAIR,
+  )
+where
 
 import Halo2.Prelude
 import Halo2.Types.ColumnTypes (ColumnTypes)

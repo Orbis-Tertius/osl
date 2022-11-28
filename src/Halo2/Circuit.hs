@@ -8,8 +8,8 @@
 module Halo2.Circuit
   ( HasPolynomialVariables (getPolynomialVariables),
     HasScalars (getScalars),
-  ) where
-
+  )
+where
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -17,7 +17,7 @@ import Halo2.Prelude
 import Halo2.Types.Circuit (Circuit)
 import Halo2.Types.Coefficient (Coefficient (getCoefficient))
 import Halo2.Types.InputExpression (InputExpression (..))
-import Halo2.Types.LogicConstraint (LogicConstraint (Atom, Not, And, Or, Iff, Top, Bottom), AtomicLogicConstraint (Equals, LessThan))
+import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
 import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArgument (LookupArgument)
 import Halo2.Types.LookupArguments (LookupArguments (getLookupArguments))
@@ -25,7 +25,6 @@ import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.PowerProduct (PowerProduct (getPowerProduct))
 import Stark.Types.Scalar (Scalar)
-
 
 class HasPolynomialVariables a where
   getPolynomialVariables :: a -> Set PolynomialVariable
@@ -64,9 +63,10 @@ deriving newtype instance HasPolynomialVariables InputExpression
 
 instance HasPolynomialVariables LookupArgument where
   getPolynomialVariables x =
-    mconcat 
-    ( getPolynomialVariables (x ^. #gate)
-      : (getPolynomialVariables . fst <$> (x ^. #tableMap)) )
+    mconcat
+      ( getPolynomialVariables (x ^. #gate) :
+        (getPolynomialVariables . fst <$> (x ^. #tableMap))
+      )
 
 instance HasPolynomialVariables LookupArguments where
   getPolynomialVariables =
@@ -75,9 +75,9 @@ instance HasPolynomialVariables LookupArguments where
 instance HasPolynomialVariables a => HasPolynomialVariables (Circuit a) where
   getPolynomialVariables x =
     mconcat
-    [ getPolynomialVariables (x ^. #gateConstraints),
-      getPolynomialVariables (x ^. #lookupArguments)
-    ]
+      [ getPolynomialVariables (x ^. #gateConstraints),
+        getPolynomialVariables (x ^. #lookupArguments)
+      ]
 
 class HasScalars a where
   getScalars :: a -> Set Scalar
@@ -85,7 +85,8 @@ class HasScalars a where
 instance HasScalars Polynomial where
   getScalars =
     Set.fromList . fmap getCoefficient
-      . Map.elems . (^. #monos)
+      . Map.elems
+      . (^. #monos)
 
 instance HasScalars AtomicLogicConstraint where
   getScalars =
@@ -115,8 +116,9 @@ deriving newtype instance HasScalars InputExpression
 instance HasScalars LookupArgument where
   getScalars x =
     mconcat
-    ( getScalars (x ^. #gate)
-      : (getScalars . fst <$> (x ^. #tableMap)) )
+      ( getScalars (x ^. #gate) :
+        (getScalars . fst <$> (x ^. #tableMap))
+      )
 
 instance HasScalars LookupArguments where
   getScalars =
@@ -125,6 +127,6 @@ instance HasScalars LookupArguments where
 instance HasScalars a => HasScalars (Circuit a) where
   getScalars x =
     mconcat
-    [ getScalars (x ^. #gateConstraints),
-      getScalars (x ^. #lookupArguments)
-    ]
+      [ getScalars (x ^. #gateConstraints),
+        getScalars (x ^. #lookupArguments)
+      ]

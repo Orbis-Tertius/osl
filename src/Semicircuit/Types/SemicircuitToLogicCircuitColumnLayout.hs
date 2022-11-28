@@ -20,7 +20,7 @@ import Data.Map (Map)
 import GHC.Generics (Generic)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnTypes (ColumnTypes)
-import Semicircuit.Types.NameMapping (NameMapping (NameMapping), OutputMapping (OutputMapping), ArgMapping (ArgMapping))
+import Semicircuit.Types.NameMapping (ArgMapping (ArgMapping), NameMapping (NameMapping), OutputMapping (OutputMapping))
 import Semicircuit.Types.Sigma11 (Name, Term)
 
 newtype TermMapping = TermMapping {unTermMapping :: ColumnIndex}

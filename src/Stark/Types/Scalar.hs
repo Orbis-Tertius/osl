@@ -27,8 +27,14 @@ module Stark.Types.Scalar
 where
 
 import Basement.Types.Word128 (Word128 (Word128))
+import Cast
+  ( integerToWord64,
+    word64ToInteger,
+    word64ToRatio,
+    word8ToInteger,
+  )
 import Control.Monad (guard)
-import Data.Bits (shiftR, (.&.), toIntegralSized)
+import Data.Bits (shiftR, toIntegralSized, (.&.))
 import qualified Data.ByteString as BS
 import Data.Kind (Type)
 import Data.Maybe (fromMaybe)
@@ -37,12 +43,6 @@ import Data.Text (pack)
 import Data.Word (Word64)
 import Die (die)
 import GHC.Generics (Generic)
-import Cast
-  ( word64ToInteger,
-    word64ToRatio,
-    word8ToInteger,
-    integerToWord64
-  )
 
 -- |
 --  Finite field of order (2^64 - 2^32) + 1, or equivalently, 2^64 - 0xFFFFFFFF.

@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.PolynomialConstraints
   ( PolynomialConstraints (PolynomialConstraints),
@@ -20,8 +20,8 @@ data PolynomialConstraints = PolynomialConstraints
 instance Semigroup PolynomialConstraints where
   p <> q =
     PolynomialConstraints
-    ((p ^. #constraints) <> (q ^. #constraints))
-    ((p ^. #degreeBound) `max` (q ^. #degreeBound))
+      ((p ^. #constraints) <> (q ^. #constraints))
+      ((p ^. #degreeBound) `max` (q ^. #degreeBound))
 
 instance Monoid PolynomialConstraints where
   mempty = PolynomialConstraints mempty 0
