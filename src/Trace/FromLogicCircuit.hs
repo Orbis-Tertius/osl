@@ -15,9 +15,11 @@ import Control.Monad (replicateM)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (foldl')
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte)
 import Halo2.ByteDecomposition (countBytes)
+import Halo2.Circuit (getPolynomialVariables, getScalars)
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice))
@@ -206,13 +208,13 @@ getMapping bitsPerByte c =
               <*> (nextSid' :: State S (StepTypeIdOf LessThan)))
 
     polyVars :: [PolynomialVariable]
-    polyVars = todo
+    polyVars = Set.toList (getPolynomialVariables c)
 
     lookupTables :: [[LookupTableColumn]]
     lookupTables = todo
 
     scalars :: [Scalar]
-    scalars = todo
+    scalars = Set.toList (getScalars c)
 
 getColumnTypes :: LogicCircuit -> Mapping -> ColumnTypes
 getColumnTypes c mapping =
