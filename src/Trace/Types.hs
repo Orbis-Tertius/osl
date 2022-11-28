@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 
 module Trace.Types
@@ -58,7 +59,7 @@ data StepType =
 
 
 newtype StepTypeId = StepTypeId { unStepTypeId :: Scalar }
-  deriving (Generic, Eq, Ord)
+  deriving (Generic, Eq, Ord, Num)
 
 
 newtype SubexpressionId = SubexpressionId { unSubexpressionId :: Scalar }

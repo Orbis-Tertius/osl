@@ -28,7 +28,7 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Stark.Types.Scalar (Scalar)
 import OSL.Types.Arity (Arity (Arity))
-import Trace.Types (TraceType (TraceType), NumberOfCases (NumberOfCases), StepTypeId, StepType, SubexpressionId, SubexpressionLink, ResultExpressionId, CaseNumberColumnIndex (..), StepTypeColumnIndex (..), InputColumnIndex (..), OutputColumnIndex (..), StepIndicatorColumnIndex (..))
+import Trace.Types (TraceType (TraceType), NumberOfCases (NumberOfCases), StepTypeId (StepTypeId), StepType, SubexpressionId, SubexpressionLink, ResultExpressionId, CaseNumberColumnIndex (..), StepTypeColumnIndex (..), InputColumnIndex (..), OutputColumnIndex (..), StepIndicatorColumnIndex (..))
 
 
 logicCircuitToTraceType
@@ -111,6 +111,7 @@ data Operator =
 
 type StepTypeIdOf :: Operator -> Type
 newtype StepTypeIdOf a = StepTypeIdOf { unOf :: StepTypeId }
+  deriving Generic
 
 data StepTypeIdMapping = StepTypeIdMapping
   { loads :: Map PolynomialVariable StepTypeId,
@@ -144,11 +145,17 @@ data S = S
   { nextColumnIndex :: ColumnIndex,
     nextStepTypeId :: StepTypeId
   }
+  deriving Generic
 
 getMapping :: BitsPerByte -> LogicCircuit -> Mapping
 getMapping bitsPerByte c =
-  evalState go (S (ColumnIndex (length (Map.keys (c ^. #columnTypes . #getColumnTypes)))))
+  evalState go initialState
   where
+    initialState :: S
+    initialState =
+      S (ColumnIndex (length (Map.keys (c ^. #columnTypes . #getColumnTypes))))
+        (StepTypeId 0)
+
     nextCol :: State S ColumnIndex
     nextCol = do
       S i j <- get
@@ -160,6 +167,9 @@ getMapping bitsPerByte c =
       S i j <- get
       put (S i (j+1))
       pure j
+
+    nextSid' :: State S (StepTypeIdOf a)
+    nextSid' = StepTypeIdOf <$> nextSid
 
     go :: State S Mapping
     go =
@@ -183,9 +193,26 @@ getMapping bitsPerByte c =
               <$> (Map.fromList . zip polyVars
                     <$> replicateM (length polyVars) nextSid)
               <*> (Map.fromList . zip lookupTables
-                    <$> replicateM (length lookupTables nextSid))
-              <*> (Map.fromList 
-                    
+                    <$> replicateM (length lookupTables) nextSid)
+              <*> (Map.fromList . zip scalars
+                    <$> replicateM (length scalars) nextSid)
+              <*> (nextSid' :: State S (StepTypeIdOf Plus))
+              <*> (nextSid' :: State S (StepTypeIdOf Times))
+              <*> (nextSid' :: State S (StepTypeIdOf And))
+              <*> (nextSid' :: State S (StepTypeIdOf Or))
+              <*> (nextSid' :: State S (StepTypeIdOf Not))
+              <*> (nextSid' :: State S (StepTypeIdOf Iff))
+              <*> (nextSid' :: State S (StepTypeIdOf Equals))
+              <*> (nextSid' :: State S (StepTypeIdOf LessThan)))
+
+    polyVars :: [PolynomialVariable]
+    polyVars = todo
+
+    lookupTables :: [[LookupTableColumn]]
+    lookupTables = todo
+
+    scalars :: [Scalar]
+    scalars = todo
 
 getColumnTypes :: LogicCircuit -> Mapping -> ColumnTypes
 getColumnTypes c mapping =
