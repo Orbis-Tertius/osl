@@ -95,16 +95,17 @@ library
     Semicircuit.Types.Semicircuit
     Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
     Semicircuit.Types.Sigma11
+    Stark.Types.Scalar
 
   build-depends:
     base >= 4.9 && < 5,
     aeson,
+    basement,
     bytestring,
     containers,
     cryptonite,
     either,
     extra,
-    fri-proofs,
     generic-lens,
     genvalidity,
     genvalidity-bytestring,
