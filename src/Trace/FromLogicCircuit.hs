@@ -278,7 +278,7 @@ getStepTypes ::
 getStepTypes c m =
   mconcat
     [ loadStepTypes m,
-      lookupStepTypes c m,
+      lookupStepTypes m,
       constantStepTypes c m,
       operatorStepTypes c m
     ]
@@ -341,10 +341,27 @@ loadFromDifferentCaseStepType m x =
     cs = LookupTableColumn (m ^. #caseNumber . #unCaseNumberColumnIndex)
 
 lookupStepTypes ::
-  LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-lookupStepTypes = todo
+lookupStepTypes m =
+  Map.fromList
+  [ (sId, lookupStepType m t)
+  | (t, sId) <- Map.toList (m ^. #stepTypeIds . #lookups)
+  ]
+
+lookupStepType ::
+  Mapping ->
+  [LookupTableColumn] ->
+  StepType
+lookupStepType m t =
+  StepType
+  mempty
+  (LookupArguments [LookupArgument P.zero (zip inputExprs t)])
+  mempty
+  where
+    inputExprs :: [InputExpression]
+    inputExprs = InputExpression . P.var' . (^. #unInputColumnIndex)
+      <$> (m ^. #inputs)
 
 constantStepTypes ::
   LogicCircuit ->
