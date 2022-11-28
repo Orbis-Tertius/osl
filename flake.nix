@@ -1,6 +1,6 @@
 {
   nixConfig.bash-prompt = "[nix-develop-osl:] ";
-  description = "Orbis Specification Language compiler";
+  description = "Open Specification Language compiler";
   inputs = {
     flake-utils = {
       url = "github:numtide/flake-utils";
