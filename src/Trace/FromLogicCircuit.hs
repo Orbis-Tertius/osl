@@ -63,6 +63,7 @@ logicCircuitToTraceType bitsPerByte c =
 
     (subexprs, links, resultId) = getSubexpressions c mapping stepTypes
 
+-- TODO: let the columns be reused where possible
 data Mapping = Mapping
   { caseNumber :: CaseNumberColumnIndex,
     stepType :: StepTypeColumnIndex,
