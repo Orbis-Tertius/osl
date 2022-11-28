@@ -1,6 +1,9 @@
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Halo2.Circuit
   ( HasPolynomialVariables (getPolynomialVariables),
@@ -13,7 +16,7 @@ import qualified Data.Set as Set
 import Halo2.Prelude
 import Halo2.Types.Circuit (Circuit)
 import Halo2.Types.Coefficient (Coefficient (getCoefficient))
-import Halo2.Types.InputExpression (InputExpression (getInputExpression))
+import Halo2.Types.InputExpression (InputExpression (..))
 import Halo2.Types.LogicConstraint (LogicConstraint (Atom, Not, And, Or, Iff, Top, Bottom), AtomicLogicConstraint (Equals, LessThan))
 import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArgument (LookupArgument)
@@ -57,8 +60,7 @@ instance HasPolynomialVariables LogicConstraints where
   getPolynomialVariables =
     mconcat . fmap getPolynomialVariables . (^. #constraints)
 
-instance HasPolynomialVariables InputExpression where
-  getPolynomialVariables = getPolynomialVariables . getInputExpression
+deriving newtype instance HasPolynomialVariables InputExpression
 
 instance HasPolynomialVariables LookupArgument where
   getPolynomialVariables x =
@@ -108,8 +110,7 @@ instance HasScalars LogicConstraints where
   getScalars =
     mconcat . fmap getScalars . (^. #constraints)
 
-instance HasScalars InputExpression where
-  getScalars = getScalars . getInputExpression
+deriving newtype instance HasScalars InputExpression
 
 instance HasScalars LookupArgument where
   getScalars x =
