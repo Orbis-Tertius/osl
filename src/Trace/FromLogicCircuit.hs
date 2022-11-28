@@ -449,7 +449,21 @@ timesStepType m =
   where
     (i0, i1) = firstTwoInputs m
 
-orStepType = todo
+orStepType m =
+  Map.singleton
+  (m ^. #stepTypeIds . #or . #unOf)
+  (StepType
+    (PolynomialConstraints
+      [P.minus (P.var' (m ^. #output . #unOutputColumnIndex))
+        (P.plus v0 (P.minus v1 (P.times v0 v1)))]
+      2)
+    mempty
+    mempty)
+  where
+    (i0, i1) = firstTwoInputs m
+    v0 = P.var' (i0 ^. #unInputColumnIndex)
+    v1 = P.var' (i1 ^. #unInputColumnIndex)
+
 notStepType = todo
 iffStepType = todo
 equalsStepType = todo
