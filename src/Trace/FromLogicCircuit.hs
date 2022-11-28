@@ -464,7 +464,19 @@ orStepType m =
     v0 = P.var' (i0 ^. #unInputColumnIndex)
     v1 = P.var' (i1 ^. #unInputColumnIndex)
 
-notStepType = todo
+notStepType m =
+  Map.singleton
+  (m ^. #stepTypeIds . #not . #unOf)
+  (StepType
+    (PolynomialConstraints
+      [P.minus (P.var' (m ^. #output . #unOutputColumnIndex))
+        (P.minus P.one (P.var' (i0 ^. #unInputColumnIndex)))]
+      1)
+    mempty
+    mempty)
+  where
+    (i0, _) = firstTwoInputs m
+
 iffStepType = todo
 equalsStepType = todo
 lessThanStepType = todo
