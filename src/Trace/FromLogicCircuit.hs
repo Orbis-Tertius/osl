@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -10,27 +11,35 @@ module Trace.FromLogicCircuit
   )
 where
 
+import Cast (intToInteger)
 import Control.Lens ((<&>))
 import Control.Monad (replicateM)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (foldl')
+import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Die (die)
 import Halo2.ByteDecomposition (countBytes)
 import Halo2.Circuit (getPolynomialVariables, getScalars, getLookupTables)
+import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte)
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
-import Halo2.Types.LookupArguments (LookupArguments)
-import Halo2.Types.LookupTableColumn (LookupTableColumn)
+import Halo2.Types.InputExpression (InputExpression (InputExpression))
+import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
+import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
+import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
+import Halo2.Types.Polynomial (Polynomial)
+import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
-import Stark.Types.Scalar (Scalar)
-import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId, StepIndicatorColumnIndex (..), StepType, StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId, SubexpressionLink, TraceType (TraceType))
+import Stark.Types.Scalar (Scalar, integerToScalar)
+import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId, StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId, SubexpressionLink, TraceType (TraceType))
 
 logicCircuitToTraceType ::
   BitsPerByte ->
@@ -268,17 +277,68 @@ getStepTypes ::
   Map StepTypeId StepType
 getStepTypes c m =
   mconcat
-    [ loadStepTypes c m,
+    [ loadStepTypes m,
       lookupStepTypes c m,
       constantStepTypes c m,
       operatorStepTypes c m
     ]
 
 loadStepTypes ::
-  LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-loadStepTypes = todo
+loadStepTypes m =
+  Map.fromList
+    [ (sId, loadStepType m x)
+    | (x, sId) <- Map.toList (m ^. #stepTypeIds . #loads)
+    ]
+
+loadStepType ::
+  Mapping ->
+  PolynomialVariable ->
+  StepType
+loadStepType m x =
+  if (x ^. #rowIndex) == 0
+  then loadFromSameCaseStepType m (x ^. #colIndex)
+  else loadFromDifferentCaseStepType m x
+
+loadFromSameCaseStepType ::
+  Mapping ->
+  ColumnIndex ->
+  StepType
+loadFromSameCaseStepType m i =
+  StepType
+  (PolynomialConstraints
+    [P.minus (P.var' i)
+       (P.var' (m ^. #output . #unOutputColumnIndex))]
+    1)
+  mempty
+  mempty
+
+loadFromDifferentCaseStepType ::
+  Mapping ->
+  PolynomialVariable ->
+  StepType
+loadFromDifferentCaseStepType m x =
+  StepType
+  mempty
+  (LookupArguments
+    [LookupArgument P.zero
+      [(o, xs), (c, cs)]])
+  mempty
+  where
+    o, c :: InputExpression
+    o = InputExpression (P.var' (m ^. #output . #unOutputColumnIndex))
+    c = InputExpression $
+      P.var' (m ^. #caseNumber . #unCaseNumberColumnIndex)
+      `P.plus` j
+
+    j :: Polynomial
+    j = P.constant . fromMaybe (die "loadFromDifferentCaseStepType: relative row index out of range of scalar (this is a compiler bug)")
+      $ integerToScalar (intToInteger (x ^. #rowIndex . #getRowIndex))
+
+    xs, cs :: LookupTableColumn
+    xs = LookupTableColumn (x ^. #colIndex)
+    cs = LookupTableColumn (m ^. #caseNumber . #unCaseNumberColumnIndex)
 
 lookupStepTypes ::
   LogicCircuit ->

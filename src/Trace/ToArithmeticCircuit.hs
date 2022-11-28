@@ -136,6 +136,7 @@ gatedStepTypeLookupArguments t (sId, s) =
     (LookupArguments . (: []) . gateStepTypeLookupArgument t sId)
     (s ^. #lookupArguments . #getLookupArguments)
 
+-- This assumes that the gate values are sufficiently small.
 gateStepTypeLookupArgument ::
   TraceType ->
   StepTypeId ->
@@ -143,7 +144,7 @@ gateStepTypeLookupArgument ::
   LookupArgument
 gateStepTypeLookupArgument t sId arg =
   LookupArgument
-    (P.times (stepIndicatorGate t) (P.times (stepTypeGate t sId) (arg ^. #gate)))
+    (P.plus (stepIndicatorGate t) (P.plus (stepTypeGate t sId) (arg ^. #gate)))
     (arg ^. #tableMap)
 
 stepIndicatorGate ::
