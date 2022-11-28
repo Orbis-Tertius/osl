@@ -477,7 +477,21 @@ notStepType m =
   where
     (i0, _) = firstTwoInputs m
 
-iffStepType = todo
+iffStepType m =
+  Map.singleton
+  (m ^. #stepTypeIds . #iff . #unOf)
+  (StepType
+    (PolynomialConstraints
+      [P.minus (P.var' (m ^. #output . #unOutputColumnIndex))
+        (P.minus P.one
+          (P.minus (P.var' (i0 ^. #unInputColumnIndex))
+            (P.var' (i1 ^. #unInputColumnIndex))))]
+      1)
+    mempty
+    mempty)
+  where
+    (i0, i1) = firstTwoInputs m
+
 equalsStepType = todo
 lessThanStepType = todo
 voidStepType m =
