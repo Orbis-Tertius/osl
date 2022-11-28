@@ -8,6 +8,7 @@
 module Halo2.Circuit
   ( HasPolynomialVariables (getPolynomialVariables),
     HasScalars (getScalars),
+    getLookupTables,
   )
 where
 
@@ -21,6 +22,7 @@ import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), Lo
 import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArgument (LookupArgument)
 import Halo2.Types.LookupArguments (LookupArguments (getLookupArguments))
+import Halo2.Types.LookupTableColumn (LookupTableColumn)
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.PowerProduct (PowerProduct (getPowerProduct))
@@ -130,3 +132,8 @@ instance HasScalars a => HasScalars (Circuit a) where
       [ getScalars (x ^. #gateConstraints),
         getScalars (x ^. #lookupArguments)
       ]
+
+getLookupTables :: Circuit a -> Set [LookupTableColumn]
+getLookupTables =
+  mconcat . fmap (Set.singleton . fmap snd . (^. #tableMap))
+    . getLookupArguments . (^. #lookupArguments)

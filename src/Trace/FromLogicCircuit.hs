@@ -17,7 +17,7 @@ import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.ByteDecomposition (countBytes)
-import Halo2.Circuit (getPolynomialVariables, getScalars)
+import Halo2.Circuit (getPolynomialVariables, getScalars, getLookupTables)
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte)
 import Halo2.Types.Circuit (LogicCircuit)
@@ -225,7 +225,7 @@ getMapping bitsPerByte c =
     polyVars = Set.toList (getPolynomialVariables c)
 
     lookupTables :: [[LookupTableColumn]]
-    lookupTables = todo
+    lookupTables = Set.toList (getLookupTables c)
 
     scalars :: [Scalar]
     scalars = Set.toList (getScalars c)
