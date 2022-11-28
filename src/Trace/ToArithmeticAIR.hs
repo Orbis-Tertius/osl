@@ -12,7 +12,6 @@ module Trace.ToArithmeticAIR
   , mappings
   ) where
 
-import Cast (scalarToInt)
 import Control.Lens ((<&>))
 import Data.List.Extra (mconcatMap, (!?))
 import qualified Data.Map as Map
@@ -28,6 +27,7 @@ import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
+import Stark.Types.Scalar (scalarToInt)
 import Trace.Types (TraceType, StepTypeId, InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, StepType, StepTypeColumnIndex, SubexpressionLink, SubexpressionId (SubexpressionId))
 
 -- Trace type arithmetic AIRs have the columnar structure

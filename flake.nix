@@ -1,6 +1,6 @@
 {
   nixConfig.bash-prompt = "[nix-develop-osl:] ";
-  description = "Orbis Specification Language compiler";
+  description = "Open Specification Language compiler";
   inputs = {
     flake-utils = {
       url = "github:numtide/flake-utils";
@@ -11,8 +11,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    horizon-orbis = {
-      url = "git+ssh://git@github.com/Orbis-Tertius/horizon-orbis";
+    horizon-platform = {
+      url = "git+https://gitlab.homotopic.tech/horizon/horizon-platform";
     };
   };
   outputs =
@@ -20,7 +20,7 @@
     { self
     , flake-utils
     , flake-compat-ci
-    , horizon-orbis
+    , horizon-platform
     , lint-utils
     , nixpkgs
     , ...
@@ -34,7 +34,7 @@
         pkgs.haskell.packages.ghc942.override
           {
             overrides = hfinal: hprev:
-              horizon-orbis.packages.x86_64-linux // {
+              horizon-platform.packages.x86_64-linux // {
                 osl = dontCheck (disableLibraryProfiling (hprev.callCabal2nix "osl" ./. { }));
                 osl-spec = disableLibraryProfiling (hprev.callCabal2nix "osl:spec" ./. { });
               };

@@ -26,7 +26,7 @@ module Semicircuit.ToLogicCircuit
   )
 where
 
-import Cast (word64ToInteger, scalarToInt)
+import Cast (word64ToInteger)
 import Control.Lens ((<&>), (^.))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
@@ -66,7 +66,7 @@ import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), IndicatorFunctionCall (..), Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), InputBound, Name, OutputBound (OutputBound), Term (Add, App, AppInverse, Const, IndLess, Mul))
-import Stark.Types.Scalar (order)
+import Stark.Types.Scalar (order, scalarToInt)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 

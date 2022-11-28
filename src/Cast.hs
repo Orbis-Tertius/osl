@@ -5,15 +5,16 @@ module Cast
     word64ToInteger,
     integerToInt,
     integerToWord64,
-    scalarToInt,
+    integerToRatio,
+    word8ToInteger,
+    word64ToRatio
   )
 where
 
 import Data.Bits (toIntegralSized)
 import Data.Maybe (fromMaybe)
-import Data.Word (Word64)
+import Data.Word (Word64, Word8)
 import Die (die)
-import Stark.Types.Scalar (Scalar, toWord64)
 
 intToInteger :: Int -> Integer
 intToInteger = fromMaybe (die "intToInteger partiality") . toIntegralSized
@@ -27,5 +28,11 @@ integerToInt = toIntegralSized
 integerToWord64 :: Integer -> Maybe Word64
 integerToWord64 = toIntegralSized
 
-scalarToInt :: Scalar -> Int
-scalarToInt = fromMaybe (die "scalarToInt partiality") . toIntegralSized . toWord64
+integerToRatio :: Integer -> Rational
+integerToRatio = toRational
+
+word8ToInteger :: Word8 -> Integer
+word8ToInteger = fromMaybe (die "word8ToInteger partiality") . toIntegralSized
+
+word64ToRatio :: Word64 -> Rational
+word64ToRatio = integerToRatio . fromMaybe (die "word64ToRatio partiality") . toIntegralSized

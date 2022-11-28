@@ -3,8 +3,8 @@ name:               osl
 version:            0.1.0.0
 license: NONE
 license-files: LICENSE
-author:        Orbis Labs
-maintainer:    morgan.thomas@platonic.systems
+author:        Orbis Labs, Casper Labs
+maintainer:    morgan.a.s.thomas@gmail.com
 
 data-files:
   examples/*.osl
@@ -97,6 +97,7 @@ library
     Semicircuit.Types.Semicircuit
     Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
     Semicircuit.Types.Sigma11
+    Stark.Types.Scalar
     Trace.FromLogicCircuit
     Trace.LogicToArithmetic
     Trace.ToArithmeticAIR
@@ -106,12 +107,12 @@ library
   build-depends:
     base >= 4.9 && < 5,
     aeson,
+    basement,
     bytestring,
     containers,
     cryptonite,
     either,
     extra,
-    fri-proofs,
     generic-lens,
     genvalidity,
     genvalidity-bytestring,

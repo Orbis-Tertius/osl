@@ -1,4 +1,8 @@
-# Orbis Specification Language (OSL)
+# Open Specification Language (OSL)
+
+This repo contains a compiler for the OSL spec language, which targets arithmetic circuits for zero knowledge proofs.
+
+OSL (Open Specification Language) is a fork, by Casper Association, of OSL (Orbis Specification Language), by Orbis Labs.
 
 For information about OSL, see: https://eprint.iacr.org/2022/1003
 

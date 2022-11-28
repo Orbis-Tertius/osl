@@ -7,7 +7,7 @@ module Halo2.TruthTable
   )
 where
 
-import Cast (intToInteger, scalarToInt)
+import Cast (intToInteger)
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Die (die)
@@ -15,7 +15,7 @@ import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.RowCount (RowCount (..))
-import Stark.Types.Scalar (Scalar, integerToScalar)
+import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt)
 
 getByteRangeColumn :: BitsPerByte -> RowCount -> FixedColumn
 getByteRangeColumn (BitsPerByte b) (RowCount r) =
