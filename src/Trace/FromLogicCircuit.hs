@@ -117,8 +117,7 @@ data TruthTableColumnIndices = TruthTableColumnIndices
 
 data Operator
   = Plus
-  | Times
-  | And
+  | TimesAnd -- * and & are the same operation, actually
   | Or
   | Not
   | Iff
@@ -135,8 +134,7 @@ data StepTypeIdMapping = StepTypeIdMapping
     lookups :: Map [LookupTableColumn] StepTypeId,
     constants :: Map Scalar StepTypeId,
     plus :: StepTypeIdOf Plus,
-    times :: StepTypeIdOf Times,
-    and :: StepTypeIdOf And,
+    timesAnd :: StepTypeIdOf TimesAnd,
     or :: StepTypeIdOf Or,
     not :: StepTypeIdOf Not,
     iff :: StepTypeIdOf Iff,
@@ -224,8 +222,7 @@ getMapping bitsPerByte c =
                         <$> replicateM (length scalars) nextSid
                     )
                 <*> (nextSid' :: State S (StepTypeIdOf Plus))
-                <*> (nextSid' :: State S (StepTypeIdOf Times))
-                <*> (nextSid' :: State S (StepTypeIdOf And))
+                <*> (nextSid' :: State S (StepTypeIdOf TimesAnd))
                 <*> (nextSid' :: State S (StepTypeIdOf Or))
                 <*> (nextSid' :: State S (StepTypeIdOf Not))
                 <*> (nextSid' :: State S (StepTypeIdOf Iff))
@@ -397,7 +394,6 @@ operatorStepTypes m =
   mconcat
     [ plusStepType m,
       timesStepType m,
-      andStepType m,
       orStepType m,
       notStepType m,
       iffStepType m,
@@ -416,7 +412,6 @@ firstTwoInputs m =
 
 plusStepType,
   timesStepType,
-  andStepType,
   orStepType,
   notStepType,
   iffStepType,
@@ -442,7 +437,7 @@ plusStepType m =
 
 timesStepType m =
   Map.singleton
-  (m ^. #stepTypeIds . #times . #unOf)
+  (m ^. #stepTypeIds . #timesAnd . #unOf)
   (StepType
     (PolynomialConstraints
       [P.minus (P.var' (m ^. #output . #unOutputColumnIndex))
@@ -454,7 +449,6 @@ timesStepType m =
   where
     (i0, i1) = firstTwoInputs m
 
-andStepType = todo
 orStepType = todo
 notStepType = todo
 iffStepType = todo
