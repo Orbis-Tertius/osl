@@ -68,7 +68,7 @@ logicCircuitToTraceType bitsPerByte c =
 
     colTypes' = getColumnTypes c mapping
 
-    stepTypes = getStepTypes c mapping
+    stepTypes = getStepTypes mapping
 
     (subexprs, links, resultId) = getSubexpressions c mapping stepTypes
 
@@ -272,15 +272,14 @@ getMappingIndices m =
        ]
 
 getStepTypes ::
-  LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-getStepTypes c m =
+getStepTypes m =
   mconcat
     [ loadStepTypes m,
       lookupStepTypes m,
       constantStepTypes m,
-      operatorStepTypes c m
+      operatorStepTypes m
     ]
 
 loadStepTypes ::
@@ -392,21 +391,28 @@ constantStepType m x =
   mempty
 
 operatorStepTypes ::
-  LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-operatorStepTypes x m =
+operatorStepTypes m =
   mconcat
-    [ plusStepType x m,
-      timesStepType x m,
-      andStepType x m,
-      orStepType x m,
-      notStepType x m,
-      iffStepType x m,
-      equalsStepType x m,
-      lessThanStepType x m,
-      voidStepType x m
+    [ plusStepType m,
+      timesStepType m,
+      andStepType m,
+      orStepType m,
+      notStepType m,
+      iffStepType m,
+      equalsStepType m,
+      lessThanStepType m,
+      voidStepType m
     ]
+
+firstTwoInputs ::
+  Mapping ->
+  (InputColumnIndex, InputColumnIndex)
+firstTwoInputs m =
+  case m ^. #inputs of
+    (i0:i1:_) -> (i0,i1)
+    _ -> die "firstTwoInputs: there are not two inputs (this is a compiler bug)"
 
 plusStepType,
   timesStepType,
@@ -417,10 +423,23 @@ plusStepType,
   equalsStepType,
   lessThanStepType,
   voidStepType ::
-    LogicCircuit ->
     Mapping ->
     Map StepTypeId StepType
-plusStepType = todo
+
+plusStepType m =
+  Map.singleton
+  (m ^. #stepTypeIds . #plus . #unOf)
+  (StepType
+    (PolynomialConstraints
+      [P.minus (P.var' (m ^. #output . #unOutputColumnIndex))
+        (P.plus (P.var' (i0 ^. #unInputColumnIndex))
+                (P.var' (i1 ^. #unInputColumnIndex)))]
+      1)
+    mempty
+    mempty)
+  where
+    (i0, i1) = firstTwoInputs m
+
 timesStepType = todo
 andStepType = todo
 orStepType = todo
@@ -428,7 +447,7 @@ notStepType = todo
 iffStepType = todo
 equalsStepType = todo
 lessThanStepType = todo
-voidStepType _ m =
+voidStepType m =
   Map.singleton (m ^. #stepTypeIds . #voidT . #unOf) mempty
 
 getSubexpressions ::
