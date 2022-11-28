@@ -136,4 +136,5 @@ instance HasScalars a => HasScalars (Circuit a) where
 getLookupTables :: Circuit a -> Set [LookupTableColumn]
 getLookupTables =
   mconcat . fmap (Set.singleton . fmap snd . (^. #tableMap))
-    . getLookupArguments . (^. #lookupArguments)
+    . getLookupArguments
+    . (^. #lookupArguments)

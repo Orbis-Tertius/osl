@@ -16,12 +16,12 @@ import Control.Lens ((<&>))
 import Control.Monad (replicateM)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (foldl')
-import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Die (die)
 import Halo2.ByteDecomposition (countBytes)
-import Halo2.Circuit (getPolynomialVariables, getScalars, getLookupTables)
+import Halo2.Circuit (getLookupTables, getPolynomialVariables, getScalars)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte)
@@ -289,7 +289,7 @@ loadStepTypes ::
 loadStepTypes m =
   Map.fromList
     [ (sId, loadStepType m x)
-    | (x, sId) <- Map.toList (m ^. #stepTypeIds . #loads)
+      | (x, sId) <- Map.toList (m ^. #stepTypeIds . #loads)
     ]
 
 loadStepType ::
@@ -298,8 +298,8 @@ loadStepType ::
   StepType
 loadStepType m x =
   if (x ^. #rowIndex) == 0
-  then loadFromSameCaseStepType m (x ^. #colIndex)
-  else loadFromDifferentCaseStepType m x
+    then loadFromSameCaseStepType m (x ^. #colIndex)
+    else loadFromDifferentCaseStepType m x
 
 loadFromSameCaseStepType ::
   Mapping ->
@@ -307,12 +307,15 @@ loadFromSameCaseStepType ::
   StepType
 loadFromSameCaseStepType m i =
   StepType
-  (PolynomialConstraints
-    [P.minus (P.var' i)
-       (P.var' (m ^. #output . #unOutputColumnIndex))]
-    1)
-  mempty
-  mempty
+    ( PolynomialConstraints
+        [ P.minus
+            (P.var' i)
+            (P.var' (m ^. #output . #unOutputColumnIndex))
+        ]
+        1
+    )
+    mempty
+    mempty
 
 loadFromDifferentCaseStepType ::
   Mapping ->
@@ -320,21 +323,26 @@ loadFromDifferentCaseStepType ::
   StepType
 loadFromDifferentCaseStepType m x =
   StepType
-  mempty
-  (LookupArguments
-    [LookupArgument P.zero
-      [(o, xs), (c, cs)]])
-  mempty
+    mempty
+    ( LookupArguments
+        [ LookupArgument
+            P.zero
+            [(o, xs), (c, cs)]
+        ]
+    )
+    mempty
   where
     o, c :: InputExpression
     o = InputExpression (P.var' (m ^. #output . #unOutputColumnIndex))
-    c = InputExpression $
-      P.var' (m ^. #caseNumber . #unCaseNumberColumnIndex)
-      `P.plus` j
+    c =
+      InputExpression $
+        P.var' (m ^. #caseNumber . #unCaseNumberColumnIndex)
+          `P.plus` j
 
     j :: Polynomial
-    j = P.constant . fromMaybe (die "loadFromDifferentCaseStepType: relative row index out of range of scalar (this is a compiler bug)")
-      $ integerToScalar (intToInteger (x ^. #rowIndex . #getRowIndex))
+    j =
+      P.constant . fromMaybe (die "loadFromDifferentCaseStepType: relative row index out of range of scalar (this is a compiler bug)") $
+        integerToScalar (intToInteger (x ^. #rowIndex . #getRowIndex))
 
     xs, cs :: LookupTableColumn
     xs = LookupTableColumn (x ^. #colIndex)
@@ -345,9 +353,9 @@ lookupStepTypes ::
   Map StepTypeId StepType
 lookupStepTypes m =
   Map.fromList
-  [ (sId, lookupStepType m t)
-  | (t, sId) <- Map.toList (m ^. #stepTypeIds . #lookups)
-  ]
+    [ (sId, lookupStepType m t)
+      | (t, sId) <- Map.toList (m ^. #stepTypeIds . #lookups)
+    ]
 
 lookupStepType ::
   Mapping ->
@@ -355,13 +363,14 @@ lookupStepType ::
   StepType
 lookupStepType m t =
   StepType
-  mempty
-  (LookupArguments [LookupArgument P.zero (zip inputExprs t)])
-  mempty
+    mempty
+    (LookupArguments [LookupArgument P.zero (zip inputExprs t)])
+    mempty
   where
     inputExprs :: [InputExpression]
-    inputExprs = InputExpression . P.var' . (^. #unInputColumnIndex)
-      <$> (m ^. #inputs)
+    inputExprs =
+      InputExpression . P.var' . (^. #unInputColumnIndex)
+        <$> (m ^. #inputs)
 
 constantStepTypes ::
   LogicCircuit ->
@@ -375,21 +384,29 @@ operatorStepTypes ::
   Map StepTypeId StepType
 operatorStepTypes x m =
   mconcat
-  [ plusStepType x m,
-    timesStepType x m,
-    andStepType x m,
-    orStepType x m,
-    notStepType x m,
-    iffStepType x m,
-    equalsStepType x m,
-    lessThanStepType x m,
-    voidStepType x m
-  ]
+    [ plusStepType x m,
+      timesStepType x m,
+      andStepType x m,
+      orStepType x m,
+      notStepType x m,
+      iffStepType x m,
+      equalsStepType x m,
+      lessThanStepType x m,
+      voidStepType x m
+    ]
 
-plusStepType, timesStepType, andStepType, orStepType, notStepType, iffStepType, equalsStepType, lessThanStepType, voidStepType ::
-  LogicCircuit ->
-  Mapping ->
-  Map StepTypeId StepType
+plusStepType,
+  timesStepType,
+  andStepType,
+  orStepType,
+  notStepType,
+  iffStepType,
+  equalsStepType,
+  lessThanStepType,
+  voidStepType ::
+    LogicCircuit ->
+    Mapping ->
+    Map StepTypeId StepType
 plusStepType = todo
 timesStepType = todo
 andStepType = todo
@@ -398,7 +415,6 @@ notStepType = todo
 iffStepType = todo
 equalsStepType = todo
 lessThanStepType = todo
-
 voidStepType _ m =
   Map.singleton (m ^. #stepTypeIds . #voidT . #unOf) mempty
 
