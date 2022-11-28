@@ -115,6 +115,7 @@ data Operator
   | Iff
   | Equals
   | LessThan
+  | Void
 
 type StepTypeIdOf :: Operator -> Type
 newtype StepTypeIdOf a = StepTypeIdOf {unOf :: StepTypeId}
@@ -131,7 +132,8 @@ data StepTypeIdMapping = StepTypeIdMapping
     not :: StepTypeIdOf Not,
     iff :: StepTypeIdOf Iff,
     equals :: StepTypeIdOf Equals,
-    lessThan :: StepTypeIdOf LessThan
+    lessThan :: StepTypeIdOf LessThan,
+    voidT :: StepTypeIdOf Void
   }
   deriving (Generic)
 
@@ -220,6 +222,7 @@ getMapping bitsPerByte c =
                 <*> (nextSid' :: State S (StepTypeIdOf Iff))
                 <*> (nextSid' :: State S (StepTypeIdOf Equals))
                 <*> (nextSid' :: State S (StepTypeIdOf LessThan))
+                <*> (nextSid' :: State S (StepTypeIdOf Void))
             )
 
     polyVars :: [PolynomialVariable]
