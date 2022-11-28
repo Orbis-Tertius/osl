@@ -199,12 +199,11 @@ caseFixedColumn t m =
       (m ^. #caseNumber . #unMapping)
       . FixedColumn
       $ [0 .. (t ^. #numCases . #unNumberOfCases) - 1]
-        <> ( replicate
-               ( scalarToInt (t ^. #rowCount . #getRowCount)
-                   - scalarToInt (t ^. #numCases . #unNumberOfCases)
-               )
-               0
-           )
+        <> replicate
+          ( scalarToInt (t ^. #rowCount . #getRowCount)
+              - scalarToInt (t ^. #numCases . #unNumberOfCases)
+          )
+          0
 
 oneFixedColumn ::
   TraceType ->

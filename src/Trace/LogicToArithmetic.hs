@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedLabels #-}
-
 module Trace.LogicToArithmetic
   ( logicCircuitToArithmeticCircuit,
   )
