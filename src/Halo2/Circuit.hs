@@ -9,8 +9,10 @@ module Halo2.Circuit
 
 
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Halo2.Prelude
 import Halo2.Types.Circuit (Circuit)
+import Halo2.Types.Coefficient (Coefficient (getCoefficient))
 import Halo2.Types.InputExpression (InputExpression (getInputExpression))
 import Halo2.Types.LogicConstraint (LogicConstraint (Atom, Not, And, Or, Iff, Top, Bottom), AtomicLogicConstraint (Equals, LessThan))
 import Halo2.Types.LogicConstraints (LogicConstraints)
@@ -75,17 +77,49 @@ instance HasPolynomialVariables a => HasPolynomialVariables (Circuit a) where
       getPolynomialVariables (x ^. #lookupArguments)
     ]
 
-todo :: a
-todo = todo
-
 class HasScalars a where
   getScalars :: a -> Set Scalar
 
+instance HasScalars Polynomial where
+  getScalars =
+    Set.fromList . fmap getCoefficient
+      . Map.elems . (^. #monos)
+
+instance HasScalars AtomicLogicConstraint where
+  getScalars =
+    \case
+      Equals x y -> getScalars x <> getScalars y
+      LessThan x y -> getScalars x <> getScalars y
+
+instance HasScalars LogicConstraint where
+  getScalars x =
+    case x of
+      Atom y -> getScalars y
+      Not y -> rec y
+      And y z -> rec y <> rec z
+      Or y z -> rec y <> rec z
+      Iff y z -> rec y <> rec z
+      Top -> Set.singleton 1
+      Bottom -> Set.singleton 0
+    where
+      rec = getScalars
+
 instance HasScalars LogicConstraints where
-  getScalars = todo
+  getScalars =
+    mconcat . fmap getScalars . (^. #constraints)
+
+instance HasScalars InputExpression where
+  getScalars = getScalars . getInputExpression
+
+instance HasScalars LookupArgument where
+  getScalars x =
+    mconcat
+    ( getScalars (x ^. #gate)
+      : (getScalars . fst <$> (x ^. #tableMap)) )
 
 instance HasScalars LookupArguments where
-  getScalars = todo
+  getScalars =
+    mconcat . fmap getScalars . getLookupArguments
 
 instance HasScalars a => HasScalars (Circuit a) where
   getScalars x =
