@@ -296,7 +296,32 @@ operatorStepTypes ::
   LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-operatorStepTypes = todo
+operatorStepTypes x m =
+  mconcat
+  [ plusStepType x m,
+    timesStepType x m,
+    andStepType x m,
+    orStepType x m,
+    notStepType x m,
+    iffStepType x m,
+    equalsStepType x m,
+    lessThanStepType x m,
+    voidStepType x m
+  ]
+
+plusStepType, timesStepType, andStepType, orStepType, notStepType, iffStepType, equalsStepType, lessThanStepType, voidStepType ::
+  LogicCircuit ->
+  Mapping ->
+  Map StepTypeId StepType
+plusStepType = todo
+timesStepType = todo
+andStepType = todo
+orStepType = todo
+notStepType = todo
+iffStepType = todo
+equalsStepType = todo
+lessThanStepType = todo
+voidStepType = todo
 
 getSubexpressions ::
   LogicCircuit ->
