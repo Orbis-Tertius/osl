@@ -279,7 +279,7 @@ getStepTypes c m =
   mconcat
     [ loadStepTypes m,
       lookupStepTypes m,
-      constantStepTypes c m,
+      constantStepTypes m,
       operatorStepTypes c m
     ]
 
@@ -373,10 +373,23 @@ lookupStepType m t =
         <$> (m ^. #inputs)
 
 constantStepTypes ::
-  LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-constantStepTypes = todo
+constantStepTypes m =
+  Map.fromList
+  [ (sId, constantStepType m x)
+  | (x, sId) <- Map.toList (m ^. #stepTypeIds . #constants)
+  ]
+
+constantStepType :: Mapping -> Scalar -> StepType
+constantStepType m x =
+  StepType
+  (PolynomialConstraints
+    [P.minus (P.constant x)
+      (P.var' (m ^. #output . #unOutputColumnIndex))]
+    1)
+  mempty
+  mempty
 
 operatorStepTypes ::
   LogicCircuit ->
