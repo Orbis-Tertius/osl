@@ -50,6 +50,13 @@ data StepType = StepType
   }
   deriving (Generic)
 
+instance Semigroup StepType where
+  (StepType a b c) <> (StepType d e f) =
+    StepType (a <> d) (b <> e) (c <> f)
+
+instance Monoid StepType where
+  mempty = StepType mempty mempty mempty
+
 newtype StepTypeId = StepTypeId {unStepTypeId :: Scalar}
   deriving (Generic, Eq, Ord, Num)
 

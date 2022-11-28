@@ -321,7 +321,9 @@ notStepType = todo
 iffStepType = todo
 equalsStepType = todo
 lessThanStepType = todo
-voidStepType = todo
+
+voidStepType _ m =
+  Map.singleton (m ^. #stepTypeIds . #voidT . #unOf) mempty
 
 getSubexpressions ::
   LogicCircuit ->
