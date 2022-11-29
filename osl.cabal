@@ -3,7 +3,7 @@ name:               osl
 version:            0.1.0.0
 license: NONE
 license-files: LICENSE
-author:        Orbis Labs, Casper Labs
+author:        Orbis Labs, Casper Association
 maintainer:    morgan.a.s.thomas@gmail.com
 
 data-files:
