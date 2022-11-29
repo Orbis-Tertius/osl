@@ -51,7 +51,7 @@ import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
 import Stark.Types.Scalar (Scalar, integerToScalar)
-import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink, TraceType (TraceType))
+import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), InputSubexpressionId (..), OutputSubexpressionId (..))
 
 logicCircuitToTraceType ::
   BitsPerByte ->
@@ -909,7 +909,31 @@ getSubexpressionLinks ::
   LogicCircuit ->
   Mapping ->
   Set SubexpressionLink
-getSubexpressionLinks = todo
+getSubexpressionLinks c m =
+  toVoid <> toVar <> toConst <> toOp <> toResult
+  where
+    voidEid :: SubexpressionIdOf Void
+    voidEid =
+      case m ^. #subexpressionIds . #void of
+        Just eid -> eid
+        Nothing -> die "getSubexpressionLinks: no voidEid (this is a compiler bug)"
+
+    nInputs :: Int
+    nInputs = length (m ^. #inputs)
+
+    toVoid, toVar, toConst, toOp, toResult :: Set SubexpressionLink
+    toVoid =
+      Set.singleton $
+      SubexpressionLink
+      (m ^. #stepTypeIds . #voidT . #unOf)
+      (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
+      mempty
+      (OutputSubexpressionId (voidEid ^. #unOf))
+
+    toVar = todo
+    toConst = todo
+    toOp = todo
+    toResult = todo
 
 getResultExpressionId ::
   Mapping ->
