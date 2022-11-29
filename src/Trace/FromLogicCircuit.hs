@@ -527,8 +527,15 @@ lessThanStepType c m =
   (mconcat
     [ StepType
         (PolynomialConstraints
-          [P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)]
-          1)
+          [ P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex),
+            P.one `P.minus`
+              foldl (\x y -> x `P.plus` (y `P.minus` (x `P.times` y))) P.zero
+                [ P.var' (snd i ^. #unTruthValueColumnIndex)
+                | i <- m ^. #byteDecomposition . #bytes
+                ]
+          ]
+          (PolynomialDegreeBound
+            (max 1 (length (m ^. #byteDecomposition . #bytes)))))
         mempty
         mempty,
       byteDecompositionCheck c m
