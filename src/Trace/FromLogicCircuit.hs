@@ -65,7 +65,7 @@ logicCircuitToTraceType bitsPerByte c =
     stepTypes
     subexprs
     (getSubexpressionLinks mapping)
-    (getResultExpressionId c mapping)
+    (getResultExpressionId mapping)
     (mapping ^. #caseNumber)
     (mapping ^. #stepType)
     (mapping ^. #stepIndicator)
@@ -883,10 +883,12 @@ getSubexpressionLinks ::
 getSubexpressionLinks = todo
 
 getResultExpressionId ::
-  LogicCircuit ->
   Mapping ->
   ResultExpressionId
-getResultExpressionId = todo
+getResultExpressionId m =
+  case m ^. #subexpressionIds . #result of
+    Just x -> x
+    Nothing -> die "getResultExpressionId: no result (this is a compiler bug)"
 
 maxStepsPerCase ::
   Set SubexpressionId ->
