@@ -378,13 +378,33 @@ getMapping bitsPerByte c =
       :: (SubexpressionId, SubexpressionIdMapping)
       -> (PowerProduct, Coefficient)
       -> State S (SubexpressionId, SubexpressionIdMapping)
-    addMono = todo
+    addMono (eid, m') m = do
+      (eid', m'') <- traverseMono m' m
+      addOp m'' (Plus' eid eid') <$> nextEid'
 
     traverseMono
       :: SubexpressionIdMapping
       -> (PowerProduct, Coefficient)
       -> State S (SubexpressionId, SubexpressionIdMapping)
-    traverseMono = todo
+    traverseMono m' (pp, a) = do
+      if Map.null (pp ^. #getPowerProduct)
+      then (, m') <$> traverseCoefficient m' a
+      else do
+        (eid, m'') <- traversePowerProduct m' pp
+        eid' <- traverseCoefficient m'' a
+        addOp m'' (TimesAnd' eid eid') <$> nextEid'
+
+    traversePowerProduct
+      :: SubexpressionIdMapping
+      -> PowerProduct
+      -> State S (SubexpressionId, SubexpressionIdMapping)
+    traversePowerProduct = todo
+
+    traverseCoefficient
+      :: SubexpressionIdMapping
+      -> Coefficient
+      -> State S SubexpressionId
+    traverseCoefficient = todo
 
     polyVars :: [PolynomialVariable]
     polyVars = Set.toList (getPolynomialVariables c)
