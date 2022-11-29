@@ -389,11 +389,10 @@ getMapping bitsPerByte c =
       -> State S (SubexpressionId, SubexpressionIdMapping)
     traverseMono m' (pp, a) = do
       if Map.null (pp ^. #getPowerProduct)
-      then (, m') <$> traverseCoefficient m' a
+      then pure (coefficientEid m' a, m')
       else do
         (eid, m'') <- traversePowerProduct m' pp
-        eid' <- traverseCoefficient m'' a
-        addOp m'' (TimesAnd' eid eid') <$> nextEid'
+        addOp m'' (TimesAnd' eid (coefficientEid m'' a)) <$> nextEid'
 
     traversePowerProduct
       :: SubexpressionIdMapping
@@ -419,13 +418,28 @@ getMapping bitsPerByte c =
       :: SubexpressionIdMapping
       -> (PolynomialVariable, Exponent)
       -> State S (SubexpressionId, SubexpressionIdMapping)
-    traverseVarExponent = todo
+    traverseVarExponent m' (v, e) =
+      case e of
+        0 -> pure (oneEid m', m')
+        1 -> pure (varEid m' v, m')
+        _ -> do
+          let (e0, r) = e `quotRem` 2
+              e1 = e0 + r
+          (eid, m'') <- traverseVarExponent m' (v, e0)
+          (eid', m''') <- traverseVarExponent m'' (v, e1)
+          addOp m''' (TimesAnd' eid eid') <$> nextEid'
 
-    traverseCoefficient
+    varEid :: SubexpressionIdMapping -> PolynomialVariable -> SubexpressionId
+    varEid m' x =
+      case Map.lookup x (m' ^. #variables) of
+        Just eid -> eid ^. #unOf
+        Nothing -> die "varEid: variable lookup failed (this is a compiler bug)"
+
+    coefficientEid
       :: SubexpressionIdMapping
       -> Coefficient
-      -> State S SubexpressionId
-    traverseCoefficient = todo
+      -> SubexpressionId
+    coefficientEid = todo
 
     polyVars :: [PolynomialVariable]
     polyVars = Set.toList (getPolynomialVariables c)
