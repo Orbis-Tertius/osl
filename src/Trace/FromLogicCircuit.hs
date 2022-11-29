@@ -750,7 +750,7 @@ equalsStepType c m =
     ( mconcat
         [ StepType
             ( PolynomialConstraints
-                [foldl P.plus P.zero truthVars]
+                [foldl' P.plus P.zero truthVars]
                 1
             )
             mempty
@@ -771,7 +771,7 @@ lessThanStepType c m =
             ( PolynomialConstraints
                 [ P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex),
                   P.one
-                    `P.minus` foldl
+                    `P.minus` foldl'
                       (\x y -> x `P.plus` (y `P.minus` (x `P.times` y)))
                       P.zero
                       [ P.var' (snd i ^. #unTruthValueColumnIndex)
@@ -797,11 +797,10 @@ byteDecompositionCheck c m =
     ( PolynomialConstraints
         [ (v0 `P.minus` v1)
             `P.minus` ( ((P.constant 2 `P.times` s) `P.minus` P.one)
-                          `P.times` ( foldl
-                                        P.plus
-                                        P.zero
-                                        (zipWith P.times byteCoefs byteVars)
-                                    )
+                          `P.times` foldl'
+                            P.plus
+                            P.zero
+                            (zipWith P.times byteCoefs byteVars)
                       )
         ]
         (PolynomialDegreeBound 2)
