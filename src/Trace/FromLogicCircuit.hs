@@ -37,6 +37,7 @@ import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
+import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
@@ -528,8 +529,10 @@ byteDecompositionCheck c m =
   (PolynomialConstraints
     [ (v0 `P.minus` v1) `P.minus`
         (foldl P.plus P.zero
-          (zipWith P.times byteCoefs byteVars)) ]
-    1)
+          (zipWith P.times byteCoefs byteVars)),
+      P.one `P.minus` foldl P.times P.one truthVars
+    ]
+    (PolynomialDegreeBound (max 1 (length truthVars))))
   (byteRangeChecks m)
   (truthTables c m)
   where
@@ -537,9 +540,10 @@ byteDecompositionCheck c m =
     v0 = P.var' (i0 ^. #unInputColumnIndex)
     v1 = P.var' (i1 ^. #unInputColumnIndex)
 
-    byteCoefs, byteVars :: [Polynomial]
+    byteCoefs, byteVars, truthVars :: [Polynomial]
     byteCoefs = todo
     byteVars = todo
+    truthVars = todo
 
 byteRangeChecks ::
   Mapping ->
