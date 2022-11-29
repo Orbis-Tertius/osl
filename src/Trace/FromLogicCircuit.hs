@@ -340,20 +340,20 @@ getMapping bitsPerByte c =
         Just eid -> eid ^. #unOf
         Nothing -> die "oneEid: no one subexpression id (this is a compiler bug)"
 
-    addOp
-      :: SubexpressionIdMapping
-      -> Operation
-      -> SubexpressionIdOf Operation
-      -> (SubexpressionId, SubexpressionIdMapping)
+    addOp ::
+      SubexpressionIdMapping ->
+      Operation ->
+      SubexpressionIdOf Operation ->
+      (SubexpressionId, SubexpressionIdMapping)
     addOp m' op opId =
       case Map.lookup op (m' ^. #operations) of
         Just opId' -> (opId' ^. #unOf, m')
         Nothing -> (opId ^. #unOf, m' <> SubexpressionIdMapping mzero mzero mempty mempty mempty (Map.singleton op opId))
 
-    traverseAtom
-      :: SubexpressionIdMapping
-      -> AtomicLogicConstraint
-      -> State S (SubexpressionId, SubexpressionIdMapping)
+    traverseAtom ::
+      SubexpressionIdMapping ->
+      AtomicLogicConstraint ->
+      State S (SubexpressionId, SubexpressionIdMapping)
     traverseAtom m' =
       \case
         LC.Equals x y -> do
@@ -365,61 +365,61 @@ getMapping bitsPerByte c =
           (yId, m''') <- traversePoly m'' y
           addOp m''' (LessThan' xId yId) <$> nextEid'
 
-    traversePoly
-      :: SubexpressionIdMapping
-      -> Polynomial
-      -> State S (SubexpressionId, SubexpressionIdMapping)
+    traversePoly ::
+      SubexpressionIdMapping ->
+      Polynomial ->
+      State S (SubexpressionId, SubexpressionIdMapping)
     traversePoly m' poly =
       case Map.toList (poly ^. #monos) of
         [] -> pure (zeroEid m', m')
         [m] -> traverseMono m' m
-        (m:ms) -> do
+        (m : ms) -> do
           (eid, m'') <- traverseMono m' m
           foldM addMono (eid, m'') ms
 
-    addMono
-      :: (SubexpressionId, SubexpressionIdMapping)
-      -> (PowerProduct, Coefficient)
-      -> State S (SubexpressionId, SubexpressionIdMapping)
+    addMono ::
+      (SubexpressionId, SubexpressionIdMapping) ->
+      (PowerProduct, Coefficient) ->
+      State S (SubexpressionId, SubexpressionIdMapping)
     addMono (eid, m') m = do
       (eid', m'') <- traverseMono m' m
       addOp m'' (Plus' eid eid') <$> nextEid'
 
-    traverseMono
-      :: SubexpressionIdMapping
-      -> (PowerProduct, Coefficient)
-      -> State S (SubexpressionId, SubexpressionIdMapping)
+    traverseMono ::
+      SubexpressionIdMapping ->
+      (PowerProduct, Coefficient) ->
+      State S (SubexpressionId, SubexpressionIdMapping)
     traverseMono m' (pp, a) = do
       if Map.null (pp ^. #getPowerProduct)
-      then pure (coefficientEid m' a, m')
-      else do
-        (eid, m'') <- traversePowerProduct m' pp
-        addOp m'' (TimesAnd' eid (coefficientEid m'' a)) <$> nextEid'
+        then pure (coefficientEid m' a, m')
+        else do
+          (eid, m'') <- traversePowerProduct m' pp
+          addOp m'' (TimesAnd' eid (coefficientEid m'' a)) <$> nextEid'
 
-    traversePowerProduct
-      :: SubexpressionIdMapping
-      -> PowerProduct
-      -> State S (SubexpressionId, SubexpressionIdMapping)
+    traversePowerProduct ::
+      SubexpressionIdMapping ->
+      PowerProduct ->
+      State S (SubexpressionId, SubexpressionIdMapping)
     traversePowerProduct m' pp =
       case Map.toList (pp ^. #getPowerProduct) of
         [] -> pure (oneEid m', m')
         [x] -> traverseVarExponent m' x
-        (x:xs) -> do
+        (x : xs) -> do
           (eid, m'') <- traverseVarExponent m' x
           foldM mulVarExponent (eid, m'') xs
 
-    mulVarExponent
-      :: (SubexpressionId, SubexpressionIdMapping)
-      -> (PolynomialVariable, Exponent)
-      -> State S (SubexpressionId, SubexpressionIdMapping)
+    mulVarExponent ::
+      (SubexpressionId, SubexpressionIdMapping) ->
+      (PolynomialVariable, Exponent) ->
+      State S (SubexpressionId, SubexpressionIdMapping)
     mulVarExponent (eid, m') x = do
       (eid', m'') <- traverseVarExponent m' x
       addOp m'' (TimesAnd' eid eid') <$> nextEid'
 
-    traverseVarExponent
-      :: SubexpressionIdMapping
-      -> (PolynomialVariable, Exponent)
-      -> State S (SubexpressionId, SubexpressionIdMapping)
+    traverseVarExponent ::
+      SubexpressionIdMapping ->
+      (PolynomialVariable, Exponent) ->
+      State S (SubexpressionId, SubexpressionIdMapping)
     traverseVarExponent m' (v, e) =
       case e of
         0 -> pure (oneEid m', m')
@@ -437,10 +437,10 @@ getMapping bitsPerByte c =
         Just eid -> eid ^. #unOf
         Nothing -> die "varEid: variable lookup failed (this is a compiler bug)"
 
-    coefficientEid
-      :: SubexpressionIdMapping
-      -> Coefficient
-      -> SubexpressionId
+    coefficientEid ::
+      SubexpressionIdMapping ->
+      Coefficient ->
+      SubexpressionId
     coefficientEid m' a =
       case Map.lookup (a ^. #getCoefficient) (m' ^. #constants) of
         Just eid -> eid ^. #unOf
@@ -880,13 +880,13 @@ getSubexpressionIdSet ::
   Set SubexpressionId
 getSubexpressionIdSet m =
   mconcat
-  [ maybeToSet ((m ^. #void) <&> (^. #unOf)),
-    maybeToSet ((m ^. #result) <&> (^. #unResultExpressionId)),
-    Set.fromList (Map.elems (m ^. #variables) <&> (^. #unOf)),
-    Set.fromList (Map.elems (m ^. #lookups) <&> (^. #unOf)),
-    Set.fromList (Map.elems (m ^. #constants) <&> (^. #unOf)),
-    Set.fromList (Map.elems (m ^. #operations) <&> (^. #unOf))
-  ]
+    [ maybeToSet ((m ^. #void) <&> (^. #unOf)),
+      maybeToSet ((m ^. #result) <&> (^. #unResultExpressionId)),
+      Set.fromList (Map.elems (m ^. #variables) <&> (^. #unOf)),
+      Set.fromList (Map.elems (m ^. #lookups) <&> (^. #unOf)),
+      Set.fromList (Map.elems (m ^. #constants) <&> (^. #unOf)),
+      Set.fromList (Map.elems (m ^. #operations) <&> (^. #unOf))
+    ]
 
 getSubexpressionLinks ::
   Mapping ->
