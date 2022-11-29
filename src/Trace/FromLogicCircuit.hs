@@ -547,7 +547,7 @@ byteDecompositionCheck c m =
             (zipWith P.times byteCoefs byteVars)))
     ]
     (PolynomialDegreeBound 2))
-  (byteRangeChecks m <> signRangeCheck m)
+  (byteRangeAndTruthChecks m <> signRangeCheck m)
   (truthTables m)
   where
     (i0, i1) = firstTwoInputs m
@@ -562,10 +562,19 @@ byteDecompositionCheck c m =
     byteVars = P.var' . (^. #unByteColumnIndex) . fst
       <$> (m ^. #byteDecomposition . #bytes)
 
-byteRangeChecks ::
+byteRangeAndTruthChecks ::
   Mapping ->
   LookupArguments
-byteRangeChecks = todo
+byteRangeAndTruthChecks m =
+  LookupArguments
+  [ LookupArgument P.zero
+      [ (InputExpression (P.var' (byteCol ^. #unByteColumnIndex)),
+         LookupTableColumn (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex)),
+        (InputExpression (P.var' (truthCol ^. #unTruthValueColumnIndex)),
+         LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex))
+      ]
+  | (byteCol, truthCol) <- m ^. #byteDecomposition . #bytes
+  ]
 
 signRangeCheck ::
   Mapping ->
