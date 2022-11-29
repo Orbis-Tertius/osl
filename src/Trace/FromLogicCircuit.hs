@@ -64,8 +64,8 @@ logicCircuitToTraceType bitsPerByte c =
     (c ^. #equalityConstraints)
     stepTypes
     subexprs
-    links
-    resultId
+    (getSubexpressionLinks mapping)
+    (getResultExpressionId c mapping)
     (mapping ^. #caseNumber)
     (mapping ^. #stepType)
     (mapping ^. #stepIndicator)
@@ -82,7 +82,7 @@ logicCircuitToTraceType bitsPerByte c =
 
     stepTypes = getStepTypes c mapping
 
-    (subexprs, links, resultId) = getSubexpressions c mapping stepTypes
+    subexprs = getSubexpressionIdSet mapping
 
 -- TODO: let the columns be reused where possible
 data Mapping = Mapping
@@ -165,6 +165,9 @@ newtype SubexpressionIdOf a = SubexpressionIdOf {unOf :: SubexpressionId}
 type Void :: Type
 data Void
 
+type Result :: Type
+data Result
+
 data Operation
   = Or' SubexpressionId SubexpressionId
   | Not' SubexpressionId
@@ -177,6 +180,7 @@ data Operation
 
 data SubexpressionIdMapping = SubexpressionIdMapping
   { void :: Maybe (SubexpressionIdOf Void),
+    result :: Maybe (SubexpressionIdOf Result),
     variables :: Map PolynomialVariable (SubexpressionIdOf PolynomialVariable),
     lookups :: Map LookupArgument (SubexpressionIdOf LookupArgument),
     constants :: Map Scalar (SubexpressionIdOf Scalar),
@@ -185,8 +189,8 @@ data SubexpressionIdMapping = SubexpressionIdMapping
   deriving (Generic)
 
 instance Semigroup SubexpressionIdMapping where
-  (SubexpressionIdMapping a b c d e) <> (SubexpressionIdMapping f g h i j) =
-    SubexpressionIdMapping (a <|> f) (b <> g) (c <> h) (d <> i) (e <> j)
+  (SubexpressionIdMapping a b c d e f) <> (SubexpressionIdMapping g h i j k l) =
+    SubexpressionIdMapping (a <|> g) (b <|> h) (c <> i) (d <> j) (e <> k) (f <> l)
 
 getStepArity :: LogicCircuit -> Arity
 getStepArity = max 2 . getLookupArgumentsArity . (^. #lookupArguments)
@@ -289,6 +293,7 @@ getMapping bitsPerByte c =
                 m0 <-
                   SubexpressionIdMapping
                     <$> (Just <$> (nextEid' :: State S (SubexpressionIdOf Void)))
+                    <*> (Just <$> (nextEid' :: State S (SubexpressionIdOf Result)))
                     <*> ( Map.fromList . zip polyVars
                             <$> replicateM (length polyVars) nextEid'
                         )
@@ -346,7 +351,7 @@ getMapping bitsPerByte c =
     addOp m' op opId =
       case Map.lookup op (m' ^. #operations) of
         Just opId' -> (opId' ^. #unOf, m')
-        Nothing -> (opId ^. #unOf, m' <> SubexpressionIdMapping mzero mempty mempty mempty (Map.singleton op opId))
+        Nothing -> (opId ^. #unOf, m' <> SubexpressionIdMapping mzero mzero mempty mempty mempty (Map.singleton op opId))
 
     traverseAtom
       :: SubexpressionIdMapping
@@ -870,15 +875,21 @@ truthTables m =
         <$> [0 .. 2 ^ (m ^. #byteDecomposition . #bits . #unBitsPerByte) - 1]
     zeroIndicator = 1 : replicate (length byteRange - 1) 0
 
-getSubexpressions ::
+getSubexpressionIdSet ::
+  Mapping ->
+  Set SubexpressionId
+getSubexpressionIdSet = todo
+
+getSubexpressionLinks ::
+  Mapping ->
+  Set SubexpressionLink
+getSubexpressionLinks = todo
+
+getResultExpressionId ::
   LogicCircuit ->
   Mapping ->
-  Map StepTypeId StepType ->
-  ( Set SubexpressionId,
-    Set SubexpressionLink,
-    ResultExpressionId
-  )
-getSubexpressions = todo
+  ResultExpressionId
+getResultExpressionId = todo
 
 maxStepsPerCase ::
   Set SubexpressionId ->
