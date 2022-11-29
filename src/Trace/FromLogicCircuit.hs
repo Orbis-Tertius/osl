@@ -527,8 +527,8 @@ lessThanStepType c m =
   (mconcat
     [ StepType
         (PolynomialConstraints
-          todo
-          todo)
+          [P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)]
+          1)
         mempty
         mempty,
       byteDecompositionCheck c m
