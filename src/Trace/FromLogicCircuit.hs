@@ -570,7 +570,11 @@ byteRangeChecks = todo
 signRangeCheck ::
   Mapping ->
   LookupArguments
-signRangeCheck = todo
+signRangeCheck m =
+  LookupArguments
+  [ LookupArgument P.zero
+      [(InputExpression (P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)),
+        LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex))] ]
 
 truthTables ::
   Mapping ->
