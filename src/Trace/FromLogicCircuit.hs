@@ -64,7 +64,7 @@ logicCircuitToTraceType bitsPerByte c =
     (c ^. #equalityConstraints)
     stepTypes
     subexprs
-    (getSubexpressionLinks mapping)
+    (getSubexpressionLinks c mapping)
     (getResultExpressionId mapping)
     (mapping ^. #caseNumber)
     (mapping ^. #stepType)
@@ -138,6 +138,7 @@ data Operator
   | Equals
   | LessThan
   | VoidT
+  | ResultT
 
 type StepTypeIdOf :: Operator -> Type
 newtype StepTypeIdOf a = StepTypeIdOf {unOf :: StepTypeId}
@@ -154,7 +155,8 @@ data StepTypeIdMapping = StepTypeIdMapping
     iff :: StepTypeIdOf Iff,
     equals :: StepTypeIdOf Equals,
     lessThan :: StepTypeIdOf LessThan,
-    voidT :: StepTypeIdOf VoidT
+    voidT :: StepTypeIdOf VoidT,
+    resultT :: StepTypeIdOf ResultT
   }
   deriving (Generic)
 
@@ -285,6 +287,7 @@ getMapping bitsPerByte c =
                 <*> (nextSid' :: State S (StepTypeIdOf Equals))
                 <*> (nextSid' :: State S (StepTypeIdOf LessThan))
                 <*> (nextSid' :: State S (StepTypeIdOf VoidT))
+                <*> (nextSid' :: State S (StepTypeIdOf ResultT))
             )
         <*> ( do
                 m0 <-
@@ -495,7 +498,8 @@ getStepTypes c m =
     [ loadStepTypes m,
       lookupStepTypes m,
       constantStepTypes m,
-      operatorStepTypes c m
+      operatorStepTypes c m,
+      resultStepType c m
     ]
 
 loadStepTypes ::
@@ -871,6 +875,12 @@ truthTables m =
         <$> [0 .. 2 ^ (m ^. #byteDecomposition . #bits . #unBitsPerByte) - 1]
     zeroIndicator = 1 : replicate (length byteRange - 1) 0
 
+resultStepType ::
+  LogicCircuit ->
+  Mapping ->
+  Map StepTypeId StepType
+resultStepType = todo
+
 maybeToSet :: Ord a => Maybe a -> Set a
 maybeToSet = maybe mempty Set.singleton
 
@@ -888,6 +898,7 @@ getSubexpressionIdSet m =
     ]
 
 getSubexpressionLinks ::
+  LogicCircuit ->
   Mapping ->
   Set SubexpressionLink
 getSubexpressionLinks = todo

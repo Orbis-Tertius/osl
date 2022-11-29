@@ -66,12 +66,20 @@ newtype SubexpressionId = SubexpressionId {unSubexpressionId :: Scalar}
 newtype InputSubexpressionId = InputSubexpressionId {unInputSubexpressionId :: SubexpressionId}
   deriving (Generic)
 
+-- Like an input subexpression, a precondition subexpression must be
+-- evaluated before the linked output subexpression can be evaluated.
+-- Unlike an input subexpression, a precondition subexpression does
+-- not supply its output as an input to the subexpression.
+newtype PreconditionSubexpressionId = PreconditionSubexpressionId {unPreconditionSubexpressionId :: SubexpressionId}
+  deriving (Generic)
+
 newtype OutputSubexpressionId = OutputSubexpressionId {unOutputSubexpressionId :: SubexpressionId}
   deriving (Generic)
 
 data SubexpressionLink = SubexpressionLink
   { stepType :: StepTypeId,
     inputs :: [InputSubexpressionId],
+    preconditions :: [PreconditionSubexpressionId],
     output :: OutputSubexpressionId
   }
   deriving (Generic)
