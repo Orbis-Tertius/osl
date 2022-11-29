@@ -508,15 +508,29 @@ equalsStepType c m =
   Map.singleton
   (m ^. #stepTypeIds . #equals . #unOf)
   (mconcat
-    [ StepType todo todo todo,
+    [ StepType
+        (PolynomialConstraints
+          [foldl P.plus P.zero truthVars]
+          1)
+        mempty
+        mempty,
       byteDecompositionCheck c m
     ])
+  where
+    truthVars :: [Polynomial]
+    truthVars = P.var' . (^. #unTruthValueColumnIndex) . snd
+      <$> (m ^. #byteDecomposition . #bytes)
 
 lessThanStepType c m =
   Map.singleton
   (m ^. #stepTypeIds . #lessThan . #unOf)
   (mconcat
-    [ StepType todo todo todo,
+    [ StepType
+        (PolynomialConstraints
+          todo
+          todo)
+        mempty
+        mempty,
       byteDecompositionCheck c m
     ])
 
@@ -528,29 +542,35 @@ byteDecompositionCheck c m =
   StepType
   (PolynomialConstraints
     [ (v0 `P.minus` v1) `P.minus`
-        (foldl P.plus P.zero
-          (zipWith P.times byteCoefs byteVars)),
-      P.one `P.minus` foldl P.times P.one truthVars
+        (((P.constant 2 `P.times` s) `P.minus` P.one) `P.times`
+          (foldl P.plus P.zero
+            (zipWith P.times byteCoefs byteVars)))
     ]
-    (PolynomialDegreeBound (max 1 (length truthVars))))
-  (byteRangeChecks m)
+    (PolynomialDegreeBound 2))
+  (byteRangeChecks m <> signRangeCheck m)
   (truthTables m)
   where
     (i0, i1) = firstTwoInputs m
     v0 = P.var' (i0 ^. #unInputColumnIndex)
     v1 = P.var' (i1 ^. #unInputColumnIndex)
+    s = P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)
 
-    byteCoefs, byteVars, truthVars :: [Polynomial]
+    byteCoefs, byteVars :: [Polynomial]
     byteCoefs =
       P.constant . fromMaybe (die "truthTables: byte coefficient is not in range of scalar (this is a compiler bug)") . integerToScalar
         <$> [ 2 ^ i | i <- [0 .. getByteDecompositionLength (m ^. #byteDecomposition . #bits) c ] ]
-    byteVars = todo
-    truthVars = todo
+    byteVars = P.var' . (^. #unByteColumnIndex) . fst
+      <$> (m ^. #byteDecomposition . #bytes)
 
 byteRangeChecks ::
   Mapping ->
   LookupArguments
 byteRangeChecks = todo
+
+signRangeCheck ::
+  Mapping ->
+  LookupArguments
+signRangeCheck = todo
 
 truthTables ::
   Mapping ->
