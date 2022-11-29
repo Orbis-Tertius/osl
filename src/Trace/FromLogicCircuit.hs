@@ -16,7 +16,7 @@ where
 import Cast (intToInteger)
 import Control.Applicative ((<|>))
 import Control.Lens ((<&>))
-import Control.Monad (replicateM, foldM, mzero)
+import Control.Monad (foldM, mzero, replicateM)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (foldl')
 import qualified Data.Map as Map
@@ -35,9 +35,9 @@ import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
-import Halo2.Types.LogicConstraints (LogicConstraints)
-import Halo2.Types.LogicConstraint (LogicConstraint, AtomicLogicConstraint)
+import Halo2.Types.LogicConstraint (AtomicLogicConstraint, LogicConstraint)
 import qualified Halo2.Types.LogicConstraint as LC
+import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
@@ -128,7 +128,7 @@ data TruthTableColumnIndices = TruthTableColumnIndices
 
 data Operator
   = Plus
-  | TimesAnd -- * and & are the same operation, actually
+  | TimesAnd -- and & are the same operation, actually
   | Or
   | Not
   | Iff
@@ -156,14 +156,14 @@ data StepTypeIdMapping = StepTypeIdMapping
   deriving (Generic)
 
 type SubexpressionIdOf :: Type -> Type
-newtype SubexpressionIdOf a = SubexpressionIdOf { unOf :: SubexpressionId }
-  deriving Generic
+newtype SubexpressionIdOf a = SubexpressionIdOf {unOf :: SubexpressionId}
+  deriving (Generic)
 
 type Void :: Type
 data Void
 
-data Operation =
-    Or' SubexpressionId SubexpressionId
+data Operation
+  = Or' SubexpressionId SubexpressionId
   | Not' SubexpressionId
   | Iff' SubexpressionId SubexpressionId
   | Plus' SubexpressionId SubexpressionId
@@ -282,16 +282,21 @@ getMapping bitsPerByte c =
                 <*> (nextSid' :: State S (StepTypeIdOf LessThan))
                 <*> (nextSid' :: State S (StepTypeIdOf VoidT))
             )
-        <*> ( do m0 <- SubexpressionIdMapping
-                   <$> (Just <$> (nextEid' :: State S (SubexpressionIdOf Void)))
-                   <*> ( Map.fromList . zip polyVars
-                           <$> replicateM (length polyVars) nextEid' )
-                   <*> ( Map.fromList . zip lookupArguments
-                           <$> replicateM (length lookupArguments) nextEid' )
-                   <*> ( Map.fromList . zip scalars
-                           <$> replicateM (length scalars) nextEid' )
-                   <*> pure mempty
-                 traverseConstraints m0 (c ^. #gateConstraints)
+        <*> ( do
+                m0 <-
+                  SubexpressionIdMapping
+                    <$> (Just <$> (nextEid' :: State S (SubexpressionIdOf Void)))
+                    <*> ( Map.fromList . zip polyVars
+                            <$> replicateM (length polyVars) nextEid'
+                        )
+                    <*> ( Map.fromList . zip lookupArguments
+                            <$> replicateM (length lookupArguments) nextEid'
+                        )
+                    <*> ( Map.fromList . zip scalars
+                            <$> replicateM (length scalars) nextEid'
+                        )
+                    <*> pure mempty
+                traverseConstraints m0 (c ^. #gateConstraints)
             )
 
     traverseConstraints :: SubexpressionIdMapping -> LogicConstraints -> State S SubexpressionIdMapping
@@ -476,19 +481,22 @@ constantStepTypes ::
   Map StepTypeId StepType
 constantStepTypes m =
   Map.fromList
-  [ (sId, constantStepType m x)
-  | (x, sId) <- Map.toList (m ^. #stepTypeIds . #constants)
-  ]
+    [ (sId, constantStepType m x)
+      | (x, sId) <- Map.toList (m ^. #stepTypeIds . #constants)
+    ]
 
 constantStepType :: Mapping -> Scalar -> StepType
 constantStepType m x =
   StepType
-  (PolynomialConstraints
-    [P.minus (P.constant x)
-      (P.var' (m ^. #output . #unOutputColumnIndex))]
-    1)
-  mempty
-  mempty
+    ( PolynomialConstraints
+        [ P.minus
+            (P.constant x)
+            (P.var' (m ^. #output . #unOutputColumnIndex))
+        ]
+        1
+    )
+    mempty
+    mempty
 
 operatorStepTypes ::
   LogicCircuit ->
@@ -511,7 +519,7 @@ firstTwoInputs ::
   (InputColumnIndex, InputColumnIndex)
 firstTwoInputs m =
   case m ^. #inputs of
-    (i0:i1:_) -> (i0,i1)
+    (i0 : i1 : _) -> (i0, i1)
     _ -> die "firstTwoInputs: there are not two inputs (this is a compiler bug)"
 
 plusStepType,
@@ -522,122 +530,151 @@ plusStepType,
   voidStepType ::
     Mapping ->
     Map StepTypeId StepType
-
 plusStepType m =
   Map.singleton
-  (m ^. #stepTypeIds . #plus . #unOf)
-  (StepType
-    (PolynomialConstraints
-      [P.minus (P.var' (m ^. #output . #unOutputColumnIndex))
-        (P.plus (P.var' (i0 ^. #unInputColumnIndex))
-                (P.var' (i1 ^. #unInputColumnIndex)))]
-      1)
-    mempty
-    mempty)
+    (m ^. #stepTypeIds . #plus . #unOf)
+    ( StepType
+        ( PolynomialConstraints
+            [ P.minus
+                (P.var' (m ^. #output . #unOutputColumnIndex))
+                ( P.plus
+                    (P.var' (i0 ^. #unInputColumnIndex))
+                    (P.var' (i1 ^. #unInputColumnIndex))
+                )
+            ]
+            1
+        )
+        mempty
+        mempty
+    )
   where
     (i0, i1) = firstTwoInputs m
-
 timesStepType m =
   Map.singleton
-  (m ^. #stepTypeIds . #timesAnd . #unOf)
-  (StepType
-    (PolynomialConstraints
-      [P.minus (P.var' (m ^. #output . #unOutputColumnIndex))
-        (P.times (P.var' (i0 ^. #unInputColumnIndex))
-                 (P.var' (i1 ^. #unInputColumnIndex)))]
-      2)
-    mempty
-    mempty)
+    (m ^. #stepTypeIds . #timesAnd . #unOf)
+    ( StepType
+        ( PolynomialConstraints
+            [ P.minus
+                (P.var' (m ^. #output . #unOutputColumnIndex))
+                ( P.times
+                    (P.var' (i0 ^. #unInputColumnIndex))
+                    (P.var' (i1 ^. #unInputColumnIndex))
+                )
+            ]
+            2
+        )
+        mempty
+        mempty
+    )
   where
     (i0, i1) = firstTwoInputs m
-
 orStepType m =
   Map.singleton
-  (m ^. #stepTypeIds . #or . #unOf)
-  (StepType
-    (PolynomialConstraints
-      [P.minus (P.var' (m ^. #output . #unOutputColumnIndex))
-        (P.plus v0 (P.minus v1 (P.times v0 v1)))]
-      2)
-    mempty
-    mempty)
+    (m ^. #stepTypeIds . #or . #unOf)
+    ( StepType
+        ( PolynomialConstraints
+            [ P.minus
+                (P.var' (m ^. #output . #unOutputColumnIndex))
+                (P.plus v0 (P.minus v1 (P.times v0 v1)))
+            ]
+            2
+        )
+        mempty
+        mempty
+    )
   where
     (i0, i1) = firstTwoInputs m
     v0 = P.var' (i0 ^. #unInputColumnIndex)
     v1 = P.var' (i1 ^. #unInputColumnIndex)
-
 notStepType m =
   Map.singleton
-  (m ^. #stepTypeIds . #not . #unOf)
-  (StepType
-    (PolynomialConstraints
-      [P.minus (P.var' (m ^. #output . #unOutputColumnIndex))
-        (P.minus P.one (P.var' (i0 ^. #unInputColumnIndex)))]
-      1)
-    mempty
-    mempty)
+    (m ^. #stepTypeIds . #not . #unOf)
+    ( StepType
+        ( PolynomialConstraints
+            [ P.minus
+                (P.var' (m ^. #output . #unOutputColumnIndex))
+                (P.minus P.one (P.var' (i0 ^. #unInputColumnIndex)))
+            ]
+            1
+        )
+        mempty
+        mempty
+    )
   where
     (i0, _) = firstTwoInputs m
-
 iffStepType m =
   Map.singleton
-  (m ^. #stepTypeIds . #iff . #unOf)
-  (StepType
-    (PolynomialConstraints
-      [P.minus (P.var' (m ^. #output . #unOutputColumnIndex))
-        (P.minus P.one
-          (P.minus (P.var' (i0 ^. #unInputColumnIndex))
-            (P.var' (i1 ^. #unInputColumnIndex))))]
-      1)
-    mempty
-    mempty)
+    (m ^. #stepTypeIds . #iff . #unOf)
+    ( StepType
+        ( PolynomialConstraints
+            [ P.minus
+                (P.var' (m ^. #output . #unOutputColumnIndex))
+                ( P.minus
+                    P.one
+                    ( P.minus
+                        (P.var' (i0 ^. #unInputColumnIndex))
+                        (P.var' (i1 ^. #unInputColumnIndex))
+                    )
+                )
+            ]
+            1
+        )
+        mempty
+        mempty
+    )
   where
     (i0, i1) = firstTwoInputs m
-
 voidStepType m =
   Map.singleton (m ^. #stepTypeIds . #voidT . #unOf) mempty
 
-equalsStepType, lessThanStepType ::
-  LogicCircuit ->
-  Mapping ->
-  Map StepTypeId StepType
-
+equalsStepType,
+  lessThanStepType ::
+    LogicCircuit ->
+    Mapping ->
+    Map StepTypeId StepType
 equalsStepType c m =
   Map.singleton
-  (m ^. #stepTypeIds . #equals . #unOf)
-  (mconcat
-    [ StepType
-        (PolynomialConstraints
-          [foldl P.plus P.zero truthVars]
-          1)
-        mempty
-        mempty,
-      byteDecompositionCheck c m
-    ])
+    (m ^. #stepTypeIds . #equals . #unOf)
+    ( mconcat
+        [ StepType
+            ( PolynomialConstraints
+                [foldl P.plus P.zero truthVars]
+                1
+            )
+            mempty
+            mempty,
+          byteDecompositionCheck c m
+        ]
+    )
   where
     truthVars :: [Polynomial]
-    truthVars = P.var' . (^. #unTruthValueColumnIndex) . snd
-      <$> (m ^. #byteDecomposition . #bytes)
-
+    truthVars =
+      P.var' . (^. #unTruthValueColumnIndex) . snd
+        <$> (m ^. #byteDecomposition . #bytes)
 lessThanStepType c m =
   Map.singleton
-  (m ^. #stepTypeIds . #lessThan . #unOf)
-  (mconcat
-    [ StepType
-        (PolynomialConstraints
-          [ P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex),
-            P.one `P.minus`
-              foldl (\x y -> x `P.plus` (y `P.minus` (x `P.times` y))) P.zero
-                [ P.var' (snd i ^. #unTruthValueColumnIndex)
-                | i <- m ^. #byteDecomposition . #bytes
+    (m ^. #stepTypeIds . #lessThan . #unOf)
+    ( mconcat
+        [ StepType
+            ( PolynomialConstraints
+                [ P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex),
+                  P.one
+                    `P.minus` foldl
+                      (\x y -> x `P.plus` (y `P.minus` (x `P.times` y)))
+                      P.zero
+                      [ P.var' (snd i ^. #unTruthValueColumnIndex)
+                        | i <- m ^. #byteDecomposition . #bytes
+                      ]
                 ]
-          ]
-          (PolynomialDegreeBound
-            (max 1 (length (m ^. #byteDecomposition . #bytes)))))
-        mempty
-        mempty,
-      byteDecompositionCheck c m
-    ])
+                ( PolynomialDegreeBound
+                    (max 1 (length (m ^. #byteDecomposition . #bytes)))
+                )
+            )
+            mempty
+            mempty,
+          byteDecompositionCheck c m
+        ]
+    )
 
 byteDecompositionCheck ::
   LogicCircuit ->
@@ -645,15 +682,20 @@ byteDecompositionCheck ::
   StepType
 byteDecompositionCheck c m =
   StepType
-  (PolynomialConstraints
-    [ (v0 `P.minus` v1) `P.minus`
-        (((P.constant 2 `P.times` s) `P.minus` P.one) `P.times`
-          (foldl P.plus P.zero
-            (zipWith P.times byteCoefs byteVars)))
-    ]
-    (PolynomialDegreeBound 2))
-  (byteRangeAndTruthChecks m <> signRangeCheck m)
-  (truthTables m)
+    ( PolynomialConstraints
+        [ (v0 `P.minus` v1)
+            `P.minus` ( ((P.constant 2 `P.times` s) `P.minus` P.one)
+                          `P.times` ( foldl
+                                        P.plus
+                                        P.zero
+                                        (zipWith P.times byteCoefs byteVars)
+                                    )
+                      )
+        ]
+        (PolynomialDegreeBound 2)
+    )
+    (byteRangeAndTruthChecks m <> signRangeCheck m)
+    (truthTables m)
   where
     (i0, i1) = firstTwoInputs m
     v0 = P.var' (i0 ^. #unInputColumnIndex)
@@ -663,46 +705,59 @@ byteDecompositionCheck c m =
     byteCoefs, byteVars :: [Polynomial]
     byteCoefs =
       P.constant . fromMaybe (die "truthTables: byte coefficient is not in range of scalar (this is a compiler bug)") . integerToScalar
-        <$> [ 2 ^ i | i <- [0 .. getByteDecompositionLength (m ^. #byteDecomposition . #bits) c ] ]
-    byteVars = P.var' . (^. #unByteColumnIndex) . fst
-      <$> (m ^. #byteDecomposition . #bytes)
+        <$> [2 ^ i | i <- [0 .. getByteDecompositionLength (m ^. #byteDecomposition . #bits) c]]
+    byteVars =
+      P.var' . (^. #unByteColumnIndex) . fst
+        <$> (m ^. #byteDecomposition . #bytes)
 
 byteRangeAndTruthChecks ::
   Mapping ->
   LookupArguments
 byteRangeAndTruthChecks m =
   LookupArguments
-  [ LookupArgument P.zero
-      [ (InputExpression (P.var' (byteCol ^. #unByteColumnIndex)),
-         LookupTableColumn (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex)),
-        (InputExpression (P.var' (truthCol ^. #unTruthValueColumnIndex)),
-         LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex))
-      ]
-  | (byteCol, truthCol) <- m ^. #byteDecomposition . #bytes
-  ]
+    [ LookupArgument
+        P.zero
+        [ ( InputExpression (P.var' (byteCol ^. #unByteColumnIndex)),
+            LookupTableColumn (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex)
+          ),
+          ( InputExpression (P.var' (truthCol ^. #unTruthValueColumnIndex)),
+            LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex)
+          )
+        ]
+      | (byteCol, truthCol) <- m ^. #byteDecomposition . #bytes
+    ]
 
 signRangeCheck ::
   Mapping ->
   LookupArguments
 signRangeCheck m =
   LookupArguments
-  [ LookupArgument P.zero
-      [(InputExpression (P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)),
-        LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex))] ]
+    [ LookupArgument
+        P.zero
+        [ ( InputExpression (P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)),
+            LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex)
+          )
+        ]
+    ]
 
 truthTables ::
   Mapping ->
   FixedValues
 truthTables m =
-  FixedValues . Map.fromList
-    $ [ (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex,
-         FixedColumn byteRange),
-        (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex,
-         FixedColumn zeroIndicator) ]
+  FixedValues . Map.fromList $
+    [ ( m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex,
+        FixedColumn byteRange
+      ),
+      ( m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex,
+        FixedColumn zeroIndicator
+      )
+    ]
   where
     byteRange, zeroIndicator :: [Scalar]
-    byteRange = fromMaybe (die "byte value out of range of scalar (this is a compiler bug)")
-      . integerToScalar <$> [0 .. 2 ^ (m ^. #byteDecomposition . #bits . #unBitsPerByte) - 1]
+    byteRange =
+      fromMaybe (die "byte value out of range of scalar (this is a compiler bug)")
+        . integerToScalar
+        <$> [0 .. 2 ^ (m ^. #byteDecomposition . #bits . #unBitsPerByte) - 1]
     zeroIndicator = 1 : replicate (length byteRange - 1) 0
 
 getSubexpressions ::
@@ -720,7 +775,9 @@ maxStepsPerCase ::
   Scalar
 maxStepsPerCase =
   fromMaybe (die "maxStepsPerCase: out of range of scalar (this is a compiler bug)")
-    . integerToScalar . intToInteger . Set.size
+    . integerToScalar
+    . intToInteger
+    . Set.size
 
 todo :: a
 todo = todo
