@@ -33,6 +33,7 @@ import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
+import Halo2.Types.Exponent (Exponent)
 import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
@@ -398,7 +399,27 @@ getMapping bitsPerByte c =
       :: SubexpressionIdMapping
       -> PowerProduct
       -> State S (SubexpressionId, SubexpressionIdMapping)
-    traversePowerProduct = todo
+    traversePowerProduct m' pp =
+      case Map.toList (pp ^. #getPowerProduct) of
+        [] -> pure (oneEid m', m')
+        [x] -> traverseVarExponent m' x
+        (x:xs) -> do
+          (eid, m'') <- traverseVarExponent m' x
+          foldM mulVarExponent (eid, m'') xs
+
+    mulVarExponent
+      :: (SubexpressionId, SubexpressionIdMapping)
+      -> (PolynomialVariable, Exponent)
+      -> State S (SubexpressionId, SubexpressionIdMapping)
+    mulVarExponent (eid, m') x = do
+      (eid', m'') <- traverseVarExponent m' x
+      addOp m'' (TimesAnd' eid eid') <$> nextEid'
+
+    traverseVarExponent
+      :: SubexpressionIdMapping
+      -> (PolynomialVariable, Exponent)
+      -> State S (SubexpressionId, SubexpressionIdMapping)
+    traverseVarExponent = todo
 
     traverseCoefficient
       :: SubexpressionIdMapping
