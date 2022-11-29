@@ -534,14 +534,16 @@ byteDecompositionCheck c m =
     ]
     (PolynomialDegreeBound (max 1 (length truthVars))))
   (byteRangeChecks m)
-  (truthTables c m)
+  (truthTables m)
   where
     (i0, i1) = firstTwoInputs m
     v0 = P.var' (i0 ^. #unInputColumnIndex)
     v1 = P.var' (i1 ^. #unInputColumnIndex)
 
     byteCoefs, byteVars, truthVars :: [Polynomial]
-    byteCoefs = todo
+    byteCoefs =
+      P.constant . fromMaybe (die "truthTables: byte coefficient is not in range of scalar (this is a compiler bug)") . integerToScalar
+        <$> [ 2 ^ i | i <- [0 .. getByteDecompositionLength (m ^. #byteDecomposition . #bits) c ] ]
     byteVars = todo
     truthVars = todo
 
@@ -551,10 +553,9 @@ byteRangeChecks ::
 byteRangeChecks = todo
 
 truthTables ::
-  LogicCircuit ->
   Mapping ->
   FixedValues
-truthTables c m =
+truthTables m =
   FixedValues . Map.fromList
     $ [ (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex,
          FixedColumn byteRange),
@@ -562,8 +563,8 @@ truthTables c m =
          FixedColumn zeroIndicator) ]
   where
     byteRange, zeroIndicator :: [Scalar]
-    byteRange = fromMaybe (die "truthTables: byte coefficient is not in range of scalar (this is a compiler bug)") . integerToScalar
-      <$> [ 2 ^ i | i <- [0 .. getByteDecompositionLength (m ^. #byteDecomposition . #bits) c ] ]
+    byteRange = fromMaybe (die "byte value out of range of scalar (this is a compiler bug)")
+      . integerToScalar <$> [0 .. 2 ^ (m ^. #byteDecomposition . #bits . #unBitsPerByte) - 1]
     zeroIndicator = 1 : replicate (length byteRange - 1) 0
 
 getSubexpressions ::
