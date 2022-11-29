@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
@@ -13,8 +14,9 @@ module Trace.FromLogicCircuit
 where
 
 import Cast (intToInteger)
+import Control.Applicative ((<|>))
 import Control.Lens ((<&>))
-import Control.Monad (replicateM, foldM)
+import Control.Monad (replicateM, foldM, mzero)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (foldl')
 import qualified Data.Map as Map
@@ -34,7 +36,8 @@ import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
 import Halo2.Types.LogicConstraints (LogicConstraints)
-import Halo2.Types.LogicConstraint (LogicConstraint)
+import Halo2.Types.LogicConstraint (LogicConstraint, AtomicLogicConstraint)
+import qualified Halo2.Types.LogicConstraint as LC
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
@@ -170,13 +173,17 @@ data Operation =
   deriving (Eq, Ord)
 
 data SubexpressionIdMapping = SubexpressionIdMapping
-  { void :: SubexpressionIdOf Void,
+  { void :: Maybe (SubexpressionIdOf Void),
     variables :: Map PolynomialVariable (SubexpressionIdOf PolynomialVariable),
     lookups :: Map LookupArgument (SubexpressionIdOf LookupArgument),
     constants :: Map Scalar (SubexpressionIdOf Scalar),
     operations :: Map Operation (SubexpressionIdOf Operation)
   }
   deriving (Generic)
+
+instance Semigroup SubexpressionIdMapping where
+  (SubexpressionIdMapping a b c d e) <> (SubexpressionIdMapping f g h i j) =
+    SubexpressionIdMapping (a <|> f) (b <> g) (c <> h) (d <> i) (e <> j)
 
 getStepArity :: LogicCircuit -> Arity
 getStepArity = max 2 . getLookupArgumentsArity . (^. #lookupArguments)
@@ -276,7 +283,7 @@ getMapping bitsPerByte c =
                 <*> (nextSid' :: State S (StepTypeIdOf VoidT))
             )
         <*> ( do m0 <- SubexpressionIdMapping
-                   <$> (nextEid' :: State S (SubexpressionIdOf Void))
+                   <$> (Just <$> (nextEid' :: State S (SubexpressionIdOf Void)))
                    <*> ( Map.fromList . zip polyVars
                            <$> replicateM (length polyVars) nextEid' )
                    <*> ( Map.fromList . zip lookupArguments
@@ -289,10 +296,38 @@ getMapping bitsPerByte c =
 
     traverseConstraints :: SubexpressionIdMapping -> LogicConstraints -> State S SubexpressionIdMapping
     traverseConstraints m' lcs =
-      foldM traverseConstraint m' (lcs ^. #constraints)
+      foldM (\x y -> snd <$> traverseConstraint x y) m' (lcs ^. #constraints)
 
-    traverseConstraint :: SubexpressionIdMapping -> LogicConstraint -> State S SubexpressionIdMapping
-    traverseConstraint = todo
+    traverseConstraint :: SubexpressionIdMapping -> LogicConstraint -> State S (SubexpressionId, SubexpressionIdMapping)
+    traverseConstraint m' =
+      \case
+        LC.Atom x -> traverseAtom m' x
+        LC.Not x -> do
+          (xId, m'') <- traverseConstraint m' x
+          addOp m'' (Not' xId) <$> nextEid'
+        LC.And x y -> do
+          (xId, m'') <- traverseConstraint m' x
+          (yId, m''') <- traverseConstraint m'' y
+          addOp m''' (TimesAnd' xId yId) <$> nextEid'
+        LC.Or x y -> do
+          (xId, m'') <- traverseConstraint m' x
+          (yId, m''') <- traverseConstraint m'' y
+          addOp m''' (Or' xId yId) <$> nextEid'
+        LC.Iff x y -> do
+          (xId, m'') <- traverseConstraint m' x
+          (yId, m''') <- traverseConstraint m'' y
+          addOp m''' (Iff' xId yId) <$> nextEid'
+        LC.Top -> pure (todo, m')
+        LC.Bottom -> pure (todo, m')
+
+    addOp :: SubexpressionIdMapping -> Operation -> SubexpressionIdOf Operation -> (SubexpressionId, SubexpressionIdMapping)
+    addOp m' op opId =
+      case Map.lookup op (m' ^. #operations) of
+        Just opId' -> (opId' ^. #unOf, m')
+        Nothing -> (opId ^. #unOf, m' <> SubexpressionIdMapping mzero mempty mempty mempty (Map.singleton op opId))
+
+    traverseAtom :: SubexpressionIdMapping -> AtomicLogicConstraint -> State S (SubexpressionId, SubexpressionIdMapping)
+    traverseAtom = todo
 
     polyVars :: [PolynomialVariable]
     polyVars = Set.toList (getPolynomialVariables c)
