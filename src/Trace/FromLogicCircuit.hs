@@ -51,7 +51,7 @@ import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
 import Stark.Types.Scalar (Scalar, integerToScalar)
-import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId, StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink, TraceType (TraceType))
+import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink, TraceType (TraceType))
 
 logicCircuitToTraceType ::
   BitsPerByte ->
@@ -165,9 +165,6 @@ newtype SubexpressionIdOf a = SubexpressionIdOf {unOf :: SubexpressionId}
 type Void :: Type
 data Void
 
-type Result :: Type
-data Result
-
 data Operation
   = Or' SubexpressionId SubexpressionId
   | Not' SubexpressionId
@@ -180,7 +177,7 @@ data Operation
 
 data SubexpressionIdMapping = SubexpressionIdMapping
   { void :: Maybe (SubexpressionIdOf Void),
-    result :: Maybe (SubexpressionIdOf Result),
+    result :: Maybe ResultExpressionId,
     variables :: Map PolynomialVariable (SubexpressionIdOf PolynomialVariable),
     lookups :: Map LookupArgument (SubexpressionIdOf LookupArgument),
     constants :: Map Scalar (SubexpressionIdOf Scalar),
@@ -293,7 +290,7 @@ getMapping bitsPerByte c =
                 m0 <-
                   SubexpressionIdMapping
                     <$> (Just <$> (nextEid' :: State S (SubexpressionIdOf Void)))
-                    <*> (Just <$> (nextEid' :: State S (SubexpressionIdOf Result)))
+                    <*> (Just . ResultExpressionId <$> nextEid)
                     <*> ( Map.fromList . zip polyVars
                             <$> replicateM (length polyVars) nextEid'
                         )
