@@ -499,7 +499,7 @@ getStepTypes c m =
       lookupStepTypes m,
       constantStepTypes m,
       operatorStepTypes c m,
-      resultStepType c m
+      resultStepType m
     ]
 
 loadStepTypes ::
@@ -876,10 +876,18 @@ truthTables m =
     zeroIndicator = 1 : replicate (length byteRange - 1) 0
 
 resultStepType ::
-  LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-resultStepType = todo
+resultStepType m =
+  Map.singleton
+  (m ^. #stepTypeIds . #resultT . #unOf)
+  (StepType
+    (PolynomialConstraints [P.minus out i0] 1)
+    mempty
+    mempty)
+  where
+    i0 = P.var' $ fst (firstTwoInputs m) ^. #unInputColumnIndex
+    out = P.var' $ m ^. #output . #unOutputColumnIndex
 
 maybeToSet :: Ord a => Maybe a -> Set a
 maybeToSet = maybe mempty Set.singleton

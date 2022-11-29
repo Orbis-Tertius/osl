@@ -73,6 +73,7 @@ inputChecks t m =
         let y = t ^. #outputColumnIndex . #unOutputColumnIndex
     ]
 
+-- TODO: add precondition checks
 linkChecks ::
   TraceType ->
   Mappings ->
