@@ -82,7 +82,7 @@ logicCircuitToTraceType bitsPerByte c =
 
     stepTypes = getStepTypes c mapping
 
-    subexprs = getSubexpressionIdSet mapping
+    subexprs = getSubexpressionIdSet (mapping ^. #subexpressionIds)
 
 -- TODO: let the columns be reused where possible
 data Mapping = Mapping
@@ -872,10 +872,21 @@ truthTables m =
         <$> [0 .. 2 ^ (m ^. #byteDecomposition . #bits . #unBitsPerByte) - 1]
     zeroIndicator = 1 : replicate (length byteRange - 1) 0
 
+maybeToSet :: Ord a => Maybe a -> Set a
+maybeToSet = maybe mempty Set.singleton
+
 getSubexpressionIdSet ::
-  Mapping ->
+  SubexpressionIdMapping ->
   Set SubexpressionId
-getSubexpressionIdSet = todo
+getSubexpressionIdSet m =
+  mconcat
+  [ maybeToSet ((m ^. #void) <&> (^. #unOf)),
+    maybeToSet ((m ^. #result) <&> (^. #unResultExpressionId)),
+    Set.fromList (Map.elems (m ^. #variables) <&> (^. #unOf)),
+    Set.fromList (Map.elems (m ^. #lookups) <&> (^. #unOf)),
+    Set.fromList (Map.elems (m ^. #constants) <&> (^. #unOf)),
+    Set.fromList (Map.elems (m ^. #operations) <&> (^. #unOf))
+  ]
 
 getSubexpressionLinks ::
   Mapping ->
