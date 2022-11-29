@@ -29,6 +29,8 @@ import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
+import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
+import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
@@ -68,7 +70,7 @@ logicCircuitToTraceType bitsPerByte c =
 
     colTypes' = getColumnTypes c mapping
 
-    stepTypes = getStepTypes mapping
+    stepTypes = getStepTypes c mapping
 
     (subexprs, links, resultId) = getSubexpressions c mapping stepTypes
 
@@ -86,7 +88,8 @@ data Mapping = Mapping
   deriving (Generic)
 
 data ByteDecompositionMapping = ByteDecompositionMapping
-  { sign :: SignColumnIndex,
+  { bits :: BitsPerByte,
+    sign :: SignColumnIndex,
     bytes :: [(ByteColumnIndex, TruthValueColumnIndex)] -- most significant first
   }
   deriving (Generic)
@@ -199,7 +202,7 @@ getMapping bitsPerByte c =
           (getStepArity c ^. #unArity)
           (InputColumnIndex <$> nextCol)
         <*> (OutputColumnIndex <$> nextCol)
-        <*> ( ByteDecompositionMapping
+        <*> ( ByteDecompositionMapping bitsPerByte
                 <$> (SignColumnIndex <$> nextCol)
                 <*> replicateM
                   (getByteDecompositionLength bitsPerByte c)
@@ -269,14 +272,15 @@ getMappingIndices m =
        ]
 
 getStepTypes ::
+  LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-getStepTypes m =
+getStepTypes c m =
   mconcat
     [ loadStepTypes m,
       lookupStepTypes m,
       constantStepTypes m,
-      operatorStepTypes m
+      operatorStepTypes c m
     ]
 
 loadStepTypes ::
@@ -388,17 +392,18 @@ constantStepType m x =
   mempty
 
 operatorStepTypes ::
+  LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-operatorStepTypes m =
+operatorStepTypes c m =
   mconcat
     [ plusStepType m,
       timesStepType m,
       orStepType m,
       notStepType m,
       iffStepType m,
-      equalsStepType m,
-      lessThanStepType m,
+      equalsStepType c m,
+      lessThanStepType c m,
       voidStepType m
     ]
 
@@ -415,8 +420,6 @@ plusStepType,
   orStepType,
   notStepType,
   iffStepType,
-  equalsStepType,
-  lessThanStepType,
   voidStepType ::
     Mapping ->
     Map StepTypeId StepType
@@ -492,10 +495,72 @@ iffStepType m =
   where
     (i0, i1) = firstTwoInputs m
 
-equalsStepType = todo
-lessThanStepType = todo
 voidStepType m =
   Map.singleton (m ^. #stepTypeIds . #voidT . #unOf) mempty
+
+equalsStepType, lessThanStepType ::
+  LogicCircuit ->
+  Mapping ->
+  Map StepTypeId StepType
+
+equalsStepType c m =
+  Map.singleton
+  (m ^. #stepTypeIds . #equals . #unOf)
+  (mconcat
+    [ StepType todo todo todo,
+      byteDecompositionCheck c m
+    ])
+
+lessThanStepType c m =
+  Map.singleton
+  (m ^. #stepTypeIds . #lessThan . #unOf)
+  (mconcat
+    [ StepType todo todo todo,
+      byteDecompositionCheck c m
+    ])
+
+byteDecompositionCheck ::
+  LogicCircuit ->
+  Mapping ->
+  StepType
+byteDecompositionCheck c m =
+  StepType
+  (PolynomialConstraints
+    [ (v0 `P.minus` v1) `P.minus`
+        (foldl P.plus P.zero
+          (zipWith P.times byteCoefs byteVars)) ]
+    1)
+  (byteRangeChecks m)
+  (truthTables c m)
+  where
+    (i0, i1) = firstTwoInputs m
+    v0 = P.var' (i0 ^. #unInputColumnIndex)
+    v1 = P.var' (i1 ^. #unInputColumnIndex)
+
+    byteCoefs, byteVars :: [Polynomial]
+    byteCoefs = todo
+    byteVars = todo
+
+byteRangeChecks ::
+  Mapping ->
+  LookupArguments
+byteRangeChecks = todo
+
+truthTables ::
+  LogicCircuit ->
+  Mapping ->
+  FixedValues
+truthTables c m =
+  FixedValues . Map.fromList
+    $ [ (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex,
+         FixedColumn byteRange),
+        (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex,
+         FixedColumn zeroIndicator) ]
+  where
+    byteRange, zeroIndicator :: [Scalar]
+    byteRange = fromMaybe (die "truthTables: byte coefficient is not in range of scalar (this is a compiler bug)") . integerToScalar
+      <$> [ 2 ^ i | i <- [0 .. getByteDecompositionLength (m ^. #byteDecomposition . #bits) c ] ]
+    zeroIndicator = 1 : replicate (length byteRange - 1) 0
 
 getSubexpressions ::
   LogicCircuit ->
