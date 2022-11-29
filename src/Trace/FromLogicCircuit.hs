@@ -439,7 +439,10 @@ getMapping bitsPerByte c =
       :: SubexpressionIdMapping
       -> Coefficient
       -> SubexpressionId
-    coefficientEid = todo
+    coefficientEid m' a =
+      case Map.lookup (a ^. #getCoefficient) (m' ^. #constants) of
+        Just eid -> eid ^. #unOf
+        Nothing -> die "coefficientEid: coefficient lookup failed (this is a compiler bug)"
 
     polyVars :: [PolynomialVariable]
     polyVars = Set.toList (getPolynomialVariables c)
