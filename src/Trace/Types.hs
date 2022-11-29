@@ -61,7 +61,7 @@ newtype StepTypeId = StepTypeId {unStepTypeId :: Scalar}
   deriving (Generic, Eq, Ord, Num)
 
 newtype SubexpressionId = SubexpressionId {unSubexpressionId :: Scalar}
-  deriving (Generic)
+  deriving (Generic, Eq, Ord, Num)
 
 newtype InputSubexpressionId = InputSubexpressionId {unInputSubexpressionId :: SubexpressionId}
   deriving (Generic)

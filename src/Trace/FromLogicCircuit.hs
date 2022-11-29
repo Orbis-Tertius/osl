@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
@@ -13,7 +14,7 @@ where
 
 import Cast (intToInteger)
 import Control.Lens ((<&>))
-import Control.Monad (replicateM)
+import Control.Monad (replicateM, foldM)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (foldl')
 import qualified Data.Map as Map
@@ -32,6 +33,8 @@ import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
+import Halo2.Types.LogicConstraints (LogicConstraints)
+import Halo2.Types.LogicConstraint (LogicConstraint)
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
@@ -42,7 +45,7 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
 import Stark.Types.Scalar (Scalar, integerToScalar)
-import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId, StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId, SubexpressionLink, TraceType (TraceType))
+import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId, StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink, TraceType (TraceType))
 
 logicCircuitToTraceType ::
   BitsPerByte ->
@@ -84,7 +87,8 @@ data Mapping = Mapping
     output :: OutputColumnIndex,
     byteDecomposition :: ByteDecompositionMapping,
     truthTable :: TruthTableColumnIndices,
-    stepTypeIds :: StepTypeIdMapping
+    stepTypeIds :: StepTypeIdMapping,
+    subexpressionIds :: SubexpressionIdMapping
   }
   deriving (Generic)
 
@@ -127,7 +131,7 @@ data Operator
   | Iff
   | Equals
   | LessThan
-  | Void
+  | VoidT
 
 type StepTypeIdOf :: Operator -> Type
 newtype StepTypeIdOf a = StepTypeIdOf {unOf :: StepTypeId}
@@ -144,7 +148,33 @@ data StepTypeIdMapping = StepTypeIdMapping
     iff :: StepTypeIdOf Iff,
     equals :: StepTypeIdOf Equals,
     lessThan :: StepTypeIdOf LessThan,
-    voidT :: StepTypeIdOf Void
+    voidT :: StepTypeIdOf VoidT
+  }
+  deriving (Generic)
+
+type SubexpressionIdOf :: Type -> Type
+newtype SubexpressionIdOf a = SubexpressionIdOf { unOf :: SubexpressionId }
+  deriving Generic
+
+type Void :: Type
+data Void
+
+data Operation =
+    Or' SubexpressionId SubexpressionId
+  | Not' SubexpressionId
+  | Iff' SubexpressionId SubexpressionId
+  | Plus' SubexpressionId SubexpressionId
+  | TimesAnd' SubexpressionId SubexpressionId
+  | Equals' SubexpressionId SubexpressionId
+  | LessThan' SubexpressionId SubexpressionId
+  deriving (Eq, Ord)
+
+data SubexpressionIdMapping = SubexpressionIdMapping
+  { void :: SubexpressionIdOf Void,
+    variables :: Map PolynomialVariable (SubexpressionIdOf PolynomialVariable),
+    lookups :: Map LookupArgument (SubexpressionIdOf LookupArgument),
+    constants :: Map Scalar (SubexpressionIdOf Scalar),
+    operations :: Map Operation (SubexpressionIdOf Operation)
   }
   deriving (Generic)
 
@@ -164,7 +194,8 @@ getByteDecompositionLength bitsPerByte c =
 
 data S = S
   { nextColumnIndex :: ColumnIndex,
-    nextStepTypeId :: StepTypeId
+    nextStepTypeId :: StepTypeId,
+    nextSubexpressionId :: SubexpressionId
   }
   deriving (Generic)
 
@@ -177,21 +208,31 @@ getMapping bitsPerByte c =
       S
         (ColumnIndex (length (Map.keys (c ^. #columnTypes . #getColumnTypes))))
         (StepTypeId 0)
+        (SubexpressionId 0)
 
     nextCol :: State S ColumnIndex
     nextCol = do
-      S i j <- get
-      put (S (i + 1) j)
+      S i j k <- get
+      put (S (i + 1) j k)
       pure i
 
     nextSid :: State S StepTypeId
     nextSid = do
-      S i j <- get
-      put (S i (j + 1))
+      S i j k <- get
+      put (S i (j + 1) k)
       pure j
 
     nextSid' :: State S (StepTypeIdOf a)
     nextSid' = StepTypeIdOf <$> nextSid
+
+    nextEid :: State S SubexpressionId
+    nextEid = do
+      S i j k <- get
+      put (S i j (k + 1))
+      pure k
+
+    nextEid' :: State S (SubexpressionIdOf a)
+    nextEid' = SubexpressionIdOf <$> nextEid
 
     go :: State S Mapping
     go =
@@ -232,14 +273,35 @@ getMapping bitsPerByte c =
                 <*> (nextSid' :: State S (StepTypeIdOf Iff))
                 <*> (nextSid' :: State S (StepTypeIdOf Equals))
                 <*> (nextSid' :: State S (StepTypeIdOf LessThan))
-                <*> (nextSid' :: State S (StepTypeIdOf Void))
+                <*> (nextSid' :: State S (StepTypeIdOf VoidT))
             )
+        <*> ( do m0 <- SubexpressionIdMapping
+                   <$> (nextEid' :: State S (SubexpressionIdOf Void))
+                   <*> ( Map.fromList . zip polyVars
+                           <$> replicateM (length polyVars) nextEid' )
+                   <*> ( Map.fromList . zip lookupArguments
+                           <$> replicateM (length lookupArguments) nextEid' )
+                   <*> ( Map.fromList . zip scalars
+                           <$> replicateM (length scalars) nextEid' )
+                   <*> pure mempty
+                 traverseConstraints m0 (c ^. #gateConstraints)
+            )
+
+    traverseConstraints :: SubexpressionIdMapping -> LogicConstraints -> State S SubexpressionIdMapping
+    traverseConstraints m' lcs =
+      foldM traverseConstraint m' (lcs ^. #constraints)
+
+    traverseConstraint :: SubexpressionIdMapping -> LogicConstraint -> State S SubexpressionIdMapping
+    traverseConstraint = todo
 
     polyVars :: [PolynomialVariable]
     polyVars = Set.toList (getPolynomialVariables c)
 
     lookupTables :: [[LookupTableColumn]]
     lookupTables = Set.toList (getLookupTables c)
+
+    lookupArguments :: [LookupArgument]
+    lookupArguments = c ^. #lookupArguments . #getLookupArguments
 
     scalars :: [Scalar]
     scalars = Set.toList (getScalars c)
@@ -358,6 +420,7 @@ lookupStepTypes m =
       | (t, sId) <- Map.toList (m ^. #stepTypeIds . #lookups)
     ]
 
+-- TODO: what if the lookup argument in the logic circuit is gated?
 lookupStepType ::
   Mapping ->
   [LookupTableColumn] ->
