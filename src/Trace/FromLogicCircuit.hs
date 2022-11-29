@@ -29,6 +29,7 @@ import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte)
 import Halo2.Types.Circuit (LogicCircuit)
+import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
@@ -45,6 +46,7 @@ import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable)
+import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
 import Stark.Types.Scalar (Scalar, integerToScalar)
@@ -322,17 +324,67 @@ getMapping bitsPerByte c =
           (xId, m'') <- traverseConstraint m' x
           (yId, m''') <- traverseConstraint m'' y
           addOp m''' (Iff' xId yId) <$> nextEid'
-        LC.Top -> pure (todo, m')
-        LC.Bottom -> pure (todo, m')
+        LC.Top -> pure (oneEid m', m')
+        LC.Bottom -> pure (zeroEid m', m')
 
-    addOp :: SubexpressionIdMapping -> Operation -> SubexpressionIdOf Operation -> (SubexpressionId, SubexpressionIdMapping)
+    zeroEid, oneEid :: SubexpressionIdMapping -> SubexpressionId
+    zeroEid m' =
+      case Map.lookup 0 (m' ^. #constants) of
+        Just eid -> eid ^. #unOf
+        Nothing -> die "zeroEid: no zero subexpression id (this is a compiler bug)"
+    oneEid m' =
+      case Map.lookup 1 (m' ^. #constants) of
+        Just eid -> eid ^. #unOf
+        Nothing -> die "oneEid: no one subexpression id (this is a compiler bug)"
+
+    addOp
+      :: SubexpressionIdMapping
+      -> Operation
+      -> SubexpressionIdOf Operation
+      -> (SubexpressionId, SubexpressionIdMapping)
     addOp m' op opId =
       case Map.lookup op (m' ^. #operations) of
         Just opId' -> (opId' ^. #unOf, m')
         Nothing -> (opId ^. #unOf, m' <> SubexpressionIdMapping mzero mempty mempty mempty (Map.singleton op opId))
 
-    traverseAtom :: SubexpressionIdMapping -> AtomicLogicConstraint -> State S (SubexpressionId, SubexpressionIdMapping)
-    traverseAtom = todo
+    traverseAtom
+      :: SubexpressionIdMapping
+      -> AtomicLogicConstraint
+      -> State S (SubexpressionId, SubexpressionIdMapping)
+    traverseAtom m' =
+      \case
+        LC.Equals x y -> do
+          (xId, m'') <- traversePoly m' x
+          (yId, m''') <- traversePoly m'' y
+          addOp m''' (Equals' xId yId) <$> nextEid'
+        LC.LessThan x y -> do
+          (xId, m'') <- traversePoly m' x
+          (yId, m''') <- traversePoly m'' y
+          addOp m''' (LessThan' xId yId) <$> nextEid'
+
+    traversePoly
+      :: SubexpressionIdMapping
+      -> Polynomial
+      -> State S (SubexpressionId, SubexpressionIdMapping)
+    traversePoly m' poly =
+      case Map.toList (poly ^. #monos) of
+        [] -> pure (zeroEid m', m')
+        [m] -> traverseMono m' m
+        (m:ms) -> do
+          (eid, m'') <- traverseMono m' m
+          foldM addMono (eid, m'') ms
+
+    addMono
+      :: (SubexpressionId, SubexpressionIdMapping)
+      -> (PowerProduct, Coefficient)
+      -> State S (SubexpressionId, SubexpressionIdMapping)
+    addMono = todo
+
+    traverseMono
+      :: SubexpressionIdMapping
+      -> (PowerProduct, Coefficient)
+      -> State S (SubexpressionId, SubexpressionIdMapping)
+    traverseMono = todo
 
     polyVars :: [PolynomialVariable]
     polyVars = Set.toList (getPolynomialVariables c)
