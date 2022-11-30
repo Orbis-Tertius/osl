@@ -4,6 +4,7 @@
 
 module Halo2.CircuitMetrics (getCircuitMetrics) where
 
+import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.Polynomial (degree)
@@ -41,7 +42,7 @@ getColumnCounts x =
 
 getPolyDegreeBound :: ArithmeticCircuit -> PolynomialDegreeBound
 getPolyDegreeBound x =
-  foldl
+  foldl'
     max
     (x ^. #gateConstraints . #degreeBound)
     (getLookupArgumentDegree <$> (x ^. #lookupArguments . #getLookupArguments))
@@ -49,14 +50,14 @@ getPolyDegreeBound x =
 getLookupArgumentDegree :: LookupArgument -> PolynomialDegreeBound
 getLookupArgumentDegree arg =
   PolynomialDegreeBound $
-    foldl
+    foldl'
       max
       (degree (arg ^. #gate))
       (degree . (^. #getInputExpression) . fst <$> (arg ^. #tableMap))
 
 getLookupTableSize :: ArithmeticCircuit -> LookupTableSize
 getLookupTableSize x =
-  foldl
+  foldl'
     max
     0
     (getLookupArgumentTableSize <$> (x ^. #lookupArguments . #getLookupArguments))
