@@ -154,7 +154,7 @@ gatedStepTypeLookupArguments t (sId, s) =
     (LookupArguments . (: []) . gateStepTypeLookupArgument t sId)
     (s ^. #lookupArguments . #getLookupArguments)
 
--- This assumes that the gate values are sufficiently small.
+-- FIXME: This assumes that the gate values are sufficiently small.
 gateStepTypeLookupArgument ::
   TraceType ->
   StepTypeId ->
