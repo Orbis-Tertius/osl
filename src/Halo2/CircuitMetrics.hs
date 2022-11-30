@@ -1,11 +1,18 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Halo2.CircuitMetrics (getCircuitMetrics) where
 
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Halo2.Polynomial (degree)
 import Halo2.Prelude
 import Halo2.Types.Circuit (ArithmeticCircuit)
-import Halo2.Types.CircuitMetrics (CircuitMetrics (CircuitMetrics), ColumnCounts, PolynomialDegreeBound (PolynomialDegreeBound), LookupTableSize (LookupTableSize), GateConstraintCount (GateConstraintCount), LookupArgumentCount (LookupArgumentCount))
+import Halo2.Types.CircuitMetrics (CircuitMetrics (CircuitMetrics), ColumnCounts (ColumnCounts), ColumnCount (ColumnCount), PolynomialDegreeBound (PolynomialDegreeBound), LookupTableSize (LookupTableSize), GateConstraintCount (GateConstraintCount), LookupArgumentCount (LookupArgumentCount), ColumnClass (Advice, Instance, Fixed, All, EqualityConstrainable))
+import Halo2.Types.ColumnIndex (ColumnIndex)
+import Halo2.Types.ColumnType (ColumnType)
+import qualified Halo2.Types.ColumnType as CT
 import Halo2.Types.LookupArgument (LookupArgument)
 
 getCircuitMetrics
@@ -21,7 +28,16 @@ getCircuitMetrics x =
   (getLookupTableSize x)
 
 getColumnCounts :: ArithmeticCircuit -> ColumnCounts
-getColumnCounts = todo
+getColumnCounts x =
+  ColumnCounts
+  (ColumnCount @Advice (Map.size (Map.filter (== CT.Advice) colTypes)))
+  (ColumnCount @Instance (Map.size (Map.filter (== CT.Instance) colTypes)))
+  (ColumnCount @Fixed (Map.size (Map.filter (== CT.Fixed) colTypes)))
+  (ColumnCount @All (Map.size colTypes))
+  (ColumnCount @EqualityConstrainable (Set.size (x ^. #equalityConstrainableColumns . #getEqualityConstrainableColumns)))
+  where
+    colTypes :: Map ColumnIndex ColumnType
+    colTypes = x ^. #columnTypes . #getColumnTypes
 
 getPolyDegreeBound :: ArithmeticCircuit -> PolynomialDegreeBound
 getPolyDegreeBound x =
@@ -42,6 +58,3 @@ getLookupTableSize x =
 getLookupArgumentTableSize :: LookupArgument -> LookupTableSize
 getLookupArgumentTableSize arg =
   LookupTableSize (length (arg ^. #tableMap))
-
-todo :: a
-todo = todo
