@@ -18,6 +18,8 @@ module Halo2.Polynomial
   )
 where
 
+import qualified Algebra.Additive as Group
+import qualified Algebra.Ring as Ring
 import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Halo2.PowerProduct as P
@@ -28,15 +30,16 @@ import Halo2.Types.Polynomial (Polynomial (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (..))
 import Stark.Types.Scalar (Scalar)
+import qualified Stark.Types.Scalar as S
 
 plus :: Polynomial -> Polynomial -> Polynomial
 plus (Polynomial p) (Polynomial q) =
-  Polynomial $ Map.unionWith (+) p q
+  Polynomial $ Map.unionWith (Group.+) p q
 
 times :: Polynomial -> Polynomial -> Polynomial
 times (Polynomial p) (Polynomial q) =
   Polynomial . sumMonomials $
-    [ (P.times x y, a * b)
+    [ (P.times x y, a Ring.* b)
       | (x, a) <- Map.toList p,
         (y, b) <- Map.toList q
     ]
@@ -52,7 +55,7 @@ sumMonomials = foldl' g mempty
       Map PowerProduct Coefficient
     g p (x, a) =
       case Map.lookup x p of
-        Just b -> Map.insert x (a + b) p
+        Just b -> Map.insert x (a Group.+ b) p
         Nothing -> Map.insert x a p
 
 constant :: Scalar -> Polynomial
@@ -61,7 +64,7 @@ constant = Polynomial . Map.singleton (PowerProduct mempty) . Coefficient
 var :: PolynomialVariable -> Polynomial
 var v =
   Polynomial
-    (Map.singleton (PowerProduct (Map.singleton v 1)) 1)
+    (Map.singleton (PowerProduct (Map.singleton v 1)) (Coefficient S.one))
 
 var' :: ColumnIndex -> Polynomial
 var' i = var (PolynomialVariable i 0)
@@ -82,13 +85,13 @@ multilinearMonomial a xs =
     )
 
 zero :: Polynomial
-zero = constant 0
+zero = constant S.zero
 
 one :: Polynomial
-one = constant 1
+one = constant S.one
 
 minusOne :: Polynomial
-minusOne = constant (-1)
+minusOne = constant S.minusOne
 
 negative :: Polynomial -> Polynomial
 negative = (minusOne `times`)

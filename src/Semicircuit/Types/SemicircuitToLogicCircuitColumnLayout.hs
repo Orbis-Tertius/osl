@@ -20,21 +20,8 @@ import Data.Map (Map)
 import GHC.Generics (Generic)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnTypes (ColumnTypes)
+import Semicircuit.Types.NameMapping (ArgMapping (ArgMapping), NameMapping (NameMapping), OutputMapping (OutputMapping))
 import Semicircuit.Types.Sigma11 (Name, Term)
-
-newtype OutputMapping = OutputMapping {unOutputMapping :: ColumnIndex}
-  deriving stock (Generic)
-  deriving newtype (Show)
-
-newtype ArgMapping = ArgMapping {unArgMapping :: ColumnIndex}
-  deriving stock (Generic)
-  deriving newtype (Show)
-
-data NameMapping = NameMapping
-  { outputMapping :: OutputMapping,
-    argMappings :: [ArgMapping]
-  }
-  deriving (Generic, Show)
 
 newtype TermMapping = TermMapping {unTermMapping :: ColumnIndex}
   deriving stock (Generic)

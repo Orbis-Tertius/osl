@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -18,16 +19,29 @@ module Stark.Types.Scalar
     primitiveNthRoot,
     sample,
     scalarToRational,
+    scalarToInt,
     scalarToInteger,
     integerToScalar,
+    zero,
+    one,
+    minusOne,
+    two,
     half,
     normalize,
   )
 where
 
+import qualified Algebra.Additive as Group
+import qualified Algebra.Ring as Ring
 import Basement.Types.Word128 (Word128 (Word128))
-import Control.Monad (guard)
-import Data.Bits (shiftR, (.&.))
+import Cast
+  ( integerToWord64,
+    word64ToInteger,
+    word64ToRatio,
+    word8ToInteger,
+  )
+import Control.Monad (guard, (<=<))
+import Data.Bits (shiftR, toIntegralSized, (.&.))
 import qualified Data.ByteString as BS
 import Data.Kind (Type)
 import Data.Maybe (fromMaybe)
@@ -36,12 +50,6 @@ import Data.Text (pack)
 import Data.Word (Word64)
 import Die (die)
 import GHC.Generics (Generic)
-import Cast
-  ( word64ToInteger,
-    word64ToRatio,
-    word8ToInteger,
-    integerToWord64
-  )
 
 -- |
 --  Finite field of order (2^64 - 2^32) + 1, or equivalently, 2^64 - 0xFFFFFFFF.
@@ -59,7 +67,17 @@ import Cast
 --  can be used for the various arithmetic operators.
 type Scalar :: Type
 newtype Scalar = Scalar {unScalar :: Word64}
-  deriving stock (Show, Generic)
+  deriving stock (Generic)
+  deriving newtype (Show)
+
+instance Group.C Scalar where
+  zero = zero
+  (+) = addScalar
+  negate = negateScalar
+
+instance Ring.C Scalar where
+  one = one
+  (*) = mulScalar
 
 epsilon :: Word64
 epsilon = 0xFFFFFFFF
@@ -165,26 +183,11 @@ instance Fractional Scalar where
 instance Eq Scalar where
   x == y = toWord64 x == toWord64 y
 
-instance Enum Scalar where
-  {- HLINT ignore "No toEnum" -}
-  toEnum n = case fromWord64 . toEnum $ n of
-    Just n' -> n'
-    Nothing -> die "out of bounds"
-  fromEnum = die "Enum Scalar: fromEnum is unsafe"
-
 instance Ord Scalar where
   compare x y = compare (toWord64 x) (toWord64 y)
 
 instance Real Scalar where
   toRational = toRational . toWord64
-
-instance Integral Scalar where
-  toInteger = toInteger . toWord64
-  a `quot` b =
-    case inverseScalar b of
-      Just c -> a * c
-      Nothing -> die "Scalar division by zero"
-  quotRem = die "quotRem Scalar unimplemented"
 
 sample :: BS.ByteString -> Scalar
 sample = fromInteger . sampleInteger
@@ -199,7 +202,14 @@ scalarToRational :: Scalar -> Rational
 scalarToRational = word64ToRatio . unScalar
 
 integerToScalar :: Integer -> Maybe Scalar
-integerToScalar = (fromWord64 =<<) . integerToWord64
+integerToScalar = fromWord64 <=< integerToWord64
 
-half :: Scalar
-half = fromMaybe (die "half: partiality") (inverseScalar 2)
+scalarToInt :: Scalar -> Int
+scalarToInt = fromMaybe (die "scalarToInt partiality") . toIntegralSized . toWord64
+
+zero, one, minusOne, two, half :: Scalar
+zero = fromMaybe (die "zero: partiality") (fromWord64 0)
+one = fromMaybe (die "zero: partiality") (fromWord64 1)
+minusOne = negateScalar one
+two = fromMaybe (die "zero: partiality") (fromWord64 2)
+half = fromMaybe (die "half: partiality") (inverseScalar two)

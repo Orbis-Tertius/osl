@@ -50,7 +50,7 @@ import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount)
-import Stark.Types.Scalar (half, inverseScalar, normalize, toWord64)
+import Stark.Types.Scalar (half, inverseScalar, normalize, one, toWord64)
 
 translateLogicGate ::
   LogicToArithmeticColumnLayout ->
@@ -134,7 +134,7 @@ signPoly advice =
 
 eqMono :: AtomAdvice -> Polynomial
 eqMono advice =
-  P.multilinearMonomial 1 $
+  P.multilinearMonomial (Coefficient one) $
     flip PolynomialVariable 0 . unTruthValueColumnIndex
       <$> advice ^. #truthValue
 

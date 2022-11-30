@@ -66,7 +66,7 @@ import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), IndicatorFunctionCall (..), Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), InputBound, Name, OutputBound (OutputBound), Term (Add, App, AppInverse, Const, IndLess, Mul))
-import Stark.Types.Scalar (order)
+import Stark.Types.Scalar (order, scalarToInt)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
@@ -224,17 +224,17 @@ fixedValues (RowCount n) layout =
     [ ( layout
           ^. #fixedColumns . #zeroVector
             . #unZeroVectorIndex,
-        FixedColumn $ replicate n 0
+        FixedColumn $ replicate (scalarToInt n) 0
       ),
       ( layout
           ^. #fixedColumns . #oneVector
             . #unOneVectorIndex,
-        FixedColumn $ replicate n 1
+        FixedColumn $ replicate (scalarToInt n) 1
       ),
       ( layout
           ^. #fixedColumns . #lastRowIndicator
             . #unLastRowIndicatorColumnIndex,
-        FixedColumn $ replicate (n - 1) 0 <> [1]
+        FixedColumn $ replicate (scalarToInt n - 1) 0 <> [1]
       )
     ]
 

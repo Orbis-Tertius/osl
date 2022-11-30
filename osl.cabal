@@ -14,16 +14,18 @@ library
   exposed-modules:
     Cast
     Die
+    Halo2.AIR
     Halo2.Prelude
     Halo2.ArithmetizationConfig
     Halo2.BoundLogicConstraintComplexity
     Halo2.ByteDecomposition
+    Halo2.Circuit
     Halo2.LogicConstraint
     Halo2.LogicToArithmetic
     Halo2.Polynomial
     Halo2.PowerProduct
     Halo2.TruthTable
-    Halo2.Types
+    Halo2.Types.AIR
     Halo2.Types.ArithmetizationConfig
     Halo2.Types.Byte
     Halo2.Types.ByteDecompositionSize
@@ -90,12 +92,18 @@ library
     Semicircuit.Sigma11
     Semicircuit.ToLogicCircuit
     Semicircuit.Types.DNFFormula
+    Semicircuit.Types.NameMapping
     Semicircuit.Types.PNFFormula
     Semicircuit.Types.QFFormula
     Semicircuit.Types.Semicircuit
     Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
     Semicircuit.Types.Sigma11
     Stark.Types.Scalar
+    Trace.FromLogicCircuit
+    Trace.LogicToArithmetic
+    Trace.ToArithmeticAIR
+    Trace.ToArithmeticCircuit
+    Trace.Types
 
   build-depends:
     base >= 4.9 && < 5,
@@ -116,6 +124,7 @@ library
     lens,
     text,
     mtl,
+    numeric-prelude,
     optparse-applicative,
     parsec,
     process,

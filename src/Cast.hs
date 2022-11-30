@@ -7,7 +7,7 @@ module Cast
     integerToWord64,
     integerToRatio,
     word8ToInteger,
-    word64ToRatio
+    word64ToRatio,
   )
 where
 

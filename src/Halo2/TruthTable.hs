@@ -15,7 +15,7 @@ import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.RowCount (RowCount (..))
-import Stark.Types.Scalar (Scalar, integerToScalar)
+import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInt, zero)
 
 getByteRangeColumn :: BitsPerByte -> RowCount -> FixedColumn
 getByteRangeColumn (BitsPerByte b) (RowCount r) =
@@ -24,7 +24,7 @@ getByteRangeColumn (BitsPerByte b) (RowCount r) =
         fromMaybe
           (die $ "getByteRangeColumn: " <> pack (show m') <> " out of range of scalar type")
           (integerToScalar (intToInteger m'))
-   in FixedColumn ((f <$> [0 .. m']) <> replicate (r - m') m)
+   in FixedColumn ((f <$> [0 .. m']) <> replicate (scalarToInt r - m') m)
   where
     f :: Int -> Scalar
     f =
@@ -34,4 +34,4 @@ getByteRangeColumn (BitsPerByte b) (RowCount r) =
 
 getZeroIndicatorColumn :: RowCount -> FixedColumn
 getZeroIndicatorColumn (RowCount n) =
-  FixedColumn (1 : replicate (n - 1) 0)
+  FixedColumn (one : replicate (scalarToInt n - 1) zero)
