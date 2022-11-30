@@ -1053,10 +1053,9 @@ getSubexpressionLinks m =
     padInputs :: [InputSubexpressionId] -> [InputSubexpressionId]
     padInputs xs =
       xs
-        <> ( replicate
-               (nInputs - length xs)
-               (InputSubexpressionId (voidEid ^. #unOf))
-           )
+        <> replicate
+          (nInputs - length xs)
+          (InputSubexpressionId (voidEid ^. #unOf))
 
     toAssert =
       Set.fromList $
