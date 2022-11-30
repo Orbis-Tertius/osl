@@ -9,6 +9,7 @@ module Trace.Types
     StepTypeId (StepTypeId),
     SubexpressionId (SubexpressionId),
     InputSubexpressionId (InputSubexpressionId),
+    PreconditionSubexpressionId (PreconditionSubexpressionId),
     OutputSubexpressionId (OutputSubexpressionId),
     SubexpressionLink (SubexpressionLink),
     ResultExpressionId (ResultExpressionId),

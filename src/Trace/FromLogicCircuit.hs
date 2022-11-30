@@ -51,7 +51,7 @@ import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
 import Stark.Types.Scalar (Scalar, integerToScalar)
-import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), InputSubexpressionId (..), OutputSubexpressionId (..))
+import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), InputSubexpressionId (..), OutputSubexpressionId (..), PreconditionSubexpressionId (..))
 
 logicCircuitToTraceType ::
   BitsPerByte ->
@@ -64,7 +64,7 @@ logicCircuitToTraceType bitsPerByte c =
     (c ^. #equalityConstraints)
     stepTypes
     subexprs
-    (getSubexpressionLinks c mapping)
+    (getSubexpressionLinks mapping)
     (getResultExpressionId mapping)
     (mapping ^. #caseNumber)
     (mapping ^. #stepType)
@@ -934,10 +934,9 @@ getSubexpressionIdSet m =
     ]
 
 getSubexpressionLinks ::
-  LogicCircuit ->
   Mapping ->
   Set SubexpressionLink
-getSubexpressionLinks c m =
+getSubexpressionLinks m =
   toVoid <> toVar <> toConst <> toOp <> toAssert <> toResult
   where
     voidEid :: SubexpressionIdOf Void
@@ -945,6 +944,12 @@ getSubexpressionLinks c m =
       case m ^. #subexpressionIds . #void of
         Just eid -> eid
         Nothing -> die "getSubexpressionLinks: no voidEid (this is a compiler bug)"
+
+    resultEid :: ResultExpressionId
+    resultEid =
+      case m ^. #subexpressionIds . #result of
+        Just eid -> eid
+        Nothing -> die "getSubexpressionLinks: noResultEid (this is a compiler bug)"
 
     nInputs :: Int
     nInputs = length (m ^. #inputs)
@@ -1002,7 +1007,18 @@ getSubexpressionLinks c m =
         (inEid, outEid) <- Set.toList (m ^. #subexpressionIds . #assertions)
       ]
 
-    toResult = todo
+    toResult =
+      Set.singleton $
+      SubexpressionLink
+      (m ^. #stepTypeIds . #resultT . #unOf)
+      (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
+      ( [ PreconditionSubexpressionId (assertEid ^. #unOutputSubexpressionId)
+        | assertEid <- snd <$> Set.toList (m ^. #subexpressionIds . #assertions)
+        ] <>
+        [ PreconditionSubexpressionId (lookupEid ^. #unOf)
+        | lookupEid <- Map.elems (m ^. #subexpressionIds . #lookups)
+        ] )
+      (OutputSubexpressionId (resultEid ^. #unResultExpressionId))
 
 getResultExpressionId ::
   Mapping ->
