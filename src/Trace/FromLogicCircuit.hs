@@ -989,7 +989,55 @@ getSubexpressionLinks m =
             (m ^. #subexpressionIds . #constants)
       ]
 
-    toOp = todo
+    toOp =
+      Set.fromList
+      ( uncurry operationLink <$> Map.toList (m ^. #subexpressionIds . #operations) )
+
+    operationLink :: Operation -> SubexpressionIdOf Operation -> SubexpressionLink
+    operationLink =
+      \case
+        Or' x y -> \z ->
+          SubexpressionLink
+          (m ^. #stepTypeIds . #or . #unOf)
+          (padInputs (InputSubexpressionId <$> [x, y]))
+          mempty
+          (OutputSubexpressionId (z ^. #unOf))
+        Not' x -> \z ->
+          SubexpressionLink
+          (m ^. #stepTypeIds . #not . #unOf)
+          (padInputs [InputSubexpressionId x])
+          mempty
+          (OutputSubexpressionId (z ^. #unOf))
+        Iff' x y -> \z ->
+          SubexpressionLink
+          (m ^. #stepTypeIds . #iff . #unOf)
+          (padInputs (InputSubexpressionId <$> [x, y]))
+          mempty
+          (OutputSubexpressionId (z ^. #unOf))
+        Plus' x y -> \z ->
+          SubexpressionLink
+          (m ^. #stepTypeIds . #plus . #unOf)
+          (padInputs (InputSubexpressionId <$> [x, y]))
+          mempty
+          (OutputSubexpressionId (z ^. #unOf))
+        TimesAnd' x y -> \z ->
+          SubexpressionLink
+          (m ^. #stepTypeIds . #timesAnd . #unOf)
+          (padInputs (InputSubexpressionId <$> [x, y]))
+          mempty
+          (OutputSubexpressionId (z ^. #unOf))
+        Equals' x y -> \z ->
+          SubexpressionLink
+          (m ^. #stepTypeIds . #equals . #unOf)
+          (padInputs (InputSubexpressionId <$> [x, y]))
+          mempty
+          (OutputSubexpressionId (z ^. #unOf))
+        LessThan' x y -> \z ->
+          SubexpressionLink
+          (m ^. #stepTypeIds . #lessThan . #unOf)
+          (padInputs (InputSubexpressionId <$> [x, y]))
+          mempty
+          (OutputSubexpressionId (z ^. #unOf))
 
     padInputs :: [InputSubexpressionId] -> [InputSubexpressionId]
     padInputs xs =
@@ -1036,6 +1084,3 @@ maxStepsPerCase =
     . integerToScalar
     . intToInteger
     . Set.size
-
-todo :: a
-todo = todo
