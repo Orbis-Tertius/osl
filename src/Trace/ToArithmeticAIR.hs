@@ -27,7 +27,7 @@ import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
-import Stark.Types.Scalar (scalarToInt)
+import Stark.Types.Scalar (scalarToInt, zero, one)
 import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink, TraceType)
 
 -- Trace type arithmetic AIRs have the columnar structure
@@ -178,7 +178,7 @@ linksTableFixedColumns (LinksTable ls) m =
         ((m ^. #inputs) <&> (^. #unMapping))
         [ FixedColumn $
             fromMaybe
-              (replicate (length ls) (InputSubexpressionId (SubexpressionId 0)))
+              (replicate (length ls) (InputSubexpressionId (SubexpressionId zero)))
               ((ls <&> (^. #inputs)) !? i)
               <&> (^. #unInputSubexpressionId . #unSubexpressionId)
           | i <- [0 .. length (m ^. #inputs) - 1]
@@ -193,9 +193,9 @@ caseFixedColumn t m =
     Map.singleton
       (m ^. #caseNumber . #unMapping)
       . FixedColumn
-      $ [0 .. (t ^. #numCases . #unNumberOfCases) - 1]
+      $ [zero .. (t ^. #numCases . #unNumberOfCases) - one]
         <> replicate
           ( scalarToInt (t ^. #rowCount . #getRowCount)
               - scalarToInt (t ^. #numCases . #unNumberOfCases)
           )
-          0
+          zero

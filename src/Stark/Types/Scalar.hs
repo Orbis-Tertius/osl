@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -64,7 +65,8 @@ import GHC.Generics (Generic)
 --  can be used for the various arithmetic operators.
 type Scalar :: Type
 newtype Scalar = Scalar {unScalar :: Word64}
-  deriving stock (Show, Generic)
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 epsilon :: Word64
 epsilon = 0xFFFFFFFF

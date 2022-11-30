@@ -62,7 +62,7 @@ constant = Polynomial . Map.singleton (PowerProduct mempty) . Coefficient
 var :: PolynomialVariable -> Polynomial
 var v =
   Polynomial
-    (Map.singleton (PowerProduct (Map.singleton v 1)) 1)
+    (Map.singleton (PowerProduct (Map.singleton v 1)) (Coefficient S.one))
 
 var' :: ColumnIndex -> Polynomial
 var' i = var (PolynomialVariable i 0)

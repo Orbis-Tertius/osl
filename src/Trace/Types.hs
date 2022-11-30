@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
@@ -59,23 +60,28 @@ instance Monoid StepType where
   mempty = StepType mempty mempty mempty
 
 newtype StepTypeId = StepTypeId {unStepTypeId :: Scalar}
-  deriving (Generic, Eq, Ord, Num, Show)
+  deriving stock (Generic)
+  deriving newtype (Eq, Ord, Num, Show)
 
 newtype SubexpressionId = SubexpressionId {unSubexpressionId :: Scalar}
-  deriving (Generic, Eq, Ord, Num, Show)
+  deriving (Generic)
+  deriving newtype (Eq, Ord, Num, Show)
 
 newtype InputSubexpressionId = InputSubexpressionId {unInputSubexpressionId :: SubexpressionId}
-  deriving (Eq, Ord, Generic, Show)
+  deriving stock (Generic)
+  deriving newtype (Eq, Ord, Show)
 
 -- Like an input subexpression, a precondition subexpression must be
 -- evaluated before the linked output subexpression can be evaluated.
 -- Unlike an input subexpression, a precondition subexpression does
 -- not supply its output as an input to the subexpression.
 newtype PreconditionSubexpressionId = PreconditionSubexpressionId {unPreconditionSubexpressionId :: SubexpressionId}
-  deriving (Eq, Ord, Generic, Show)
+  deriving stock (Generic)
+  deriving newtype (Eq, Ord, Show)
 
 newtype OutputSubexpressionId = OutputSubexpressionId {unOutputSubexpressionId :: SubexpressionId}
-  deriving (Eq, Ord, Generic, Show)
+  deriving stock (Generic)
+  deriving (Eq, Ord, Show)
 
 data SubexpressionLink = SubexpressionLink
   { stepType :: StepTypeId,
@@ -86,19 +92,24 @@ data SubexpressionLink = SubexpressionLink
   deriving (Eq, Ord, Generic, Show)
 
 newtype ResultExpressionId = ResultExpressionId {unResultExpressionId :: SubexpressionId}
-  deriving (Generic, Show)
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 newtype CaseNumberColumnIndex = CaseNumberColumnIndex {unCaseNumberColumnIndex :: ColumnIndex}
-  deriving (Generic, Show)
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 newtype StepTypeColumnIndex = StepTypeColumnIndex {unStepTypeColumnIndex :: ColumnIndex}
-  deriving (Generic, Show)
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 newtype StepIndicatorColumnIndex = StepIndicatorColumnIndex {unStepIndicatorColumnIndex :: ColumnIndex}
-  deriving (Generic, Show)
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 newtype NumberOfCases = NumberOfCases {unNumberOfCases :: Scalar}
-  deriving (Generic, Show)
+  deriving stock (Generic)
+  deriving newtype (Show)
 
 data TraceType = TraceType
   { columnTypes :: ColumnTypes,

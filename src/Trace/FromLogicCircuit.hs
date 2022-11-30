@@ -27,7 +27,7 @@ import Halo2.ByteDecomposition (countBytes)
 import Halo2.Circuit (getLookupTables, getPolynomialVariables, getScalars)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
-import Halo2.Types.BitsPerByte (BitsPerByte)
+import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
@@ -50,7 +50,7 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
-import Stark.Types.Scalar (Scalar, integerToScalar)
+import Stark.Types.Scalar (Scalar, integerToScalar, zero, one, two)
 import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), PreconditionSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType))
 
 logicCircuitToTraceType ::
@@ -80,7 +80,7 @@ logicCircuitToTraceType bitsPerByte c =
 
     colTypes' = getColumnTypes c mapping
 
-    stepTypes = getStepTypes c mapping
+    stepTypes = getStepTypes bitsPerByte c mapping
 
     subexprs = getSubexpressionIdSet (mapping ^. #subexpressionIds)
 
@@ -230,8 +230,8 @@ getMapping bitsPerByte c =
     initialState =
       S
         (ColumnIndex (length (Map.keys (c ^. #columnTypes . #getColumnTypes))))
-        (StepTypeId 0)
-        (SubexpressionId 0)
+        (StepTypeId zero)
+        (SubexpressionId zero)
 
     nextCol :: State S ColumnIndex
     nextCol = do
@@ -242,7 +242,7 @@ getMapping bitsPerByte c =
     nextSid :: State S StepTypeId
     nextSid = do
       S i j k <- get
-      put (S i (j + 1) k)
+      put (S i (j + StepTypeId one) k)
       pure j
 
     nextSid' :: State S (StepTypeIdOf a)
@@ -251,7 +251,7 @@ getMapping bitsPerByte c =
     nextEid :: State S SubexpressionId
     nextEid = do
       S i j k <- get
-      put (S i j (k + 1))
+      put (S i j (k + SubexpressionId one))
       pure k
 
     nextEid' :: State S (SubexpressionIdOf a)
@@ -353,11 +353,11 @@ getMapping bitsPerByte c =
 
     zeroEid, oneEid :: SubexpressionIdMapping -> SubexpressionId
     zeroEid m' =
-      case Map.lookup 0 (m' ^. #constants) of
+      case Map.lookup zero (m' ^. #constants) of
         Just eid -> eid ^. #unOf
         Nothing -> die "zeroEid: no zero subexpression id (this is a compiler bug)"
     oneEid m' =
-      case Map.lookup 1 (m' ^. #constants) of
+      case Map.lookup one (m' ^. #constants) of
         Just eid -> eid ^. #unOf
         Nothing -> die "oneEid: no one subexpression id (this is a compiler bug)"
 
@@ -515,15 +515,16 @@ getMappingIndices m =
        ]
 
 getStepTypes ::
+  BitsPerByte ->
   LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-getStepTypes c m =
+getStepTypes bitsPerByte c m =
   mconcat
     [ loadStepTypes m,
       lookupStepTypes m,
       constantStepTypes m,
-      operatorStepTypes c m,
+      operatorStepTypes bitsPerByte c m,
       assertStepType m,
       resultStepType m
     ]
@@ -641,18 +642,19 @@ constantStepType m x =
     mempty
 
 operatorStepTypes ::
+  BitsPerByte ->
   LogicCircuit ->
   Mapping ->
   Map StepTypeId StepType
-operatorStepTypes c m =
+operatorStepTypes bitsPerByte c m =
   mconcat
     [ plusStepType m,
       timesStepType m,
       orStepType m,
       notStepType m,
       iffStepType m,
-      equalsStepType c m,
-      lessThanStepType c m,
+      equalsStepType bitsPerByte c m,
+      lessThanStepType bitsPerByte c m,
       voidStepType m
     ]
 
@@ -771,10 +773,11 @@ voidStepType m =
 
 equalsStepType,
   lessThanStepType ::
+    BitsPerByte ->
     LogicCircuit ->
     Mapping ->
     Map StepTypeId StepType
-equalsStepType c m =
+equalsStepType bitsPerByte c m =
   Map.singleton
     (m ^. #stepTypeIds . #equals . #unOf)
     ( mconcat
@@ -785,7 +788,7 @@ equalsStepType c m =
             )
             mempty
             mempty,
-          byteDecompositionCheck c m
+          byteDecompositionCheck bitsPerByte c m
         ]
     )
   where
@@ -793,7 +796,7 @@ equalsStepType c m =
     truthVars =
       P.var' . (^. #unTruthValueColumnIndex) . snd
         <$> (m ^. #byteDecomposition . #bytes)
-lessThanStepType c m =
+lessThanStepType bitsPerByte c m =
   Map.singleton
     (m ^. #stepTypeIds . #lessThan . #unOf)
     ( mconcat
@@ -814,19 +817,20 @@ lessThanStepType c m =
             )
             mempty
             mempty,
-          byteDecompositionCheck c m
+          byteDecompositionCheck bitsPerByte c m
         ]
     )
 
 byteDecompositionCheck ::
+  BitsPerByte ->
   LogicCircuit ->
   Mapping ->
   StepType
-byteDecompositionCheck c m =
+byteDecompositionCheck (BitsPerByte bitsPerByte) c m =
   StepType
     ( PolynomialConstraints
         [ (v0 `P.minus` v1)
-            `P.minus` ( ((P.constant 2 `P.times` s) `P.minus` P.one)
+            `P.minus` ( ((P.constant two `P.times` s) `P.minus` P.one)
                           `P.times` foldl'
                             P.plus
                             P.zero
@@ -846,7 +850,7 @@ byteDecompositionCheck c m =
     byteCoefs, byteVars :: [Polynomial]
     byteCoefs =
       P.constant . fromMaybe (die "truthTables: byte coefficient is not in range of scalar (this is a compiler bug)") . integerToScalar
-        <$> [2 ^ i | i <- [0 .. getByteDecompositionLength (m ^. #byteDecomposition . #bits) c]]
+        <$> [2 ^ (bitsPerByte * i) | i <- [0 .. getByteDecompositionLength (m ^. #byteDecomposition . #bits) c]]
     byteVars =
       P.var' . (^. #unByteColumnIndex) . fst
         <$> (m ^. #byteDecomposition . #bytes)
