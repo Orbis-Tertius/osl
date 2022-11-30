@@ -182,7 +182,7 @@ data Operation
 data SubexpressionIdMapping = SubexpressionIdMapping
   { void :: Maybe (SubexpressionIdOf Void),
     result :: Maybe ResultExpressionId,
-    assertions :: Set SubexpressionId,
+    assertions :: Set (InputSubexpressionId, OutputSubexpressionId),
     variables :: Map PolynomialVariable (SubexpressionIdOf PolynomialVariable),
     lookups :: Map LookupArgument (SubexpressionIdOf LookupArgument),
     constants :: Map Scalar (SubexpressionIdOf Scalar),
@@ -319,8 +319,9 @@ getMapping bitsPerByte c =
 
     traverseAssertion :: SubexpressionIdMapping -> LogicConstraint -> State S SubexpressionIdMapping
     traverseAssertion m' lc = do
-      (eid, m'') <- traverseConstraint m' lc
-      pure (addAssertion m'' eid)
+      (inEid, m'') <- traverseConstraint m' lc
+      outEid <- OutputSubexpressionId <$> nextEid
+      pure (addAssertion m'' (InputSubexpressionId inEid, outEid))
 
     traverseConstraint :: SubexpressionIdMapping -> LogicConstraint -> State S (SubexpressionId, SubexpressionIdMapping)
     traverseConstraint m' =
@@ -366,7 +367,7 @@ getMapping bitsPerByte c =
 
     addAssertion ::
       SubexpressionIdMapping ->
-      SubexpressionId ->
+      (InputSubexpressionId, OutputSubexpressionId) ->
       SubexpressionIdMapping
     addAssertion m' a =
       m' <> SubexpressionIdMapping mzero mzero (Set.singleton a) mempty mempty mempty mempty
@@ -970,9 +971,37 @@ getSubexpressionLinks c m =
             (m ^. #subexpressionIds . #variables)
       ]
 
-    toConst = todo
+    toConst =
+      Set.fromList $
+      [ SubexpressionLink
+        stepTypeId
+        (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
+        mempty
+        (OutputSubexpressionId (eid ^. #unOf))
+      | (stepTypeId, eid) <- Map.elems
+          $ Map.intersectionWith (,)
+            (m ^. #stepTypeIds . #constants)
+            (m ^. #subexpressionIds . #constants)
+      ]
+
     toOp = todo
-    toAssert = todo
+
+    padInputs :: [InputSubexpressionId] -> [InputSubexpressionId]
+    padInputs xs =
+      xs <> (replicate (nInputs - length xs)
+              (InputSubexpressionId (voidEid ^. #unOf)))
+
+    toAssert =
+      Set.fromList $
+      [ SubexpressionLink
+        (m ^. #stepTypeIds . #assertT . #unOf)
+        (padInputs [inEid])
+        mempty
+        outEid
+      |
+        (inEid, outEid) <- Set.toList (m ^. #subexpressionIds . #assertions)
+      ]
+
     toResult = todo
 
 getResultExpressionId ::
