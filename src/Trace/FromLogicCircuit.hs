@@ -147,7 +147,7 @@ newtype StepTypeIdOf a = StepTypeIdOf {unOf :: StepTypeId}
 
 data StepTypeIdMapping = StepTypeIdMapping
   { loads :: Map PolynomialVariable StepTypeId,
-    lookups :: Map [LookupTableColumn] StepTypeId,
+    lookups :: Map (Polynomial, [LookupTableColumn]) StepTypeId,
     constants :: Map Scalar StepTypeId,
     plus :: StepTypeIdOf Plus,
     timesAnd :: StepTypeIdOf TimesAnd,
@@ -471,7 +471,7 @@ getMapping bitsPerByte c =
     polyVars :: [PolynomialVariable]
     polyVars = Set.toList (getPolynomialVariables c)
 
-    lookupTables :: [[LookupTableColumn]]
+    lookupTables :: [(Polynomial, [LookupTableColumn])]
     lookupTables = Set.toList (getLookupTables c)
 
     lookupArguments :: [LookupArgument]
@@ -592,19 +592,20 @@ lookupStepTypes ::
   Map StepTypeId StepType
 lookupStepTypes m =
   Map.fromList
-    [ (sId, lookupStepType m t)
-      | (t, sId) <- Map.toList (m ^. #stepTypeIds . #lookups)
+    [ (sId, lookupStepType m g t)
+      | ((g, t), sId) <- Map.toList (m ^. #stepTypeIds . #lookups)
     ]
 
 -- TODO: what if the lookup argument in the logic circuit is gated?
 lookupStepType ::
   Mapping ->
+  Polynomial ->
   [LookupTableColumn] ->
   StepType
-lookupStepType m t =
+lookupStepType m p t =
   StepType
     mempty
-    (LookupArguments [LookupArgument P.zero (zip inputExprs t)])
+    (LookupArguments [LookupArgument p (zip inputExprs t)])
     mempty
   where
     inputExprs :: [InputExpression]
