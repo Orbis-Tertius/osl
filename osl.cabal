@@ -34,6 +34,7 @@ library
     Halo2.Types.BytesPerWord
     Halo2.Types.CellReference
     Halo2.Types.Circuit
+    Halo2.Types.CircuitMetrics
     Halo2.Types.CircuitWithWitnesses
     Halo2.Types.Coefficient
     Halo2.Types.ColumnType
