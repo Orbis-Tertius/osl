@@ -11,19 +11,19 @@ module Halo2.Types.CircuitMetrics
     ColumnCounts (ColumnCounts),
     ColumnCount (ColumnCount),
     PolynomialDegreeBound (PolynomialDegreeBound),
-    GateConstraintCount (GateConstraintCount)
+    GateConstraintCount (GateConstraintCount),
+    LookupArgumentCount (LookupArgumentCount),
+    LookupTableSize (LookupTableSize)
   ) where
 
 import Data.Kind (Type)
 import GHC.Generics (Generic)
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (PolynomialDegreeBound))
 import Halo2.Types.RowCount (RowCount (RowCount))
-import Trace.Types (NumberOfCases)
 
 data CircuitMetrics =
   CircuitMetrics
   { rowCount :: RowCount,
-    numCases :: NumberOfCases,
     columnCounts :: ColumnCounts,
     polyDegreeBound :: PolynomialDegreeBound,
     gateConstraintCount :: GateConstraintCount,

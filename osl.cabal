@@ -20,6 +20,7 @@ library
     Halo2.BoundLogicConstraintComplexity
     Halo2.ByteDecomposition
     Halo2.Circuit
+    Halo2.CircuitMetrics
     Halo2.LogicConstraint
     Halo2.LogicToArithmetic
     Halo2.Polynomial
