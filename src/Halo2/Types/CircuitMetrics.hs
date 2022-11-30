@@ -64,4 +64,4 @@ newtype LookupArgumentCount = LookupArgumentCount { unLookupArgumentCount :: Int
 
 newtype LookupTableSize = LookupTableSize { unLookupTableSize :: Int }
   deriving stock (Generic)
-  deriving newtype (Show)
+  deriving newtype (Eq, Ord, Num, Show)

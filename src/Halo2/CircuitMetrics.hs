@@ -5,7 +5,7 @@ module Halo2.CircuitMetrics (getCircuitMetrics) where
 import Halo2.Polynomial (degree)
 import Halo2.Prelude
 import Halo2.Types.Circuit (ArithmeticCircuit)
-import Halo2.Types.CircuitMetrics (CircuitMetrics (CircuitMetrics), ColumnCounts, PolynomialDegreeBound (PolynomialDegreeBound), LookupTableSize, GateConstraintCount (GateConstraintCount), LookupArgumentCount (LookupArgumentCount))
+import Halo2.Types.CircuitMetrics (CircuitMetrics (CircuitMetrics), ColumnCounts, PolynomialDegreeBound (PolynomialDegreeBound), LookupTableSize (LookupTableSize), GateConstraintCount (GateConstraintCount), LookupArgumentCount (LookupArgumentCount))
 import Halo2.Types.LookupArgument (LookupArgument)
 
 getCircuitMetrics
@@ -35,7 +35,13 @@ getLookupArgumentDegree arg =
     (degree . (^. #getInputExpression) . fst <$> (arg ^. #tableMap))
 
 getLookupTableSize :: ArithmeticCircuit -> LookupTableSize
-getLookupTableSize = todo
+getLookupTableSize x =
+  foldl max 0
+    (getLookupArgumentTableSize <$> (x ^. #lookupArguments . #getLookupArguments))
+
+getLookupArgumentTableSize :: LookupArgument -> LookupTableSize
+getLookupArgumentTableSize arg =
+  LookupTableSize (length (arg ^. #tableMap))
 
 todo :: a
 todo = todo
