@@ -13,16 +13,16 @@ module Halo2.Types.CircuitMetrics
     PolynomialDegreeBound (PolynomialDegreeBound),
     GateConstraintCount (GateConstraintCount),
     LookupArgumentCount (LookupArgumentCount),
-    LookupTableSize (LookupTableSize)
-  ) where
+    LookupTableSize (LookupTableSize),
+  )
+where
 
 import Data.Kind (Type)
 import GHC.Generics (Generic)
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (PolynomialDegreeBound))
 import Halo2.Types.RowCount (RowCount (RowCount))
 
-data CircuitMetrics =
-  CircuitMetrics
+data CircuitMetrics = CircuitMetrics
   { rowCount :: RowCount,
     columnCounts :: ColumnCounts,
     polyDegreeBound :: PolynomialDegreeBound,
@@ -32,15 +32,14 @@ data CircuitMetrics =
   }
   deriving stock (Generic, Show)
 
-data ColumnClass =
-    Advice
+data ColumnClass
+  = Advice
   | Instance
   | Fixed
   | All
   | EqualityConstrainable
 
-data ColumnCounts =
-  ColumnCounts
+data ColumnCounts = ColumnCounts
   { advice :: ColumnCount Advice,
     instances :: ColumnCount Instance,
     fixed :: ColumnCount Fixed,
@@ -50,18 +49,18 @@ data ColumnCounts =
   deriving stock (Generic, Show)
 
 type ColumnCount :: ColumnClass -> Type
-newtype ColumnCount a = ColumnCount { unColumnCount :: Int }
+newtype ColumnCount a = ColumnCount {unColumnCount :: Int}
   deriving stock (Generic)
   deriving newtype (Show)
 
-newtype GateConstraintCount = GateConstraintCount { unGateConstraintCount :: Int }
+newtype GateConstraintCount = GateConstraintCount {unGateConstraintCount :: Int}
   deriving stock (Generic)
   deriving newtype (Show)
 
-newtype LookupArgumentCount = LookupArgumentCount { unLookupArgumentCount :: Int }
+newtype LookupArgumentCount = LookupArgumentCount {unLookupArgumentCount :: Int}
   deriving stock (Generic)
   deriving newtype (Show)
 
-newtype LookupTableSize = LookupTableSize { unLookupTableSize :: Int }
+newtype LookupTableSize = LookupTableSize {unLookupTableSize :: Int}
   deriving stock (Generic)
   deriving newtype (Eq, Ord, Num, Show)
