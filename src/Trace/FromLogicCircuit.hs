@@ -596,7 +596,6 @@ lookupStepTypes m =
       | ((g, t), sId) <- Map.toList (m ^. #stepTypeIds . #lookups)
     ]
 
--- TODO: what if the lookup argument in the logic circuit is gated?
 lookupStepType ::
   Mapping ->
   Polynomial ->
