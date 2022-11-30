@@ -6,7 +6,6 @@ module Trace.ToArithmeticAIR
   ( traceTypeToArithmeticAIR,
     Mapping (Mapping),
     CaseNumber,
-    One,
     Mappings (Mappings),
     FixedMappings (FixedMappings),
     mappings,
@@ -100,8 +99,6 @@ newtype Mapping a = Mapping {unMapping :: ColumnIndex}
 
 data CaseNumber
 
-data One
-
 data Mappings = Mappings
   { fixed :: FixedMappings,
     advice :: AdviceMappings
@@ -112,8 +109,7 @@ data FixedMappings = FixedMappings
   { stepType :: Mapping StepTypeId,
     inputs :: [Mapping InputSubexpressionId],
     output :: Mapping OutputSubexpressionId,
-    caseNumber :: Mapping CaseNumber,
-    one :: Mapping One -- TODO: not needed; get rid of it
+    caseNumber :: Mapping CaseNumber
   }
   deriving (Generic)
 
@@ -131,7 +127,6 @@ mappings t =
         (Mapping <$> [i + 1 .. j] :: [Mapping InputSubexpressionId])
         (Mapping (j + 1) :: Mapping OutputSubexpressionId)
         (Mapping (j + 2) :: Mapping CaseNumber)
-        (Mapping (j + 3) :: Mapping One)
     )
     ( AdviceMappings
         (Mapping <$> [j + 4 .. k] :: [Mapping InputSubexpressionId])
@@ -155,7 +150,7 @@ additionalFixedValues ::
   FixedMappings ->
   FixedValues
 additionalFixedValues t m =
-  linksTableFixedColumns (linksTable t) m <> caseFixedColumn t m <> oneFixedColumn t m
+  linksTableFixedColumns (linksTable t) m <> caseFixedColumn t m
 
 newtype LinksTable = LinksTable
   {unLinksTable :: [SubexpressionLink]}
@@ -204,13 +199,3 @@ caseFixedColumn t m =
               - scalarToInt (t ^. #numCases . #unNumberOfCases)
           )
           0
-
-oneFixedColumn ::
-  TraceType ->
-  FixedMappings ->
-  FixedValues
-oneFixedColumn t m =
-  FixedValues $
-    Map.singleton
-      (m ^. #one . #unMapping)
-      (FixedColumn (replicate (scalarToInt (t ^. #rowCount . #getRowCount)) 1))

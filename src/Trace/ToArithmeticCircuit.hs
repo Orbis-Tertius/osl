@@ -109,15 +109,14 @@ resultChecks t m =
         P.zero
         [ (InputExpression i, LookupTableColumn sigma),
           (InputExpression r, LookupTableColumn tau),
-          (InputExpression one, LookupTableColumn y)
+          (InputExpression P.one, LookupTableColumn y)
         ]
     ]
   where
-    i, r, one :: Polynomial
+    i, r :: Polynomial
     sigma, tau, y :: ColumnIndex
     i = P.var' $ m ^. #fixed . #caseNumber . #unMapping
     r = P.constant (t ^. #result . #unResultExpressionId . #unSubexpressionId)
-    one = P.var' $ m ^. #fixed . #one . #unMapping
     sigma = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
     tau = t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex
     y = t ^. #outputColumnIndex . #unOutputColumnIndex
