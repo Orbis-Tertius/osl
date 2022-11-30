@@ -64,7 +64,7 @@ newtype StepTypeId = StepTypeId {unStepTypeId :: Scalar}
   deriving newtype (Eq, Ord, Num, Show)
 
 newtype SubexpressionId = SubexpressionId {unSubexpressionId :: Scalar}
-  deriving (Generic)
+  deriving stock (Generic)
   deriving newtype (Eq, Ord, Num, Show)
 
 newtype InputSubexpressionId = InputSubexpressionId {unInputSubexpressionId :: SubexpressionId}
@@ -81,7 +81,7 @@ newtype PreconditionSubexpressionId = PreconditionSubexpressionId {unPreconditio
 
 newtype OutputSubexpressionId = OutputSubexpressionId {unOutputSubexpressionId :: SubexpressionId}
   deriving stock (Generic)
-  deriving (Eq, Ord, Show)
+  deriving newtype (Eq, Ord, Show)
 
 data SubexpressionLink = SubexpressionLink
   { stepType :: StepTypeId,

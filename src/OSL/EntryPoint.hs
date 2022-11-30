@@ -17,6 +17,7 @@ import Data.ByteString (readFile)
 import Data.Either.Extra (mapLeft)
 import Data.Text (Text, pack)
 import Data.Text.Encoding (decodeUtf8')
+import Halo2.CircuitMetrics (getCircuitMetrics)
 import Halo2.Types.BitsPerByte (BitsPerByte (BitsPerByte))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.BuildTranslationContext (buildTranslationContext)
@@ -125,13 +126,16 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
           (logic, layout) = semicircuitToLogicCircuit rowCount semi
           traceType = logicCircuitToTraceType bitsPerByte logic
           circuit = traceTypeToArithmeticCircuit traceType
+          metrics = getCircuitMetrics circuit
       pure . SuccessfulOutput $
         "Translated OSL:\n"
           <> show translated
           <> (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
           <> ( case compileToCircuit of
                  CompileToCircuit ->
-                   "\n\nPrenex normal form: "
+                   "\n\nMetrics: "
+                     <> show metrics
+                     <> "\n\nPrenex normal form: "
                      <> show pnf
                      <> "\n\nStrong prenex normal form: "
                      <> show spnf
