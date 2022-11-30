@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Trace.ToArithmeticAIR
   ( traceTypeToArithmeticAIR,
@@ -17,6 +18,7 @@ import Data.List.Extra (mconcatMap, (!?))
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
+import Die (die)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.AIR (AIR (AIR), ArithmeticAIR)
@@ -27,7 +29,7 @@ import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
-import Stark.Types.Scalar (scalarToInt, zero, one)
+import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, scalarToInteger, zero)
 import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink, TraceType)
 
 -- Trace type arithmetic AIRs have the columnar structure
@@ -193,9 +195,15 @@ caseFixedColumn t m =
     Map.singleton
       (m ^. #caseNumber . #unMapping)
       . FixedColumn
-      $ [zero .. (t ^. #numCases . #unNumberOfCases) - one]
+      $ (f <$> [0 .. scalarToInteger (t ^. #numCases . #unNumberOfCases) - 1])
         <> replicate
           ( scalarToInt (t ^. #rowCount . #getRowCount)
               - scalarToInt (t ^. #numCases . #unNumberOfCases)
           )
           zero
+  where
+    f :: Integer -> Scalar
+    f x =
+      case integerToScalar x of
+        Just y -> y
+        Nothing -> die "caseFixedCoumn: case number out of range of scalar (this is a compiler bug)"

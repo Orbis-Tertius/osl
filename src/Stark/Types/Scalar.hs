@@ -31,6 +31,8 @@ module Stark.Types.Scalar
   )
 where
 
+import qualified Algebra.Additive as Group
+import qualified Algebra.Ring as Ring
 import Basement.Types.Word128 (Word128 (Word128))
 import Cast
   ( integerToWord64,
@@ -67,6 +69,15 @@ type Scalar :: Type
 newtype Scalar = Scalar {unScalar :: Word64}
   deriving stock (Generic)
   deriving newtype (Show)
+
+instance Group.C Scalar where
+  zero = zero
+  (+) = addScalar
+  negate = negateScalar
+
+instance Ring.C Scalar where
+  one = one
+  (*) = mulScalar
 
 epsilon :: Word64
 epsilon = 0xFFFFFFFF
@@ -172,26 +183,11 @@ instance Fractional Scalar where
 instance Eq Scalar where
   x == y = toWord64 x == toWord64 y
 
-instance Enum Scalar where
-  {- HLINT ignore "No toEnum" -}
-  toEnum n = case fromWord64 . toEnum $ n of
-    Just n' -> n'
-    Nothing -> die "out of bounds"
-  fromEnum = die "Enum Scalar: fromEnum is unsafe"
-
 instance Ord Scalar where
   compare x y = compare (toWord64 x) (toWord64 y)
 
 instance Real Scalar where
   toRational = toRational . toWord64
-
-instance Integral Scalar where
-  toInteger = toInteger . toWord64
-  a `quot` b =
-    case inverseScalar b of
-      Just c -> a * c
-      Nothing -> die "Scalar division by zero"
-  quotRem = die "quotRem Scalar unimplemented"
 
 sample :: BS.ByteString -> Scalar
 sample = fromInteger . sampleInteger

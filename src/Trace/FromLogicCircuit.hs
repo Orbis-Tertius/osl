@@ -50,7 +50,7 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
-import Stark.Types.Scalar (Scalar, integerToScalar, zero, one, two)
+import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero)
 import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), PreconditionSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType))
 
 logicCircuitToTraceType ::
@@ -903,7 +903,7 @@ truthTables m =
       fromMaybe (die "byte value out of range of scalar (this is a compiler bug)")
         . integerToScalar
         <$> [0 .. 2 ^ (m ^. #byteDecomposition . #bits . #unBitsPerByte) - 1]
-    zeroIndicator = 1 : replicate (length byteRange - 1) 0
+    zeroIndicator = one : replicate (length byteRange - 1) zero
 
 assertStepType ::
   Mapping ->

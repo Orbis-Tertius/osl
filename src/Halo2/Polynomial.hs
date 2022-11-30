@@ -18,6 +18,8 @@ module Halo2.Polynomial
   )
 where
 
+import qualified Algebra.Additive as Group
+import qualified Algebra.Ring as Ring
 import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Halo2.PowerProduct as P
@@ -32,12 +34,12 @@ import qualified Stark.Types.Scalar as S
 
 plus :: Polynomial -> Polynomial -> Polynomial
 plus (Polynomial p) (Polynomial q) =
-  Polynomial $ Map.unionWith (+) p q
+  Polynomial $ Map.unionWith (Group.+) p q
 
 times :: Polynomial -> Polynomial -> Polynomial
 times (Polynomial p) (Polynomial q) =
   Polynomial . sumMonomials $
-    [ (P.times x y, a * b)
+    [ (P.times x y, a Ring.* b)
       | (x, a) <- Map.toList p,
         (y, b) <- Map.toList q
     ]
@@ -53,7 +55,7 @@ sumMonomials = foldl' g mempty
       Map PowerProduct Coefficient
     g p (x, a) =
       case Map.lookup x p of
-        Just b -> Map.insert x (a + b) p
+        Just b -> Map.insert x (a Group.+ b) p
         Nothing -> Map.insert x a p
 
 constant :: Scalar -> Polynomial

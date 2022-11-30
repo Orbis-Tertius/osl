@@ -124,6 +124,7 @@ library
     lens,
     text,
     mtl,
+    numeric-prelude,
     optparse-applicative,
     parsec,
     process,
