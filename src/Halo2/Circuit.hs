@@ -136,6 +136,6 @@ instance HasScalars a => HasScalars (Circuit a) where
 getLookupTables :: Circuit a -> Set (Polynomial, [LookupTableColumn])
 getLookupTables c =
   Set.fromList
-  [ (a ^. #gate, snd <$> (a ^. #tableMap))
-  | a <- c ^. #lookupArguments . #getLookupArguments
-  ]
+    [ (a ^. #gate, snd <$> (a ^. #tableMap))
+      | a <- c ^. #lookupArguments . #getLookupArguments
+    ]

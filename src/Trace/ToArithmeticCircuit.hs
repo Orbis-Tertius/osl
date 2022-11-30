@@ -19,7 +19,7 @@ import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
 import Halo2.Types.Polynomial (Polynomial)
 import Trace.ToArithmeticAIR (Mappings, mappings, traceTypeToArithmeticAIR)
-import Trace.Types (StepType, StepTypeId, TraceType, SubexpressionId)
+import Trace.Types (StepType, StepTypeId, SubexpressionId, TraceType)
 
 traceTypeToArithmeticCircuit ::
   TraceType ->
@@ -88,15 +88,17 @@ linkChecks t m =
             (InputExpression <$> ([currentCase, tau] <> alphas <> [beta]))
             (LookupTableColumn <$> links)
         )
-    ] <>
-    [ LookupArgument
-        (P.plus (P.times gamma (stepIndicatorGate t)) (subexpressionIdGate m eidOut))
-        (zip (InputExpression <$> [currentCase, P.constant $ eidIn ^. #unPreconditionSubexpressionId . #unSubexpressionId])
-             (LookupTableColumn <$> [caseNumber, subexpressionId]))
-    | link <- Set.toList (t ^. #links),
-      let eidOut = link ^. #output . #unOutputSubexpressionId,
-      eidIn <- link ^. #preconditions
     ]
+      <> [ LookupArgument
+             (P.plus (P.times gamma (stepIndicatorGate t)) (subexpressionIdGate m eidOut))
+             ( zip
+                 (InputExpression <$> [currentCase, P.constant $ eidIn ^. #unPreconditionSubexpressionId . #unSubexpressionId])
+                 (LookupTableColumn <$> [caseNumber, subexpressionId])
+             )
+           | link <- Set.toList (t ^. #links),
+             let eidOut = link ^. #output . #unOutputSubexpressionId,
+             eidIn <- link ^. #preconditions
+         ]
   where
     tau, beta, gamma, currentCase :: Polynomial
     alphas :: [Polynomial]

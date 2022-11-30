@@ -51,7 +51,7 @@ import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
 import Stark.Types.Scalar (Scalar, integerToScalar)
-import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), InputSubexpressionId (..), OutputSubexpressionId (..), PreconditionSubexpressionId (..))
+import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), PreconditionSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType))
 
 logicCircuitToTraceType ::
   BitsPerByte ->
@@ -192,8 +192,14 @@ data SubexpressionIdMapping = SubexpressionIdMapping
 
 instance Semigroup SubexpressionIdMapping where
   (SubexpressionIdMapping a b c d e f g) <> (SubexpressionIdMapping h i j k l m n) =
-    SubexpressionIdMapping (a <|> h)
-      (b <|> i) (c <> j) (d <> k) (e <> l) (f <> m) (g <> n)
+    SubexpressionIdMapping
+      (a <|> h)
+      (b <|> i)
+      (c <> j)
+      (d <> k)
+      (e <> l)
+      (f <> m)
+      (g <> n)
 
 getStepArity :: LogicCircuit -> Arity
 getStepArity = max 2 . getLookupArgumentsArity . (^. #lookupArguments)
@@ -900,11 +906,12 @@ assertStepType ::
   Map StepTypeId StepType
 assertStepType m =
   Map.singleton
-  (m ^. #stepTypeIds . #assertT . #unOf)
-  (StepType
-    (PolynomialConstraints [P.minus out i0] 1)
-    mempty
-    mempty)
+    (m ^. #stepTypeIds . #assertT . #unOf)
+    ( StepType
+        (PolynomialConstraints [P.minus out i0] 1)
+        mempty
+        mempty
+    )
   where
     i0 = P.var' $ fst (firstTwoInputs m) ^. #unInputColumnIndex
     out = P.var' $ m ^. #output . #unOutputColumnIndex
@@ -914,8 +921,8 @@ resultStepType ::
   Map StepTypeId StepType
 resultStepType m =
   Map.singleton
-  (m ^. #stepTypeIds . #resultT . #unOf)
-  mempty
+    (m ^. #stepTypeIds . #resultT . #unOf)
+    mempty
 
 maybeToSet :: Ord a => Maybe a -> Set a
 maybeToSet = maybe mempty Set.singleton
@@ -957,116 +964,123 @@ getSubexpressionLinks m =
     toVoid, toVar, toConst, toOp, toResult :: Set SubexpressionLink
     toVoid =
       Set.singleton $
-      SubexpressionLink
-      (m ^. #stepTypeIds . #voidT . #unOf)
-      (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
-      mempty
-      (OutputSubexpressionId (voidEid ^. #unOf))
+        SubexpressionLink
+          (m ^. #stepTypeIds . #voidT . #unOf)
+          (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
+          mempty
+          (OutputSubexpressionId (voidEid ^. #unOf))
 
     toVar =
       Set.fromList $
-      [ SubexpressionLink
-        stepTypeId
-        (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
-        mempty
-        (OutputSubexpressionId (eid ^. #unOf))
-      | (stepTypeId, eid) <- Map.elems
-          $ Map.intersectionWith (,)
-            (m ^. #stepTypeIds . #loads)
-            (m ^. #subexpressionIds . #variables)
-      ]
+        [ SubexpressionLink
+            stepTypeId
+            (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
+            mempty
+            (OutputSubexpressionId (eid ^. #unOf))
+          | (stepTypeId, eid) <-
+              Map.elems $
+                Map.intersectionWith
+                  (,)
+                  (m ^. #stepTypeIds . #loads)
+                  (m ^. #subexpressionIds . #variables)
+        ]
 
     toConst =
       Set.fromList $
-      [ SubexpressionLink
-        stepTypeId
-        (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
-        mempty
-        (OutputSubexpressionId (eid ^. #unOf))
-      | (stepTypeId, eid) <- Map.elems
-          $ Map.intersectionWith (,)
-            (m ^. #stepTypeIds . #constants)
-            (m ^. #subexpressionIds . #constants)
-      ]
+        [ SubexpressionLink
+            stepTypeId
+            (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
+            mempty
+            (OutputSubexpressionId (eid ^. #unOf))
+          | (stepTypeId, eid) <-
+              Map.elems $
+                Map.intersectionWith
+                  (,)
+                  (m ^. #stepTypeIds . #constants)
+                  (m ^. #subexpressionIds . #constants)
+        ]
 
     toOp =
       Set.fromList
-      ( uncurry operationLink <$> Map.toList (m ^. #subexpressionIds . #operations) )
+        (uncurry operationLink <$> Map.toList (m ^. #subexpressionIds . #operations))
 
     operationLink :: Operation -> SubexpressionIdOf Operation -> SubexpressionLink
     operationLink =
       \case
         Or' x y -> \z ->
           SubexpressionLink
-          (m ^. #stepTypeIds . #or . #unOf)
-          (padInputs (InputSubexpressionId <$> [x, y]))
-          mempty
-          (OutputSubexpressionId (z ^. #unOf))
+            (m ^. #stepTypeIds . #or . #unOf)
+            (padInputs (InputSubexpressionId <$> [x, y]))
+            mempty
+            (OutputSubexpressionId (z ^. #unOf))
         Not' x -> \z ->
           SubexpressionLink
-          (m ^. #stepTypeIds . #not . #unOf)
-          (padInputs [InputSubexpressionId x])
-          mempty
-          (OutputSubexpressionId (z ^. #unOf))
+            (m ^. #stepTypeIds . #not . #unOf)
+            (padInputs [InputSubexpressionId x])
+            mempty
+            (OutputSubexpressionId (z ^. #unOf))
         Iff' x y -> \z ->
           SubexpressionLink
-          (m ^. #stepTypeIds . #iff . #unOf)
-          (padInputs (InputSubexpressionId <$> [x, y]))
-          mempty
-          (OutputSubexpressionId (z ^. #unOf))
+            (m ^. #stepTypeIds . #iff . #unOf)
+            (padInputs (InputSubexpressionId <$> [x, y]))
+            mempty
+            (OutputSubexpressionId (z ^. #unOf))
         Plus' x y -> \z ->
           SubexpressionLink
-          (m ^. #stepTypeIds . #plus . #unOf)
-          (padInputs (InputSubexpressionId <$> [x, y]))
-          mempty
-          (OutputSubexpressionId (z ^. #unOf))
+            (m ^. #stepTypeIds . #plus . #unOf)
+            (padInputs (InputSubexpressionId <$> [x, y]))
+            mempty
+            (OutputSubexpressionId (z ^. #unOf))
         TimesAnd' x y -> \z ->
           SubexpressionLink
-          (m ^. #stepTypeIds . #timesAnd . #unOf)
-          (padInputs (InputSubexpressionId <$> [x, y]))
-          mempty
-          (OutputSubexpressionId (z ^. #unOf))
+            (m ^. #stepTypeIds . #timesAnd . #unOf)
+            (padInputs (InputSubexpressionId <$> [x, y]))
+            mempty
+            (OutputSubexpressionId (z ^. #unOf))
         Equals' x y -> \z ->
           SubexpressionLink
-          (m ^. #stepTypeIds . #equals . #unOf)
-          (padInputs (InputSubexpressionId <$> [x, y]))
-          mempty
-          (OutputSubexpressionId (z ^. #unOf))
+            (m ^. #stepTypeIds . #equals . #unOf)
+            (padInputs (InputSubexpressionId <$> [x, y]))
+            mempty
+            (OutputSubexpressionId (z ^. #unOf))
         LessThan' x y -> \z ->
           SubexpressionLink
-          (m ^. #stepTypeIds . #lessThan . #unOf)
-          (padInputs (InputSubexpressionId <$> [x, y]))
-          mempty
-          (OutputSubexpressionId (z ^. #unOf))
+            (m ^. #stepTypeIds . #lessThan . #unOf)
+            (padInputs (InputSubexpressionId <$> [x, y]))
+            mempty
+            (OutputSubexpressionId (z ^. #unOf))
 
     padInputs :: [InputSubexpressionId] -> [InputSubexpressionId]
     padInputs xs =
-      xs <> (replicate (nInputs - length xs)
-              (InputSubexpressionId (voidEid ^. #unOf)))
+      xs
+        <> ( replicate
+               (nInputs - length xs)
+               (InputSubexpressionId (voidEid ^. #unOf))
+           )
 
     toAssert =
       Set.fromList $
-      [ SubexpressionLink
-        (m ^. #stepTypeIds . #assertT . #unOf)
-        (padInputs [inEid])
-        mempty
-        outEid
-      |
-        (inEid, outEid) <- Set.toList (m ^. #subexpressionIds . #assertions)
-      ]
+        [ SubexpressionLink
+            (m ^. #stepTypeIds . #assertT . #unOf)
+            (padInputs [inEid])
+            mempty
+            outEid
+          | (inEid, outEid) <- Set.toList (m ^. #subexpressionIds . #assertions)
+        ]
 
     toResult =
       Set.singleton $
-      SubexpressionLink
-      (m ^. #stepTypeIds . #resultT . #unOf)
-      (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
-      ( [ PreconditionSubexpressionId (assertEid ^. #unOutputSubexpressionId)
-        | assertEid <- snd <$> Set.toList (m ^. #subexpressionIds . #assertions)
-        ] <>
-        [ PreconditionSubexpressionId (lookupEid ^. #unOf)
-        | lookupEid <- Map.elems (m ^. #subexpressionIds . #lookups)
-        ] )
-      (OutputSubexpressionId (resultEid ^. #unResultExpressionId))
+        SubexpressionLink
+          (m ^. #stepTypeIds . #resultT . #unOf)
+          (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
+          ( [ PreconditionSubexpressionId (assertEid ^. #unOutputSubexpressionId)
+              | assertEid <- snd <$> Set.toList (m ^. #subexpressionIds . #assertions)
+            ]
+              <> [ PreconditionSubexpressionId (lookupEid ^. #unOf)
+                   | lookupEid <- Map.elems (m ^. #subexpressionIds . #lookups)
+                 ]
+          )
+          (OutputSubexpressionId (resultEid ^. #unResultExpressionId))
 
 getResultExpressionId ::
   Mapping ->
