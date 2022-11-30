@@ -138,6 +138,7 @@ data Operator
   | Equals
   | LessThan
   | VoidT
+  | AssertT
   | ResultT
 
 type StepTypeIdOf :: Operator -> Type
@@ -156,6 +157,7 @@ data StepTypeIdMapping = StepTypeIdMapping
     equals :: StepTypeIdOf Equals,
     lessThan :: StepTypeIdOf LessThan,
     voidT :: StepTypeIdOf VoidT,
+    assertT :: StepTypeIdOf AssertT,
     resultT :: StepTypeIdOf ResultT
   }
   deriving (Generic)
@@ -180,6 +182,7 @@ data Operation
 data SubexpressionIdMapping = SubexpressionIdMapping
   { void :: Maybe (SubexpressionIdOf Void),
     result :: Maybe ResultExpressionId,
+    assertions :: Set SubexpressionId,
     variables :: Map PolynomialVariable (SubexpressionIdOf PolynomialVariable),
     lookups :: Map LookupArgument (SubexpressionIdOf LookupArgument),
     constants :: Map Scalar (SubexpressionIdOf Scalar),
@@ -188,8 +191,9 @@ data SubexpressionIdMapping = SubexpressionIdMapping
   deriving (Generic)
 
 instance Semigroup SubexpressionIdMapping where
-  (SubexpressionIdMapping a b c d e f) <> (SubexpressionIdMapping g h i j k l) =
-    SubexpressionIdMapping (a <|> g) (b <|> h) (c <> i) (d <> j) (e <> k) (f <> l)
+  (SubexpressionIdMapping a b c d e f g) <> (SubexpressionIdMapping h i j k l m n) =
+    SubexpressionIdMapping (a <|> h)
+      (b <|> i) (c <> j) (d <> k) (e <> l) (f <> m) (g <> n)
 
 getStepArity :: LogicCircuit -> Arity
 getStepArity = max 2 . getLookupArgumentsArity . (^. #lookupArguments)
@@ -287,6 +291,7 @@ getMapping bitsPerByte c =
                 <*> (nextSid' :: State S (StepTypeIdOf Equals))
                 <*> (nextSid' :: State S (StepTypeIdOf LessThan))
                 <*> (nextSid' :: State S (StepTypeIdOf VoidT))
+                <*> (nextSid' :: State S (StepTypeIdOf AssertT))
                 <*> (nextSid' :: State S (StepTypeIdOf ResultT))
             )
         <*> ( do
@@ -294,6 +299,7 @@ getMapping bitsPerByte c =
                   SubexpressionIdMapping
                     <$> (Just <$> (nextEid' :: State S (SubexpressionIdOf Void)))
                     <*> (Just . ResultExpressionId <$> nextEid)
+                    <*> pure mempty
                     <*> ( Map.fromList . zip polyVars
                             <$> replicateM (length polyVars) nextEid'
                         )
@@ -309,7 +315,12 @@ getMapping bitsPerByte c =
 
     traverseConstraints :: SubexpressionIdMapping -> LogicConstraints -> State S SubexpressionIdMapping
     traverseConstraints m' lcs =
-      foldM (\x y -> snd <$> traverseConstraint x y) m' (lcs ^. #constraints)
+      foldM traverseAssertion m' (lcs ^. #constraints)
+
+    traverseAssertion :: SubexpressionIdMapping -> LogicConstraint -> State S SubexpressionIdMapping
+    traverseAssertion m' lc = do
+      (eid, m'') <- traverseConstraint m' lc
+      pure (addAssertion m'' eid)
 
     traverseConstraint :: SubexpressionIdMapping -> LogicConstraint -> State S (SubexpressionId, SubexpressionIdMapping)
     traverseConstraint m' =
@@ -351,7 +362,14 @@ getMapping bitsPerByte c =
     addOp m' op opId =
       case Map.lookup op (m' ^. #operations) of
         Just opId' -> (opId' ^. #unOf, m')
-        Nothing -> (opId ^. #unOf, m' <> SubexpressionIdMapping mzero mzero mempty mempty mempty (Map.singleton op opId))
+        Nothing -> (opId ^. #unOf, m' <> SubexpressionIdMapping mzero mzero mempty mempty mempty mempty (Map.singleton op opId))
+
+    addAssertion ::
+      SubexpressionIdMapping ->
+      SubexpressionId ->
+      SubexpressionIdMapping
+    addAssertion m' a =
+      m' <> SubexpressionIdMapping mzero mzero (Set.singleton a) mempty mempty mempty mempty
 
     traverseAtom ::
       SubexpressionIdMapping ->
@@ -499,6 +517,7 @@ getStepTypes c m =
       lookupStepTypes m,
       constantStepTypes m,
       operatorStepTypes c m,
+      assertStepType m,
       resultStepType m
     ]
 
@@ -875,12 +894,12 @@ truthTables m =
         <$> [0 .. 2 ^ (m ^. #byteDecomposition . #bits . #unBitsPerByte) - 1]
     zeroIndicator = 1 : replicate (length byteRange - 1) 0
 
-resultStepType ::
+assertStepType ::
   Mapping ->
   Map StepTypeId StepType
-resultStepType m =
+assertStepType m =
   Map.singleton
-  (m ^. #stepTypeIds . #resultT . #unOf)
+  (m ^. #stepTypeIds . #assertT . #unOf)
   (StepType
     (PolynomialConstraints [P.minus out i0] 1)
     mempty
@@ -888,6 +907,14 @@ resultStepType m =
   where
     i0 = P.var' $ fst (firstTwoInputs m) ^. #unInputColumnIndex
     out = P.var' $ m ^. #output . #unOutputColumnIndex
+
+resultStepType ::
+  Mapping ->
+  Map StepTypeId StepType
+resultStepType m =
+  Map.singleton
+  (m ^. #stepTypeIds . #resultT . #unOf)
+  mempty
 
 maybeToSet :: Ord a => Maybe a -> Set a
 maybeToSet = maybe mempty Set.singleton
@@ -910,7 +937,7 @@ getSubexpressionLinks ::
   Mapping ->
   Set SubexpressionLink
 getSubexpressionLinks c m =
-  toVoid <> toVar <> toConst <> toOp <> toResult
+  toVoid <> toVar <> toConst <> toOp <> toAssert <> toResult
   where
     voidEid :: SubexpressionIdOf Void
     voidEid =
@@ -930,9 +957,22 @@ getSubexpressionLinks c m =
       mempty
       (OutputSubexpressionId (voidEid ^. #unOf))
 
-    toVar = todo
+    toVar =
+      Set.fromList $
+      [ SubexpressionLink
+        stepTypeId
+        (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
+        mempty
+        (OutputSubexpressionId (eid ^. #unOf))
+      | (stepTypeId, eid) <- Map.elems
+          $ Map.intersectionWith (,)
+            (m ^. #stepTypeIds . #loads)
+            (m ^. #subexpressionIds . #variables)
+      ]
+
     toConst = todo
     toOp = todo
+    toAssert = todo
     toResult = todo
 
 getResultExpressionId ::
