@@ -17,8 +17,6 @@ import Data.ByteString (readFile)
 import Data.Either.Extra (mapLeft)
 import Data.Text (Text, pack)
 import Data.Text.Encoding (decodeUtf8')
-import Halo2.BoundLogicConstraintComplexity (ComplexityBound (ComplexityBound), boundLogicConstraintComplexity)
-import Halo2.LogicToArithmetic (logicToArithmeticCircuit)
 import Halo2.Types.BitsPerByte (BitsPerByte (BitsPerByte))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.BuildTranslationContext (buildTranslationContext)
@@ -37,6 +35,8 @@ import Semicircuit.Sigma11 (prependQuantifiers)
 -- import qualified Semicircuit.Types.PNFFormula as PNF
 import Semicircuit.ToLogicCircuit (semicircuitToLogicCircuit)
 import System.Environment (getArgs)
+import Trace.FromLogicCircuit (logicCircuitToTraceType)
+import Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit)
 import Prelude hiding (readFile)
 
 main :: IO ()
@@ -123,8 +123,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
       let -- dnf = fromDisjunctiveNormalForm (toDisjunctiveNormalForm (pnff ^. #qfFormula))
           semi = toSemicircuit pnff -- (PNF.Formula dnf (pnff ^. #quantifiers))
           (logic, layout) = semicircuitToLogicCircuit rowCount semi
-          logic' = boundLogicConstraintComplexity (ComplexityBound 2) logic
-          circuit = logicToArithmeticCircuit bitsPerByte rowCount logic'
+          traceType = logicCircuitToTraceType bitsPerByte logic
+          circuit = traceTypeToArithmeticCircuit traceType
       pure . SuccessfulOutput $
         "Translated OSL:\n"
           <> show translated
@@ -143,8 +143,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
                      <> show layout
                      <> "\n\nLogic circuit: "
                      <> show logic
-                     <> "\n\nLogic circuit (constraint complexity bounded): "
-                     <> show logic'
+                     <> "\n\nTrace type: "
+                     <> show traceType
                      <> "\n\nArithmetic circuit:\n"
                      <> show circuit
                  DONTCompileToCircuit ->
