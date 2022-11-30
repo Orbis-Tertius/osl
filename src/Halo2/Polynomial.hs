@@ -28,6 +28,7 @@ import Halo2.Types.Polynomial (Polynomial (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (..))
 import Stark.Types.Scalar (Scalar)
+import qualified Stark.Types.Scalar as S
 
 plus :: Polynomial -> Polynomial -> Polynomial
 plus (Polynomial p) (Polynomial q) =
@@ -82,13 +83,13 @@ multilinearMonomial a xs =
     )
 
 zero :: Polynomial
-zero = constant 0
+zero = constant S.zero
 
 one :: Polynomial
-one = constant 1
+one = constant S.one
 
 minusOne :: Polynomial
-minusOne = constant (-1)
+minusOne = constant S.minusOne
 
 negative :: Polynomial -> Polynomial
 negative = (minusOne `times`)

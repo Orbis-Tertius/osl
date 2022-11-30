@@ -21,6 +21,10 @@ module Stark.Types.Scalar
     scalarToInt,
     scalarToInteger,
     integerToScalar,
+    zero,
+    one,
+    minusOne,
+    two,
     half,
     normalize,
   )
@@ -205,5 +209,9 @@ integerToScalar = fromWord64 <=< integerToWord64
 scalarToInt :: Scalar -> Int
 scalarToInt = fromMaybe (die "scalarToInt partiality") . toIntegralSized . toWord64
 
-half :: Scalar
-half = fromMaybe (die "half: partiality") (inverseScalar 2)
+zero, one, minusOne, two, half :: Scalar
+zero = fromMaybe (die "zero: partiality") (fromWord64 0)
+one = fromMaybe (die "zero: partiality") (fromWord64 1)
+minusOne = negateScalar one
+two = fromMaybe (die "zero: partiality") (fromWord64 2)
+half = fromMaybe (die "half: partiality") (inverseScalar two)

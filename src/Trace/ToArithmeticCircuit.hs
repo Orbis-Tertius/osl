@@ -18,6 +18,7 @@ import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
 import Halo2.Types.Polynomial (Polynomial)
+import Stark.Types.Scalar (one)
 import Trace.ToArithmeticAIR (Mappings, mappings, traceTypeToArithmeticAIR)
 import Trace.Types (StepType, StepTypeId, SubexpressionId, TraceType)
 
@@ -109,7 +110,7 @@ linkChecks t m =
     currentCase = P.var' caseNumber
     gamma = P.constant $
       case Set.lookupMax (t ^. #subexpressions) of
-        Just eid -> (eid ^. #unSubexpressionId) + 1
+        Just eid -> (eid ^. #unSubexpressionId) + one
         Nothing -> die "linkChecks: no subexpression ids (this is a compiler bug)"
     tau = P.var' $ t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex
     alphas = P.var' <$> ((m ^. #advice . #inputs) <&> (^. #unMapping))
