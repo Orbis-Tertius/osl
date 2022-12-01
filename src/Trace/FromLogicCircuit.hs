@@ -220,7 +220,7 @@ data SubexpressionIdMapping = SubexpressionIdMapping
     result :: Maybe ResultExpressionId,
     assertions :: Set Assertion,
     variables :: Map PolynomialVariable (SubexpressionIdOf PolynomialVariable),
-    bareLookups :: Map BareLookupArgument (SubexpressionIdOf BareLookupArgument),
+    bareLookups :: Map BareLookupArgument BareLookupSubexpressionId,
     lookupAssertions :: Set LookupAssertion,
     constants :: Map Scalar (SubexpressionIdOf Scalar),
     operations :: Map Operation (SubexpressionIdOf Operation)
@@ -349,7 +349,8 @@ getMapping bitsPerByte c =
                             <$> replicateM (length polyVars) nextEid'
                         )
                     <*> ( Map.fromList . zip bareLookupArguments
-                            <$> replicateM (length bareLookupArguments) nextEid'
+                            <$> replicateM (length bareLookupArguments)
+                                (BareLookupSubexpressionId <$> nextEid)
                         )
                     <*> pure mempty
                     <*> ( Map.fromList . zip scalars
@@ -378,7 +379,13 @@ getMapping bitsPerByte c =
       pure (GateSubexpressionIds (InputSubexpressionId inId) (OutputSubexpressionId outId), m''')
 
     traverseBareLookupArgument :: SubexpressionIdMapping -> BareLookupArgument -> State S (BareLookupSubexpressionId, SubexpressionIdMapping)
-    traverseBareLookupArgument = todo
+    traverseBareLookupArgument m' arg =
+      case Map.lookup arg (m' ^. #bareLookups) of
+        Just bareLookupId -> do
+          m'' <- foldM (\m'' e -> snd <$> traversePoly m'' (fst e ^. #getInputExpression)) m'
+                 (arg ^. #getBareLookupArgument)
+          pure (bareLookupId, m'')
+        Nothing -> die "traverseBareLookupArgument: argument id not found (this is a compiler bug)"
 
     todo :: a
     todo = todo
@@ -1036,7 +1043,7 @@ getSubexpressionIdSet m =
     [ maybeToSet ((m ^. #void) <&> (^. #unOf)),
       maybeToSet ((m ^. #result) <&> (^. #unResultExpressionId)),
       Set.fromList (Map.elems (m ^. #variables) <&> (^. #unOf)),
-      Set.fromList (Map.elems (m ^. #bareLookups) <&> (^. #unOf)),
+      Set.fromList (Map.elems (m ^. #bareLookups) <&> (^. #unBareLookupSubexpressionId)),
       Set.map (^. #output . #unOutputSubexpressionId)
         (m ^. #lookupAssertions),
       Set.fromList (Map.elems (m ^. #constants) <&> (^. #unOf)),
