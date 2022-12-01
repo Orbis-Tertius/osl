@@ -1052,7 +1052,7 @@ getSubexpressionLinks ::
   Mapping ->
   Set SubexpressionLink
 getSubexpressionLinks m =
-  toVoid <> toVar <> toConst <> toOp <> toAssert <> toResult
+  toVoid <> toVar <> toConst <> toOp <> toAssert <> toAssertLookup <> toResult
   where
     voidEid :: SubexpressionIdOf Void
     voidEid =
@@ -1173,6 +1173,21 @@ getSubexpressionLinks m =
             mempty
             outEid
           | Assertion inEid outEid <- Set.toList (m ^. #subexpressionIds . #assertions)
+        ]
+
+    toAssertLookup =
+      Set.fromList $
+        [ SubexpressionLink
+            (m ^. #stepTypeIds . #assertLookup . #unOf)
+            (padInputs [gateEid', bareLookupEid'])
+            mempty
+            outEid
+          | LookupAssertion bareLookupEid gateEids outEid
+              <- Set.toList (m ^. #subexpressionIds . #lookupAssertions),
+            let gateEid' = InputSubexpressionId $
+                  gateEids ^. #output . #unOutputSubexpressionId,
+            let bareLookupEid' = InputSubexpressionId $
+                  bareLookupEid ^. #unBareLookupSubexpressionId
         ]
 
     toResult =
