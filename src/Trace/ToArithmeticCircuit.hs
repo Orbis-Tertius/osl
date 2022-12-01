@@ -168,10 +168,13 @@ gateStepTypeLookupArgument t sId arg =
     (P.plus (P.times alpha (stepIndicatorGate t)) (stepTypeGate t sId))
     (arg ^. #tableMap)
   where
-    alpha = P.constant $
-      foldl' max zero
-        (Map.keys (t ^. #stepTypes) <&> (^. #unStepTypeId))
-        Group.+ one
+    alpha =
+      P.constant $
+        foldl'
+          max
+          zero
+          (Map.keys (t ^. #stepTypes) <&> (^. #unStepTypeId))
+          Group.+ one
 
 stepIndicatorGate ::
   TraceType ->

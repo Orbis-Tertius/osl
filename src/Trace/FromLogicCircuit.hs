@@ -146,12 +146,13 @@ type StepTypeIdOf :: Operator -> Type
 newtype StepTypeIdOf a = StepTypeIdOf {unOf :: StepTypeId}
   deriving (Generic)
 
-newtype LookupTable = LookupTable { unLookupTable :: [LookupTableColumn] }
+newtype LookupTable = LookupTable {unLookupTable :: [LookupTableColumn]}
   deriving (Eq, Ord, Generic)
 
-newtype BareLookupArgument =
-  BareLookupArgument { getBareLookupArgument
-    :: [(InputExpression, LookupTableColumn)] }
+newtype BareLookupArgument = BareLookupArgument
+  { getBareLookupArgument ::
+      [(InputExpression, LookupTableColumn)]
+  }
   deriving (Eq, Ord, Generic)
 
 data StepTypeIdMapping = StepTypeIdMapping
@@ -189,26 +190,22 @@ data Operation
   | LessThan' SubexpressionId SubexpressionId
   deriving (Eq, Ord)
 
-data Assertion =
-  Assertion
+data Assertion = Assertion
   { input :: InputSubexpressionId,
     output :: OutputSubexpressionId
   }
   deriving (Eq, Ord, Generic)
 
-newtype BareLookupSubexpressionId =
-  BareLookupSubexpressionId { unBareLookupSubexpressionId :: SubexpressionId }
+newtype BareLookupSubexpressionId = BareLookupSubexpressionId {unBareLookupSubexpressionId :: SubexpressionId}
   deriving (Eq, Ord, Generic)
 
-data GateSubexpressionIds =
-  GateSubexpressionIds
+data GateSubexpressionIds = GateSubexpressionIds
   { input :: InputSubexpressionId,
     output :: OutputSubexpressionId
   }
   deriving (Eq, Ord, Generic)
 
-data LookupAssertion =
-  LookupAssertion
+data LookupAssertion = LookupAssertion
   { bareLookup :: BareLookupSubexpressionId,
     gate :: GateSubexpressionIds,
     output :: OutputSubexpressionId
@@ -349,8 +346,9 @@ getMapping bitsPerByte c =
                             <$> replicateM (length polyVars) nextEid'
                         )
                     <*> ( Map.fromList . zip bareLookupArguments
-                            <$> replicateM (length bareLookupArguments)
-                                (BareLookupSubexpressionId <$> nextEid)
+                            <$> replicateM
+                              (length bareLookupArguments)
+                              (BareLookupSubexpressionId <$> nextEid)
                         )
                     <*> pure mempty
                     <*> ( Map.fromList . zip scalars
@@ -370,7 +368,8 @@ getMapping bitsPerByte c =
       (gateId, m'') <- traverseLookupGate m' (arg ^. #gate)
       (bareLookupId, m''') <- traverseBareLookupArgument m'' (BareLookupArgument (arg ^. #tableMap))
       addLookupAssertion m''' . LookupAssertion bareLookupId gateId
-        . OutputSubexpressionId <$> nextEid
+        . OutputSubexpressionId
+        <$> nextEid
 
     traverseLookupGate :: SubexpressionIdMapping -> Polynomial -> State S (GateSubexpressionIds, SubexpressionIdMapping)
     traverseLookupGate m' x = do
@@ -382,8 +381,11 @@ getMapping bitsPerByte c =
     traverseBareLookupArgument m' arg =
       case Map.lookup arg (m' ^. #bareLookups) of
         Just bareLookupId -> do
-          m'' <- foldM (\m'' e -> snd <$> traversePoly m'' (fst e ^. #getInputExpression)) m'
-                 (arg ^. #getBareLookupArgument)
+          m'' <-
+            foldM
+              (\m'' e -> snd <$> traversePoly m'' (fst e ^. #getInputExpression))
+              m'
+              (arg ^. #getBareLookupArgument)
           pure (bareLookupId, m'')
         Nothing -> die "traverseBareLookupArgument: argument id not found (this is a compiler bug)"
 
@@ -553,14 +555,15 @@ getMapping bitsPerByte c =
     polyVars = Set.toList (getPolynomialVariables c)
 
     lookupTables' :: [LookupTable]
-    lookupTables' = LookupTable . snd
-      <$> Set.toList (getLookupTables c)
+    lookupTables' =
+      LookupTable . snd
+        <$> Set.toList (getLookupTables c)
 
     bareLookupArguments :: [BareLookupArgument]
     bareLookupArguments =
       Set.toList . Set.fromList $
-      BareLookupArgument . (^. #tableMap)
-        <$> (c ^. #lookupArguments . #getLookupArguments)
+        BareLookupArgument . (^. #tableMap)
+          <$> (c ^. #lookupArguments . #getLookupArguments)
 
     scalars :: [Scalar]
     scalars = Set.toList (getScalars c)
@@ -1009,9 +1012,10 @@ assertLookupStepType m =
   Map.singleton
     (m ^. #stepTypeIds . #assertLookup . #unOf)
     ( StepType
-        (PolynomialConstraints
-          [bareLookup' `P.minus` (gate' `P.times` bareLookup')]
-          2)
+        ( PolynomialConstraints
+            [bareLookup' `P.minus` (gate' `P.times` bareLookup')]
+            2
+        )
         mempty
         mempty
     )
@@ -1042,7 +1046,8 @@ getSubexpressionIdSet m =
       maybeToSet ((m ^. #result) <&> (^. #unResultExpressionId)),
       Set.fromList (Map.elems (m ^. #variables) <&> (^. #unOf)),
       Set.fromList (Map.elems (m ^. #bareLookups) <&> (^. #unBareLookupSubexpressionId)),
-      Set.map (^. #output . #unOutputSubexpressionId)
+      Set.map
+        (^. #output . #unOutputSubexpressionId)
         (m ^. #lookupAssertions),
       Set.fromList (Map.elems (m ^. #constants) <&> (^. #unOf)),
       Set.fromList (Map.elems (m ^. #operations) <&> (^. #unOf))
@@ -1182,12 +1187,14 @@ getSubexpressionLinks m =
             (padInputs [gateEid', bareLookupEid'])
             mempty
             outEid
-          | LookupAssertion bareLookupEid gateEids outEid
-              <- Set.toList (m ^. #subexpressionIds . #lookupAssertions),
-            let gateEid' = InputSubexpressionId $
-                  gateEids ^. #output . #unOutputSubexpressionId,
-            let bareLookupEid' = InputSubexpressionId $
-                  bareLookupEid ^. #unBareLookupSubexpressionId
+          | LookupAssertion bareLookupEid gateEids outEid <-
+              Set.toList (m ^. #subexpressionIds . #lookupAssertions),
+            let gateEid' =
+                  InputSubexpressionId $
+                    gateEids ^. #output . #unOutputSubexpressionId,
+            let bareLookupEid' =
+                  InputSubexpressionId $
+                    bareLookupEid ^. #unBareLookupSubexpressionId
         ]
 
     toResult =
