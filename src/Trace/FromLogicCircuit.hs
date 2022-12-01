@@ -387,9 +387,6 @@ getMapping bitsPerByte c =
           pure (bareLookupId, m'')
         Nothing -> die "traverseBareLookupArgument: argument id not found (this is a compiler bug)"
 
-    todo :: a
-    todo = todo
-
     traverseLogicConstraints :: SubexpressionIdMapping -> LogicConstraints -> State S SubexpressionIdMapping
     traverseLogicConstraints m' lcs =
       foldM traverseAssertion m' (lcs ^. #constraints)
@@ -453,7 +450,8 @@ getMapping bitsPerByte c =
       SubexpressionIdMapping ->
       LookupAssertion ->
       SubexpressionIdMapping
-    addLookupAssertion = todo
+    addLookupAssertion m' a =
+      m' <> SubexpressionIdMapping mzero mzero mempty mempty mempty (Set.singleton a) mempty mempty
 
     traverseAtom ::
       SubexpressionIdMapping ->
