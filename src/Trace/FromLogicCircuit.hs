@@ -574,6 +574,7 @@ getStepTypes bitsPerByte c m =
       constantStepTypes m,
       operatorStepTypes bitsPerByte c m,
       assertStepType m,
+      assertLookupStepType m,
       resultStepType m
     ]
 
@@ -969,6 +970,26 @@ assertStepType m =
   where
     i0 = P.var' $ fst (firstTwoInputs m) ^. #unInputColumnIndex
     out = P.var' $ m ^. #output . #unOutputColumnIndex
+
+assertLookupStepType ::
+  Mapping ->
+  Map StepTypeId StepType
+assertLookupStepType m =
+  Map.singleton
+    (m ^. #stepTypeIds . #assertLookup . #unOf)
+    ( StepType
+        (PolynomialConstraints
+          [bareLookup' `P.minus` (gate' `P.times` bareLookup')]
+          2)
+        mempty
+        mempty
+    )
+  where
+    (i0, i1) = firstTwoInputs m
+
+    gate', bareLookup' :: Polynomial
+    gate' = P.var' (i0 ^. #unInputColumnIndex)
+    bareLookup' = P.var' (i1 ^. #unInputColumnIndex)
 
 resultStepType ::
   Mapping ->
