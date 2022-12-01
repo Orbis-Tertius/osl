@@ -147,6 +147,9 @@ newtype StepTypeIdOf a = StepTypeIdOf {unOf :: StepTypeId}
 
 data StepTypeIdMapping = StepTypeIdMapping
   { loads :: Map PolynomialVariable StepTypeId,
+    -- TODO: To reduce the polynomial degree bound, need to separate
+    -- the actual lookup step from the gate step, and assert for each
+    -- lookup that either the gate is not zero or the lookup is satisfied.
     lookups :: Map (Polynomial, [LookupTableColumn]) StepTypeId,
     constants :: Map Scalar StepTypeId,
     plus :: StepTypeIdOf Plus,
