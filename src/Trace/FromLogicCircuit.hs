@@ -200,14 +200,17 @@ newtype BareLookupSubexpressionId =
   BareLookupSubexpressionId { unBareLookupSubexpressionId :: SubexpressionId }
   deriving (Eq, Ord, Generic)
 
-newtype GateSubexpressionId =
-  GateSubexpressionId { unGateSubexpressionId :: SubexpressionId }
+data GateSubexpressionIds =
+  GateSubexpressionIds
+  { input :: InputSubexpressionId,
+    output :: OutputSubexpressionId
+  }
   deriving (Eq, Ord, Generic)
 
 data LookupAssertion =
   LookupAssertion
   { bareLookup :: BareLookupSubexpressionId,
-    gate :: GateSubexpressionId,
+    gate :: GateSubexpressionIds,
     output :: OutputSubexpressionId
   }
   deriving (Eq, Ord, Generic)
@@ -358,7 +361,24 @@ getMapping bitsPerByte c =
             )
 
     traverseLookupArguments :: LookupArguments -> SubexpressionIdMapping -> State S SubexpressionIdMapping
-    traverseLookupArguments = todo
+    traverseLookupArguments args m' =
+      foldM traverseLookupArgument m' (args ^. #getLookupArguments)
+
+    traverseLookupArgument :: SubexpressionIdMapping -> LookupArgument -> State S SubexpressionIdMapping
+    traverseLookupArgument m' arg = do
+      (gateId, m'') <- traverseLookupGate m' (arg ^. #gate)
+      (bareLookupId, m''') <- traverseBareLookupArgument m'' (BareLookupArgument (arg ^. #tableMap))
+      addLookupAssertion m''' . LookupAssertion bareLookupId gateId
+        . OutputSubexpressionId <$> nextEid
+
+    traverseLookupGate :: SubexpressionIdMapping -> Polynomial -> State S (GateSubexpressionIds, SubexpressionIdMapping)
+    traverseLookupGate m' x = do
+      (inId, m'') <- traversePoly m' x
+      (outId, m''') <- addOp m'' (Equals' (zeroEid m'') inId) <$> nextEid'
+      pure (GateSubexpressionIds (InputSubexpressionId inId) (OutputSubexpressionId outId), m''')
+
+    traverseBareLookupArgument :: SubexpressionIdMapping -> BareLookupArgument -> State S (BareLookupSubexpressionId, SubexpressionIdMapping)
+    traverseBareLookupArgument = todo
 
     todo :: a
     todo = todo
@@ -421,6 +441,12 @@ getMapping bitsPerByte c =
       SubexpressionIdMapping
     addAssertion m' a =
       m' <> SubexpressionIdMapping mzero mzero (Set.singleton a) mempty mempty mempty mempty mempty
+
+    addLookupAssertion ::
+      SubexpressionIdMapping ->
+      LookupAssertion ->
+      SubexpressionIdMapping
+    addLookupAssertion = todo
 
     traverseAtom ::
       SubexpressionIdMapping ->
