@@ -3,6 +3,7 @@
 
 module Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit) where
 
+import qualified Algebra.Additive as Group
 import Control.Lens ((<&>))
 import Data.List.Extra (foldl', mconcatMap)
 import qualified Data.Map as Map
@@ -18,7 +19,7 @@ import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
 import Halo2.Types.Polynomial (Polynomial)
-import Stark.Types.Scalar (one)
+import Stark.Types.Scalar (one, zero)
 import Trace.ToArithmeticAIR (Mappings, mappings, traceTypeToArithmeticAIR)
 import Trace.Types (StepType, StepTypeId, SubexpressionId, TraceType)
 
@@ -157,7 +158,6 @@ gatedStepTypeLookupArguments t (sId, s) =
     (LookupArguments . (: []) . gateStepTypeLookupArgument t sId)
     (s ^. #lookupArguments . #getLookupArguments)
 
--- FIXME: This assumes that the gate values are sufficiently small.
 gateStepTypeLookupArgument ::
   TraceType ->
   StepTypeId ->
@@ -165,8 +165,16 @@ gateStepTypeLookupArgument ::
   LookupArgument
 gateStepTypeLookupArgument t sId arg =
   LookupArgument
-    (P.plus (stepIndicatorGate t) (P.plus (stepTypeGate t sId) (arg ^. #gate)))
+    (P.plus (P.times alpha (stepIndicatorGate t)) (stepTypeGate t sId))
     (arg ^. #tableMap)
+  where
+    alpha =
+      P.constant $
+        foldl'
+          max
+          zero
+          (Map.keys (t ^. #stepTypes) <&> (^. #unStepTypeId))
+          Group.+ one
 
 stepIndicatorGate ::
   TraceType ->
@@ -179,15 +187,8 @@ stepTypeGate ::
   StepTypeId ->
   Polynomial
 stepTypeGate t sId =
-  foldl'
-    P.times
-    P.one
-    [ P.minus
-        (P.constant (sId' ^. #unStepTypeId))
-        (P.var' (t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex))
-      | sId' <- Map.keys (t ^. #stepTypes),
-        sId' /= sId
-    ]
+  P.constant (sId ^. #unStepTypeId)
+    `P.minus` P.var' (t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex)
 
 subexpressionIdGate ::
   Mappings ->
