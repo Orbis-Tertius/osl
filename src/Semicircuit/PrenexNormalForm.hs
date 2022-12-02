@@ -105,18 +105,18 @@ toPrenexNormalForm ann =
       (qs, p') <- rec p
       (,Not p') <$> flipQuantifiers ann qs
     And p q -> do
-      (pQs, p') <- rec p
-      (qQs, q') <- rec q
-      pure (pQs <> qQs, And p' q')
+      p' <- rec p
+      q' <- rec q
+      pure $ mergeQuantifiersConjunctive p' q'
     Or p q -> do
-      (pQs, p') <- rec p
-      (qQs, q') <- rec q
-      pure (pQs <> qQs, Or p' q')
+      p' <- rec p
+      q' <- rec q
+      pure $ mergeQuantifiersDisjunctive p' q'
     Implies p q -> do
       (pQs, p') <- rec p
       (qQs, q') <- rec q
       pQs' <- flipQuantifiers ann pQs
-      pure (pQs' <> qQs, Implies p' q')
+      pure $ mergeQuantifiersDisjunctive (pQs', Not p') (qQs, q')
     Iff p q -> do
       (pQs, p') <- rec p
       (qQs, q') <- rec q
@@ -136,6 +136,32 @@ toPrenexNormalForm ann =
       pure (Instance x n ibs ob : pQs, p')
   where
     rec = toPrenexNormalForm ann
+
+todo :: a
+todo = todo
+
+-- Performs prenex normal form conversion on a conjunction
+-- of two prenex normal forms, merging universal quantifiers
+-- where applicable.
+mergeQuantifiersConjunctive ::
+  ([Quantifier], Formula) ->
+  ([Quantifier], Formula) ->
+  ([Quantifier], Formula)
+mergeQuantifiersConjunctive =
+  \case
+    (Universal x a : pQs, p) -> todo x a pQs p
+    (Existential q : pQs, p) -> todo q pQs p
+    (Instance x a ibs ob : pQs, p) -> todo x a ibs ob pQs p
+    ([], p) -> todo p
+
+-- Perform prenex normal form conversion on a disjunction
+-- of two prenex normal forms, merging existential quantifiers
+-- where applicable.
+mergeQuantifiersDisjunctive ::
+  ([Quantifier], Formula) ->
+  ([Quantifier], Formula) ->
+  ([Quantifier], Formula)
+mergeQuantifiersDisjunctive = todo
 
 flipQuantifiers ::
   ann ->
