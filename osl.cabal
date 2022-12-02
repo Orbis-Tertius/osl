@@ -103,9 +103,11 @@ library
     Stark.Types.Scalar
     Trace.FromLogicCircuit
     Trace.LogicToArithmetic
+    Trace.Metrics
     Trace.ToArithmeticAIR
     Trace.ToArithmeticCircuit
     Trace.Types
+    Trace.Types.Metrics
 
   build-depends:
     base >= 4.9 && < 5,
