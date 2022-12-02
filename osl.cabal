@@ -103,6 +103,7 @@ library
     Stark.Types.Scalar
     Trace.FromLogicCircuit
     Trace.LogicToArithmetic
+    Trace.Metrics
     Trace.ToArithmeticAIR
     Trace.ToArithmeticCircuit
     Trace.Types
