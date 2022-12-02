@@ -920,14 +920,28 @@ maxStepType bitsPerByte c m =
     ( mconcat
         [ StepType
             ( PolynomialConstraints
-                []
-                (PolynomialDegreeBound 0)
+                [ P.var' out `P.minus`
+                  ((P.var' i1 `P.times` lessInd)
+                    `P.plus` (P.var' i0 `P.times` (P.one `P.minus` lessInd))) ]
+                (PolynomialDegreeBound 3)
             )
             mempty
             mempty,
           byteDecompositionCheck bitsPerByte c m
         ]
      )
+  where
+    out, i0, i1 :: ColumnIndex
+    lessInd :: Polynomial
+    (InputColumnIndex i0, InputColumnIndex i1) = firstTwoInputs m
+    out = m ^. #output . #unOutputColumnIndex
+    lessInd = (P.one `P.minus` sign') `P.times` truthValueSum
+    sign', truthValueSum :: Polynomial
+    sign' = P.var' $ m ^. #byteDecomposition . #sign . #unSignColumnIndex
+    truthValueSum = todo
+
+todo :: a
+todo = todo
 
 byteDecompositionCheck ::
   BitsPerByte ->
