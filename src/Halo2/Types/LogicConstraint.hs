@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.LogicConstraint
-  ( AtomicLogicConstraint (Equals, LessThan),
+  ( AtomicLogicConstraint (Equals, LessThan, EqualsMax),
     LogicConstraint (Atom, Not, And, Or, Iff, Top, Bottom),
     atomicConstraintArgs,
   )
@@ -14,6 +14,7 @@ import Halo2.Types.Polynomial (Polynomial)
 data AtomicLogicConstraint
   = Equals Polynomial Polynomial
   | LessThan Polynomial Polynomial
+  | EqualsMax Polynomial Polynomial Polynomial
   deriving (Eq, Ord)
 
 instance Show AtomicLogicConstraint where
@@ -21,12 +22,15 @@ instance Show AtomicLogicConstraint where
     "(" <> show x <> " = " <> show y <> ")"
   show (LessThan x y) =
     "(" <> show x <> " < " <> show y <> ")"
+  show (EqualsMax x y z) =
+    "(max(" <> show x <> ", " <> show y <> ") = " <> show z <> ")"
 
-atomicConstraintArgs :: AtomicLogicConstraint -> (Polynomial, Polynomial)
+atomicConstraintArgs :: AtomicLogicConstraint -> [Polynomial]
 atomicConstraintArgs =
   \case
-    Equals a b -> (a, b)
-    LessThan a b -> (a, b)
+    Equals a b -> [a, b]
+    LessThan a b -> [a, b]
+    EqualsMax a b c -> [a, b, c]
 
 data LogicConstraint
   = Atom AtomicLogicConstraint

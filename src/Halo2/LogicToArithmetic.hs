@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Halo2.LogicToArithmetic
   ( eval,
@@ -64,7 +65,7 @@ byteDecompositionGate ::
   AtomicLogicConstraint ->
   Maybe Polynomial
 byteDecompositionGate layout c =
-  let (a, b) = atomicConstraintArgs c
+  let [a, b] = atomicConstraintArgs c
    in do
         advice <- Map.lookup c (layout ^. #atomAdvice)
         pure $
@@ -103,6 +104,7 @@ eval layout =
       pure $
         signPoly advice
           `P.times` some (unTruthValueColumnIndex <$> advice ^. #truthValue)
+    Atom (EqualsMax {}) -> todo
     Not p -> P.minus P.one <$> rec p
     And p q -> P.times <$> rec p <*> rec q
     Or p q ->
@@ -120,6 +122,9 @@ eval layout =
     Bottom -> pure (P.constant 0)
   where
     rec = eval layout
+
+todo :: a
+todo = todo
 
 signPoly :: AtomAdvice -> Polynomial
 signPoly advice =
@@ -207,7 +212,7 @@ getAtomicConstraints lc =
 
 getAtomicConstraintFixedBound :: LogicCircuit -> AtomicLogicConstraint -> FixedBound
 getAtomicConstraintFixedBound lc =
-  getPolynomialFixedBound lc . uncurry P.minus . atomicConstraintArgs
+  getPolynomialFixedBound lc . uncurry P.minus . (\[a,b] -> (a,b)) . atomicConstraintArgs
 
 -- Gets a fixed bound on the absolute value of the given polynomial.
 getPolynomialFixedBound :: LogicCircuit -> Polynomial -> FixedBound

@@ -18,7 +18,7 @@ import Halo2.Prelude
 import Halo2.Types.Circuit (Circuit)
 import Halo2.Types.Coefficient (Coefficient (getCoefficient))
 import Halo2.Types.InputExpression (InputExpression (..))
-import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
+import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan, EqualsMax), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
 import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArgument (LookupArgument)
 import Halo2.Types.LookupArguments (LookupArguments (getLookupArguments))
@@ -43,6 +43,7 @@ instance HasPolynomialVariables AtomicLogicConstraint where
     \case
       Equals x y -> getPolynomialVariables x <> getPolynomialVariables y
       LessThan x y -> getPolynomialVariables x <> getPolynomialVariables y
+      EqualsMax x y z -> getPolynomialVariables x <> getPolynomialVariables y <> getPolynomialVariables z
 
 instance HasPolynomialVariables LogicConstraint where
   getPolynomialVariables x =
@@ -95,6 +96,7 @@ instance HasScalars AtomicLogicConstraint where
     \case
       Equals x y -> getScalars x <> getScalars y
       LessThan x y -> getScalars x <> getScalars y
+      EqualsMax x y z -> getScalars x <> getScalars y <> getScalars z
 
 instance HasScalars LogicConstraint where
   getScalars x =

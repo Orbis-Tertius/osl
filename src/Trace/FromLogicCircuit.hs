@@ -137,6 +137,7 @@ data Operator
   | Iff
   | Equals
   | LessThan
+  | Max
   | VoidT
   | AssertT
   | AssertLookupT
@@ -166,6 +167,7 @@ data StepTypeIdMapping = StepTypeIdMapping
     iff :: StepTypeIdOf Iff,
     equals :: StepTypeIdOf Equals,
     lessThan :: StepTypeIdOf LessThan,
+    maxT :: StepTypeIdOf Max,
     voidT :: StepTypeIdOf VoidT,
     assertT :: StepTypeIdOf AssertT
   }
@@ -186,6 +188,7 @@ data Operation
   | TimesAnd' SubexpressionId SubexpressionId
   | Equals' SubexpressionId SubexpressionId
   | LessThan' SubexpressionId SubexpressionId
+  | Max' SubexpressionId SubexpressionId
   deriving (Eq, Ord)
 
 data Assertion = Assertion
@@ -328,6 +331,7 @@ getMapping bitsPerByte c =
                 <*> (nextSid' :: State S (StepTypeIdOf Iff))
                 <*> (nextSid' :: State S (StepTypeIdOf Equals))
                 <*> (nextSid' :: State S (StepTypeIdOf LessThan))
+                <*> (nextSid' :: State S (StepTypeIdOf Max))
                 <*> (nextSid' :: State S (StepTypeIdOf VoidT))
                 <*> (nextSid' :: State S (StepTypeIdOf AssertT))
             )
@@ -463,6 +467,12 @@ getMapping bitsPerByte c =
           (xId, m'') <- traversePoly m' x
           (yId, m''') <- traversePoly m'' y
           addOp m''' (LessThan' xId yId) <$> nextEid'
+        LC.EqualsMax x y z -> do
+          (xId, m1) <- traversePoly m' x
+          (yId, m2) <- traversePoly m1 y
+          (zId, m3) <- traversePoly m2 z
+          (maxId, m5) <- addOp m3 (Max' xId yId) <$> nextEid'
+          addOp m5 (Equals' maxId zId) <$> nextEid'
 
     traversePoly ::
       SubexpressionIdMapping ->
@@ -733,6 +743,7 @@ operatorStepTypes bitsPerByte c m =
       iffStepType m,
       equalsStepType bitsPerByte c m,
       lessThanStepType bitsPerByte c m,
+      maxStepType bitsPerByte c m,
       voidStepType m
     ]
 
@@ -849,8 +860,11 @@ iffStepType m =
 voidStepType m =
   Map.singleton (m ^. #stepTypeIds . #voidT . #unOf) mempty
 
+-- TODO: shouldn't equalsStepType and lessThanStepType
+-- involve their outputs (true or false)?
 equalsStepType,
-  lessThanStepType ::
+  lessThanStepType,
+  maxStepType ::
     BitsPerByte ->
     LogicCircuit ->
     Mapping ->
@@ -898,6 +912,22 @@ lessThanStepType bitsPerByte c m =
           byteDecompositionCheck bitsPerByte c m
         ]
     )
+
+-- TODO
+maxStepType bitsPerByte c m =
+  Map.singleton
+    (m ^. #stepTypeIds . #maxT . #unOf)
+    ( mconcat
+        [ StepType
+            ( PolynomialConstraints
+                []
+                (PolynomialDegreeBound 0)
+            )
+            mempty
+            mempty,
+          byteDecompositionCheck bitsPerByte c m
+        ]
+     )
 
 byteDecompositionCheck ::
   BitsPerByte ->
@@ -1128,6 +1158,11 @@ getSubexpressionLinks m =
         LessThan' x y -> \z ->
           SubexpressionLink
             (m ^. #stepTypeIds . #lessThan . #unOf)
+            (padInputs (InputSubexpressionId <$> [x, y]))
+            (OutputSubexpressionId (z ^. #unOf))
+        Max' x y -> \z ->
+          SubexpressionLink
+            (m ^. #stepTypeIds . #maxT . #unOf)
             (padInputs (InputSubexpressionId <$> [x, y]))
             (OutputSubexpressionId (z ^. #unOf))
 
