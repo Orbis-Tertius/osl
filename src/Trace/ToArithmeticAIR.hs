@@ -13,6 +13,7 @@ module Trace.ToArithmeticAIR
   )
 where
 
+import Cast (intToInteger)
 import Control.Lens ((<&>))
 import Data.List.Extra (mconcatMap, (!?))
 import qualified Data.Map as Map
@@ -29,8 +30,8 @@ import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
-import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, scalarToInteger, zero)
-import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink, TraceType)
+import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero)
+import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink, TraceType)
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -101,6 +102,8 @@ newtype Mapping a = Mapping {unMapping :: ColumnIndex}
 
 data CaseNumber
 
+data CaseUsed
+
 data Mappings = Mappings
   { fixed :: FixedMappings,
     advice :: AdviceMappings
@@ -111,13 +114,15 @@ data FixedMappings = FixedMappings
   { stepType :: Mapping StepTypeId,
     inputs :: [Mapping InputSubexpressionId],
     output :: Mapping OutputSubexpressionId,
-    caseNumber :: Mapping CaseNumber
+    caseNumber :: Mapping CaseNumber,
+    result :: Mapping ResultExpressionId
   }
   deriving (Generic)
 
 data AdviceMappings = AdviceMappings
   { inputs :: [Mapping InputSubexpressionId],
-    output :: Mapping OutputSubexpressionId
+    output :: Mapping OutputSubexpressionId,
+    caseUsed :: Mapping CaseUsed
   }
   deriving (Generic)
 
@@ -129,10 +134,12 @@ mappings t =
         (Mapping <$> [i + 1 .. j] :: [Mapping InputSubexpressionId])
         (Mapping (j + 1) :: Mapping OutputSubexpressionId)
         (Mapping (j + 2) :: Mapping CaseNumber)
+        (Mapping (j + 3) :: Mapping ResultExpressionId)
     )
     ( AdviceMappings
-        (Mapping <$> [j + 4 .. k] :: [Mapping InputSubexpressionId])
+        (Mapping <$> [j + 5 .. k] :: [Mapping InputSubexpressionId])
         (Mapping (k + 1) :: Mapping OutputSubexpressionId)
+        (Mapping (k + 2) :: Mapping CaseUsed)
     )
   where
     i :: ColumnIndex
@@ -142,7 +149,7 @@ mappings t =
     j = i + ColumnIndex n
 
     k :: ColumnIndex
-    k = j + 4 + ColumnIndex n
+    k = j + 5 + ColumnIndex n
 
     n :: Int
     n = length (t ^. #inputColumnIndices)
@@ -152,7 +159,7 @@ additionalFixedValues ::
   FixedMappings ->
   FixedValues
 additionalFixedValues t m =
-  linksTableFixedColumns (linksTable t) m <> caseFixedColumn t m
+  linksTableFixedColumns (linksTable t) m <> caseAndResultFixedColumns t m
 
 newtype LinksTable = LinksTable
   {unLinksTable :: [SubexpressionLink]}
@@ -186,24 +193,31 @@ linksTableFixedColumns (LinksTable ls) m =
           | i <- [0 .. length (m ^. #inputs) - 1]
         ]
 
-caseFixedColumn ::
+caseAndResultFixedColumns ::
   TraceType ->
   FixedMappings ->
   FixedValues
-caseFixedColumn t m =
+caseAndResultFixedColumns t m =
   FixedValues $
-    Map.singleton
-      (m ^. #caseNumber . #unMapping)
-      . FixedColumn
-      $ (f <$> [0 .. scalarToInteger (t ^. #numCases . #unNumberOfCases) - 1])
-        <> replicate
-          ( scalarToInt (t ^. #rowCount . #getRowCount)
-              - scalarToInt (t ^. #numCases . #unNumberOfCases)
-          )
-          zero
+    Map.fromList
+      [ ( m ^. #caseNumber . #unMapping,
+          FixedColumn $
+            concatMap
+              (replicate nResults . f)
+              [0 .. nCases - 1]
+        ),
+        ( m ^. #result . #unMapping,
+          FixedColumn . concat . replicate nCases $
+            f
+              <$> [0 .. nResults - 1]
+        )
+      ]
   where
-    f :: Integer -> Scalar
+    nResults = Set.size (t ^. #results)
+    nCases = scalarToInt (t ^. #numCases . #unNumberOfCases)
+
+    f :: Int -> Scalar
     f x =
-      case integerToScalar x of
+      case integerToScalar (intToInteger x) of
         Just y -> y
         Nothing -> die "caseFixedCoumn: case number out of range of scalar (this is a compiler bug)"

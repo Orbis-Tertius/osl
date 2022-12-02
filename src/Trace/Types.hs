@@ -10,7 +10,6 @@ module Trace.Types
     StepTypeId (StepTypeId),
     SubexpressionId (SubexpressionId),
     InputSubexpressionId (InputSubexpressionId),
-    PreconditionSubexpressionId (PreconditionSubexpressionId),
     OutputSubexpressionId (OutputSubexpressionId),
     SubexpressionLink (SubexpressionLink),
     ResultExpressionId (ResultExpressionId),
@@ -71,14 +70,6 @@ newtype InputSubexpressionId = InputSubexpressionId {unInputSubexpressionId :: S
   deriving stock (Generic)
   deriving newtype (Eq, Ord, Show)
 
--- Like an input subexpression, a precondition subexpression must be
--- evaluated before the linked output subexpression can be evaluated.
--- Unlike an input subexpression, a precondition subexpression does
--- not supply its output as an input to the subexpression.
-newtype PreconditionSubexpressionId = PreconditionSubexpressionId {unPreconditionSubexpressionId :: SubexpressionId}
-  deriving stock (Generic)
-  deriving newtype (Eq, Ord, Show)
-
 newtype OutputSubexpressionId = OutputSubexpressionId {unOutputSubexpressionId :: SubexpressionId}
   deriving stock (Generic)
   deriving newtype (Eq, Ord, Show)
@@ -86,14 +77,13 @@ newtype OutputSubexpressionId = OutputSubexpressionId {unOutputSubexpressionId :
 data SubexpressionLink = SubexpressionLink
   { stepType :: StepTypeId,
     inputs :: [InputSubexpressionId],
-    preconditions :: [PreconditionSubexpressionId],
     output :: OutputSubexpressionId
   }
   deriving (Eq, Ord, Generic, Show)
 
 newtype ResultExpressionId = ResultExpressionId {unResultExpressionId :: SubexpressionId}
   deriving stock (Generic)
-  deriving newtype (Show)
+  deriving newtype (Show, Eq, Ord)
 
 newtype CaseNumberColumnIndex = CaseNumberColumnIndex {unCaseNumberColumnIndex :: ColumnIndex}
   deriving stock (Generic)
@@ -118,7 +108,7 @@ data TraceType = TraceType
     stepTypes :: Map StepTypeId StepType,
     subexpressions :: Set SubexpressionId,
     links :: Set SubexpressionLink,
-    result :: ResultExpressionId,
+    results :: Set ResultExpressionId,
     caseNumberColumnIndex :: CaseNumberColumnIndex,
     stepTypeColumnIndex :: StepTypeColumnIndex,
     stepIndicatorColumnIndex :: StepIndicatorColumnIndex,
