@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedLabels #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit) where
 
@@ -8,20 +7,24 @@ import Control.Lens ((<&>))
 import Data.List.Extra (foldl', mconcatMap)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Die (die)
 import Halo2.AIR (toCircuit)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
+import Halo2.Types.CellReference (CellReference (..))
 import Halo2.Types.Circuit (ArithmeticCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
+import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (..))
+import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
+import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
 import Halo2.Types.Polynomial (Polynomial)
-import Stark.Types.Scalar (one, zero)
+import Halo2.Types.RowIndex (RowIndex (..))
+import Stark.Types.Scalar (one, scalarToInt, zero)
 import Trace.ToArithmeticAIR (Mappings, mappings, traceTypeToArithmeticAIR)
-import Trace.Types (StepType, StepTypeId, SubexpressionId, TraceType)
+import Trace.Types (StepType, StepTypeId, TraceType)
 
 traceTypeToArithmeticCircuit ::
   TraceType ->
@@ -29,9 +32,11 @@ traceTypeToArithmeticCircuit ::
 traceTypeToArithmeticCircuit traceType =
   toCircuit
     (traceTypeToArithmeticAIR traceType)
-    mempty
-    (traceTypeLookupArguments traceType (mappings traceType))
-    mempty
+    (EqualityConstrainableColumns (Set.singleton (m ^. #advice . #caseUsed . #unMapping)))
+    (traceTypeLookupArguments traceType m)
+    (traceTypeEqualityConstraints traceType m)
+  where
+    m = mappings traceType
 
 -- Trace type lookup arguments entail that:
 --  * For each step of each case, for each input to the step,
@@ -83,7 +88,7 @@ linkChecks ::
   Mappings ->
   LookupArguments
 linkChecks t m =
-  LookupArguments $
+  LookupArguments
     [ LookupArgument
         (stepIndicatorGate t)
         ( zip
@@ -91,28 +96,14 @@ linkChecks t m =
             (LookupTableColumn <$> links)
         )
     ]
-      <> [ LookupArgument
-             (P.plus (P.times gamma (stepIndicatorGate t)) (subexpressionIdGate m eidOut))
-             ( zip
-                 (InputExpression <$> [currentCase, P.constant $ eidIn ^. #unPreconditionSubexpressionId . #unSubexpressionId])
-                 (LookupTableColumn <$> [caseNumber, subexpressionId])
-             )
-           | link <- Set.toList (t ^. #links),
-             let eidOut = link ^. #output . #unOutputSubexpressionId,
-             eidIn <- link ^. #preconditions
-         ]
   where
-    tau, beta, gamma, currentCase :: Polynomial
+    tau, beta, currentCase :: Polynomial
     alphas :: [Polynomial]
     links :: [ColumnIndex]
     caseNumber, subexpressionId :: ColumnIndex
     caseNumber = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
     subexpressionId = m ^. #advice . #output . #unMapping
     currentCase = P.var' caseNumber
-    gamma = P.constant $
-      case Set.lookupMax (t ^. #subexpressions) of
-        Just eid -> (eid ^. #unSubexpressionId) + one
-        Nothing -> die "linkChecks: no subexpression ids (this is a compiler bug)"
     tau = P.var' $ t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex
     alphas = P.var' <$> ((m ^. #advice . #inputs) <&> (^. #unMapping))
     beta = P.var' subexpressionId
@@ -128,20 +119,24 @@ resultChecks ::
 resultChecks t m =
   LookupArguments
     [ LookupArgument
-        P.zero
-        [ (InputExpression i, LookupTableColumn sigma),
-          (InputExpression r, LookupTableColumn tau),
-          (InputExpression P.one, LookupTableColumn y)
+        ( P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex)
+            `P.minus` P.one
+        )
+        [ (InputExpression (P.var' traceCase), LookupTableColumn fixedCase),
+          (InputExpression P.one, LookupTableColumn used)
+        ],
+      LookupArgument
+        (P.var' used `P.minus` P.one)
+        [ (InputExpression (P.var' fixedCase), LookupTableColumn traceCase),
+          (InputExpression (P.var' fixedResultId), LookupTableColumn outputExpressionId)
         ]
     ]
   where
-    i, r :: Polynomial
-    sigma, tau, y :: ColumnIndex
-    i = P.var' $ m ^. #fixed . #caseNumber . #unMapping
-    r = P.constant (t ^. #result . #unResultExpressionId . #unSubexpressionId)
-    sigma = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
-    tau = t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex
-    y = t ^. #outputColumnIndex . #unOutputColumnIndex
+    fixedCase = m ^. #fixed . #caseNumber . #unMapping
+    fixedResultId = m ^. #fixed . #result . #unMapping
+    traceCase = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
+    outputExpressionId = m ^. #advice . #output . #unMapping
+    used = m ^. #advice . #caseUsed . #unMapping
 
 traceStepTypeLookupArguments ::
   TraceType ->
@@ -190,10 +185,20 @@ stepTypeGate t sId =
   P.constant (sId ^. #unStepTypeId)
     `P.minus` P.var' (t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex)
 
-subexpressionIdGate ::
+traceTypeEqualityConstraints ::
+  TraceType ->
   Mappings ->
-  SubexpressionId ->
-  Polynomial
-subexpressionIdGate m eid =
-  P.var' (m ^. #advice . #output . #unMapping)
-    `P.minus` P.constant (eid ^. #unSubexpressionId)
+  EqualityConstraints
+traceTypeEqualityConstraints t m =
+  EqualityConstraints
+    [ EqualityConstraint . Set.fromList $
+        [ CellReference
+            (m ^. #advice . #caseUsed . #unMapping)
+            (RowIndex (caseNum * nResults + resultNum))
+          | resultNum <- [0 .. nResults - 1]
+        ]
+      | caseNum <- [0 .. nCases - 1]
+    ]
+  where
+    nCases = scalarToInt (t ^. #numCases . #unNumberOfCases)
+    nResults = Set.size (t ^. #results)
