@@ -9,6 +9,8 @@ module Semicircuit.Types.Semicircuit
     FunctionCall (FunctionCall),
     IndicatorFunctionCalls (..),
     IndicatorFunctionCall (..),
+    MaxFunctionCalls (..),
+    MaxFunctionCall (..),
     AdviceTerms (..),
   )
 where
@@ -22,6 +24,7 @@ import Semicircuit.Types.Sigma11 (Name, Term)
 data Semicircuit = Semicircuit
   { freeVariables :: FreeVariables,
     indicatorCalls :: IndicatorFunctionCalls,
+    maxFunctionCalls :: MaxFunctionCalls,
     functionCalls :: FunctionCalls,
     adviceTerms :: AdviceTerms,
     formula :: Formula
@@ -38,6 +41,13 @@ newtype IndicatorFunctionCalls = IndicatorFunctionCalls
   deriving newtype (Semigroup, Monoid)
   deriving stock (Generic, Show)
 
+newtype MaxFunctionCalls = MaxFunctionCalls
+  { unMaxFunctionCalls ::
+      Set MaxFunctionCall
+  }
+  deriving newtype (Semigroup, Monoid)
+  deriving stock (Generic, Show)
+
 newtype FunctionCalls = FunctionCalls {unFunctionCalls :: Set FunctionCall}
   deriving newtype (Semigroup, Monoid)
   deriving stock (Generic, Show)
@@ -48,6 +58,10 @@ newtype AdviceTerms = AdviceTerms {unAdviceTerms :: Set Term}
 
 data IndicatorFunctionCall
   = IndicatorFunctionCall Term Term
+  deriving (Eq, Ord, Show)
+
+data MaxFunctionCall
+  = MaxFunctionCall Term Term
   deriving (Eq, Ord, Show)
 
 data FunctionCall = FunctionCall

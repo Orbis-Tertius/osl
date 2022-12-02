@@ -65,7 +65,7 @@ import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), Instan
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), IndicatorFunctionCall (..), Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), InputBound, Name, OutputBound (OutputBound), Term (Add, App, AppInverse, Const, IndLess, Mul))
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), InputBound, Name, OutputBound (OutputBound), Term (Add, App, AppInverse, Const, IndLess, Mul, Max))
 import Stark.Types.Scalar (order, scalarToInt)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
@@ -423,6 +423,7 @@ termToFixedBound x layout constraints =
     AppInverse f _ -> outputBound f
     Add y z -> rec y + rec z
     Mul y z -> rec y * rec z
+    Max y z -> rec y `max` rec z
     IndLess _ _ -> boolBound
   where
     rec = termToFixedBound x layout constraints
@@ -710,6 +711,7 @@ termToPolynomial layout =
     Add x y -> rec x `plus` rec y
     Mul x y -> rec x `times` rec y
     t@(IndLess {}) -> lookupTerm t
+    t@(Max {}) -> lookupTerm t
     Const x ->
       if x < word64ToInteger order
         then constant (fromInteger x)

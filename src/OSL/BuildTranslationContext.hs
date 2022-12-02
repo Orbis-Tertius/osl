@@ -252,6 +252,7 @@ getBoundS11NamesInMapping arity =
     f (S11.Add x y) = f x `Set.union` f y
     f (S11.Mul x y) = f x `Set.union` f y
     f (S11.IndLess x y) = f x `Set.union` f y
+    f (S11.Max x y) = f x `Set.union` f y
     f (S11.Const _) = Set.empty
 
     g :: S11.Name -> Set S11.Name
