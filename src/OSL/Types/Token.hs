@@ -25,6 +25,9 @@ data Token
   | MulZOp
   | AddFpOp
   | MulFpOp
+  | MaxNOp
+  | MaxZOp
+  | MaxFpOp
   | Equal
   | Less
   | LessOrEqual

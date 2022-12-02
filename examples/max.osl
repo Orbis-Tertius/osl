@@ -1,0 +1,20 @@
+def a : Prop
+  := (0N maxN 1N) = 1N.
+
+def b : Prop
+  := (0Z maxZ 1Z) = 1Z.
+
+def c : Prop
+  := (0F maxF 1F) = 1F.
+
+def a' : Prop
+  := (0N maxℕ 1N) = 1N.
+
+def b' : Prop
+  := (0Z maxℤ 1Z) = 1Z.
+
+def c' : Prop
+  := (0F max𝔽 1F) = 1F.
+
+def foo : Prop
+  := a & b & c & a' & b' & c'.

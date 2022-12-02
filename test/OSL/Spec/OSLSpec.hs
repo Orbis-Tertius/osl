@@ -97,6 +97,11 @@ P0^1(0^1(1))
 Aux Data:
 AuxTables {functionTables = fromList [(0^1,fromList [([1],10),([10],100)])], predicateTables = fromList [(P0^1,fromList [[1],[5],[10]])]}|],
     TestCase
+      "max"
+      "foo"
+      [r|Translated OSL:
+|],
+    TestCase
       "field"
       "arr"
       [r|Translated OSL:

@@ -108,6 +108,9 @@ data Term ann
   | MaybePi2 ann
   | MaybeTo ann Name
   | MaybeFrom ann Name
+  | MaxN ann
+  | MaxZ ann
+  | MaxFp ann
   | Exists ann
   | Length ann
   | Nth ann
