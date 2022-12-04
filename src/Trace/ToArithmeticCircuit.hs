@@ -50,7 +50,7 @@ traceTypeToArithmeticCircuit traceType =
 traceTypeLookupArguments ::
   TraceType ->
   Mappings ->
-  LookupArguments
+  LookupArguments Polynomial
 traceTypeLookupArguments t m =
   mconcat
     [ inputChecks t m,
@@ -62,7 +62,7 @@ traceTypeLookupArguments t m =
 inputChecks ::
   TraceType ->
   Mappings ->
-  LookupArguments
+  LookupArguments Polynomial
 inputChecks t m =
   LookupArguments
     [ LookupArgument
@@ -86,7 +86,7 @@ inputChecks t m =
 linkChecks ::
   TraceType ->
   Mappings ->
-  LookupArguments
+  LookupArguments Polynomial
 linkChecks t m =
   LookupArguments
     [ LookupArgument
@@ -115,7 +115,7 @@ linkChecks t m =
 resultChecks ::
   TraceType ->
   Mappings ->
-  LookupArguments
+  LookupArguments Polynomial
 resultChecks t m =
   LookupArguments
     [ LookupArgument
@@ -140,14 +140,14 @@ resultChecks t m =
 
 traceStepTypeLookupArguments ::
   TraceType ->
-  LookupArguments
+  LookupArguments Polynomial
 traceStepTypeLookupArguments t =
   mconcatMap (gatedStepTypeLookupArguments t) (Map.toList (t ^. #stepTypes))
 
 gatedStepTypeLookupArguments ::
   TraceType ->
   (StepTypeId, StepType) ->
-  LookupArguments
+  LookupArguments Polynomial
 gatedStepTypeLookupArguments t (sId, s) =
   mconcatMap
     (LookupArguments . (: []) . gateStepTypeLookupArgument t sId)
@@ -156,8 +156,8 @@ gatedStepTypeLookupArguments t (sId, s) =
 gateStepTypeLookupArgument ::
   TraceType ->
   StepTypeId ->
-  LookupArgument ->
-  LookupArgument
+  LookupArgument Polynomial ->
+  LookupArgument Polynomial
 gateStepTypeLookupArgument t sId arg =
   LookupArgument
     (P.plus (P.times alpha (stepIndicatorGate t)) (stepTypeGate t sId))

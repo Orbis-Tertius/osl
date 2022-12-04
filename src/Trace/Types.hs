@@ -28,6 +28,7 @@ import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
 import Halo2.Types.EqualityConstraints (EqualityConstraints)
 import Halo2.Types.FixedValues (FixedValues)
 import Halo2.Types.LookupArguments (LookupArguments)
+import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
 import Halo2.Types.RowCount (RowCount)
 import Stark.Types.Scalar (Scalar)
@@ -46,7 +47,7 @@ newtype OutputColumnIndex = OutputColumnIndex {unOutputColumnIndex :: ColumnInde
 -- Void's value can legally be set to anything. Each trace type features void.
 data StepType = StepType
   { gateConstraints :: PolynomialConstraints,
-    lookupArguments :: LookupArguments,
+    lookupArguments :: LookupArguments Polynomial,
     fixedValues :: FixedValues
   }
   deriving (Generic, Show)

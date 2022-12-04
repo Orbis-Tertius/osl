@@ -29,11 +29,9 @@ import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Circuit (LogicCircuit)
-import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
-import Halo2.Types.Exponent (Exponent)
 import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
@@ -47,7 +45,6 @@ import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable)
-import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero)
@@ -151,7 +148,7 @@ newtype LookupTable = LookupTable {unLookupTable :: [LookupTableColumn]}
 
 newtype BareLookupArgument = BareLookupArgument
   { getBareLookupArgument ::
-      [(InputExpression, LookupTableColumn)]
+      [(InputExpression LC.Term, LookupTableColumn)]
   }
   deriving (Eq, Ord, Generic)
 
@@ -238,7 +235,7 @@ instance Semigroup SubexpressionIdMapping where
 getStepArity :: LogicCircuit -> Arity
 getStepArity = max 2 . getLookupArgumentsArity . (^. #lookupArguments)
 
-getLookupArgumentsArity :: LookupArguments -> Arity
+getLookupArgumentsArity :: LookupArguments a -> Arity
 getLookupArgumentsArity =
   foldl' max 0 . fmap (Arity . length . (^. #tableMap))
     . (^. #getLookupArguments)
@@ -357,11 +354,11 @@ getMapping bitsPerByte c =
                   =<< traverseLogicConstraints m0 (c ^. #gateConstraints)
             )
 
-    traverseLookupArguments :: LookupArguments -> SubexpressionIdMapping -> State S SubexpressionIdMapping
+    traverseLookupArguments :: LookupArguments LC.Term -> SubexpressionIdMapping -> State S SubexpressionIdMapping
     traverseLookupArguments args m' =
       foldM traverseLookupArgument m' (args ^. #getLookupArguments)
 
-    traverseLookupArgument :: SubexpressionIdMapping -> LookupArgument -> State S SubexpressionIdMapping
+    traverseLookupArgument :: SubexpressionIdMapping -> LookupArgument LC.Term -> State S SubexpressionIdMapping
     traverseLookupArgument m' arg = do
       (gateId, m'') <- traverseLookupGate m' (arg ^. #gate)
       (bareLookupId, m''') <- traverseBareLookupArgument m'' (BareLookupArgument (arg ^. #tableMap))
@@ -369,9 +366,9 @@ getMapping bitsPerByte c =
         . OutputSubexpressionId
         <$> nextEid
 
-    traverseLookupGate :: SubexpressionIdMapping -> Polynomial -> State S (GateSubexpressionIds, SubexpressionIdMapping)
+    traverseLookupGate :: SubexpressionIdMapping -> LC.Term -> State S (GateSubexpressionIds, SubexpressionIdMapping)
     traverseLookupGate m' x = do
-      (inId, m'') <- traversePoly m' x
+      (inId, m'') <- traverseTerm m' x
       (outId, m''') <- addOp m'' (Equals' (zeroEid m'') inId) <$> nextEid'
       pure (GateSubexpressionIds (InputSubexpressionId inId) (OutputSubexpressionId outId), m''')
 
@@ -381,7 +378,7 @@ getMapping bitsPerByte c =
         Just bareLookupId -> do
           m'' <-
             foldM
-              (\m'' e -> snd <$> traversePoly m'' (fst e ^. #getInputExpression))
+              (\m'' e -> snd <$> traverseTerm m'' (fst e ^. #getInputExpression))
               m'
               (arg ^. #getBareLookupArgument)
           pure (bareLookupId, m'')
@@ -460,85 +457,38 @@ getMapping bitsPerByte c =
     traverseAtom m' =
       \case
         LC.Equals x y -> do
-          (xId, m'') <- traversePoly m' x
-          (yId, m''') <- traversePoly m'' y
+          (xId, m'') <- traverseTerm m' x
+          (yId, m''') <- traverseTerm m'' y
           addOp m''' (Equals' xId yId) <$> nextEid'
         LC.LessThan x y -> do
-          (xId, m'') <- traversePoly m' x
-          (yId, m''') <- traversePoly m'' y
+          (xId, m'') <- traverseTerm m' x
+          (yId, m''') <- traverseTerm m'' y
           addOp m''' (LessThan' xId yId) <$> nextEid'
-        LC.EqualsMax x y z -> do
-          (xId, m1) <- traversePoly m' x
-          (yId, m2) <- traversePoly m1 y
-          (zId, m3) <- traversePoly m2 z
-          (maxId, m5) <- addOp m3 (Max' xId yId) <$> nextEid'
-          addOp m5 (Equals' maxId zId) <$> nextEid'
 
-    traversePoly ::
+    traverseTerm ::
       SubexpressionIdMapping ->
-      Polynomial ->
+      LC.Term ->
       State S (SubexpressionId, SubexpressionIdMapping)
-    traversePoly m' poly =
-      case Map.toList (poly ^. #monos) of
-        [] -> pure (zeroEid m', m')
-        [m] -> traverseMono m' m
-        (m : ms) -> do
-          (eid, m'') <- traverseMono m' m
-          foldM addMono (eid, m'') ms
-
-    addMono ::
-      (SubexpressionId, SubexpressionIdMapping) ->
-      (PowerProduct, Coefficient) ->
-      State S (SubexpressionId, SubexpressionIdMapping)
-    addMono (eid, m') m = do
-      (eid', m'') <- traverseMono m' m
-      addOp m'' (Plus' eid eid') <$> nextEid'
-
-    traverseMono ::
-      SubexpressionIdMapping ->
-      (PowerProduct, Coefficient) ->
-      State S (SubexpressionId, SubexpressionIdMapping)
-    traverseMono m' (pp, a) = do
-      if Map.null (pp ^. #getPowerProduct)
-        then pure (coefficientEid m' a, m')
-        else do
-          (eid, m'') <- traversePowerProduct m' pp
-          addOp m'' (TimesAnd' eid (coefficientEid m'' a)) <$> nextEid'
-
-    traversePowerProduct ::
-      SubexpressionIdMapping ->
-      PowerProduct ->
-      State S (SubexpressionId, SubexpressionIdMapping)
-    traversePowerProduct m' pp =
-      case Map.toList (pp ^. #getPowerProduct) of
-        [] -> pure (oneEid m', m')
-        [x] -> traverseVarExponent m' x
-        (x : xs) -> do
-          (eid, m'') <- traverseVarExponent m' x
-          foldM mulVarExponent (eid, m'') xs
-
-    mulVarExponent ::
-      (SubexpressionId, SubexpressionIdMapping) ->
-      (PolynomialVariable, Exponent) ->
-      State S (SubexpressionId, SubexpressionIdMapping)
-    mulVarExponent (eid, m') x = do
-      (eid', m'') <- traverseVarExponent m' x
-      addOp m'' (TimesAnd' eid eid') <$> nextEid'
-
-    traverseVarExponent ::
-      SubexpressionIdMapping ->
-      (PolynomialVariable, Exponent) ->
-      State S (SubexpressionId, SubexpressionIdMapping)
-    traverseVarExponent m' (v, e) =
-      case e of
-        0 -> pure (oneEid m', m')
-        1 -> pure (varEid m' v, m')
-        _ -> do
-          let (e0, r) = e `quotRem` 2
-              e1 = e0 + r
-          (eid, m'') <- traverseVarExponent m' (v, e0)
-          (eid', m''') <- traverseVarExponent m'' (v, e1)
-          addOp m''' (TimesAnd' eid eid') <$> nextEid'
+    traverseTerm m' =
+      \case
+        LC.Var x -> pure (varEid m' x, m')
+        LC.Const x -> pure (constantEid m' x, m')
+        LC.Plus x y -> do
+          (xEid, m'') <- traverseTerm m' x
+          (yEid, m''') <- traverseTerm m'' y
+          addOp m''' (Plus' xEid yEid) <$> nextEid'
+        LC.Times x y -> do
+          (xEid, m'') <- traverseTerm m' x
+          (yEid, m''') <- traverseTerm m'' y
+          addOp m''' (TimesAnd' xEid yEid) <$> nextEid'
+        LC.Max x y -> do
+          (xEid, m'') <- traverseTerm m' x
+          (yEid, m''') <- traverseTerm m'' y
+          addOp m''' (Max' xEid yEid) <$> nextEid'
+        LC.IndLess x y -> do
+          (xEid, m'') <- traverseTerm m' x
+          (yEid, m''') <- traverseTerm m'' y
+          addOp m''' (LessThan' xEid yEid) <$> nextEid'
 
     varEid :: SubexpressionIdMapping -> PolynomialVariable -> SubexpressionId
     varEid m' x =
@@ -546,12 +496,12 @@ getMapping bitsPerByte c =
         Just eid -> eid ^. #unOf
         Nothing -> die "varEid: variable lookup failed (this is a compiler bug)"
 
-    coefficientEid ::
+    constantEid ::
       SubexpressionIdMapping ->
-      Coefficient ->
+      Scalar ->
       SubexpressionId
-    coefficientEid m' a =
-      case Map.lookup (a ^. #getCoefficient) (m' ^. #constants) of
+    constantEid m' a =
+      case Map.lookup a (m' ^. #constants) of
         Just eid -> eid ^. #unOf
         Nothing -> die "coefficientEid: coefficient lookup failed (this is a compiler bug)"
 
@@ -664,7 +614,7 @@ loadFromDifferentCaseStepType m x =
     )
     mempty
   where
-    o, c :: InputExpression
+    o, c :: InputExpression Polynomial
     o = InputExpression (P.var' (m ^. #output . #unOutputColumnIndex))
     c =
       InputExpression $
@@ -702,7 +652,7 @@ lookupStepType m p (LookupTable t) =
     (LookupArguments [LookupArgument p (zip inputExprs t)])
     mempty
   where
-    inputExprs :: [InputExpression]
+    inputExprs :: [InputExpression Polynomial]
     inputExprs =
       InputExpression . P.var' . (^. #unInputColumnIndex)
         <$> (m ^. #inputs)
@@ -979,7 +929,7 @@ byteDecompositionCheck (BitsPerByte bitsPerByte) c m =
 
 byteRangeAndTruthChecks ::
   Mapping ->
-  LookupArguments
+  LookupArguments Polynomial
 byteRangeAndTruthChecks m =
   LookupArguments
     [ LookupArgument
@@ -996,7 +946,7 @@ byteRangeAndTruthChecks m =
 
 signRangeCheck ::
   Mapping ->
-  LookupArguments
+  LookupArguments Polynomial
 signRangeCheck m =
   LookupArguments
     [ LookupArgument

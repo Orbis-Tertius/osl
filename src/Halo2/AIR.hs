@@ -17,9 +17,9 @@ import Halo2.Types.LookupArguments (LookupArguments)
 toCircuit ::
   AIR a ->
   EqualityConstrainableColumns ->
-  LookupArguments ->
+  LookupArguments b ->
   EqualityConstraints ->
-  Circuit a
+  Circuit a b
 toCircuit a eqcs lookups eqs =
   Circuit
     (a ^. #columnTypes)
@@ -30,7 +30,7 @@ toCircuit a eqcs lookups eqs =
     eqs
     (a ^. #fixedValues)
 
-fromCircuit :: Circuit a -> AIR a
+fromCircuit :: Circuit a b -> AIR a
 fromCircuit c =
   AIR
     (c ^. #columnTypes)

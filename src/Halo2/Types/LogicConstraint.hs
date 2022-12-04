@@ -2,19 +2,39 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.LogicConstraint
-  ( AtomicLogicConstraint (Equals, LessThan, EqualsMax),
+  ( Term (Var, Const, Plus, Times, Max, IndLess),
+    AtomicLogicConstraint (Equals, LessThan),
     LogicConstraint (Atom, Not, And, Or, Iff, Top, Bottom),
     atomicConstraintArgs,
   )
 where
 
 import Halo2.Prelude
-import Halo2.Types.Polynomial (Polynomial)
+import Halo2.Types.PolynomialVariable (PolynomialVariable)
+import Stark.Types.Scalar (Scalar)
+
+data Term
+  = Var PolynomialVariable
+  | Const Scalar
+  | Plus Term Term
+  | Times Term Term
+  | Max Term Term
+  | IndLess Term Term
+  deriving (Eq, Ord)
+
+instance Show Term where
+  show =
+    \case
+      Var x -> show x
+      Const x -> show x
+      Plus x y -> "(" <> show x <> " + " <> show y <> ")"
+      Times x y -> "(" <> show x <> " + " <> show y <> ")"
+      Max x y -> "(" <> show x <> " max " <> show y <> ")"
+      IndLess x y -> "ind<(" <> show x <> ", " <> show y <> ")"
 
 data AtomicLogicConstraint
-  = Equals Polynomial Polynomial
-  | LessThan Polynomial Polynomial
-  | EqualsMax Polynomial Polynomial Polynomial
+  = Equals Term Term
+  | LessThan Term Term
   deriving (Eq, Ord)
 
 instance Show AtomicLogicConstraint where
@@ -22,15 +42,12 @@ instance Show AtomicLogicConstraint where
     "(" <> show x <> " = " <> show y <> ")"
   show (LessThan x y) =
     "(" <> show x <> " < " <> show y <> ")"
-  show (EqualsMax x y z) =
-    "(max(" <> show x <> ", " <> show y <> ") = " <> show z <> ")"
 
-atomicConstraintArgs :: AtomicLogicConstraint -> [Polynomial]
+atomicConstraintArgs :: AtomicLogicConstraint -> [Term]
 atomicConstraintArgs =
   \case
     Equals a b -> [a, b]
     LessThan a b -> [a, b]
-    EqualsMax a b c -> [a, b, c]
 
 data LogicConstraint
   = Atom AtomicLogicConstraint
