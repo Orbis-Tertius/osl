@@ -826,7 +826,7 @@ equalsStepType bitsPerByte c m =
         [ StepType
             ( PolynomialConstraints
                 [ result `P.times` (result `P.minus` P.one),
-                  result `P.times` foldl P.plus P.zero ((P.one `P.minus`) <$> truthVars)
+                  result `P.times` foldl' P.plus P.zero ((P.one `P.minus`) <$> truthVars)
                 ]
                 1
             )
@@ -852,11 +852,11 @@ lessThanStepType bitsPerByte c m =
                 [ result `P.times` (result `P.minus` P.one),
                   (P.one `P.minus` result)
                     `P.times` ( (P.one `P.minus` sign')
-                                  `P.times` foldl P.plus P.zero truthVars
+                                  `P.times` foldl' P.plus P.zero truthVars
                               ),
                   result
                     `P.times` ( P.one
-                                  `P.minus` foldl
+                                  `P.minus` foldl'
                                     P.times
                                     P.one
                                     [P.one `P.minus` v | v <- truthVars]
