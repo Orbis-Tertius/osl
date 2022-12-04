@@ -825,8 +825,9 @@ equalsStepType bitsPerByte c m =
     ( mconcat
         [ StepType
             ( PolynomialConstraints
-                [result `P.times` (result `P.minus` P.one),
-                 result `P.times` foldl P.plus P.zero ((P.one `P.minus`) <$> truthVars)]
+                [ result `P.times` (result `P.minus` P.one),
+                  result `P.times` foldl P.plus P.zero ((P.one `P.minus`) <$> truthVars)
+                ]
                 1
             )
             mempty
@@ -849,15 +850,19 @@ lessThanStepType bitsPerByte c m =
         [ StepType
             ( PolynomialConstraints
                 [ result `P.times` (result `P.minus` P.one),
-                  (P.one `P.minus` result) `P.times`
-                    ((P.one `P.minus` sign') `P.times`
-                      foldl P.plus P.zero truthVars),
-                  result `P.times`
-                    (P.one `P.minus`
-                      foldl P.times P.one
-                        [P.one `P.minus` v | v <- truthVars])
+                  (P.one `P.minus` result)
+                    `P.times` ( (P.one `P.minus` sign')
+                                  `P.times` foldl P.plus P.zero truthVars
+                              ),
+                  result
+                    `P.times` ( P.one
+                                  `P.minus` foldl
+                                    P.times
+                                    P.one
+                                    [P.one `P.minus` v | v <- truthVars]
+                              )
                 ]
-                ( PolynomialDegreeBound (1 + length truthVars) )
+                (PolynomialDegreeBound (1 + length truthVars))
             )
             mempty
             mempty,
