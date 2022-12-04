@@ -100,7 +100,7 @@ AuxTables {functionTables = fromList [(0^1,fromList [([1],10),([10],100)])], pre
       "max"
       "foo"
       [r|Translated OSL:
-|],
+((((((max(0, 1) = 1) & (max(0, 1) = 1)) & (max(0, 1) = 1)) & (max(0, 1) = 1)) & (max(0, 1) = 1)) & (max(0, 1) = 1))|],
     TestCase
       "field"
       "arr"
