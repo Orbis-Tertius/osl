@@ -18,7 +18,7 @@ import Halo2.Prelude
 import Halo2.Types.Circuit (Circuit)
 import Halo2.Types.Coefficient (Coefficient (getCoefficient))
 import Halo2.Types.InputExpression (InputExpression (..))
-import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), Term (Var, Const, Plus, Times, Max, IndLess))
+import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), Term (Const, IndLess, Max, Plus, Times, Var))
 import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArgument (LookupArgument)
 import Halo2.Types.LookupArguments (LookupArguments (getLookupArguments))
@@ -86,8 +86,10 @@ instance HasPolynomialVariables a => HasPolynomialVariables (LookupArguments a) 
   getPolynomialVariables =
     mconcat . fmap getPolynomialVariables . getLookupArguments
 
-instance ( HasPolynomialVariables a, HasPolynomialVariables b )
-    => HasPolynomialVariables (Circuit a b) where
+instance
+  (HasPolynomialVariables a, HasPolynomialVariables b) =>
+  HasPolynomialVariables (Circuit a b)
+  where
   getPolynomialVariables x =
     mconcat
       [ getPolynomialVariables (x ^. #gateConstraints),
@@ -149,7 +151,7 @@ instance HasScalars a => HasScalars (LookupArguments a) where
   getScalars =
     mconcat . fmap getScalars . getLookupArguments
 
-instance ( HasScalars a, HasScalars b ) => HasScalars (Circuit a b) where
+instance (HasScalars a, HasScalars b) => HasScalars (Circuit a b) where
   getScalars x =
     mconcat
       [ getScalars (x ^. #gateConstraints),

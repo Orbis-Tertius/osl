@@ -63,8 +63,8 @@ import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), Instan
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (FunctionCall (..), Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), InputBound, Name, OutputBound (OutputBound), Term (Add, App, AppInverse, Const, IndLess, Mul, Max))
-import Stark.Types.Scalar (order, scalarToInt, zero, one, minusOne)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), InputBound, Name, OutputBound (OutputBound), Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import Stark.Types.Scalar (minusOne, one, order, scalarToInt, zero)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
@@ -736,8 +736,8 @@ quantifierFreeFormulaIsTrueConstraints x layout =
     mempty
   where
     dummyRowIndicator =
-      LC.Var . flip PolynomialVariable 0
-        $ layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
+      LC.Var . flip PolynomialVariable 0 $
+        layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
 
 dummyRowIndicatorConstraints ::
   Semicircuit ->
@@ -752,8 +752,9 @@ dummyRowIndicatorConstraints x layout =
     ]
     mempty
   where
-    dummyRowIndicator = LC.Var . flip PolynomialVariable 0
-      $ layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
+    dummyRowIndicator =
+      LC.Var . flip PolynomialVariable 0 $
+        layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
 
 someUniversalQuantifierBoundIsZeroConstraint ::
   Semicircuit ->
@@ -1058,5 +1059,6 @@ functionCallLookupArguments x layout =
             ((nm ^. #argMappings) !? k)
         Nothing -> die "functionCallLookupArguments: inputColumn: name lookup failed (this is a compiler bug)"
 
-    dummyRowIndicator = LC.Var . flip PolynomialVariable 0
-      $ layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
+    dummyRowIndicator =
+      LC.Var . flip PolynomialVariable 0 $
+        layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn

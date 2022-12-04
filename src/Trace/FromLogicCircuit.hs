@@ -862,23 +862,24 @@ lessThanStepType bitsPerByte c m =
           byteDecompositionCheck bitsPerByte c m
         ]
     )
-
 maxStepType bitsPerByte c m =
   Map.singleton
     (m ^. #stepTypeIds . #maxT . #unOf)
     ( mconcat
         [ StepType
             ( PolynomialConstraints
-                [ P.var' out `P.minus`
-                  ((P.var' i1 `P.times` lessInd)
-                    `P.plus` (P.var' i0 `P.times` (P.one `P.minus` lessInd))) ]
+                [ P.var' out
+                    `P.minus` ( (P.var' i1 `P.times` lessInd)
+                                  `P.plus` (P.var' i0 `P.times` (P.one `P.minus` lessInd))
+                              )
+                ]
                 (PolynomialDegreeBound 3)
             )
             mempty
             mempty,
           byteDecompositionCheck bitsPerByte c m
         ]
-     )
+    )
   where
     out, i0, i1 :: ColumnIndex
     lessInd :: Polynomial
@@ -889,8 +890,11 @@ maxStepType bitsPerByte c m =
     sign' = P.var' $ m ^. #byteDecomposition . #sign . #unSignColumnIndex
     truthValueSum =
       case snd <$> m ^. #byteDecomposition . #bytes of
-        (t:ts) -> foldl P.plus (P.var' (t ^. #unTruthValueColumnIndex))
-                  [P.var' $ t' ^. #unTruthValueColumnIndex | t' <- ts]
+        (t : ts) ->
+          foldl
+            P.plus
+            (P.var' (t ^. #unTruthValueColumnIndex))
+            [P.var' $ t' ^. #unTruthValueColumnIndex | t' <- ts]
         [] -> die "maxStepType: no truth values (this is a compiler bug)"
 
 byteDecompositionCheck ::
