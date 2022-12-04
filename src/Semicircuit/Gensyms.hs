@@ -125,6 +125,7 @@ term =
     DB.Add x y -> GS.Add <$> term x <*> term y
     DB.Mul x y -> GS.Mul <$> term x <*> term y
     DB.IndLess x y -> GS.IndLess <$> term x <*> term y
+    DB.Max x y -> GS.Max <$> term x <*> term y
     DB.Const x -> pure (GS.Const x)
 
 mapName :: DB.Name -> State S GS.Name

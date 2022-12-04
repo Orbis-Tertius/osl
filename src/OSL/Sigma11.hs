@@ -25,7 +25,7 @@ import Die (die)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
-import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Mul))
+import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
 import OSL.Types.TranslationContext (Mapping (..))
 
 class MapNames a where
@@ -42,6 +42,7 @@ instance MapNames Term where
       Add x y -> Add (mapNames f x) (mapNames f y)
       Mul x y -> Mul (mapNames f x) (mapNames f y)
       IndLess x y -> IndLess (mapNames f x) (mapNames f y)
+      Max x y -> Max (mapNames f x) (mapNames f y)
       Const x -> Const x
 
 instance MapNames Formula where
@@ -118,6 +119,7 @@ termIndices =
     Add x y -> termIndices x `unionIndices` termIndices y
     Mul x y -> termIndices x `unionIndices` termIndices y
     IndLess x y -> termIndices x `unionIndices` termIndices y
+    Max x y -> termIndices x `unionIndices` termIndices y
     Const _ -> mempty
 
 class PrependBounds a where

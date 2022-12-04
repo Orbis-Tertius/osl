@@ -101,6 +101,26 @@ translate
                   <$> translateToTerm gc lc (OSL.Fp ann) a
                   <*> translateToTerm gc lc (OSL.Fp ann) b
               )
+      OSL.Apply ann (OSL.Apply _ (OSL.MaxN _) a) b ->
+        Term
+          <$> ( S11.Max
+                  <$> translateToTerm gc lc (OSL.N ann) a
+                  <*> translateToTerm gc lc (OSL.N ann) b
+              )
+      OSL.Apply ann (OSL.Apply _ (OSL.MaxFp _) a) b ->
+        Term
+          <$> ( S11.Max
+                  <$> translateToTerm gc lc (OSL.Fp ann) a
+                  <*> translateToTerm gc lc (OSL.Fp ann) b
+              )
+      OSL.Apply ann (OSL.Apply _ (OSL.MaxZ _) a) b ->
+        -- FIXME: this will behave counterintuitively
+        -- in the presence of negative numbers.
+        Term
+          <$> ( S11.Max
+                  <$> translateToTerm gc lc (OSL.Z ann) a
+                  <*> translateToTerm gc lc (OSL.Z ann) b
+              )
       OSL.Apply _ (OSL.Cast _) a -> do
         aT <- lift $ inferType decls a
         translate gc lc aT a

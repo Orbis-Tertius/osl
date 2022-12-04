@@ -18,7 +18,7 @@ import Halo2.Prelude
 import Halo2.Types.Circuit (Circuit)
 import Halo2.Types.Coefficient (Coefficient (getCoefficient))
 import Halo2.Types.InputExpression (InputExpression (..))
-import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
+import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), Term (Const, IndLess, Max, Plus, Times, Var))
 import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArgument (LookupArgument)
 import Halo2.Types.LookupArguments (LookupArguments (getLookupArguments))
@@ -37,6 +37,18 @@ instance HasPolynomialVariables PowerProduct where
 instance HasPolynomialVariables Polynomial where
   getPolynomialVariables =
     mconcat . fmap getPolynomialVariables . Map.keys . (^. #monos)
+
+instance HasPolynomialVariables Term where
+  getPolynomialVariables =
+    \case
+      Var x -> Set.singleton x
+      Const _ -> mempty
+      Plus x y -> rec x <> rec y
+      Times x y -> rec x <> rec y
+      Max x y -> rec x <> rec y
+      IndLess x y -> rec x <> rec y
+    where
+      rec = getPolynomialVariables
 
 instance HasPolynomialVariables AtomicLogicConstraint where
   getPolynomialVariables =
@@ -61,20 +73,23 @@ instance HasPolynomialVariables LogicConstraints where
   getPolynomialVariables =
     mconcat . fmap getPolynomialVariables . (^. #constraints)
 
-deriving newtype instance HasPolynomialVariables InputExpression
+deriving newtype instance HasPolynomialVariables a => HasPolynomialVariables (InputExpression a)
 
-instance HasPolynomialVariables LookupArgument where
+instance HasPolynomialVariables a => HasPolynomialVariables (LookupArgument a) where
   getPolynomialVariables x =
     mconcat
       ( getPolynomialVariables (x ^. #gate) :
         (getPolynomialVariables . fst <$> (x ^. #tableMap))
       )
 
-instance HasPolynomialVariables LookupArguments where
+instance HasPolynomialVariables a => HasPolynomialVariables (LookupArguments a) where
   getPolynomialVariables =
     mconcat . fmap getPolynomialVariables . getLookupArguments
 
-instance HasPolynomialVariables a => HasPolynomialVariables (Circuit a) where
+instance
+  (HasPolynomialVariables a, HasPolynomialVariables b) =>
+  HasPolynomialVariables (Circuit a b)
+  where
   getPolynomialVariables x =
     mconcat
       [ getPolynomialVariables (x ^. #gateConstraints),
@@ -89,6 +104,16 @@ instance HasScalars Polynomial where
     Set.fromList . fmap getCoefficient
       . Map.elems
       . (^. #monos)
+
+instance HasScalars Term where
+  getScalars =
+    \case
+      Var _ -> mempty
+      Const x -> Set.singleton x
+      Plus x y -> getScalars x <> getScalars y
+      Times x y -> getScalars x <> getScalars y
+      Max x y -> getScalars x <> getScalars y
+      IndLess x y -> getScalars x <> getScalars y
 
 instance HasScalars AtomicLogicConstraint where
   getScalars =
@@ -113,27 +138,27 @@ instance HasScalars LogicConstraints where
   getScalars =
     mconcat . fmap getScalars . (^. #constraints)
 
-deriving newtype instance HasScalars InputExpression
+deriving newtype instance HasScalars a => HasScalars (InputExpression a)
 
-instance HasScalars LookupArgument where
+instance HasScalars a => HasScalars (LookupArgument a) where
   getScalars x =
     mconcat
       ( getScalars (x ^. #gate) :
         (getScalars . fst <$> (x ^. #tableMap))
       )
 
-instance HasScalars LookupArguments where
+instance HasScalars a => HasScalars (LookupArguments a) where
   getScalars =
     mconcat . fmap getScalars . getLookupArguments
 
-instance HasScalars a => HasScalars (Circuit a) where
+instance (HasScalars a, HasScalars b) => HasScalars (Circuit a b) where
   getScalars x =
     mconcat
       [ getScalars (x ^. #gateConstraints),
         getScalars (x ^. #lookupArguments)
       ]
 
-getLookupTables :: Circuit a -> Set (Polynomial, [LookupTableColumn])
+getLookupTables :: Ord b => Circuit a b -> Set (b, [LookupTableColumn])
 getLookupTables c =
   Set.fromList
     [ (a ^. #gate, snd <$> (a ^. #tableMap))

@@ -21,7 +21,7 @@ import Stark.Types.Scalar (order)
 newtype FixedBound = FixedBound
   {unFixedBound :: Word64}
   deriving stock (Generic)
-  deriving newtype (Show)
+  deriving newtype (Show, Eq, Ord)
 
 instance Num FixedBound where
   a + b = integerToFixedBound (fixedBoundToInteger a + fixedBoundToInteger b)

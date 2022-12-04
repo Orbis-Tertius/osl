@@ -29,11 +29,9 @@ import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Circuit (LogicCircuit)
-import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
-import Halo2.Types.Exponent (Exponent)
 import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
@@ -47,7 +45,6 @@ import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable)
-import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero)
@@ -137,6 +134,7 @@ data Operator
   | Iff
   | Equals
   | LessThan
+  | Max
   | VoidT
   | AssertT
   | AssertLookupT
@@ -150,7 +148,7 @@ newtype LookupTable = LookupTable {unLookupTable :: [LookupTableColumn]}
 
 newtype BareLookupArgument = BareLookupArgument
   { getBareLookupArgument ::
-      [(InputExpression, LookupTableColumn)]
+      [(InputExpression LC.Term, LookupTableColumn)]
   }
   deriving (Eq, Ord, Generic)
 
@@ -166,6 +164,7 @@ data StepTypeIdMapping = StepTypeIdMapping
     iff :: StepTypeIdOf Iff,
     equals :: StepTypeIdOf Equals,
     lessThan :: StepTypeIdOf LessThan,
+    maxT :: StepTypeIdOf Max,
     voidT :: StepTypeIdOf VoidT,
     assertT :: StepTypeIdOf AssertT
   }
@@ -186,6 +185,7 @@ data Operation
   | TimesAnd' SubexpressionId SubexpressionId
   | Equals' SubexpressionId SubexpressionId
   | LessThan' SubexpressionId SubexpressionId
+  | Max' SubexpressionId SubexpressionId
   deriving (Eq, Ord)
 
 data Assertion = Assertion
@@ -235,7 +235,7 @@ instance Semigroup SubexpressionIdMapping where
 getStepArity :: LogicCircuit -> Arity
 getStepArity = max 2 . getLookupArgumentsArity . (^. #lookupArguments)
 
-getLookupArgumentsArity :: LookupArguments -> Arity
+getLookupArgumentsArity :: LookupArguments a -> Arity
 getLookupArgumentsArity =
   foldl' max 0 . fmap (Arity . length . (^. #tableMap))
     . (^. #getLookupArguments)
@@ -328,6 +328,7 @@ getMapping bitsPerByte c =
                 <*> (nextSid' :: State S (StepTypeIdOf Iff))
                 <*> (nextSid' :: State S (StepTypeIdOf Equals))
                 <*> (nextSid' :: State S (StepTypeIdOf LessThan))
+                <*> (nextSid' :: State S (StepTypeIdOf Max))
                 <*> (nextSid' :: State S (StepTypeIdOf VoidT))
                 <*> (nextSid' :: State S (StepTypeIdOf AssertT))
             )
@@ -353,11 +354,11 @@ getMapping bitsPerByte c =
                   =<< traverseLogicConstraints m0 (c ^. #gateConstraints)
             )
 
-    traverseLookupArguments :: LookupArguments -> SubexpressionIdMapping -> State S SubexpressionIdMapping
+    traverseLookupArguments :: LookupArguments LC.Term -> SubexpressionIdMapping -> State S SubexpressionIdMapping
     traverseLookupArguments args m' =
       foldM traverseLookupArgument m' (args ^. #getLookupArguments)
 
-    traverseLookupArgument :: SubexpressionIdMapping -> LookupArgument -> State S SubexpressionIdMapping
+    traverseLookupArgument :: SubexpressionIdMapping -> LookupArgument LC.Term -> State S SubexpressionIdMapping
     traverseLookupArgument m' arg = do
       (gateId, m'') <- traverseLookupGate m' (arg ^. #gate)
       (bareLookupId, m''') <- traverseBareLookupArgument m'' (BareLookupArgument (arg ^. #tableMap))
@@ -365,9 +366,9 @@ getMapping bitsPerByte c =
         . OutputSubexpressionId
         <$> nextEid
 
-    traverseLookupGate :: SubexpressionIdMapping -> Polynomial -> State S (GateSubexpressionIds, SubexpressionIdMapping)
+    traverseLookupGate :: SubexpressionIdMapping -> LC.Term -> State S (GateSubexpressionIds, SubexpressionIdMapping)
     traverseLookupGate m' x = do
-      (inId, m'') <- traversePoly m' x
+      (inId, m'') <- traverseTerm m' x
       (outId, m''') <- addOp m'' (Equals' (zeroEid m'') inId) <$> nextEid'
       pure (GateSubexpressionIds (InputSubexpressionId inId) (OutputSubexpressionId outId), m''')
 
@@ -377,7 +378,7 @@ getMapping bitsPerByte c =
         Just bareLookupId -> do
           m'' <-
             foldM
-              (\m'' e -> snd <$> traversePoly m'' (fst e ^. #getInputExpression))
+              (\m'' e -> snd <$> traverseTerm m'' (fst e ^. #getInputExpression))
               m'
               (arg ^. #getBareLookupArgument)
           pure (bareLookupId, m'')
@@ -456,79 +457,38 @@ getMapping bitsPerByte c =
     traverseAtom m' =
       \case
         LC.Equals x y -> do
-          (xId, m'') <- traversePoly m' x
-          (yId, m''') <- traversePoly m'' y
+          (xId, m'') <- traverseTerm m' x
+          (yId, m''') <- traverseTerm m'' y
           addOp m''' (Equals' xId yId) <$> nextEid'
         LC.LessThan x y -> do
-          (xId, m'') <- traversePoly m' x
-          (yId, m''') <- traversePoly m'' y
+          (xId, m'') <- traverseTerm m' x
+          (yId, m''') <- traverseTerm m'' y
           addOp m''' (LessThan' xId yId) <$> nextEid'
 
-    traversePoly ::
+    traverseTerm ::
       SubexpressionIdMapping ->
-      Polynomial ->
+      LC.Term ->
       State S (SubexpressionId, SubexpressionIdMapping)
-    traversePoly m' poly =
-      case Map.toList (poly ^. #monos) of
-        [] -> pure (zeroEid m', m')
-        [m] -> traverseMono m' m
-        (m : ms) -> do
-          (eid, m'') <- traverseMono m' m
-          foldM addMono (eid, m'') ms
-
-    addMono ::
-      (SubexpressionId, SubexpressionIdMapping) ->
-      (PowerProduct, Coefficient) ->
-      State S (SubexpressionId, SubexpressionIdMapping)
-    addMono (eid, m') m = do
-      (eid', m'') <- traverseMono m' m
-      addOp m'' (Plus' eid eid') <$> nextEid'
-
-    traverseMono ::
-      SubexpressionIdMapping ->
-      (PowerProduct, Coefficient) ->
-      State S (SubexpressionId, SubexpressionIdMapping)
-    traverseMono m' (pp, a) = do
-      if Map.null (pp ^. #getPowerProduct)
-        then pure (coefficientEid m' a, m')
-        else do
-          (eid, m'') <- traversePowerProduct m' pp
-          addOp m'' (TimesAnd' eid (coefficientEid m'' a)) <$> nextEid'
-
-    traversePowerProduct ::
-      SubexpressionIdMapping ->
-      PowerProduct ->
-      State S (SubexpressionId, SubexpressionIdMapping)
-    traversePowerProduct m' pp =
-      case Map.toList (pp ^. #getPowerProduct) of
-        [] -> pure (oneEid m', m')
-        [x] -> traverseVarExponent m' x
-        (x : xs) -> do
-          (eid, m'') <- traverseVarExponent m' x
-          foldM mulVarExponent (eid, m'') xs
-
-    mulVarExponent ::
-      (SubexpressionId, SubexpressionIdMapping) ->
-      (PolynomialVariable, Exponent) ->
-      State S (SubexpressionId, SubexpressionIdMapping)
-    mulVarExponent (eid, m') x = do
-      (eid', m'') <- traverseVarExponent m' x
-      addOp m'' (TimesAnd' eid eid') <$> nextEid'
-
-    traverseVarExponent ::
-      SubexpressionIdMapping ->
-      (PolynomialVariable, Exponent) ->
-      State S (SubexpressionId, SubexpressionIdMapping)
-    traverseVarExponent m' (v, e) =
-      case e of
-        0 -> pure (oneEid m', m')
-        1 -> pure (varEid m' v, m')
-        _ -> do
-          let (e0, r) = e `quotRem` 2
-              e1 = e0 + r
-          (eid, m'') <- traverseVarExponent m' (v, e0)
-          (eid', m''') <- traverseVarExponent m'' (v, e1)
-          addOp m''' (TimesAnd' eid eid') <$> nextEid'
+    traverseTerm m' =
+      \case
+        LC.Var x -> pure (varEid m' x, m')
+        LC.Const x -> pure (constantEid m' x, m')
+        LC.Plus x y -> do
+          (xEid, m'') <- traverseTerm m' x
+          (yEid, m''') <- traverseTerm m'' y
+          addOp m''' (Plus' xEid yEid) <$> nextEid'
+        LC.Times x y -> do
+          (xEid, m'') <- traverseTerm m' x
+          (yEid, m''') <- traverseTerm m'' y
+          addOp m''' (TimesAnd' xEid yEid) <$> nextEid'
+        LC.Max x y -> do
+          (xEid, m'') <- traverseTerm m' x
+          (yEid, m''') <- traverseTerm m'' y
+          addOp m''' (Max' xEid yEid) <$> nextEid'
+        LC.IndLess x y -> do
+          (xEid, m'') <- traverseTerm m' x
+          (yEid, m''') <- traverseTerm m'' y
+          addOp m''' (LessThan' xEid yEid) <$> nextEid'
 
     varEid :: SubexpressionIdMapping -> PolynomialVariable -> SubexpressionId
     varEid m' x =
@@ -536,12 +496,12 @@ getMapping bitsPerByte c =
         Just eid -> eid ^. #unOf
         Nothing -> die "varEid: variable lookup failed (this is a compiler bug)"
 
-    coefficientEid ::
+    constantEid ::
       SubexpressionIdMapping ->
-      Coefficient ->
+      Scalar ->
       SubexpressionId
-    coefficientEid m' a =
-      case Map.lookup (a ^. #getCoefficient) (m' ^. #constants) of
+    constantEid m' a =
+      case Map.lookup a (m' ^. #constants) of
         Just eid -> eid ^. #unOf
         Nothing -> die "coefficientEid: coefficient lookup failed (this is a compiler bug)"
 
@@ -654,7 +614,7 @@ loadFromDifferentCaseStepType m x =
     )
     mempty
   where
-    o, c :: InputExpression
+    o, c :: InputExpression Polynomial
     o = InputExpression (P.var' (m ^. #output . #unOutputColumnIndex))
     c =
       InputExpression $
@@ -692,7 +652,7 @@ lookupStepType m p (LookupTable t) =
     (LookupArguments [LookupArgument p (zip inputExprs t)])
     mempty
   where
-    inputExprs :: [InputExpression]
+    inputExprs :: [InputExpression Polynomial]
     inputExprs =
       InputExpression . P.var' . (^. #unInputColumnIndex)
         <$> (m ^. #inputs)
@@ -733,6 +693,7 @@ operatorStepTypes bitsPerByte c m =
       iffStepType m,
       equalsStepType bitsPerByte c m,
       lessThanStepType bitsPerByte c m,
+      maxStepType bitsPerByte c m,
       voidStepType m
     ]
 
@@ -849,8 +810,11 @@ iffStepType m =
 voidStepType m =
   Map.singleton (m ^. #stepTypeIds . #voidT . #unOf) mempty
 
+-- TODO: shouldn't equalsStepType and lessThanStepType
+-- involve their outputs (true or false)?
 equalsStepType,
-  lessThanStepType ::
+  lessThanStepType,
+  maxStepType ::
     BitsPerByte ->
     LogicCircuit ->
     Mapping ->
@@ -861,7 +825,9 @@ equalsStepType bitsPerByte c m =
     ( mconcat
         [ StepType
             ( PolynomialConstraints
-                [foldl' P.plus P.zero truthVars]
+                [ result `P.times` (result `P.minus` P.one),
+                  result `P.times` foldl' P.plus P.zero ((P.one `P.minus`) <$> truthVars)
+                ]
                 1
             )
             mempty
@@ -874,30 +840,80 @@ equalsStepType bitsPerByte c m =
     truthVars =
       P.var' . (^. #unTruthValueColumnIndex) . snd
         <$> (m ^. #byteDecomposition . #bytes)
+
+    result :: Polynomial
+    result = P.var' $ m ^. #output . #unOutputColumnIndex
 lessThanStepType bitsPerByte c m =
   Map.singleton
     (m ^. #stepTypeIds . #lessThan . #unOf)
     ( mconcat
         [ StepType
             ( PolynomialConstraints
-                [ P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex),
-                  P.one
-                    `P.minus` foldl'
-                      (\x y -> x `P.plus` (y `P.minus` (x `P.times` y)))
-                      P.zero
-                      [ P.var' (snd i ^. #unTruthValueColumnIndex)
-                        | i <- m ^. #byteDecomposition . #bytes
-                      ]
+                [ result `P.times` (result `P.minus` P.one),
+                  (P.one `P.minus` result)
+                    `P.times` ( (P.one `P.minus` sign')
+                                  `P.times` foldl' P.plus P.zero truthVars
+                              ),
+                  result
+                    `P.times` ( P.one
+                                  `P.minus` foldl'
+                                    P.times
+                                    P.one
+                                    [P.one `P.minus` v | v <- truthVars]
+                              )
                 ]
-                ( PolynomialDegreeBound
-                    (max 1 (length (m ^. #byteDecomposition . #bytes)))
-                )
+                (PolynomialDegreeBound (1 + length truthVars))
             )
             mempty
             mempty,
           byteDecompositionCheck bitsPerByte c m
         ]
     )
+  where
+    truthVars :: [Polynomial]
+    truthVars =
+      P.var' . (^. #unTruthValueColumnIndex) . snd
+        <$> (m ^. #byteDecomposition . #bytes)
+
+    sign' :: Polynomial
+    sign' = P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)
+
+    result :: Polynomial
+    result = P.var' $ m ^. #output . #unOutputColumnIndex
+maxStepType bitsPerByte c m =
+  Map.singleton
+    (m ^. #stepTypeIds . #maxT . #unOf)
+    ( mconcat
+        [ StepType
+            ( PolynomialConstraints
+                [ P.var' out
+                    `P.minus` ( (P.var' i1 `P.times` lessInd)
+                                  `P.plus` (P.var' i0 `P.times` (P.one `P.minus` lessInd))
+                              )
+                ]
+                (PolynomialDegreeBound 3)
+            )
+            mempty
+            mempty,
+          byteDecompositionCheck bitsPerByte c m
+        ]
+    )
+  where
+    out, i0, i1 :: ColumnIndex
+    lessInd :: Polynomial
+    (InputColumnIndex i0, InputColumnIndex i1) = firstTwoInputs m
+    out = m ^. #output . #unOutputColumnIndex
+    lessInd = (P.one `P.minus` sign') `P.times` truthValueSum
+    sign', truthValueSum :: Polynomial
+    sign' = P.var' $ m ^. #byteDecomposition . #sign . #unSignColumnIndex
+    truthValueSum =
+      case snd <$> m ^. #byteDecomposition . #bytes of
+        (t : ts) ->
+          foldl'
+            P.plus
+            (P.var' (t ^. #unTruthValueColumnIndex))
+            [P.var' $ t' ^. #unTruthValueColumnIndex | t' <- ts]
+        [] -> die "maxStepType: no truth values (this is a compiler bug)"
 
 byteDecompositionCheck ::
   BitsPerByte ->
@@ -935,7 +951,7 @@ byteDecompositionCheck (BitsPerByte bitsPerByte) c m =
 
 byteRangeAndTruthChecks ::
   Mapping ->
-  LookupArguments
+  LookupArguments Polynomial
 byteRangeAndTruthChecks m =
   LookupArguments
     [ LookupArgument
@@ -952,7 +968,7 @@ byteRangeAndTruthChecks m =
 
 signRangeCheck ::
   Mapping ->
-  LookupArguments
+  LookupArguments Polynomial
 signRangeCheck m =
   LookupArguments
     [ LookupArgument
@@ -1128,6 +1144,11 @@ getSubexpressionLinks m =
         LessThan' x y -> \z ->
           SubexpressionLink
             (m ^. #stepTypeIds . #lessThan . #unOf)
+            (padInputs (InputSubexpressionId <$> [x, y]))
+            (OutputSubexpressionId (z ^. #unOf))
+        Max' x y -> \z ->
+          SubexpressionLink
+            (m ^. #stepTypeIds . #maxT . #unOf)
             (padInputs (InputSubexpressionId <$> [x, y]))
             (OutputSubexpressionId (z ^. #unOf))
 

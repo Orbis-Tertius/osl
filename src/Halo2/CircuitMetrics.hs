@@ -15,6 +15,7 @@ import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnType (ColumnType)
 import qualified Halo2.Types.ColumnType as CT
 import Halo2.Types.LookupArgument (LookupArgument)
+import Halo2.Types.Polynomial (Polynomial)
 
 getCircuitMetrics ::
   ArithmeticCircuit ->
@@ -47,7 +48,7 @@ getPolyDegreeBound x =
     (x ^. #gateConstraints . #degreeBound)
     (getLookupArgumentDegree <$> (x ^. #lookupArguments . #getLookupArguments))
 
-getLookupArgumentDegree :: LookupArgument -> PolynomialDegreeBound
+getLookupArgumentDegree :: LookupArgument Polynomial -> PolynomialDegreeBound
 getLookupArgumentDegree arg =
   PolynomialDegreeBound $
     foldl'
@@ -62,6 +63,6 @@ getLookupTableSize x =
     0
     (getLookupArgumentTableSize <$> (x ^. #lookupArguments . #getLookupArguments))
 
-getLookupArgumentTableSize :: LookupArgument -> LookupTableSize
+getLookupArgumentTableSize :: LookupArgument a -> LookupTableSize
 getLookupArgumentTableSize arg =
   LookupTableSize (length (arg ^. #tableMap))
