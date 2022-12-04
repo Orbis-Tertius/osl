@@ -825,7 +825,9 @@ equalsStepType bitsPerByte c m =
     ( mconcat
         [ StepType
             ( PolynomialConstraints
-                [foldl' P.plus P.zero truthVars]
+                [ result `P.times` (result `P.minus` P.one),
+                  result `P.times` foldl' P.plus P.zero ((P.one `P.minus`) <$> truthVars)
+                ]
                 1
             )
             mempty
@@ -838,30 +840,46 @@ equalsStepType bitsPerByte c m =
     truthVars =
       P.var' . (^. #unTruthValueColumnIndex) . snd
         <$> (m ^. #byteDecomposition . #bytes)
+
+    result :: Polynomial
+    result = P.var' $ m ^. #output . #unOutputColumnIndex
 lessThanStepType bitsPerByte c m =
   Map.singleton
     (m ^. #stepTypeIds . #lessThan . #unOf)
     ( mconcat
         [ StepType
             ( PolynomialConstraints
-                [ P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex),
-                  P.one
-                    `P.minus` foldl'
-                      (\x y -> x `P.plus` (y `P.minus` (x `P.times` y)))
-                      P.zero
-                      [ P.var' (snd i ^. #unTruthValueColumnIndex)
-                        | i <- m ^. #byteDecomposition . #bytes
-                      ]
+                [ result `P.times` (result `P.minus` P.one),
+                  (P.one `P.minus` result)
+                    `P.times` ( (P.one `P.minus` sign')
+                                  `P.times` foldl' P.plus P.zero truthVars
+                              ),
+                  result
+                    `P.times` ( P.one
+                                  `P.minus` foldl'
+                                    P.times
+                                    P.one
+                                    [P.one `P.minus` v | v <- truthVars]
+                              )
                 ]
-                ( PolynomialDegreeBound
-                    (max 1 (length (m ^. #byteDecomposition . #bytes)))
-                )
+                (PolynomialDegreeBound (1 + length truthVars))
             )
             mempty
             mempty,
           byteDecompositionCheck bitsPerByte c m
         ]
     )
+  where
+    truthVars :: [Polynomial]
+    truthVars =
+      P.var' . (^. #unTruthValueColumnIndex) . snd
+        <$> (m ^. #byteDecomposition . #bytes)
+
+    sign' :: Polynomial
+    sign' = P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)
+
+    result :: Polynomial
+    result = P.var' $ m ^. #output . #unOutputColumnIndex
 maxStepType bitsPerByte c m =
   Map.singleton
     (m ^. #stepTypeIds . #maxT . #unOf)
