@@ -891,7 +891,7 @@ maxStepType bitsPerByte c m =
     truthValueSum =
       case snd <$> m ^. #byteDecomposition . #bytes of
         (t : ts) ->
-          foldl
+          foldl'
             P.plus
             (P.var' (t ^. #unTruthValueColumnIndex))
             [P.var' $ t' ^. #unTruthValueColumnIndex | t' <- ts]
