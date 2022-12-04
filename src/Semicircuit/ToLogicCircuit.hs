@@ -787,28 +787,6 @@ boundTerm layout =
     TermBound x -> sigma11TermToLogicConstraintTerm layout x
     FieldMaxBound -> LC.Const maxBound
 
--- lessThanIndicatorFunctionCallConstraints ::
---   Semicircuit ->
---   Layout ->
---   LogicConstraints
--- lessThanIndicatorFunctionCallConstraints x layout =
---   LogicConstraints
---     [ (Atom (a `Equals` constant 0) `Or` Atom (a `Equals` constant 1))
---         `And` ( Atom (a `Equals` constant 1)
---                   `Iff` Atom (term y `Equals` term z)
---               )
---       | IndicatorFunctionCall y z <-
---           Set.toList (x ^. #indicatorCalls . #unIndicatorFunctionCalls),
---         let a = case Map.lookup
---               (IndLess y z)
---               (layout ^. #termMappings) of
---               Just (TermMapping c) -> var' c
---               Nothing -> die "lessThanIndicatorFunctionCallConstraints: lookup failed (this is a compiler bug)"
---     ]
---     mempty
---   where
---     term = termToPolynomial layout
-
 existentialOutputsInBoundsConstraints ::
   Semicircuit ->
   Layout ->
