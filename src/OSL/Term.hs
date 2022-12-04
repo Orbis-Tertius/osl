@@ -19,6 +19,9 @@ termAnnotation =
     AddZ ann -> ann
     MulZ ann -> ann
     ConstZ ann _ -> ann
+    MaxN ann -> ann
+    MaxZ ann -> ann
+    MaxFp ann -> ann
     Cast ann -> ann
     ConstFin ann _ -> ann
     Inverse ann -> ann

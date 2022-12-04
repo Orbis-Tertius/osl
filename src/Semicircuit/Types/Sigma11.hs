@@ -56,6 +56,7 @@ data Term
   | Add Term Term
   | Mul Term Term
   | IndLess Term Term
+  | Max Term Term
   | Const Integer
   deriving (Eq, Ord)
 
@@ -71,6 +72,8 @@ instance Show Term where
     "(" <> show x <> " * " <> show y <> ")"
   show (IndLess x y) =
     "ind_<(" <> show x <> ", " <> show y <> ")"
+  show (Max x y) =
+    "max(" <> show x <> ", " <> show y <> ")"
   show (Const x) = show x
 
 var :: Name -> Term
@@ -87,6 +90,8 @@ instance MapNames Term where
     Mul (mapNames f x) (mapNames f y)
   mapNames f (IndLess x y) =
     IndLess (mapNames f x) (mapNames f y)
+  mapNames f (Max x y) =
+    Max (mapNames f x) (mapNames f y)
   mapNames _ (Const i) = Const i
 
 data Formula

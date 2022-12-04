@@ -8,15 +8,14 @@ import Data.List (intercalate)
 import Halo2.Prelude
 import Halo2.Types.InputExpression (InputExpression)
 import Halo2.Types.LookupTableColumn (LookupTableColumn)
-import Halo2.Types.Polynomial (Polynomial)
 
-data LookupArgument = LookupArgument
-  { gate :: Polynomial,
-    tableMap :: [(InputExpression, LookupTableColumn)]
+data LookupArgument a = LookupArgument
+  { gate :: a,
+    tableMap :: [(InputExpression a, LookupTableColumn)]
   }
   deriving (Eq, Ord, Generic)
 
-instance Show LookupArgument where
+instance Show a => Show (LookupArgument a) where
   show arg =
     show (arg ^. #gate) <> " = 0 => ("
       <> intercalate ", " (show <$> inputs)

@@ -279,6 +279,24 @@ checkTerm c t x =
         t
         (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
     ConstZ ann _ -> checkTypeInclusion c ann t (Z ann)
+    MaxN ann ->
+      checkTypeInclusion
+        c
+        ann
+        t
+        (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
+    MaxZ ann ->
+      checkTypeInclusion
+        c
+        ann
+        t
+        (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
+    MaxFp ann ->
+      checkTypeInclusion
+        c
+        ann
+        t
+        (F ann Nothing (Fp ann) (F ann Nothing (Fp ann) (Fp ann)))
     Cast ann ->
       case t of
         F _ _ a b -> checkTypeIsNumeric c a >> checkTypeIsNumeric c b
@@ -854,6 +872,9 @@ inferType c t =
     MulZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
     AddFp ann -> pure (F ann Nothing (Fp ann) (F ann Nothing (Fp ann) (Fp ann)))
     MulFp ann -> pure (F ann Nothing (Fp ann) (F ann Nothing (Fp ann) (Fp ann)))
+    MaxN ann -> pure (F ann Nothing (N ann) (F ann Nothing (N ann) (N ann)))
+    MaxZ ann -> pure (F ann Nothing (Z ann) (F ann Nothing (Z ann) (Z ann)))
+    MaxFp ann -> pure (F ann Nothing (Fp ann) (F ann Nothing (Fp ann) (Fp ann)))
     Cast ann -> Left (ErrorMessage ann "cannot infer the type of cast from context")
     ListCast ann -> Left (ErrorMessage ann "cannot infer the type of List(cast) from context")
     To ann name -> do
