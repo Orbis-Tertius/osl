@@ -863,7 +863,6 @@ lessThanStepType bitsPerByte c m =
         ]
     )
 
--- TODO
 maxStepType bitsPerByte c m =
   Map.singleton
     (m ^. #stepTypeIds . #maxT . #unOf)
@@ -888,10 +887,11 @@ maxStepType bitsPerByte c m =
     lessInd = (P.one `P.minus` sign') `P.times` truthValueSum
     sign', truthValueSum :: Polynomial
     sign' = P.var' $ m ^. #byteDecomposition . #sign . #unSignColumnIndex
-    truthValueSum = todo
-
-todo :: a
-todo = todo
+    truthValueSum =
+      case snd <$> m ^. #byteDecomposition . #bytes of
+        (t:ts) -> foldl P.plus (P.var' (t ^. #unTruthValueColumnIndex))
+                  [P.var' $ t' ^. #unTruthValueColumnIndex | t' <- ts]
+        [] -> die "maxStepType: no truth values (this is a compiler bug)"
 
 byteDecompositionCheck ::
   BitsPerByte ->
