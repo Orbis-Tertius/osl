@@ -9,8 +9,8 @@ module Semicircuit.PrenexNormalForm
 where
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Sigma11 (prependArguments, prependBounds)
-import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), someFirstOrder)
+import Semicircuit.Sigma11 (prependArguments, prependBounds, substitute, FromName (FromName), ToName (ToName))
+import Semicircuit.Types.Sigma11 (Bound (TermBound, FieldMaxBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), someFirstOrder, Term (Add, Const, Max), var)
 
 -- Assumes input is in prenex normal form.
 -- Brings all instance quantifiers to the front.
@@ -149,10 +149,51 @@ mergeQuantifiersConjunctive ::
   ([Quantifier], Formula)
 mergeQuantifiersConjunctive =
   \case
-    (Universal x a : pQs, p) -> todo x a pQs p
-    (Existential q : pQs, p) -> todo q pQs p
-    (Instance x a ibs ob : pQs, p) -> todo x a ibs ob pQs p
-    ([], p) -> todo p
+    (Universal x (TermBound a) : pQs, p) ->
+      \case
+        (Universal y (TermBound b) : qQs, q) ->
+          let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
+              q' = ((var x `Add` Const 1) `LessOrEqual` b) `And` (substitute (FromName y) (ToName x) q)
+              qQs' = substitute (FromName y) (ToName x) <$> qQs
+              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q')
+              ab = if a == b then a else a `Max` b
+          in (Universal x (TermBound ab) : pqQs, pq)
+        (Universal y FieldMaxBound : qQs, q) ->
+          let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
+              q' = substitute (FromName y) (ToName x) q
+              qQs' = substitute (FromName y) (ToName x) <$> qQs
+              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q')
+          in (Universal x FieldMaxBound : pqQs, pq)
+        (Existential q : rQs, r) -> todo x a pQs p q rQs r
+        (Instance y b ibs ob : qQs, q) -> todo x a pQs p y b ibs ob qQs q
+        ([], q) -> (Universal x (TermBound a) : pQs, p `And` q)
+    (Universal x FieldMaxBound : pQs, p) ->
+      \case
+        (Universal y FieldMaxBound : qQs, q) ->
+          let qQs' = substitute (FromName y) (ToName x) <$> qQs
+              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs', q)
+          in (Universal x FieldMaxBound : pqQs, pq)
+        (Universal y (TermBound b) : qQs, q) ->
+          let q' = ((var x `Add` Const 1) `LessOrEqual` b) `And` (substitute (FromName y) (ToName x) q)
+              qQs' = substitute (FromName y) (ToName x) <$> qQs
+              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs', q')
+          in (Universal x FieldMaxBound : pqQs, pq)
+        (Existential q : rQs, r) -> todo x pQs p q rQs r
+        (Instance y b ibs ob : qQs, q) -> todo x pQs p y b ibs ob qQs q
+        ([], q) -> (Universal x FieldMaxBound : pQs, p `And` q)
+    (Existential q : pQs, p) ->
+      \case
+        (Universal x a : rQs, r) -> todo q pQs p x a rQs r
+        (Existential r : sQs, s) -> todo q pQs p r sQs s
+        (Instance x a ibs ob : rQs, r) -> todo q pQs p x a ibs ob rQs r
+        ([], r) -> (Existential q : pQs, p `And` r)
+    (Instance x a ibs ob : pQs, p) ->
+      \case
+        (Universal y b : qQs, q) -> todo x a ibs ob pQs p y b qQs q
+        (Existential q : rQs, r) -> todo x a ibs ob pQs p q rQs r
+        (Instance y b ibs' ob' : qQs, q) -> todo x a ibs ob pQs p y b ibs' ob' qQs q
+        ([], q) -> todo x a ibs ob pQs p q
+    ([], p) -> \(qQs, q) -> (qQs, p `And` q)
 
 -- Perform prenex normal form conversion on a disjunction
 -- of two prenex normal forms, merging existential quantifiers

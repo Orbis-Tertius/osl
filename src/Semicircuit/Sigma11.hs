@@ -1,9 +1,16 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Semicircuit.Sigma11
-  ( prependBounds,
+  ( MapNames (mapNames),
+    FromName (FromName),
+    ToName (ToName),
+    substitute,
+    prependBounds,
     prependQuantifiers,
     prependArguments,
     existentialQuantifierName,
@@ -17,6 +24,78 @@ import Data.List (foldl')
 import Die (die)
 import OSL.Types.Arity (Arity (..))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Instance, Universal), Term (Add, App, AppInverse, Const, IndLess, Max, Mul), var)
+
+class MapNames a where
+  mapNames :: (Name -> Name) -> a -> a
+
+instance MapNames Name where
+  mapNames = id
+
+instance MapNames Term where
+  mapNames f =
+    \case
+      App g xs -> App (f g) (rec <$> xs)
+      AppInverse g x -> AppInverse (f g) (rec x)
+      Add x y -> Add (rec x) (rec y)
+      Mul x y -> Mul (rec x) (rec y)
+      IndLess x y -> IndLess (rec x) (rec y)
+      Max x y -> Max (rec x) (rec y)
+      Const x -> Const x
+    where
+      rec = mapNames f
+
+instance MapNames Bound where
+  mapNames f =
+    \case
+      FieldMaxBound -> FieldMaxBound
+      TermBound x -> TermBound (mapNames f x)
+
+instance MapNames InputBound where
+  mapNames f (InputBound x b) =
+    InputBound (f x) (mapNames f b)
+
+deriving newtype instance MapNames OutputBound
+
+instance MapNames ExistentialQuantifier where
+  mapNames f =
+    \case
+      Some x n ibs ob -> Some (f x) n (mapNames f <$> ibs) (mapNames f ob)
+      SomeP x n ib ob -> SomeP (f x) n (mapNames f ib) (mapNames f ob)
+
+instance MapNames Formula where
+  mapNames f =
+    \case
+      Equal x y -> Equal (term x) (term y)
+      LessOrEqual x y -> LessOrEqual (term x) (term y)
+      Predicate p xs -> Predicate p (term <$> xs)
+      And p q -> And (rec p) (rec q)
+      Not p -> Not (rec p)
+      Or p q -> Or (rec p) (rec q)
+      Implies p q -> Implies (rec p) (rec q)
+      Iff p q -> Iff (rec p) (rec q)
+      ForAll x a p -> ForAll (f x) (mapNames f a) (rec p)
+      ForSome q p -> ForSome (mapNames f q) (rec p)
+      Given x n ibs ob p ->
+        Given (f x) n (mapNames f <$> ibs) (mapNames f ob) (rec p)
+      Top -> Top
+      Bottom -> Bottom
+    where
+      rec = mapNames f
+      term = mapNames f
+
+instance MapNames Quantifier where
+  mapNames f =
+    \case
+      Universal x b -> Universal (f x) (mapNames f b)
+      Existential q -> Existential (mapNames f q)
+      Instance x n ibs ob -> Instance (f x) n (mapNames f <$> ibs) (mapNames f ob)
+
+newtype FromName = FromName Name
+
+newtype ToName = ToName Name
+
+substitute :: MapNames a => FromName -> ToName -> a -> a
+substitute (FromName f) (ToName t) = mapNames (\x -> if x == f then t else x)
 
 prependBounds ::
   [InputBound] ->
