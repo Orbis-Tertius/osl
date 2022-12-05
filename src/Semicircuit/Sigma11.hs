@@ -27,6 +27,7 @@ where
 import Control.Lens ((%~), (^.))
 import Data.List (foldl')
 import Data.Set (Set)
+import qualified Data.Set as Set
 import Die (die)
 import OSL.Types.Arity (Arity (..))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Instance, Universal), Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
@@ -108,14 +109,67 @@ substitute (FromName f) (ToName t) = mapNames (\x -> if x == f then t else x)
 class HasNames a where
   getNames :: a -> Set Name
 
+instance HasNames a => HasNames [a] where
+  getNames = mconcat . fmap getNames
+
+instance HasNames Term where
+  getNames =
+    \case
+      App f xs -> Set.singleton f <> getNames xs
+      AppInverse f x -> Set.singleton f <> getNames x
+      Add x y -> rec x <> rec y
+      Mul x y -> rec x <> rec y
+      IndLess x y -> rec x <> rec y
+      Max x y -> rec x <> rec y
+      Const _ -> mempty
+    where
+      rec = getNames
+
+instance HasNames Bound where
+  getNames =
+    \case
+      FieldMaxBound -> mempty
+      TermBound x -> getNames x
+
+instance HasNames InputBound where
+  getNames =
+    \case
+      NamedInputBound x b -> Set.singleton x <> getNames b
+      UnnamedInputBound b -> getNames b
+
+deriving newtype instance HasNames OutputBound
+
 instance HasNames ExistentialQuantifier where
-  getNames = todo
+  getNames =
+    \case
+      Some x _ ibs ob -> Set.singleton x <> getNames ibs <> getNames ob
+      SomeP x _ ib ob -> Set.singleton x <> getNames ib <> getNames ob
 
 instance HasNames Quantifier where
-  getNames = todo
+  getNames =
+    \case
+      Existential q -> getNames q
+      Universal x b -> Set.singleton x <> getNames b
+      Instance x _ ibs ob -> Set.singleton x <> getNames ibs <> getNames ob
 
 instance HasNames Formula where
-  getNames = todo
+  getNames =
+    \case
+      Equal x y -> getNames x <> getNames y
+      LessOrEqual x y -> getNames x <> getNames y
+      Predicate _ xs -> getNames xs
+      Not p -> rec p
+      And p q -> rec p <> rec q
+      Or p q -> rec p <> rec q
+      Implies p q -> rec p <> rec q
+      Iff p q -> rec p <> rec q
+      ForAll x b p -> Set.singleton x <> getNames b <> rec p
+      ForSome q p -> getNames q <> rec p
+      Given x _ ibs ob p -> Set.singleton x <> getNames ibs <> getNames ob <> rec p
+      Top -> mempty
+      Bottom -> mempty
+    where
+      rec = getNames
 
 todo :: a
 todo = todo
