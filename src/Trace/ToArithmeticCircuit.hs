@@ -64,38 +64,40 @@ inputChecks ::
   Mappings ->
   LookupArguments Polynomial
 inputChecks t m =
-  LookupArguments
-    [ LookupArgument
-        (stepIndicatorGate t)
-        [ (InputExpression alpha, LookupTableColumn beta),
-          (InputExpression sigma', LookupTableColumn sigma),
-          (InputExpression x, LookupTableColumn y)
-        ]
-      | (iIdCol, iCol) <-
-          zip
-            ((m ^. #advice . #inputs) <&> (^. #unMapping))
-            ((t ^. #inputColumnIndices) <&> (^. #unInputColumnIndex)),
-        let alpha = P.var' iIdCol,
-        let beta = m ^. #advice . #output . #unMapping,
-        let sigma = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex,
-        let sigma' = P.var' sigma,
-        let x = P.var' iCol,
-        let y = t ^. #outputColumnIndex . #unOutputColumnIndex
-    ]
+  LookupArguments $
+    Set.fromList
+      [ LookupArgument
+          (stepIndicatorGate t)
+          [ (InputExpression alpha, LookupTableColumn beta),
+            (InputExpression sigma', LookupTableColumn sigma),
+            (InputExpression x, LookupTableColumn y)
+          ]
+        | (iIdCol, iCol) <-
+            zip
+              ((m ^. #advice . #inputs) <&> (^. #unMapping))
+              ((t ^. #inputColumnIndices) <&> (^. #unInputColumnIndex)),
+          let alpha = P.var' iIdCol,
+          let beta = m ^. #advice . #output . #unMapping,
+          let sigma = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex,
+          let sigma' = P.var' sigma,
+          let x = P.var' iCol,
+          let y = t ^. #outputColumnIndex . #unOutputColumnIndex
+      ]
 
 linkChecks ::
   TraceType ->
   Mappings ->
   LookupArguments Polynomial
 linkChecks t m =
-  LookupArguments
-    [ LookupArgument
-        (stepIndicatorGate t)
-        ( zip
-            (InputExpression <$> ([currentCase, tau] <> alphas <> [beta]))
-            (LookupTableColumn <$> links)
-        )
-    ]
+  LookupArguments $
+    Set.fromList
+      [ LookupArgument
+          (stepIndicatorGate t)
+          ( zip
+              (InputExpression <$> ([currentCase, tau] <> alphas <> [beta]))
+              (LookupTableColumn <$> links)
+          )
+      ]
   where
     tau, beta, currentCase :: Polynomial
     alphas :: [Polynomial]
@@ -117,20 +119,21 @@ resultChecks ::
   Mappings ->
   LookupArguments Polynomial
 resultChecks t m =
-  LookupArguments
-    [ LookupArgument
-        ( P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex)
-            `P.minus` P.one
-        )
-        [ (InputExpression (P.var' traceCase), LookupTableColumn fixedCase),
-          (InputExpression P.one, LookupTableColumn used)
-        ],
-      LookupArgument
-        (P.var' used `P.minus` P.one)
-        [ (InputExpression (P.var' fixedCase), LookupTableColumn traceCase),
-          (InputExpression (P.var' fixedResultId), LookupTableColumn outputExpressionId)
-        ]
-    ]
+  LookupArguments $
+    Set.fromList
+      [ LookupArgument
+          ( P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex)
+              `P.minus` P.one
+          )
+          [ (InputExpression (P.var' traceCase), LookupTableColumn fixedCase),
+            (InputExpression P.one, LookupTableColumn used)
+          ],
+        LookupArgument
+          (P.var' used `P.minus` P.one)
+          [ (InputExpression (P.var' fixedCase), LookupTableColumn traceCase),
+            (InputExpression (P.var' fixedResultId), LookupTableColumn outputExpressionId)
+          ]
+      ]
   where
     fixedCase = m ^. #fixed . #caseNumber . #unMapping
     fixedResultId = m ^. #fixed . #result . #unMapping
@@ -150,8 +153,8 @@ gatedStepTypeLookupArguments ::
   LookupArguments Polynomial
 gatedStepTypeLookupArguments t (sId, s) =
   mconcatMap
-    (LookupArguments . (: []) . gateStepTypeLookupArgument t sId)
-    (s ^. #lookupArguments . #getLookupArguments)
+    (LookupArguments . Set.singleton . gateStepTypeLookupArgument t sId)
+    (Set.toList (s ^. #lookupArguments . #getLookupArguments))
 
 gateStepTypeLookupArgument ::
   TraceType ->

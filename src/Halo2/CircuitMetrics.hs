@@ -49,7 +49,9 @@ getPolyDegreeBound x =
   foldl'
     max
     (x ^. #gateConstraints . #degreeBound)
-    (getLookupArgumentDegree <$> (x ^. #lookupArguments . #getLookupArguments))
+    ( getLookupArgumentDegree
+        <$> Set.toList (x ^. #lookupArguments . #getLookupArguments)
+    )
 
 getLookupArgumentDegree :: LookupArgument Polynomial -> PolynomialDegreeBound
 getLookupArgumentDegree arg =
@@ -64,7 +66,9 @@ getLookupTableSize x =
   foldl'
     max
     0
-    (getLookupArgumentTableSize <$> (x ^. #lookupArguments . #getLookupArguments))
+    ( getLookupArgumentTableSize
+        <$> Set.toList (x ^. #lookupArguments . #getLookupArguments)
+    )
 
 getLookupArgumentTableSize :: LookupArgument a -> LookupTableSize
 getLookupArgumentTableSize arg =

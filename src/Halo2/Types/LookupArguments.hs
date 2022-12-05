@@ -10,5 +10,5 @@ where
 import Halo2.Prelude
 import Halo2.Types.LookupArgument (LookupArgument)
 
-newtype LookupArguments a = LookupArguments {getLookupArguments :: [LookupArgument a]}
+newtype LookupArguments a = LookupArguments {getLookupArguments :: Set (LookupArgument a)}
   deriving (Eq, Ord, Show, Generic, Semigroup, Monoid)
