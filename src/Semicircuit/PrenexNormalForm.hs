@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -9,6 +10,7 @@ module Semicircuit.PrenexNormalForm
   )
 where
 
+import Control.Lens ((^.))
 import Data.Bifunctor (second)
 import Data.List (foldl')
 import Die (die)
@@ -42,6 +44,7 @@ toSuperStrongPrenexNormalForm qs f =
 mergeQuantifiers ::
   [Quantifier] ->
   (Quantifier, Formula -> Formula)
+mergeQuantifiers [q] = (q, id)
 mergeQuantifiers qs =
   let (qs', arity, padSubst) = padToSameArity qs
       (q, mergeSubst) = mergePaddedQuantifiers qs' arity
@@ -69,7 +72,20 @@ padToArity ::
   Arity ->
   Quantifier ->
   (Quantifier, Formula -> Formula)
-padToArity = todo
+padToArity arity =
+  \case
+    Universal {} -> die "padToArity: saw a universal quantifier (this is a compiler bug)"
+    Existential (SomeP {}) -> die "padToArity: saw a permutation quantifier (this is a compiler bug)"
+    Existential (Some x n ibs ob) ->
+      let d = (arity ^. #unArity) - length ibs in
+      ( Existential $ Some x n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
+        prependArguments x (replicate d (Const 0))
+      )
+    Instance x n ibs ob ->
+      let d = (arity ^. #unArity) - length ibs in
+      ( Instance x n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
+        prependArguments x (replicate d (Const 0))
+      )
 
 -- Assumes the quantifier sequence is mergeable into a single
 -- quantifier, and the quantifiers in the sequence all have the
@@ -202,8 +218,8 @@ pushUniversalQuantifiersDown ann us qs f =
       (qs'', f') <- pushUniversalQuantifiersDown ann us qs' f
       case q of
         Some g _ _ _ -> do
-          let q' = prependBounds (uncurry InputBound <$> us) q
-              f'' = prependArguments g (fst <$> us) f'
+          let q' = prependBounds (uncurry NamedInputBound <$> us) q
+              f'' = prependArguments g (var . fst <$> us) f'
           pure ([Existential q'] <> qs'', f'')
         SomeP {} ->
           Left . ErrorMessage ann $

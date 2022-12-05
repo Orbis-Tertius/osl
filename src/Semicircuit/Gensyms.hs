@@ -58,7 +58,7 @@ deBruijnToGensyms' =
       bs' <-
         mapM
           ( \b'' ->
-              GS.InputBound
+              GS.NamedInputBound
                 <$> (GS.Name (Arity 0) <$> nextSym)
                 <*> bound b''
           )
@@ -74,7 +74,7 @@ deBruijnToGensyms' =
       pure r
     DB.ForSome (DB.SomeP n b0 b1) p -> do
       b0' <-
-        GS.InputBound
+        GS.NamedInputBound
           <$> (GS.Name 0 <$> nextSym)
           <*> bound (b0 ^. #unInputBound)
       b1' <-
@@ -92,7 +92,7 @@ deBruijnToGensyms' =
       ibs' <-
         mapM
           ( \b'' ->
-              GS.InputBound
+              GS.NamedInputBound
                 <$> (GS.Name (Arity 0) <$> nextSym)
                 <*> bound b''
           )

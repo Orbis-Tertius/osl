@@ -27,7 +27,7 @@ import Data.List (foldl')
 import Data.Set (Set)
 import Die (die)
 import OSL.Types.Arity (Arity (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Instance, Universal), Term (Add, App, AppInverse, Const, IndLess, Max, Mul), var)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Instance, Universal), Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
 
 class MapNames a where
   mapNames :: (Name -> Name) -> a -> a
@@ -55,8 +55,10 @@ instance MapNames Bound where
       TermBound x -> TermBound (mapNames f x)
 
 instance MapNames InputBound where
-  mapNames f (InputBound x b) =
-    InputBound (f x) (mapNames f b)
+  mapNames f (NamedInputBound x b) =
+    NamedInputBound (f x) (mapNames f b)
+  mapNames f (UnnamedInputBound b) =
+    UnnamedInputBound (mapNames f b)
 
 deriving newtype instance MapNames OutputBound
 
@@ -150,7 +152,7 @@ prependQuantifier (Instance x n ibs ob) f =
 -- of the given name. This substitution does not need
 -- to account for name shadowing, since all gensyms
 -- are globally unique.
-prependArguments :: Name -> [Name] -> Formula -> Formula
+prependArguments :: Name -> [Term] -> Formula -> Formula
 prependArguments f xs =
   \case
     Equal a b -> Equal (term a) (term b)
@@ -183,7 +185,7 @@ prependArguments f xs =
             then
               App
                 (Name ((g ^. #arity) + Arity (length xs)) (g ^. #sym))
-                ((var <$> xs) <> (term <$> xs'))
+                (xs <> (term <$> xs'))
             else App g (term <$> xs')
         AppInverse g x ->
           if (g ^. #sym) == (f ^. #sym)
@@ -209,8 +211,10 @@ mapBound f =
     FieldMaxBound -> FieldMaxBound
 
 mapInputBound :: (Term -> Term) -> InputBound -> InputBound
-mapInputBound f (InputBound x b) =
-  InputBound x (mapBound f b)
+mapInputBound f (NamedInputBound x b) =
+  NamedInputBound x (mapBound f b)
+mapInputBound f (UnnamedInputBound b) =
+  UnnamedInputBound (mapBound f b)
 
 mapOutputBound :: (Term -> Term) -> OutputBound -> OutputBound
 mapOutputBound f (OutputBound b) =
