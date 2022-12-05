@@ -4,6 +4,7 @@
 
 module Semicircuit.Gensyms
   ( deBruijnToGensyms,
+    NextSym (NextSym),
   )
 where
 

@@ -10,16 +10,19 @@ module Semicircuit.PrenexNormalForm
   )
 where
 
-import Control.Lens ((^.))
+import Cast (intToInteger)
+import Control.Lens ((^.), _1, _2, (<&>))
+import Control.Monad.State (State, evalState, get, put, replicateM)
 import Data.Bifunctor (first, second)
 import Data.List (foldl')
 import Die (die)
 import qualified Data.Set as Set
-import OSL.Types.Arity (Arity)
+import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
+import Semicircuit.Gensyms (NextSym (NextSym))
 import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames), HasArity (getArity))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), Term (Add, Const, Max), someFirstOrder, var)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name (Name), OutputBound (..), Quantifier (..), Term (Add, Const, Max), someFirstOrder, var)
 
 -- Assumes input is in strong prenex normal form.
 -- Merges all consecutive same-type quantifiers that can be
@@ -34,8 +37,11 @@ toSuperStrongPrenexNormalForm ::
   ([Quantifier], Formula)
 toSuperStrongPrenexNormalForm qs f =
   let (qs', substitutions) = unzip $
-        mergeQuantifiers <$> groupMergeableQuantifiers qs
+        mergeQuantifiers nextSym <$> groupMergeableQuantifiers qs
   in (qs', foldl' (flip ($)) f substitutions)
+  where
+    nextSym :: NextSym
+    nextSym = NextSym (1 + foldl' max 0 ((^. #sym) <$> Set.toList (mconcat (getNames <$> qs) <> getNames f)))
 
 -- Assumes the quantifier sequence is mergeable into a single
 -- quantifier. Returns the merged quantifier and the substitution
@@ -43,12 +49,13 @@ toSuperStrongPrenexNormalForm qs f =
 -- quantified variables with applications of the merged quantified
 -- variable.
 mergeQuantifiers ::
+  NextSym ->
   [Quantifier] ->
   (Quantifier, Formula -> Formula)
-mergeQuantifiers [q] = (q, id)
-mergeQuantifiers qs =
+mergeQuantifiers _ [q] = (q, id)
+mergeQuantifiers nextSym qs =
   let (qs', padSubst) = padToSameArity qs
-      (q, mergeSubst) = mergePaddedQuantifiers qs'
+      (q, mergeSubst) = evalState (mergePaddedQuantifiers qs') nextSym
   in (q, mergeSubst . padSubst)
 
 -- Assumes the quantifier sequence is mergeable into a single
@@ -96,7 +103,7 @@ padToArity arity =
 -- variable.
 mergePaddedQuantifiers ::
   [Quantifier] ->
-  (Quantifier, Formula -> Formula)
+  State NextSym (Quantifier, Formula -> Formula)
 mergePaddedQuantifiers =
   \case
     [] -> die "mergePaddedQuantifiers: empty quantifier list (this is a compiler bug)"
@@ -109,15 +116,15 @@ mergePaddedQuantifiers =
 
 mergePaddedExistentialQuantifiers ::
   [Quantifier] ->
-  (Quantifier, Formula -> Formula)
+  State NextSym (Quantifier, Formula -> Formula)
 mergePaddedExistentialQuantifiers qs =
-  first sigToExistential (mergePaddedQuantifierSigs (quantifierSig <$> qs))
+  first sigToExistential <$> mergePaddedQuantifierSigs (quantifierSig <$> qs)
 
 mergePaddedInstanceQuantifiers ::
   [Quantifier] ->
-  (Quantifier, Formula -> Formula)
+  State NextSym (Quantifier, Formula -> Formula)
 mergePaddedInstanceQuantifiers qs =
-  first sigToInstance (mergePaddedQuantifierSigs (quantifierSig <$> qs))
+  first sigToInstance <$> mergePaddedQuantifierSigs (quantifierSig <$> qs)
 
 quantifierSig :: Quantifier -> (Name, Cardinality, [InputBound], OutputBound)
 quantifierSig =
@@ -135,8 +142,54 @@ sigToInstance (x, n, ibs, ob) = Instance x n ibs ob
 
 mergePaddedQuantifierSigs ::
   [(Name, Cardinality, [InputBound], OutputBound)] ->
-  ((Name, Cardinality, [InputBound], OutputBound), Formula -> Formula)
-mergePaddedQuantifierSigs = todo
+  State NextSym ((Name, Cardinality, [InputBound], OutputBound), Formula -> Formula)
+mergePaddedQuantifierSigs [] = die "mergePaddedQuantifierSigs: no signatures provided (this is a compiler bug)"
+mergePaddedQuantifierSigs sigs@((f0, _, ibs, _):_) = do
+  h <- Name (Arity (length ibs + 1)) <$> getNextSym
+  (,) <$> (uncurry (f0, cardinality,,) <$> mergedBounds)
+      <*> pure (substitutions h)
+  where
+    cardinality :: Cardinality
+    cardinality = foldl' (+) 0 $ (^. _2) <$> sigs
+
+    names :: [Name]
+    names = sigs <&> (^. _1)
+
+    mergedBounds :: State NextSym ([InputBound], OutputBound)
+    mergedBounds = do
+      tagName <- Name 0 <$> getNextSym
+      inputNames <- replicateM (length ibs) (Name 0 <$> getNextSym)
+      let tagBound :: InputBound
+          tagBound = NamedInputBound tagName (TermBound (Const (intToInteger (length sigs))))
+          inputBounds :: [InputBound]
+          inputBounds = todo inputNames
+          outputBound :: OutputBound
+          outputBound = todo
+      pure (tagBound : inputBounds, outputBound)
+
+    substitutions :: Name -> Formula -> Formula
+    substitutions h = functionNameSubstitutions h . tagPrependingSubstitutions
+
+    functionNameSubstitutions :: Name -> Formula -> Formula
+    functionNameSubstitutions h =
+      foldl (.) id
+        [ substitute (FromName f') (ToName h)
+        | f <- names,
+          let f' = Name (f ^. #arity + 1) (f ^. #sym)
+        ]
+
+    tagPrependingSubstitutions :: Formula -> Formula
+    tagPrependingSubstitutions =
+      foldl (.) id
+        [ prependArguments f [Const i]
+        | (i, f) <- zip [0..] names
+        ]
+
+getNextSym :: State NextSym Int
+getNextSym = do
+  NextSym next <- get
+  put (NextSym (next + 1))
+  pure next
 
 -- Assumes the quantifier sequence is in strong prenex normal form.
 -- Partitions the quantifier sequence into maximal subsequences

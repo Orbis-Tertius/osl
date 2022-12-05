@@ -112,6 +112,9 @@ instance HasNames ExistentialQuantifier where
 instance HasNames Quantifier where
   getNames = todo
 
+instance HasNames Formula where
+  getNames = todo
+
 todo :: a
 todo = todo
 
