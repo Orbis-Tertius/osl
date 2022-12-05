@@ -21,7 +21,6 @@ module Semicircuit.ToLogicCircuit
     existentialOutputsInBoundsConstraints,
     existentialInputsInBoundsConstraints,
     universalTableConstraints,
-    lookupArguments,
   )
 where
 
@@ -30,7 +29,6 @@ import Control.Lens ((<&>), (^.))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Data.List.Extra (foldl', (!?))
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -52,8 +50,6 @@ import Halo2.Types.InputExpression (InputExpression (..))
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
 import qualified Halo2.Types.LogicConstraint as LC
 import Halo2.Types.LogicConstraints (LogicConstraints (..))
-import Halo2.Types.LookupArgument (LookupArgument (..))
-import Halo2.Types.LookupArguments (LookupArguments (..))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
@@ -61,10 +57,10 @@ import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative))
 import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound)
 import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), InstanceQuantifier (Instance), UniversalQuantifier (All))
 import qualified Semicircuit.Types.QFFormula as QF
-import Semicircuit.Types.Semicircuit (FunctionCall (..), Semicircuit)
-import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
+import Semicircuit.Types.Semicircuit (Semicircuit)
+import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), ZeroVectorIndex (..))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), InputBound, Name, OutputBound (OutputBound), Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
-import Stark.Types.Scalar (minusOne, one, order, scalarToInt, zero)
+import Stark.Types.Scalar (one, order, scalarToInt, zero)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
@@ -78,7 +74,7 @@ semicircuitToLogicCircuit rowCount x =
           (layout ^. #columnTypes)
           (equalityConstrainableColumns x layout)
           (columnBounds x layout (gateConstraints x layout))
-          (lookupArguments x layout)
+          mempty
           rowCount
           (equalityConstraints x layout)
           (fixedValues rowCount layout),
@@ -97,7 +93,6 @@ columnLayout :: Semicircuit -> Layout
 columnLayout x =
   flip evalState (S (0, mempty)) $ do
     nm <- nameMappings x
-    tm <- termMappings x
     dr <- DummyRowAdviceColumn <$> nextCol ColType.Advice
     fs <- fixedColumns
     S (_, colTypes) <- get
@@ -105,7 +100,6 @@ columnLayout x =
       SemicircuitToLogicCircuitColumnLayout
         colTypes
         nm
-        tm
         fs
         dr
 
@@ -198,16 +192,6 @@ freeVariableMapping x =
               (x ^. #arity . #unArity)
               (ArgMapping <$> nextCol ColType.Instance)
         )
-
-termMappings :: Semicircuit -> State S (Map Term TermMapping)
-termMappings x =
-  Map.fromList
-    <$> mapM
-      termMapping
-      (Set.toList (x ^. #adviceTerms . #unAdviceTerms))
-
-termMapping :: Term -> State S (Term, TermMapping)
-termMapping t = (t,) . TermMapping <$> nextCol ColType.Advice
 
 fixedColumns :: State S FixedColumns
 fixedColumns =
@@ -310,9 +294,7 @@ columnBounds ::
   LogicConstraints ->
   LogicConstraints
 columnBounds x layout =
-  functionCallOutputColumnBounds x layout
-    . adviceTermColumnBounds x layout
-    . dummyRowAdviceColumnBounds layout
+  dummyRowAdviceColumnBounds layout
     . fixedColumnBounds layout
     . universalTableBounds x layout
     . existentialFunctionTableColumnBounds x layout
@@ -485,50 +467,6 @@ universalQuantifierBounds ::
 universalQuantifierBounds x layout (All name bound) =
   quantifierBounds "universal" x layout name [] (OutputBound bound)
 
-functionCallOutputColumnBounds ::
-  Semicircuit ->
-  Layout ->
-  LogicConstraints ->
-  LogicConstraints
-functionCallOutputColumnBounds x layout =
-  foldl'
-    (.)
-    id
-    ( functionCallOutputColumnBound layout
-        <$> Set.toList (x ^. #functionCalls . #unFunctionCalls)
-    )
-
-functionCallOutputColumnBound ::
-  Layout ->
-  FunctionCall ->
-  LogicConstraints ->
-  LogicConstraints
-functionCallOutputColumnBound layout (FunctionCall name _) constraints =
-  case Map.lookup name (layout ^. #nameMappings) of
-    Just (NameMapping (OutputMapping i) _) ->
-      case Map.lookup i (constraints ^. #bounds) of
-        Just b ->
-          constraints <> LogicConstraints mempty (Map.singleton i b)
-        Nothing ->
-          die $
-            "functionCallOutputColumnBound: output bound lookup failed (this is a compiler bug)"
-              <> pack (show (name, i, constraints ^. #bounds))
-    Nothing -> die "functionCallOutputColumnBound: name mapping lookup failed (this is a compiler bug)"
-
-adviceTermColumnBounds ::
-  Semicircuit ->
-  Layout ->
-  LogicConstraints ->
-  LogicConstraints
-adviceTermColumnBounds x layout constraints =
-  constraints
-    <> mconcat
-      [ LogicConstraints
-          mempty
-          (Map.singleton i (termToFixedBound x layout constraints term))
-        | (term, TermMapping i) <- Map.toList (layout ^. #termMappings)
-      ]
-
 dummyRowAdviceColumnBounds ::
   Layout ->
   LogicConstraints ->
@@ -671,10 +609,27 @@ sigma11TermToLogicConstraintTerm layout =
       case Map.lookup x names of
         Just (NameMapping (OutputMapping o) []) ->
           LC.Var . flip PolynomialVariable 0 $ o
-        Just (NameMapping _ _) -> die "termToPolynomial: encountered empty application with non-empty name mapping (this is a compiler bug)"
-        Nothing -> die $ "termToPolynomial: failed name mapping lookup (this is a compiler bug)\n" <> pack (show x)
-    t@(App {}) -> lookupTerm t
-    t@(AppInverse {}) -> lookupTerm t
+        Just (NameMapping _ _) -> die "sigma11TermToLogicConstraintTerm: encountered empty application with non-empty name mapping (this is a compiler bug)"
+        Nothing -> die $ "sigma11TermToLogicConstraintTerm: failed name mapping lookup (this is a compiler bug)\n" <> pack (show x)
+    App f xs ->
+      case Map.lookup f names of
+        Just (NameMapping (OutputMapping o) inputs) ->
+          LC.Lookup
+            ( zip
+                (InputExpression . rec <$> xs)
+                (LookupTableColumn . (^. #unArgMapping) <$> inputs)
+            )
+            (LC.LookupTableOutputColumn (LookupTableColumn o))
+        Nothing -> die "sigma11TermToLogicConstraintTerm: failed name mapping lookup (this is a compiler bug)"
+    AppInverse f x ->
+      case Map.lookup f names of
+        Just (NameMapping (OutputMapping o) [input]) ->
+          LC.Lookup
+            [(InputExpression (rec x), LookupTableColumn o)]
+            (LC.LookupTableOutputColumn (LookupTableColumn (input ^. #unArgMapping)))
+        Just (NameMapping {}) ->
+          die "sigma11TermToLogicConstraintTerm: expected a name mapping with exactly one input in an inverse application (this is a compiler bug)"
+        Nothing -> die "sigma11TermToLogicConstraintTerm: failed name mapping lookup (this is a compiler bug)"
     Add x y -> rec x `LC.Plus` rec y
     Mul x y -> rec x `LC.Times` rec y
     IndLess x y -> rec x `LC.IndLess` rec y
@@ -688,15 +643,6 @@ sigma11TermToLogicConstraintTerm layout =
 
     names :: Map Name NameMapping
     names = layout ^. #nameMappings
-
-    terms :: Map Term TermMapping
-    terms = layout ^. #termMappings
-
-    lookupTerm :: Term -> LC.Term
-    lookupTerm t =
-      case Map.lookup t terms of
-        Just (TermMapping i) -> LC.Var (PolynomialVariable i 0)
-        Nothing -> die $ "termToPolynomial: failed term mapping lookup (this is a compiler bug)\n" <> pack (show t)
 
 qfFormulaToLogicConstraint ::
   Layout ->
@@ -932,111 +878,3 @@ universalTableConstraints x layout =
           ^. #fixedColumns
             . #lastRowIndicator
             . #unLastRowIndicatorColumnIndex
-
-lookupArguments ::
-  Semicircuit ->
-  Layout ->
-  LookupArguments LC.Term
-lookupArguments = functionCallLookupArguments
-
-newtype FunctionIndex = FunctionIndex Int
-  deriving (Eq, Ord, Num)
-
-newtype FunctionCallIndex = FunctionCallIndex Int
-
-newtype ArgumentIndex = ArgumentIndex Int
-
-functionCallLookupArguments ::
-  Semicircuit ->
-  Layout ->
-  LookupArguments LC.Term
-functionCallLookupArguments x layout =
-  LookupArguments
-    [ LookupArgument
-        (dummyRowIndicator `LC.Plus` LC.Const minusOne)
-        ( [(outputEval i j, outputColumn i)]
-            <> [ (argEval i j k, inputColumn i k)
-                 | k <- argumentIndices i
-               ]
-        )
-      | i <- functionIndices,
-        j <- functionCallIndices i
-    ]
-  where
-    functionSymbols :: [Name]
-    functionSymbols =
-      filter ((> 0) . (^. #arity))
-        . Map.keys
-        $ layout ^. #nameMappings
-
-    functionSymbol :: FunctionIndex -> Name
-    functionSymbol (FunctionIndex i) =
-      fromMaybe
-        (die "functionCallLookupArguments: functionSymbol: lookup failed (this is a compiler bug)")
-        (functionSymbols !? i)
-
-    functionIndices :: [FunctionIndex]
-    functionIndices =
-      FunctionIndex <$> [0 .. length functionSymbols - 1]
-
-    functionCalls :: FunctionIndex -> [FunctionCall]
-    functionCalls i =
-      filter
-        ((== functionSymbol i) . (^. #name))
-        (Set.toList (x ^. #functionCalls . #unFunctionCalls))
-
-    functionCall :: FunctionIndex -> FunctionCallIndex -> FunctionCall
-    functionCall i (FunctionCallIndex j) =
-      fromMaybe (die "functionCallLookupArguments: functionCall: call index out of range (this is a compiler bug") $
-        functionCalls i !? j
-
-    functionCallIndices :: FunctionIndex -> [FunctionCallIndex]
-    functionCallIndices i = FunctionCallIndex <$> [0 .. length (functionCalls i) - 1]
-
-    argumentIndices :: FunctionIndex -> [ArgumentIndex]
-    argumentIndices i = ArgumentIndex <$> [0 .. functionSymbol i ^. #arity . #unArity - 1]
-
-    functionCallArgument :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> Term
-    functionCallArgument i j (ArgumentIndex k) =
-      fromMaybe
-        ( die $
-            "functionCallLookupArguments: functionCallArgument: argument index out of range (this is a compiler bug)\n"
-              <> pack (show (functionSymbol i, functionCall i j, k))
-        )
-        $ NonEmpty.toList (functionCall i j ^. #args) !? k
-
-    outputEval :: FunctionIndex -> FunctionCallIndex -> InputExpression LC.Term
-    outputEval i j =
-      InputExpression . LC.Var . flip PolynomialVariable 0 . (^. #unTermMapping)
-        . fromMaybe (die "functionCallLookupArguments: outputEval: term mapping lookup failed (this is a compiler bug)")
-        $ Map.lookup t (layout ^. #termMappings)
-      where
-        FunctionCall f xs = functionCall i j
-        t = App f (NonEmpty.toList xs)
-
-    argEval :: FunctionIndex -> FunctionCallIndex -> ArgumentIndex -> InputExpression LC.Term
-    argEval i j k =
-      InputExpression
-        . sigma11TermToLogicConstraintTerm layout
-        $ functionCallArgument i j k
-
-    outputColumn :: FunctionIndex -> LookupTableColumn
-    outputColumn i =
-      case Map.lookup (functionSymbol i) (layout ^. #nameMappings) of
-        Just nm ->
-          LookupTableColumn $ nm ^. #outputMapping . #unOutputMapping
-        Nothing -> die "functionCallLookupArguments: outputColumn: lookup failed (this is a compiler bug)"
-
-    inputColumn :: FunctionIndex -> ArgumentIndex -> LookupTableColumn
-    inputColumn i (ArgumentIndex k) =
-      case Map.lookup (functionSymbol i) (layout ^. #nameMappings) of
-        Just nm ->
-          maybe
-            (die "functionCallLookupArguments: inputColumn: argument index out of range (this is a compiler bug")
-            (LookupTableColumn . (^. #unArgMapping))
-            ((nm ^. #argMappings) !? k)
-        Nothing -> die "functionCallLookupArguments: inputColumn: name lookup failed (this is a compiler bug)"
-
-    dummyRowIndicator =
-      LC.Var . flip PolynomialVariable 0 $
-        layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn

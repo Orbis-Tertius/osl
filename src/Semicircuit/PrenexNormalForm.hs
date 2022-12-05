@@ -9,9 +9,10 @@ module Semicircuit.PrenexNormalForm
   )
 where
 
+import Data.Bifunctor (second)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Sigma11 (prependArguments, prependBounds, substitute, FromName (FromName), ToName (ToName), foldConstants)
-import Semicircuit.Types.Sigma11 (Bound (TermBound, FieldMaxBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), someFirstOrder, Term (Add, Const, Max), var)
+import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), Term (Add, Const, Max), someFirstOrder, var)
 
 -- Assumes input is in strong prenex normal form.
 -- Merges all consecutive same-type quantifiers that can be
@@ -182,40 +183,40 @@ mergeQuantifiersConjunctive =
               q' = substitute (FromName y) (ToName x) q
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q')
-          in (Universal x FieldMaxBound : pqQs, pq)
+           in (Universal x FieldMaxBound : pqQs, pq)
         (q : rQs, r) ->
           let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (rQs, r)
-          in (q : Universal x (TermBound a) : prQs, pr)
+           in (q : Universal x (TermBound a) : prQs, pr)
         ([], q) -> (Universal x (TermBound a) : pQs, p `And` q)
     (Universal x FieldMaxBound : pQs, p) ->
       \case
         (Universal y FieldMaxBound : qQs, q) ->
           let qQs' = substitute (FromName y) (ToName x) <$> qQs
               (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs', q)
-          in (Universal x FieldMaxBound : pqQs, pq)
+           in (Universal x FieldMaxBound : pqQs, pq)
         (Universal y (TermBound b) : qQs, q) ->
-          let q' = ((var x `Add` Const 1) `LessOrEqual` b) `And` (substitute (FromName y) (ToName x) q)
+          let q' = ((var x `Add` Const 1) `LessOrEqual` b) `And` substitute (FromName y) (ToName x) q
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs', q')
-          in (Universal x FieldMaxBound : pqQs, pq)
+           in (Universal x FieldMaxBound : pqQs, pq)
         (q : rQs, r) ->
           let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (rQs, r)
-          in (q : Universal x FieldMaxBound : prQs, pr)
+           in (q : Universal x FieldMaxBound : prQs, pr)
         ([], q) -> (Universal x FieldMaxBound : pQs, p `And` q)
     (Existential q : pQs, p) ->
       \case
         (Universal x a : rQs, r) ->
           let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (Universal x a : rQs, r)
-          in (Existential q : prQs, pr)
+           in (Existential q : prQs, pr)
         (r : sQs, s) ->
           let (psQs, ps) = mergeQuantifiersConjunctive (pQs, p) (sQs, s)
-          in (r : Existential q : psQs, ps)
+           in (r : Existential q : psQs, ps)
         ([], r) -> (Existential q : pQs, p `And` r)
     (Instance x a ibs ob : pQs, p) ->
       \(qQs, q) ->
         let (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs, q)
-        in (Instance x a ibs ob : pqQs, pq)
-    ([], p) -> \(qQs, q) -> (qQs, p `And` q)
+         in (Instance x a ibs ob : pqQs, pq)
+    ([], p) -> second (And p)
 
 -- Perform prenex normal form conversion on a disjunction
 -- of two prenex normal forms, merging existential quantifiers
@@ -239,35 +240,36 @@ mergeQuantifiersDisjunctive =
               q'' = if obV' == obV''' then q'
                     else ((var x `Add` Const 1) `LessOrEqual` obV'') `And` q'
               (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p') (qQs', q'')
-          in (Existential (Some x n [] (OutputBound (TermBound obV'''))) : pqQs, pq)
+           in (Existential (Some x n [] (OutputBound (TermBound obV'''))) : pqQs, pq)
         (Existential (Some x' _ [] (OutputBound FieldMaxBound)) : qQs, q) ->
           let qQs' = substitute (FromName x') (ToName x) <$> qQs
               q' = substitute (FromName x') (ToName x) q
               p' = ((var x `Add` Const 1) `LessOrEqual` obV) `And` p
               (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p') (qQs', q')
-          in (Existential (Some x n [] (OutputBound FieldMaxBound)) : pqQs, pq)
+           in (Existential (Some x n [] (OutputBound FieldMaxBound)) : pqQs, pq)
         (qQs, q) ->
           let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-          in (Existential r : pqQs, pq)
+           in (Existential r : pqQs, pq)
     (Existential r@(Some x n [] (OutputBound FieldMaxBound)) : pQs, p) ->
       \case
         (Existential (Some x' _ [] (OutputBound (TermBound obV))) : qQs, q) ->
           let qQs' = substitute (FromName x') (ToName x) <$> qQs
-              q' = ((var x `Add` Const 1) `LessOrEqual` obV)
-                     `And` substitute (FromName x') (ToName x) q
+              q' =
+                ((var x `Add` Const 1) `LessOrEqual` obV)
+                  `And` substitute (FromName x') (ToName x) q
               (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs', q')
-          in (Existential (Some x n [] (OutputBound FieldMaxBound)) : pqQs, pq)
+           in (Existential (Some x n [] (OutputBound FieldMaxBound)) : pqQs, pq)
         (Existential (Some x' _ [] (OutputBound FieldMaxBound)) : qQs, q) ->
           let qQs' = substitute (FromName x') (ToName x) <$> qQs
               q' = substitute (FromName x') (ToName x) q
               (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs', q')
-          in (Existential r : pqQs, pq)
+           in (Existential r : pqQs, pq)
         (qQs, q) ->
           let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-          in (Existential r : pqQs, pq)
+           in (Existential r : pqQs, pq)
     (Existential r@(Some {}) : pQs, p) -> \(qQs, q) ->
       let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-      in (Existential r : pqQs, pq)
+       in (Existential r : pqQs, pq)
     (Existential (SomeP x n ib ob) : pQs, p) ->
       \case
         (Existential (SomeP x' n' ib' ob') : rQs, r) ->
@@ -277,19 +279,19 @@ mergeQuantifiersDisjunctive =
               r' = substitute (FromName x') (ToName x) r
               (prQs', pr') = mergeQuantifiersDisjunctive (pQs, p) (rQs', r')
               (prQs, pr) = mergeQuantifiersDisjunctive (pQs, p) (rQs, r)
-          in if n == n' && ib'' == ib && ob'' == ob
-             then (Existential (SomeP x n ib ob) : prQs', pr')
-             else (Existential (SomeP x n ib ob) : Existential (SomeP x' n' ib' ob') : prQs, pr)
+           in if n == n' && ib'' == ib && ob'' == ob
+                then (Existential (SomeP x n ib ob) : prQs', pr')
+                else (Existential (SomeP x n ib ob) : Existential (SomeP x' n' ib' ob') : prQs, pr)
         (rQs, r) ->
           let (prQs, pr) = mergeQuantifiersDisjunctive (pQs, p) (rQs, r)
-          in (Existential (SomeP x n ib ob) : prQs, pr)
+           in (Existential (SomeP x n ib ob) : prQs, pr)
     (Universal x a : pQs, p) -> \(qQs, q) ->
       let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-      in (Universal x a : pqQs, pq)
+       in (Universal x a : pqQs, pq)
     (Instance x n ibs ob : pQs, p) -> \(qQs, q) ->
       let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-      in (Instance x n ibs ob : pqQs, pq)
-    ([], p) -> \(qQs, q) -> (qQs, p `Or` q)
+       in (Instance x n ibs ob : pqQs, pq)
+    ([], p) -> second (Or p)
 
 flipQuantifiers ::
   ann ->
