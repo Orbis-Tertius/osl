@@ -1203,9 +1203,14 @@ getResultExpressionIds ::
   Mapping ->
   Set ResultExpressionId
 getResultExpressionIds m =
-  Set.map
-    (ResultExpressionId . (^. #output . #unOutputSubexpressionId))
-    (m ^. #subexpressionIds . #lookupAssertions)
+  mconcat
+    [ Set.map
+        (ResultExpressionId . (^. #output . #unOutputSubexpressionId))
+        (m ^. #subexpressionIds . #lookupAssertions),
+      Set.map
+        (ResultExpressionId . (^. #output . #unOutputSubexpressionId))
+        (m ^. #subexpressionIds . #assertions)
+    ]
 
 maxStepsPerCase ::
   Set SubexpressionId ->
