@@ -41,7 +41,7 @@ toSuperStrongPrenexNormalForm qs f =
   let (qs', substitutions) =
         unzip . flip evalState nextSym $
           mapM mergeQuantifiers (groupMergeableQuantifiers qs)
-   in (qs', foldl' (.) id substitutions $ f)
+   in (qs', foldl' (.) id substitutions f)
   where
     nextSym :: NextSym
     nextSym = NextSym (1 + foldl' max 0 ((^. #sym) <$> Set.toList (mconcat (getNames <$> qs) <> getNames f)))
@@ -174,7 +174,7 @@ mergePaddedQuantifierSigs sigs@((_, _, ibs, _) : _) = do
 
           inputNameSubstitutions :: [Term -> Term] -- one per input sig
           inputNameSubstitutions =
-            [ foldl
+            [ foldl'
                 (.)
                 id
                 [ substitute (FromName fromName) (ToName toName)
@@ -203,10 +203,10 @@ mergePaddedQuantifierSigs sigs@((_, _, ibs, _) : _) = do
           mergedInputBounds :: [InputBound]
           mergedInputBounds =
             [ NamedInputBound xi . TermBound $
-                foldl
+                foldl'
                   Add
                   (Const 0)
-                  [ tagIndicator `Mul` (sub bi)
+                  [ tagIndicator `Mul` sub bi
                     | (tagIndicator, sub, bi) <- zip3 tagIndicators inputNameSubstitutions bis
                   ]
               | (xi, bis) <- zip inputNames (transpose inputBoundTerms)
@@ -218,10 +218,10 @@ mergePaddedQuantifierSigs sigs@((_, _, ibs, _) : _) = do
           mergedOutputBound :: OutputBound
           mergedOutputBound =
             OutputBound . TermBound $
-              foldl
+              foldl'
                 Add
                 (Const 0)
-                [ tagIndicator `Mul` (sub bi)
+                [ tagIndicator `Mul` sub bi
                   | (tagIndicator, sub, bi) <- zip3 tagIndicators inputNameSubstitutions outputBoundTerms
                 ]
 
@@ -232,7 +232,7 @@ mergePaddedQuantifierSigs sigs@((_, _, ibs, _) : _) = do
 
     functionNameSubstitutions :: Name -> Formula -> Formula
     functionNameSubstitutions h =
-      foldl
+      foldl'
         (.)
         id
         [ substitute (FromName f') (ToName h)
@@ -242,7 +242,7 @@ mergePaddedQuantifierSigs sigs@((_, _, ibs, _) : _) = do
 
     tagPrependingSubstitutions :: Formula -> Formula
     tagPrependingSubstitutions =
-      foldl
+      foldl'
         (.)
         id
         [ prependArguments f [Const i]
@@ -302,7 +302,7 @@ groupMergeableQuantifiers =
             else -- mergeable
               (q : rs) : qss
         [] -> die "groupMergeableQuantifiers: empty result for non-empty recursion (this is a compiler bug)"
-    (q : []) -> [[q]]
+    [q] -> [[q]]
     [] -> []
   where
     rec = groupMergeableQuantifiers
