@@ -3,14 +3,32 @@
 {-# LANGUAGE TupleSections #-}
 
 module Semicircuit.PrenexNormalForm
-  ( toStrongPrenexNormalForm,
+  ( toSuperStrongPrenexNormalForm,
+    toStrongPrenexNormalForm,
     toPrenexNormalForm,
   )
 where
 
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Sigma11 (prependArguments, prependBounds, substitute, FromName (FromName), ToName (ToName))
+import Semicircuit.Sigma11 (prependArguments, prependBounds, substitute, FromName (FromName), ToName (ToName), foldConstants)
 import Semicircuit.Types.Sigma11 (Bound (TermBound, FieldMaxBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), someFirstOrder, Term (Add, Const, Max), var)
+
+-- Assumes input is in strong prenex normal form.
+-- Merges all consecutive same-type quantifiers that can be
+-- merged, so, all same-type consecutive quantifiers except
+-- for permutation and universal quantifiers are merged.
+-- As a result, all instance quantifiers are merged into one,
+-- and if there are no permutation quantifiers, then all
+-- existential quantifiers are merged into one.
+toSuperStrongPrenexNormalForm ::
+  ann ->
+  [Quantifier] ->
+  Formula ->
+  Either (ErrorMessage ann) ([Quantifier], Formula)
+toSuperStrongPrenexNormalForm = todo
+
+todo :: a
+todo = todo
 
 -- Assumes input is in prenex normal form.
 -- Brings all instance quantifiers to the front.
@@ -149,12 +167,15 @@ mergeQuantifiersConjunctive =
     (Universal x (TermBound a) : pQs, p) ->
       \case
         (Universal y (TermBound b) : qQs, q) ->
-          let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
-              q' = ((var x `Add` Const 1) `LessOrEqual` b) `And` (substitute (FromName y) (ToName x) q)
+          let ab = if a == b then a else foldConstants (a `Max` b')
+              p' = if ab == a then p
+                   else ((var x `Add` Const 1) `LessOrEqual` a) `And` p
+              q' = substitute (FromName y) (ToName x) q
+              q'' = if ab == b then q'
+                    else ((var x `Add` Const 1) `LessOrEqual` b) `And` q'
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               b' = substitute (FromName y) (ToName x) b
-              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q')
-              ab = if a == b then a else a `Max` b'
+              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q'')
           in (Universal x (TermBound ab) : pqQs, pq)
         (Universal y FieldMaxBound : qQs, q) ->
           let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
@@ -212,9 +233,11 @@ mergeQuantifiersDisjunctive =
               q' = substitute (FromName x') (ToName x) q
               obV'' = substitute (FromName x') (ToName x) obV'
               obV''' = if ob == ob' then obV
-                       else obV `Max` obV''
-              p' = if ob == ob' then p else ((var x `Add` Const 1) `LessOrEqual` obV) `And` p
-              q'' = if ob == ob' then q' else ((var x `Add` Const 1) `LessOrEqual` obV'') `And` q'
+                       else foldConstants (obV `Max` obV'')
+              p' = if obV == obV''' then p
+                   else ((var x `Add` Const 1) `LessOrEqual` obV) `And` p
+              q'' = if obV' == obV''' then q'
+                    else ((var x `Add` Const 1) `LessOrEqual` obV'') `And` q'
               (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p') (qQs', q'')
           in (Existential (Some x n [] (OutputBound (TermBound obV'''))) : pqQs, pq)
         (Existential (Some x' _ [] (OutputBound FieldMaxBound)) : qQs, q) ->

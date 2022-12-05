@@ -16,6 +16,7 @@ module Semicircuit.Sigma11
     existentialQuantifierName,
     existentialQuantifierOutputBound,
     existentialQuantifierInputBounds,
+    foldConstants,
   )
 where
 
@@ -215,3 +216,29 @@ existentialQuantifierInputBounds =
   \case
     Some _ _ ibs _ -> ibs
     SomeP _ _ ib _ -> [ib]
+
+foldConstants :: Term -> Term
+foldConstants =
+  \case
+    App f xs -> App f (rec <$> xs)
+    AppInverse f x -> AppInverse f (rec x)
+    Add x y ->
+      case (rec x, rec y) of
+        (Const x', Const y') -> Const (x' + y')
+        (x', y') -> x' `Add` y'
+    Mul x y ->
+      case (rec x, rec y) of
+        (Const x', Const y') -> Const (x' * y')
+        (x', y') -> x' `Mul` y'
+    IndLess x y ->
+      case (rec x, rec y) of
+        (Const x', Const y') ->
+          if x' < y' then Const 1 else Const 0
+        (x', y') -> x' `IndLess` y'
+    Max x y ->
+      case (rec x, rec y) of
+        (Const x', Const y') -> Const (x' `max` y')
+        (x', y') -> x' `Max` y'
+    Const x -> Const x
+  where
+    rec = foldConstants
