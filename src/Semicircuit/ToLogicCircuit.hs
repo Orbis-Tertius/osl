@@ -108,7 +108,7 @@ nameMappings x =
   mconcat
     <$> sequence
       [ freeVariableMappings x,
-        instanceVariableMappings x,
+        instanceQuantifiersMappings x,
         universalVariableMappings x,
         existentialQuantifiersMappings x
       ]
@@ -129,24 +129,28 @@ universalVariableMapping v =
             <*> pure []
         )
 
-instanceVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
-instanceVariableMappings x =
-  Map.fromList
+instanceQuantifiersMappings :: Semicircuit -> State S (Map Name NameMapping)
+instanceQuantifiersMappings x =
+  mconcat
     <$> mapM
-      instanceVariableMapping
+      instanceQuantifierMappings
       (x ^. #formula . #quantifiers . #instanceQuantifiers)
 
-instanceVariableMapping ::
+instanceQuantifierMappings ::
   InstanceQuantifier ->
-  State S (Name, NameMapping)
-instanceVariableMapping q =
-  (q ^. #name,)
-    <$> ( NameMapping
-            <$> (OutputMapping <$> nextCol ColType.Instance)
-            <*> replicateM
-              (q ^. #name . #arity . #unArity)
-              (ArgMapping <$> nextCol ColType.Instance)
-        )
+  State S (Map Name NameMapping)
+instanceQuantifierMappings q = do
+  outMapping <- OutputMapping <$> nextCol ColType.Instance
+  argMappings <- replicateM
+    (q ^. #name . #arity . #unArity)
+    (ArgMapping <$> nextCol ColType.Instance)
+  pure . Map.fromList $
+    [(q ^. #name, NameMapping outMapping argMappings)] <>
+    catMaybes
+      [ (, NameMapping (OutputMapping (m ^. #unArgMapping)) [])
+          <$> getInputName ib
+      | (ib, m) <- zip (q ^. #inputBounds) argMappings
+      ]
 
 existentialQuantifiersMappings ::
   Semicircuit ->
