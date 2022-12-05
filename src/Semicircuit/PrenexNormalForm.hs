@@ -13,6 +13,7 @@ import Data.Bifunctor (second)
 import Data.List (foldl')
 import Die (die)
 import qualified Data.Set as Set
+import OSL.Types.Arity (Arity)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), Term (Add, Const, Max), someFirstOrder, var)
@@ -41,7 +42,33 @@ toSuperStrongPrenexNormalForm qs f =
 mergeQuantifiers ::
   [Quantifier] ->
   (Quantifier, Formula -> Formula)
-mergeQuantifiers = todo
+mergeQuantifiers qs =
+  let (qs', arity, padSubst) = padToSameArity qs
+      (q, mergeSubst) = mergePaddedQuantifiers qs' arity
+  in (q, mergeSubst . padSubst)
+
+-- Assumes the quantifier sequence is mergeable into a single
+-- quantifier. Returns the same quantifier sequence but with all
+-- quantified variables padded with extra arguments as needed to
+-- make them all the same arity. Also returns their common arity
+-- and a substitution to apply to pad all function applications with
+-- zeroes as needed to be consistent.
+padToSameArity ::
+  [Quantifier] ->
+  ([Quantifier], Arity, Formula -> Formula)
+padToSameArity = todo
+
+-- Assumes the quantifier sequence is mergeable into a single
+-- quantifier, and the quantifiers in the sequence all have the
+-- given arity. Returns the merged quantifier and the
+-- substitution to replace all applications of the non-merged
+-- quantified variables with applications of the merged quantified
+-- variable.
+mergePaddedQuantifiers ::
+  [Quantifier] ->
+  Arity ->
+  (Quantifier, Formula -> Formula)
+mergePaddedQuantifiers = todo
 
 -- Assumes the quantifier sequence is in strong prenex normal form.
 -- Partitions the quantifier sequence into maximal subsequences
