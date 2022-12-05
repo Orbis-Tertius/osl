@@ -4,13 +4,15 @@
 
 module Halo2.CircuitMetrics (getCircuitMetrics) where
 
+import Control.Lens ((<&>))
 import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Halo2.Circuit (getPolynomialVariables)
 import Halo2.Polynomial (degree)
 import Halo2.Prelude
 import Halo2.Types.Circuit (ArithmeticCircuit)
-import Halo2.Types.CircuitMetrics (CircuitMetrics (CircuitMetrics), ColumnClass (Advice, All, EqualityConstrainable, Fixed, Instance), ColumnCount (ColumnCount), ColumnCounts (ColumnCounts), GateConstraintCount (GateConstraintCount), LookupArgumentCount (LookupArgumentCount), LookupTableSize (LookupTableSize), PolynomialDegreeBound (PolynomialDegreeBound))
+import Halo2.Types.CircuitMetrics (CircuitMetrics (CircuitMetrics), ColumnClass (Advice, All, EqualityConstrainable, Fixed, Instance), ColumnCount (ColumnCount), ColumnCounts (ColumnCounts), GateConstraintCount (GateConstraintCount), LookupArgumentCount (LookupArgumentCount), LookupTableSize (LookupTableSize), PolynomialDegreeBound (PolynomialDegreeBound), RowOffsetMagnitude (RowOffsetMagnitude))
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnType (ColumnType)
 import qualified Halo2.Types.ColumnType as CT
@@ -28,6 +30,7 @@ getCircuitMetrics x =
     (GateConstraintCount (length (x ^. #gateConstraints . #constraints)))
     (LookupArgumentCount (length (x ^. #lookupArguments . #getLookupArguments)))
     (getLookupTableSize x)
+    (getRowOffsetMagnitude x)
 
 getColumnCounts :: ArithmeticCircuit -> ColumnCounts
 getColumnCounts x =
@@ -66,3 +69,9 @@ getLookupTableSize x =
 getLookupArgumentTableSize :: LookupArgument a -> LookupTableSize
 getLookupArgumentTableSize arg =
   LookupTableSize (length (arg ^. #tableMap))
+
+getRowOffsetMagnitude :: ArithmeticCircuit -> RowOffsetMagnitude
+getRowOffsetMagnitude c =
+  foldl' max 0 $
+    Set.toList (getPolynomialVariables c)
+      <&> RowOffsetMagnitude . abs . (^. #rowIndex . #getRowIndex)

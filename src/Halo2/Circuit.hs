@@ -24,6 +24,7 @@ import Halo2.Types.LookupArgument (LookupArgument)
 import Halo2.Types.LookupArguments (LookupArguments (getLookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn)
 import Halo2.Types.Polynomial (Polynomial)
+import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (getPowerProduct))
 import Stark.Types.Scalar (Scalar)
@@ -33,6 +34,10 @@ class HasPolynomialVariables a where
 
 instance HasPolynomialVariables PowerProduct where
   getPolynomialVariables = Map.keysSet . getPowerProduct
+
+instance HasPolynomialVariables PolynomialConstraints where
+  getPolynomialVariables cs =
+    mconcat $ getPolynomialVariables <$> cs ^. #constraints
 
 instance HasPolynomialVariables Polynomial where
   getPolynomialVariables =
