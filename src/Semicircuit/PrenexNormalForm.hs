@@ -206,7 +206,16 @@ mergeQuantifiersDisjunctive ::
   ([Quantifier], Formula) ->
   ([Quantifier], Formula) ->
   ([Quantifier], Formula)
-mergeQuantifiersDisjunctive = todo
+mergeQuantifiersDisjunctive =
+  \case
+    (Existential (Some x n [] ob) : pQs, p) -> todo x n ob pQs p
+    (Existential (Some x n ibs ob) : pQs, p) -> todo x n ibs ob pQs p
+    (Existential (SomeP x n ib ob) : pQs, p) -> todo x n ib ob pQs p
+    (Universal x a : pQs, p) -> todo x a pQs p
+    (Instance x n ibs ob : pQs, p) -> \(qQs, q) ->
+      let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
+      in (Instance x n ibs ob : pqQs, pq)
+    ([], p) -> \(qQs, q) -> (qQs, p `Or` q)
 
 flipQuantifiers ::
   ann ->
