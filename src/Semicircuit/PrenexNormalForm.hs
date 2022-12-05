@@ -15,7 +15,7 @@ import Die (die)
 import qualified Data.Set as Set
 import OSL.Types.Arity (Arity)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames))
+import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames), HasArity (getArity))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), Term (Add, Const, Max), someFirstOrder, var)
 
 -- Assumes input is in strong prenex normal form.
@@ -56,7 +56,20 @@ mergeQuantifiers qs =
 padToSameArity ::
   [Quantifier] ->
   ([Quantifier], Arity, Formula -> Formula)
-padToSameArity = todo
+padToSameArity qs =
+  let arity = foldl' max 0 (getArity <$> qs)
+      (qs', subs) = unzip (padToArity arity <$> qs)
+  in (qs', arity, foldl' (.) id subs)
+
+-- Returns the given quantifier padded with extra arguments as
+-- needed to bring it to the given arity. Assumes that this can
+-- be done. Also returns a substitution to apply to pad all
+-- function applications with zeroes as needed to be consistent.
+padToArity ::
+  Arity ->
+  Quantifier ->
+  (Quantifier, Formula -> Formula)
+padToArity = todo
 
 -- Assumes the quantifier sequence is mergeable into a single
 -- quantifier, and the quantifiers in the sequence all have the

@@ -9,8 +9,9 @@ module Semicircuit.Sigma11
   ( MapNames (mapNames),
     FromName (FromName),
     ToName (ToName),
-    HasNames (getNames),
     substitute,
+    HasNames (getNames),
+    HasArity (getArity),
     prependBounds,
     prependQuantifiers,
     prependArguments,
@@ -111,6 +112,18 @@ instance HasNames Quantifier where
 
 todo :: a
 todo = todo
+
+class HasArity a where
+  getArity :: a -> Arity
+
+instance HasArity ExistentialQuantifier where
+  getArity (Some _ _ ibs _) = Arity (length ibs)
+  getArity (SomeP {}) = 1
+
+instance HasArity Quantifier where
+  getArity (Universal {}) = 0
+  getArity (Existential q) = getArity q
+  getArity (Instance _ _ ibs _) = Arity (length ibs)
 
 prependBounds ::
   [InputBound] ->
