@@ -155,8 +155,9 @@ mergeQuantifiersConjunctive =
           let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
               q' = ((var x `Add` Const 1) `LessOrEqual` b) `And` (substitute (FromName y) (ToName x) q)
               qQs' = substitute (FromName y) (ToName x) <$> qQs
+              b' = substitute (FromName y) (ToName x) b
               (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q')
-              ab = if a == b then a else a `Max` b
+              ab = if a == b then a else a `Max` b'
           in (Universal x (TermBound ab) : pqQs, pq)
         (Universal y FieldMaxBound : qQs, q) ->
           let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
