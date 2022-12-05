@@ -15,7 +15,7 @@ import Control.Applicative (liftA2)
 import Control.Lens ((^.), _1, _2, _3, _4, (<&>))
 import Control.Monad.State (State, evalState, get, put, replicateM)
 import Data.Bifunctor (first, second)
-import Data.List (foldl')
+import Data.List (foldl', transpose)
 import Data.Maybe (catMaybes)
 import Die (die)
 import qualified Data.Set as Set
@@ -24,7 +24,7 @@ import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Gensyms (NextSym (NextSym))
 import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames), HasArity (getArity), getInputName, hasFieldMaxBound)
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name (Name), OutputBound (..), Quantifier (..), Term (Add, Const, Max, IndLess), someFirstOrder, var)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name (Name), OutputBound (..), Quantifier (..), Term (Add, Mul, Const, Max, IndLess), someFirstOrder, var)
 
 -- Assumes input is in strong prenex normal form.
 -- Merges all consecutive same-type quantifiers that can be
@@ -183,26 +183,38 @@ mergePaddedQuantifierSigs sigs@((f0, _, ibs, _):_) = do
            | is <- inputBounds
            ]
 
-          inputBoundTerm :: InputBound -> Term
-          inputBoundTerm b =
-            case b ^. #bound of
+          boundTerm :: Bound -> Term
+          boundTerm b =
+            case b of
               TermBound x -> x
               FieldMaxBound -> die "mergePaddedQuantifierSigs: saw an |F| bound (this is a compiler bug)"
 
-          inputBounds :: [[InputBound]] -- one per input sig
+          inputBounds :: [[InputBound]] -- one list per input sig
           inputBounds = sigs <&> (^. _3)
 
-          inputBoundTerms :: [[Term]]
-          inputBoundTerms = fmap inputBoundTerm <$> inputBounds
+          inputBoundTerms :: [[Term]] -- one list per input sig
+          inputBoundTerms = fmap (boundTerm . (^. #bound)) <$> inputBounds
 
           mergedInputBounds :: [InputBound]
-          mergedInputBounds = todo inputNames tagIndicators inputNameSubstitutions inputBoundTerms
+          mergedInputBounds =
+            [ NamedInputBound xi . TermBound
+                $ foldl Add (Const 0)
+                  [ tagIndicator `Mul` (sub bi)
+                  | (tagIndicator, sub, bi) <- zip3 tagIndicators inputNameSubstitutions bis
+                  ]
+            | (xi, bis) <- zip inputNames (transpose inputBoundTerms)
+            ]
 
-          outputBounds :: [OutputBound] -- one per input sig
-          outputBounds = sigs <&> (^. _4)
+          outputBoundTerms :: [Term] -- one per input sig
+          outputBoundTerms = sigs <&> (boundTerm . (^. _4 . #unOutputBound))
 
           mergedOutputBound :: OutputBound
-          mergedOutputBound = todo outputBounds inputNameSubstitutions tagIndicators
+          mergedOutputBound =
+            OutputBound . TermBound
+              $ foldl Add (Const 0)
+                  [ tagIndicator `Mul` (sub bi)
+                  | (tagIndicator, sub, bi) <- zip3 tagIndicators inputNameSubstitutions outputBoundTerms
+                  ]
 
       pure (tagBound : mergedInputBounds, mergedOutputBound)
 
@@ -280,9 +292,6 @@ groupMergeableQuantifiers =
     [] -> []
   where
     rec = groupMergeableQuantifiers
-
-todo :: a
-todo = todo
 
 -- Assumes input is in prenex normal form.
 -- Brings all instance quantifiers to the front.
