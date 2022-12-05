@@ -171,9 +171,6 @@ instance HasNames Formula where
     where
       rec = getNames
 
-todo :: a
-todo = todo
-
 class HasArity a where
   getArity :: a -> Arity
 
@@ -338,4 +335,25 @@ getInputName (NamedInputBound x _) = Just x
 getInputName (UnnamedInputBound _) = Nothing
 
 hasFieldMaxBound :: Quantifier -> Bool
-hasFieldMaxBound = todo
+hasFieldMaxBound =
+  \case
+    Universal _ b -> bound' b
+    Existential (Some _ _ ibs ob) ->
+      inputBounds ibs || outputBound ob
+    Existential (SomeP _ _ ib ob) ->
+      inputBound ib || outputBound ob
+    Instance _ _ ibs ob ->
+      inputBounds ibs || outputBound ob
+  where
+    inputBounds :: [InputBound] -> Bool
+    inputBounds = any inputBound
+
+    inputBound :: InputBound -> Bool
+    inputBound = bound' . (^. #bound)
+
+    outputBound :: OutputBound -> Bool
+    outputBound = bound' . (^. #unOutputBound)
+
+    bound' :: Bound -> Bool
+    bound' FieldMaxBound = True
+    bound' (TermBound _) = False
