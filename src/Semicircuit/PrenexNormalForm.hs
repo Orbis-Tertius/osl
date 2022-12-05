@@ -23,7 +23,7 @@ import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Gensyms (NextSym (NextSym))
-import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames), HasArity (getArity), getInputName)
+import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames), HasArity (getArity), getInputName, hasFieldMaxBound)
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name (Name), OutputBound (..), Quantifier (..), Term (Add, Const, Max, IndLess), someFirstOrder, var)
 
 -- Assumes input is in strong prenex normal form.
@@ -243,8 +243,11 @@ groupMergeableQuantifiers =
       case rec (Existential r : qs) of
         (rs : qss) ->
           if x `Set.member` mconcat (getNames <$> rs)
-          then -- not mergeable; since names are not reused, the name x
+              || hasFieldMaxBound (Existential q) || any hasFieldMaxBound rs
+          then -- Not mergeable; since names are not reused, the name x
                -- being present in r indicates that a bound of r depends on x.
+               -- Also, for now, quantifiers containing field max bounds are
+               -- not mergeable.
             [Existential q] : rs : qss
           else -- mergeable
             (Existential q : rs) : qss

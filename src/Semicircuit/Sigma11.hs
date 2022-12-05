@@ -20,6 +20,7 @@ module Semicircuit.Sigma11
     existentialQuantifierInputBounds,
     foldConstants,
     getInputName,
+    hasFieldMaxBound,
   )
 where
 
@@ -281,3 +282,6 @@ foldConstants =
 getInputName :: InputBound -> Maybe Name
 getInputName (NamedInputBound x _) = Just x
 getInputName (UnnamedInputBound _) = Nothing
+
+hasFieldMaxBound :: Quantifier -> Bool
+hasFieldMaxBound = todo
