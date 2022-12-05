@@ -183,11 +183,20 @@ mergePaddedQuantifierSigs sigs@((f0, _, ibs, _):_) = do
            | is <- inputBounds
            ]
 
+          inputBoundTerm :: InputBound -> Term
+          inputBoundTerm b =
+            case b ^. #bound of
+              TermBound x -> x
+              FieldMaxBound -> die "mergePaddedQuantifierSigs: saw an |F| bound (this is a compiler bug)"
+
           inputBounds :: [[InputBound]] -- one per input sig
           inputBounds = sigs <&> (^. _3)
 
+          inputBoundTerms :: [[Term]]
+          inputBoundTerms = fmap inputBoundTerm <$> inputBounds
+
           mergedInputBounds :: [InputBound]
-          mergedInputBounds = todo inputNames tagIndicators inputNameSubstitutions inputBounds
+          mergedInputBounds = todo inputNames tagIndicators inputNameSubstitutions inputBoundTerms
 
           outputBounds :: [OutputBound] -- one per input sig
           outputBounds = sigs <&> (^. _4)
