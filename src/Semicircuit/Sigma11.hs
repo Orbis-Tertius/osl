@@ -19,6 +19,7 @@ module Semicircuit.Sigma11
     existentialQuantifierOutputBound,
     existentialQuantifierInputBounds,
     foldConstants,
+    getInputName,
   )
 where
 
@@ -276,3 +277,7 @@ foldConstants =
     Const x -> Const x
   where
     rec = foldConstants
+
+getInputName :: InputBound -> Maybe Name
+getInputName (NamedInputBound x _) = Just x
+getInputName (UnnamedInputBound _) = Nothing

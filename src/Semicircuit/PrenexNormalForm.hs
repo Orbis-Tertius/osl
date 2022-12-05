@@ -11,18 +11,20 @@ module Semicircuit.PrenexNormalForm
 where
 
 import Cast (intToInteger)
-import Control.Lens ((^.), _1, _2, (<&>))
+import Control.Applicative (liftA2)
+import Control.Lens ((^.), _1, _2, _3, _4, (<&>))
 import Control.Monad.State (State, evalState, get, put, replicateM)
 import Data.Bifunctor (first, second)
 import Data.List (foldl')
+import Data.Maybe (catMaybes)
 import Die (die)
 import qualified Data.Set as Set
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Gensyms (NextSym (NextSym))
-import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames), HasArity (getArity))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name (Name), OutputBound (..), Quantifier (..), Term (Add, Const, Max), someFirstOrder, var)
+import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames), HasArity (getArity), getInputName)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name (Name), OutputBound (..), Quantifier (..), Term (Add, Const, Max, IndLess), someFirstOrder, var)
 
 -- Assumes input is in strong prenex normal form.
 -- Merges all consecutive same-type quantifiers that can be
@@ -161,11 +163,39 @@ mergePaddedQuantifierSigs sigs@((f0, _, ibs, _):_) = do
       inputNames <- replicateM (length ibs) (Name 0 <$> getNextSym)
       let tagBound :: InputBound
           tagBound = NamedInputBound tagName (TermBound (Const (intToInteger (length sigs))))
-          inputBounds :: [InputBound]
-          inputBounds = todo inputNames
-          outputBound :: OutputBound
-          outputBound = todo
-      pure (tagBound : inputBounds, outputBound)
+
+          tagIndicators :: [Term] -- one per input sig
+          tagIndicators =
+            [ (var tagName `Add` Const (intToInteger (negate i))) `IndLess` Const 1
+            | i <- [0 .. length sigs - 1]
+            ]
+
+          inputNameSubstitutions :: [Term -> Term] -- one per input sig
+          inputNameSubstitutions =
+           [ foldl (.) id
+             [ substitute (FromName fromName) (ToName toName)
+             | (toName, fromName) <-
+                 catMaybes $
+                   zipWith (liftA2 (,))
+                   (pure <$> inputNames)
+                   (getInputName <$> is)
+             ]
+           | is <- inputBounds
+           ]
+
+          inputBounds :: [[InputBound]] -- one per input sig
+          inputBounds = sigs <&> (^. _3)
+
+          mergedInputBounds :: [InputBound]
+          mergedInputBounds = todo inputNames tagIndicators inputNameSubstitutions inputBounds
+
+          outputBounds :: [OutputBound] -- one per input sig
+          outputBounds = sigs <&> (^. _4)
+
+          mergedOutputBound :: OutputBound
+          mergedOutputBound = todo outputBounds inputNameSubstitutions tagIndicators
+
+      pure (tagBound : mergedInputBounds, mergedOutputBound)
 
     substitutions :: Name -> Formula -> Formula
     substitutions h = functionNameSubstitutions h . tagPrependingSubstitutions
