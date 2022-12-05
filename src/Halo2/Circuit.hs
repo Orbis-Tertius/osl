@@ -92,7 +92,7 @@ instance HasPolynomialVariables a => HasPolynomialVariables (LookupArgument a) w
 
 instance HasPolynomialVariables a => HasPolynomialVariables (LookupArguments a) where
   getPolynomialVariables =
-    mconcat . fmap getPolynomialVariables . getLookupArguments
+    mconcat . fmap getPolynomialVariables . Set.toList . getLookupArguments
 
 instance
   (HasPolynomialVariables a, HasPolynomialVariables b) =>
@@ -158,7 +158,7 @@ instance HasScalars a => HasScalars (LookupArgument a) where
 
 instance HasScalars a => HasScalars (LookupArguments a) where
   getScalars =
-    mconcat . fmap getScalars . getLookupArguments
+    mconcat . fmap getScalars . Set.toList . getLookupArguments
 
 instance (HasScalars a, HasScalars b) => HasScalars (Circuit a b) where
   getScalars x =
@@ -171,5 +171,5 @@ getLookupTables :: Ord b => Circuit a b -> Set (b, [LookupTableColumn])
 getLookupTables c =
   Set.fromList
     [ (a ^. #gate, snd <$> (a ^. #tableMap))
-      | a <- c ^. #lookupArguments . #getLookupArguments
+      | a <- Set.toList (c ^. #lookupArguments . #getLookupArguments)
     ]

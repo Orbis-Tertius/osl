@@ -237,7 +237,7 @@ getStepArity = max 2 . getLookupArgumentsArity . (^. #lookupArguments)
 
 getLookupArgumentsArity :: LookupArguments a -> Arity
 getLookupArgumentsArity =
-  foldl' max 0 . fmap (Arity . length . (^. #tableMap))
+  foldl' max 0 . fmap (Arity . length . (^. #tableMap)) . Set.toList
     . (^. #getLookupArguments)
 
 getByteDecompositionLength :: BitsPerByte -> LogicCircuit -> Int
@@ -529,9 +529,9 @@ getMapping bitsPerByte c =
 
     bareLookupArguments :: [BareLookupArgument]
     bareLookupArguments =
-      Set.toList . Set.fromList $
+      Set.toList . Set.fromList $ -- this appears redundant but is actually there to eliminate redundancy
         BareLookupArgument . (^. #tableMap)
-          <$> (c ^. #lookupArguments . #getLookupArguments)
+          <$> Set.toList (c ^. #lookupArguments . #getLookupArguments)
 
     scalars :: [Scalar]
     scalars = Set.toList (getScalars c)
@@ -620,11 +620,10 @@ loadFromDifferentCaseStepType ::
 loadFromDifferentCaseStepType m x =
   StepType
     mempty
-    ( LookupArguments
-        [ LookupArgument
-            P.zero
-            [(o, xs), (c, cs)]
-        ]
+    ( LookupArguments . Set.singleton $
+        LookupArgument
+          P.zero
+          [(o, xs), (c, cs)]
     )
     mempty
   where
@@ -663,7 +662,7 @@ lookupStepType ::
 lookupStepType m p (LookupTable t) =
   StepType
     mempty
-    (LookupArguments [LookupArgument p (zip inputExprs t)])
+    (LookupArguments . Set.singleton $ LookupArgument p (zip inputExprs t))
     mempty
   where
     inputExprs :: [InputExpression Polynomial]
@@ -967,31 +966,33 @@ byteRangeAndTruthChecks ::
   Mapping ->
   LookupArguments Polynomial
 byteRangeAndTruthChecks m =
-  LookupArguments
-    [ LookupArgument
-        P.zero
-        [ ( InputExpression (P.var' (byteCol ^. #unByteColumnIndex)),
-            LookupTableColumn (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex)
-          ),
-          ( InputExpression (P.var' (truthCol ^. #unTruthValueColumnIndex)),
-            LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex)
-          )
-        ]
-      | (byteCol, truthCol) <- m ^. #byteDecomposition . #bytes
-    ]
+  LookupArguments $
+    Set.fromList
+      [ LookupArgument
+          P.zero
+          [ ( InputExpression (P.var' (byteCol ^. #unByteColumnIndex)),
+              LookupTableColumn (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex)
+            ),
+            ( InputExpression (P.var' (truthCol ^. #unTruthValueColumnIndex)),
+              LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex)
+            )
+          ]
+        | (byteCol, truthCol) <- m ^. #byteDecomposition . #bytes
+      ]
 
 signRangeCheck ::
   Mapping ->
   LookupArguments Polynomial
 signRangeCheck m =
-  LookupArguments
-    [ LookupArgument
-        P.zero
-        [ ( InputExpression (P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)),
-            LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex)
-          )
-        ]
-    ]
+  LookupArguments $
+    Set.fromList
+      [ LookupArgument
+          P.zero
+          [ ( InputExpression (P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)),
+              LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex)
+            )
+          ]
+      ]
 
 truthTables ::
   Mapping ->
