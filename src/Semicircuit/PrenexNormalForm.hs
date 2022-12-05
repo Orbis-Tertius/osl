@@ -1,17 +1,311 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
 module Semicircuit.PrenexNormalForm
-  ( toStrongPrenexNormalForm,
+  ( toSuperStrongPrenexNormalForm,
+    toStrongPrenexNormalForm,
     toPrenexNormalForm,
   )
 where
 
-import Data.Bifunctor (second)
+import Cast (intToInteger)
+import Control.Applicative (liftA2)
+import Control.Lens ((<&>), (^.), _1, _2, _3, _4)
+import Control.Monad.State (State, evalState, get, put, replicateM)
+import Data.Bifunctor (first, second)
+import Data.List (foldl', transpose)
+import Data.Maybe (catMaybes)
+import qualified Data.Set as Set
+import Die (die)
+import OSL.Types.Arity (Arity (Arity))
+import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute)
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), Term (Add, Const, Max), someFirstOrder, var)
+import Semicircuit.Gensyms (NextSym (NextSym))
+import Semicircuit.Sigma11 (FromName (FromName), HasArity (getArity), HasNames (getNames), ToName (ToName), foldConstants, getInputName, hasFieldMaxBound, prependArguments, prependBounds, substitute)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name (Name), OutputBound (..), Quantifier (..), Term (Add, Const, IndLess, Max, Mul), someFirstOrder, var)
+
+-- Assumes input is in strong prenex normal form.
+-- Merges all consecutive same-type quantifiers that can be
+-- merged, so, all same-type consecutive quantifiers except
+-- for permutation and universal quantifiers are merged.
+-- As a result, all instance quantifiers are merged into one,
+-- and if there are no permutation quantifiers, then all
+-- existential quantifiers are merged into one.
+toSuperStrongPrenexNormalForm ::
+  [Quantifier] ->
+  Formula ->
+  ([Quantifier], Formula)
+toSuperStrongPrenexNormalForm qs f =
+  let (qs', substitutions) =
+        unzip . flip evalState nextSym $
+          mapM mergeQuantifiers (groupMergeableQuantifiers qs)
+   in (qs', foldl' (.) id substitutions f)
+  where
+    nextSym :: NextSym
+    nextSym = NextSym (1 + foldl' max 0 ((^. #sym) <$> Set.toList (mconcat (getNames <$> qs) <> getNames f)))
+
+-- Assumes the quantifier sequence is mergeable into a single
+-- quantifier. Returns the merged quantifier and the substitution
+-- function to apply to replace applications of the non-merged
+-- quantified variables with applications of the merged quantified
+-- variable.
+mergeQuantifiers ::
+  [Quantifier] ->
+  State NextSym (Quantifier, Formula -> Formula)
+mergeQuantifiers [q] = pure (q, id)
+mergeQuantifiers qs = do
+  let (qs', padSubst) = padToSameArity qs
+  (q, mergeSubst) <- mergePaddedQuantifiers qs'
+  pure (q, mergeSubst . padSubst)
+
+-- Assumes the quantifier sequence is mergeable into a single
+-- quantifier. Returns the same quantifier sequence but with all
+-- quantified variables padded with extra arguments as needed to
+-- make them all the same arity. Also returns their common arity
+-- and a substitution to apply to pad all function applications with
+-- zeroes as needed to be consistent.
+padToSameArity ::
+  [Quantifier] ->
+  ([Quantifier], Formula -> Formula)
+padToSameArity qs =
+  let arity = foldl' max 0 (getArity <$> qs)
+      (qs', subs) = unzip (padToArity arity <$> qs)
+   in (qs', foldl' (.) id subs)
+
+-- Returns the given quantifier padded with extra arguments as
+-- needed to bring it to the given arity. Assumes that this can
+-- be done. Also returns a substitution to apply to pad all
+-- function applications with zeroes as needed to be consistent.
+padToArity ::
+  Arity ->
+  Quantifier ->
+  (Quantifier, Formula -> Formula)
+padToArity arity =
+  \case
+    Universal {} -> die "padToArity: saw a universal quantifier (this is a compiler bug)"
+    Existential (SomeP {}) -> die "padToArity: saw a permutation quantifier (this is a compiler bug)"
+    Existential (Some x n ibs ob) ->
+      let d = (arity ^. #unArity) - length ibs
+          x' = Name arity (x ^. #sym)
+       in ( Existential $ Some x' n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
+            prependArguments x (replicate d (Const 0))
+          )
+    Instance x n ibs ob ->
+      let d = (arity ^. #unArity) - length ibs
+          x' = Name arity (x ^. #sym)
+       in ( Instance x' n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
+            prependArguments x (replicate d (Const 0))
+          )
+
+-- Assumes the quantifier sequence is mergeable into a single
+-- quantifier, and the quantifiers in the sequence all have the
+-- given arity. Returns the merged quantifier and the
+-- substitution to replace all applications of the non-merged
+-- quantified variables with applications of the merged quantified
+-- variable.
+mergePaddedQuantifiers ::
+  [Quantifier] ->
+  State NextSym (Quantifier, Formula -> Formula)
+mergePaddedQuantifiers =
+  \case
+    [] -> die "mergePaddedQuantifiers: empty quantifier list (this is a compiler bug)"
+    qs@(Existential _ : _) ->
+      mergePaddedExistentialQuantifiers qs
+    qs@(Instance {} : _) ->
+      mergePaddedInstanceQuantifiers qs
+    Universal {} : _ ->
+      die "mergePaddedQuantifiers: saw a universal quantifier (this is a compiler bug)"
+
+mergePaddedExistentialQuantifiers ::
+  [Quantifier] ->
+  State NextSym (Quantifier, Formula -> Formula)
+mergePaddedExistentialQuantifiers qs =
+  first sigToExistential <$> mergePaddedQuantifierSigs (quantifierSig <$> qs)
+
+mergePaddedInstanceQuantifiers ::
+  [Quantifier] ->
+  State NextSym (Quantifier, Formula -> Formula)
+mergePaddedInstanceQuantifiers qs =
+  first sigToInstance <$> mergePaddedQuantifierSigs (quantifierSig <$> qs)
+
+quantifierSig :: Quantifier -> (Name, Cardinality, [InputBound], OutputBound)
+quantifierSig =
+  \case
+    Existential (Some x n ibs ob) -> (x, n, ibs, ob)
+    Existential (SomeP {}) -> die "quantifierSig: saw a permutation quantifier (this is a compiler bug)"
+    Instance x n ibs ob -> (x, n, ibs, ob)
+    Universal {} -> die "quantifierSig: saw a universal quantifier (this is a compiler bug)"
+
+sigToExistential :: (Name, Cardinality, [InputBound], OutputBound) -> Quantifier
+sigToExistential (x, n, ibs, ob) = Existential (Some x n ibs ob)
+
+sigToInstance :: (Name, Cardinality, [InputBound], OutputBound) -> Quantifier
+sigToInstance (x, n, ibs, ob) = Instance x n ibs ob
+
+mergePaddedQuantifierSigs ::
+  [(Name, Cardinality, [InputBound], OutputBound)] ->
+  State NextSym ((Name, Cardinality, [InputBound], OutputBound), Formula -> Formula)
+mergePaddedQuantifierSigs [] = die "mergePaddedQuantifierSigs: no signatures provided (this is a compiler bug)"
+mergePaddedQuantifierSigs sigs@((_, _, ibs, _) : _) = do
+  h <- Name (Arity (length ibs + 1)) <$> getNextSym
+  (,) <$> (uncurry (h,cardinality,,) <$> mergedBounds)
+    <*> pure (substitutions h)
+  where
+    cardinality :: Cardinality
+    cardinality = foldl' (+) 0 $ (^. _2) <$> sigs
+
+    quantifierNames :: [Name]
+    quantifierNames = sigs <&> (^. _1)
+
+    mergedBounds :: State NextSym ([InputBound], OutputBound)
+    mergedBounds = do
+      tagName <- Name 0 <$> getNextSym
+      inputNames <- replicateM (length ibs) (Name 0 <$> getNextSym)
+      let tagBound :: InputBound
+          tagBound = NamedInputBound tagName (TermBound (Const (intToInteger (length sigs))))
+
+          tagIndicators :: [Term] -- one per input sig
+          tagIndicators =
+            [ (var tagName `Add` Const (intToInteger (negate i))) `IndLess` Const 1
+              | i <- [0 .. length sigs - 1]
+            ]
+
+          inputNameSubstitutions :: [Term -> Term] -- one per input sig
+          inputNameSubstitutions =
+            [ foldl'
+                (.)
+                id
+                [ substitute (FromName fromName) (ToName toName)
+                  | (toName, fromName) <-
+                      catMaybes $
+                        zipWith
+                          (liftA2 (,))
+                          (pure <$> inputNames)
+                          (getInputName <$> is)
+                ]
+              | is <- inputBounds
+            ]
+
+          boundTerm :: Bound -> Term
+          boundTerm b =
+            case b of
+              TermBound x -> x
+              FieldMaxBound -> die "mergePaddedQuantifierSigs: saw an |F| bound (this is a compiler bug)"
+
+          inputBounds :: [[InputBound]] -- one list per input sig
+          inputBounds = sigs <&> (^. _3)
+
+          inputBoundTerms :: [[Term]] -- one list per input sig
+          inputBoundTerms = fmap (boundTerm . (^. #bound)) <$> inputBounds
+
+          mergedInputBounds :: [InputBound]
+          mergedInputBounds =
+            [ NamedInputBound xi . TermBound $
+                foldl'
+                  Add
+                  (Const 0)
+                  [ tagIndicator `Mul` sub bi
+                    | (tagIndicator, sub, bi) <- zip3 tagIndicators inputNameSubstitutions bis
+                  ]
+              | (xi, bis) <- zip inputNames (transpose inputBoundTerms)
+            ]
+
+          outputBoundTerms :: [Term] -- one per input sig
+          outputBoundTerms = sigs <&> (boundTerm . (^. _4 . #unOutputBound))
+
+          mergedOutputBound :: OutputBound
+          mergedOutputBound =
+            OutputBound . TermBound $
+              foldl'
+                Add
+                (Const 0)
+                [ tagIndicator `Mul` sub bi
+                  | (tagIndicator, sub, bi) <- zip3 tagIndicators inputNameSubstitutions outputBoundTerms
+                ]
+
+      pure (tagBound : mergedInputBounds, mergedOutputBound)
+
+    substitutions :: Name -> Formula -> Formula
+    substitutions h = functionNameSubstitutions h . tagPrependingSubstitutions
+
+    functionNameSubstitutions :: Name -> Formula -> Formula
+    functionNameSubstitutions h =
+      foldl'
+        (.)
+        id
+        [ substitute (FromName f') (ToName h)
+          | f <- quantifierNames,
+            let f' = Name (f ^. #arity + 1) (f ^. #sym)
+        ]
+
+    tagPrependingSubstitutions :: Formula -> Formula
+    tagPrependingSubstitutions =
+      foldl'
+        (.)
+        id
+        [ prependArguments f [Const i]
+          | (i, f) <- zip [0 ..] quantifierNames
+        ]
+
+getNextSym :: State NextSym Int
+getNextSym = do
+  NextSym next <- get
+  put (NextSym (next + 1))
+  pure next
+
+-- Assumes the quantifier sequence is in strong prenex normal form.
+-- Partitions the quantifier sequence into maximal subsequences
+-- which are each mergeable into a single quantifier.
+groupMergeableQuantifiers ::
+  [Quantifier] ->
+  [[Quantifier]]
+groupMergeableQuantifiers =
+  \case
+    (Universal x a : qs) ->
+      -- Universals are never mergeable, and there is never another
+      -- quantifier type after a universal.
+      ([Universal x a] : ((: []) <$> qs))
+    (Existential q : Universal x a : qs) ->
+      ([Existential q] : [Universal x a] : ((: []) <$> qs))
+    (Existential q : Existential r@(SomeP {}) : qs) ->
+      ([Existential q] : [Existential r] : rec qs)
+    (Existential q@(SomeP {}) : qs) ->
+      ([Existential q] : rec qs)
+    (Existential q@(Some x _ _ _) : Existential r : qs) ->
+      case rec (Existential r : qs) of
+        (rs : qss) ->
+          if x `Set.member` mconcat (getNames <$> rs)
+            || hasFieldMaxBound (Existential q)
+            || any hasFieldMaxBound rs
+            then -- Not mergeable; since names are not reused, the name x
+            -- being present in r indicates that a bound of r depends on x.
+            -- Also, for now, quantifiers containing field max bounds are
+            -- not mergeable.
+              [Existential q] : rs : qss
+            else -- mergeable
+              (Existential q : rs) : qss
+        [] -> die "groupMergeableQuantifiers: empty result for non-empty recursion (this is a compiler bug)"
+    (Existential _ : Instance {} : _) ->
+      die "groupMergeableQuantifiers: input is not in strong prenex normal form (this is a compiler bug)"
+    (q@(Instance {}) : Existential r : qs) ->
+      [q] : rec (Existential r : qs)
+    (q@(Instance {}) : r@(Universal {}) : qs) ->
+      [q] : rec (r : qs)
+    (q@(Instance x _ _ _) : r@(Instance {}) : qs) ->
+      case rec (r : qs) of
+        (rs : qss) ->
+          if x `Set.member` mconcat (getNames <$> rs)
+            then -- not mergeable
+              [q] : rs : qss
+            else -- mergeable
+              (q : rs) : qss
+        [] -> die "groupMergeableQuantifiers: empty result for non-empty recursion (this is a compiler bug)"
+    [q] -> [[q]]
+    [] -> []
+  where
+    rec = groupMergeableQuantifiers
 
 -- Assumes input is in prenex normal form.
 -- Brings all instance quantifiers to the front.
@@ -81,8 +375,8 @@ pushUniversalQuantifiersDown ann us qs f =
       (qs'', f') <- pushUniversalQuantifiersDown ann us qs' f
       case q of
         Some g _ _ _ -> do
-          let q' = prependBounds (uncurry InputBound <$> us) q
-              f'' = prependArguments g (fst <$> us) f'
+          let q' = prependBounds (uncurry NamedInputBound <$> us) q
+              f'' = prependArguments g (var . fst <$> us) f'
           pure ([Existential q'] <> qs'', f'')
         SomeP {} ->
           Left . ErrorMessage ann $
@@ -150,12 +444,19 @@ mergeQuantifiersConjunctive =
     (Universal x (TermBound a) : pQs, p) ->
       \case
         (Universal y (TermBound b) : qQs, q) ->
-          let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
-              q' = ((var x `Add` Const 1) `LessOrEqual` b) `And` substitute (FromName y) (ToName x) q
+          let ab = if a == b then a else foldConstants (a `Max` b')
+              p' =
+                if ab == a
+                  then p
+                  else ((var x `Add` Const 1) `LessOrEqual` a) `And` p
+              q' = substitute (FromName y) (ToName x) q
+              q'' =
+                if ab == b
+                  then q'
+                  else ((var x `Add` Const 1) `LessOrEqual` b) `And` q'
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               b' = substitute (FromName y) (ToName x) b
-              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q')
-              ab = if a == b then a else a `Max` b'
+              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q'')
            in (Universal x (TermBound ab) : pqQs, pq)
         (Universal y FieldMaxBound : qQs, q) ->
           let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
@@ -215,9 +516,15 @@ mergeQuantifiersDisjunctive =
               obV''' =
                 if ob == ob'
                   then obV
-                  else obV `Max` obV''
-              p' = if ob == ob' then p else ((var x `Add` Const 1) `LessOrEqual` obV) `And` p
-              q'' = if ob == ob' then q' else ((var x `Add` Const 1) `LessOrEqual` obV'') `And` q'
+                  else foldConstants (obV `Max` obV'')
+              p' =
+                if obV == obV'''
+                  then p
+                  else ((var x `Add` Const 1) `LessOrEqual` obV) `And` p
+              q'' =
+                if obV' == obV'''
+                  then q'
+                  else ((var x `Add` Const 1) `LessOrEqual` obV'') `And` q'
               (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p') (qQs', q'')
            in (Existential (Some x n [] (OutputBound (TermBound obV'''))) : pqQs, pq)
         (Existential (Some x' _ [] (OutputBound FieldMaxBound)) : qQs, q) ->

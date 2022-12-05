@@ -11,7 +11,6 @@ module OSL.EntryPoint
   )
 where
 
--- import Control.Lens ((^.))
 import Control.Monad.Trans.State.Strict (runStateT)
 import Data.ByteString (readFile)
 import Data.Either.Extra (mapLeft)
@@ -28,12 +27,10 @@ import OSL.TranslationContext (toLocalTranslationContext)
 import OSL.Types.OSL (Declaration (Defined), Name (Sym))
 import OSL.ValidContext (getDeclaration)
 import OSL.ValidateContext (validateContext)
--- import Semicircuit.DNFFormula (fromDisjunctiveNormalForm, toDisjunctiveNormalForm)
 import Semicircuit.Gensyms (deBruijnToGensyms)
 import Semicircuit.PNFFormula (toPNFFormula, toSemicircuit)
-import Semicircuit.PrenexNormalForm (toPrenexNormalForm, toStrongPrenexNormalForm)
+import Semicircuit.PrenexNormalForm (toPrenexNormalForm, toStrongPrenexNormalForm, toSuperStrongPrenexNormalForm)
 import Semicircuit.Sigma11 (prependQuantifiers)
--- import qualified Semicircuit.Types.PNFFormula as PNF
 import Semicircuit.ToLogicCircuit (semicircuitToLogicCircuit)
 import System.Environment (getArgs)
 import Trace.FromLogicCircuit (logicCircuitToTraceType)
@@ -119,11 +116,11 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
       spnf <-
         mapLeft (ErrorMessage . ("Error converting to strong prenex normal form: " <>) . show) $
           uncurry (toStrongPrenexNormalForm ()) pnf
+      let sspnf = uncurry toSuperStrongPrenexNormalForm spnf
       pnff <-
         mapLeft (ErrorMessage . ("Error converting to PNF formula: " <>) . show) $
-          toPNFFormula () (uncurry prependQuantifiers spnf)
-      let -- dnf = fromDisjunctiveNormalForm (toDisjunctiveNormalForm (pnff ^. #qfFormula))
-          semi = toSemicircuit pnff -- (PNF.Formula dnf (pnff ^. #quantifiers))
+          toPNFFormula () (uncurry prependQuantifiers sspnf)
+      let semi = toSemicircuit pnff
           (logic, layout) = semicircuitToLogicCircuit rowCount semi
           traceType = logicCircuitToTraceType bitsPerByte logic
           circuit = traceTypeToArithmeticCircuit traceType
@@ -143,6 +140,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
                      <> show pnf
                      <> "\n\nStrong prenex normal form: "
                      <> show spnf
+                     <> "\n\nSuper strong prenex normal form: "
+                     <> show sspnf
                      <> "\n\nPNF formula: "
                      <> show pnff
                      <> "\n\nSemicircuit: "

@@ -10,20 +10,27 @@ module Semicircuit.Sigma11
     FromName (FromName),
     ToName (ToName),
     substitute,
+    HasNames (getNames),
+    HasArity (getArity),
     prependBounds,
     prependQuantifiers,
     prependArguments,
     existentialQuantifierName,
     existentialQuantifierOutputBound,
     existentialQuantifierInputBounds,
+    foldConstants,
+    getInputName,
+    hasFieldMaxBound,
   )
 where
 
 import Control.Lens ((%~), (^.))
 import Data.List (foldl')
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Die (die)
 import OSL.Types.Arity (Arity (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Instance, Universal), Term (Add, App, AppInverse, Const, IndLess, Max, Mul), var)
+import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Instance, Universal), Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
 
 class MapNames a where
   mapNames :: (Name -> Name) -> a -> a
@@ -51,8 +58,10 @@ instance MapNames Bound where
       TermBound x -> TermBound (mapNames f x)
 
 instance MapNames InputBound where
-  mapNames f (InputBound x b) =
-    InputBound (f x) (mapNames f b)
+  mapNames f (NamedInputBound x b) =
+    NamedInputBound (f x) (mapNames f b)
+  mapNames f (UnnamedInputBound b) =
+    UnnamedInputBound (mapNames f b)
 
 deriving newtype instance MapNames OutputBound
 
@@ -97,6 +106,83 @@ newtype ToName = ToName Name
 substitute :: MapNames a => FromName -> ToName -> a -> a
 substitute (FromName f) (ToName t) = mapNames (\x -> if x == f then t else x)
 
+class HasNames a where
+  getNames :: a -> Set Name
+
+instance HasNames a => HasNames [a] where
+  getNames = mconcat . fmap getNames
+
+instance HasNames Term where
+  getNames =
+    \case
+      App f xs -> Set.singleton f <> getNames xs
+      AppInverse f x -> Set.singleton f <> getNames x
+      Add x y -> rec x <> rec y
+      Mul x y -> rec x <> rec y
+      IndLess x y -> rec x <> rec y
+      Max x y -> rec x <> rec y
+      Const _ -> mempty
+    where
+      rec = getNames
+
+instance HasNames Bound where
+  getNames =
+    \case
+      FieldMaxBound -> mempty
+      TermBound x -> getNames x
+
+instance HasNames InputBound where
+  getNames =
+    \case
+      NamedInputBound x b -> Set.singleton x <> getNames b
+      UnnamedInputBound b -> getNames b
+
+deriving newtype instance HasNames OutputBound
+
+instance HasNames ExistentialQuantifier where
+  getNames =
+    \case
+      Some x _ ibs ob -> Set.singleton x <> getNames ibs <> getNames ob
+      SomeP x _ ib ob -> Set.singleton x <> getNames ib <> getNames ob
+
+instance HasNames Quantifier where
+  getNames =
+    \case
+      Existential q -> getNames q
+      Universal x b -> Set.singleton x <> getNames b
+      Instance x _ ibs ob -> Set.singleton x <> getNames ibs <> getNames ob
+
+instance HasNames Formula where
+  getNames =
+    \case
+      Equal x y -> getNames x <> getNames y
+      LessOrEqual x y -> getNames x <> getNames y
+      Predicate _ xs -> getNames xs
+      Not p -> rec p
+      And p q -> rec p <> rec q
+      Or p q -> rec p <> rec q
+      Implies p q -> rec p <> rec q
+      Iff p q -> rec p <> rec q
+      ForAll x b p -> Set.singleton x <> getNames b <> rec p
+      ForSome q p -> getNames q <> rec p
+      Given x _ ibs ob p -> Set.singleton x <> getNames ibs <> getNames ob <> rec p
+      Top -> mempty
+      Bottom -> mempty
+    where
+      rec = getNames
+
+class HasArity a where
+  getArity :: a -> Arity
+
+instance HasArity ExistentialQuantifier where
+  getArity (Some _ _ ibs _) = Arity (length ibs)
+  getArity (SomeP {}) = 1
+
+instance HasArity Quantifier where
+  getArity (Universal {}) = 0
+  getArity (Existential q) = getArity q
+  getArity (Instance _ _ ibs _) = Arity (length ibs)
+
 prependBounds ::
   [InputBound] ->
   ExistentialQuantifier ->
@@ -122,7 +208,8 @@ prependQuantifier (Instance x n ibs ob) f =
 -- of the given name. This substitution does not need
 -- to account for name shadowing, since all gensyms
 -- are globally unique.
-prependArguments :: Name -> [Name] -> Formula -> Formula
+prependArguments :: Name -> [Term] -> Formula -> Formula
+prependArguments _ [] = id
 prependArguments f xs =
   \case
     Equal a b -> Equal (term a) (term b)
@@ -155,7 +242,7 @@ prependArguments f xs =
             then
               App
                 (Name ((g ^. #arity) + Arity (length xs)) (g ^. #sym))
-                ((var <$> xs) <> (term <$> xs'))
+                (xs <> (term <$> xs'))
             else App g (term <$> xs')
         AppInverse g x ->
           if (g ^. #sym) == (f ^. #sym)
@@ -181,8 +268,10 @@ mapBound f =
     FieldMaxBound -> FieldMaxBound
 
 mapInputBound :: (Term -> Term) -> InputBound -> InputBound
-mapInputBound f (InputBound x b) =
-  InputBound x (mapBound f b)
+mapInputBound f (NamedInputBound x b) =
+  NamedInputBound x (mapBound f b)
+mapInputBound f (UnnamedInputBound b) =
+  UnnamedInputBound (mapBound f b)
 
 mapOutputBound :: (Term -> Term) -> OutputBound -> OutputBound
 mapOutputBound f (OutputBound b) =
@@ -215,3 +304,57 @@ existentialQuantifierInputBounds =
   \case
     Some _ _ ibs _ -> ibs
     SomeP _ _ ib _ -> [ib]
+
+foldConstants :: Term -> Term
+foldConstants =
+  \case
+    App f xs -> App f (rec <$> xs)
+    AppInverse f x -> AppInverse f (rec x)
+    Add x y ->
+      case (rec x, rec y) of
+        (Const x', Const y') -> Const (x' + y')
+        (x', y') -> x' `Add` y'
+    Mul x y ->
+      case (rec x, rec y) of
+        (Const x', Const y') -> Const (x' * y')
+        (x', y') -> x' `Mul` y'
+    IndLess x y ->
+      case (rec x, rec y) of
+        (Const x', Const y') ->
+          if x' < y' then Const 1 else Const 0
+        (x', y') -> x' `IndLess` y'
+    Max x y ->
+      case (rec x, rec y) of
+        (Const x', Const y') -> Const (x' `max` y')
+        (x', y') -> x' `Max` y'
+    Const x -> Const x
+  where
+    rec = foldConstants
+
+getInputName :: InputBound -> Maybe Name
+getInputName (NamedInputBound x _) = Just x
+getInputName (UnnamedInputBound _) = Nothing
+
+hasFieldMaxBound :: Quantifier -> Bool
+hasFieldMaxBound =
+  \case
+    Universal _ b -> bound' b
+    Existential (Some _ _ ibs ob) ->
+      inputBounds ibs || outputBound ob
+    Existential (SomeP _ _ ib ob) ->
+      inputBound ib || outputBound ob
+    Instance _ _ ibs ob ->
+      inputBounds ibs || outputBound ob
+  where
+    inputBounds :: [InputBound] -> Bool
+    inputBounds = any inputBound
+
+    inputBound :: InputBound -> Bool
+    inputBound = bound' . (^. #bound)
+
+    outputBound :: OutputBound -> Bool
+    outputBound = bound' . (^. #unOutputBound)
+
+    bound' :: Bound -> Bool
+    bound' FieldMaxBound = True
+    bound' (TermBound _) = False

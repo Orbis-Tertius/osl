@@ -176,14 +176,16 @@ instance Show Bound where
   show (TermBound x) = show x
   show FieldMaxBound = "|F|"
 
-data InputBound = InputBound
-  { name :: Name,
-    bound :: Bound
-  }
+data InputBound
+  = NamedInputBound {_name :: Name, bound :: Bound}
+  | UnnamedInputBound {bound :: Bound}
   deriving (Eq, Generic)
 
 instance Show InputBound where
-  show x = show (x ^. #name) <> "<" <> show (x ^. #bound)
+  show (NamedInputBound name b) =
+    show name <> "<" <> show b
+  show (UnnamedInputBound b) =
+    "<" <> show b
 
 newtype OutputBound = OutputBound {unOutputBound :: Bound}
   deriving stock (Eq, Generic)

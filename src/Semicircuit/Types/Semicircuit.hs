@@ -13,7 +13,7 @@ import Semicircuit.Types.PNFFormula (Formula)
 import Semicircuit.Types.Sigma11 (Name)
 
 data Semicircuit = Semicircuit
-  { freeVariables :: FreeVariables,
+  { freeVariables :: FreeVariables, -- this is supposed to be empty
     formula :: Formula
   }
   deriving (Generic, Show)
