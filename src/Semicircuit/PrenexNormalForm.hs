@@ -10,8 +10,9 @@ module Semicircuit.PrenexNormalForm
 where
 
 import Data.Bifunctor (second)
+import qualified Data.Set as Set
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants)
+import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), Term (Add, Const, Max), someFirstOrder, var)
 
 -- Assumes input is in strong prenex normal form.
@@ -45,8 +46,24 @@ groupMergeableQuantifiers =
       ([Existential q] : [Existential r] : rec qs)
     (Existential q@(SomeP {}) : qs) ->
       ([Existential q] : rec qs)
+    (Existential q@(Some x _ _ _) : Existential r : qs) ->
+      case rec (Existential r : qs) of
+        (rs : qss) ->
+          if x `Set.member` mconcat (getNames <$> rs)
+          then -- not mergeable; since names are not reused, the name x
+               -- being present in r indicates that a bound of r depends on x.
+            [Existential q] : rs : qss
+          else -- mergeable
+            (Existential q : rs) : qss
   where
     rec = groupMergeableQuantifiers
+
+-- Assumes the given quantifiers are mergeable and merges them.
+mergeTwoExistentials ::
+  ExistentialQuantifier ->
+  ExistentialQuantifier ->
+  ExistentialQuantifier
+mergeTwoExistentials = todo
 
 todo :: a
 todo = todo

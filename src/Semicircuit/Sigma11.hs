@@ -9,6 +9,7 @@ module Semicircuit.Sigma11
   ( MapNames (mapNames),
     FromName (FromName),
     ToName (ToName),
+    HasNames (getNames),
     substitute,
     prependBounds,
     prependQuantifiers,
@@ -22,6 +23,7 @@ where
 
 import Control.Lens ((%~), (^.))
 import Data.List (foldl')
+import Data.Set (Set)
 import Die (die)
 import OSL.Types.Arity (Arity (..))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Instance, Universal), Term (Add, App, AppInverse, Const, IndLess, Max, Mul), var)
@@ -97,6 +99,18 @@ newtype ToName = ToName Name
 
 substitute :: MapNames a => FromName -> ToName -> a -> a
 substitute (FromName f) (ToName t) = mapNames (\x -> if x == f then t else x)
+
+class HasNames a where
+  getNames :: a -> Set Name
+
+instance HasNames ExistentialQuantifier where
+  getNames = todo
+
+instance HasNames Quantifier where
+  getNames = todo
+
+todo :: a
+todo = todo
 
 prependBounds ::
   [InputBound] ->
