@@ -117,9 +117,7 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
       spnf <-
         mapLeft (ErrorMessage . ("Error converting to strong prenex normal form: " <>) . show) $
           uncurry (toStrongPrenexNormalForm ()) pnf
-      sspnf <-
-        mapLeft (ErrorMessage . ("Error converting to super strong prenex normal form: " <>) . show) $
-          uncurry (toSuperStrongPrenexNormalForm ()) spnf
+      let sspnf = uncurry toSuperStrongPrenexNormalForm spnf
       pnff <-
         mapLeft (ErrorMessage . ("Error converting to PNF formula: " <>) . show) $
           toPNFFormula () (uncurry prependQuantifiers sspnf)

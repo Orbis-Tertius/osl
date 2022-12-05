@@ -10,6 +10,8 @@ module Semicircuit.PrenexNormalForm
 where
 
 import Data.Bifunctor (second)
+import Data.List (foldl')
+import Die (die)
 import qualified Data.Set as Set
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames))
@@ -23,12 +25,25 @@ import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQ
 -- and if there are no permutation quantifiers, then all
 -- existential quantifiers are merged into one.
 toSuperStrongPrenexNormalForm ::
-  ann ->
   [Quantifier] ->
   Formula ->
-  Either (ErrorMessage ann) ([Quantifier], Formula)
-toSuperStrongPrenexNormalForm = todo
+  ([Quantifier], Formula)
+toSuperStrongPrenexNormalForm qs f =
+  let (qs', substitutions) = unzip $
+        mergeQuantifiers <$> groupMergeableQuantifiers qs
+  in (qs', foldl' (flip ($)) f substitutions)
 
+-- Assumes the quantifier sequence is mergeable into a single
+-- quantifier. Returns the merged quantifier and the substitution
+-- function to apply to replace applications of the non-merged
+-- quantified variables with applications of the merged quantified
+-- variable.
+mergeQuantifiers ::
+  [Quantifier] ->
+  (Quantifier, Formula -> Formula)
+mergeQuantifiers = todo
+
+-- Assumes the quantifier sequence is in strong prenex normal form.
 -- Partitions the quantifier sequence into maximal subsequences
 -- which are each mergeable into a single quantifier.
 groupMergeableQuantifiers ::
@@ -55,15 +70,26 @@ groupMergeableQuantifiers =
             [Existential q] : rs : qss
           else -- mergeable
             (Existential q : rs) : qss
+        [] -> die "groupMergeableQuantifiers: empty result for non-empty recursion (this is a compiler bug)"
+    (Existential _ : Instance {} : _) ->
+      die "groupMergeableQuantifiers: input is not in strong prenex normal form (this is a compiler bug)"
+    (q@(Instance {}) : Existential r : qs) ->
+      [q] : rec (Existential r : qs)
+    (q@(Instance {}) : r@(Universal {}) : qs) ->
+      [q] : rec (r : qs)
+    (q@(Instance x _ _ _) : r@(Instance {}) : qs) ->
+      case rec (r : qs) of
+        (rs : qss) ->
+          if x `Set.member` mconcat (getNames <$> rs)
+          then -- not mergeable
+            [q] : rs : qss
+          else -- mergeable
+            (q : rs) : qss
+        [] -> die "groupMergeableQuantifiers: empty result for non-empty recursion (this is a compiler bug)"
+    (q : []) -> [[q]]
+    [] -> []
   where
     rec = groupMergeableQuantifiers
-
--- Assumes the given quantifiers are mergeable and merges them.
-mergeTwoExistentials ::
-  ExistentialQuantifier ->
-  ExistentialQuantifier ->
-  ExistentialQuantifier
-mergeTwoExistentials = todo
 
 todo :: a
 todo = todo
