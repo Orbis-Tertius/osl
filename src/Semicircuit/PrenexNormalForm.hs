@@ -164,12 +164,9 @@ mergeQuantifiersConjunctive =
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q')
           in (Universal x FieldMaxBound : pqQs, pq)
-        (Existential q : rQs, r) ->
+        (q : rQs, r) ->
           let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (rQs, r)
-          in (Existential q : Universal x (TermBound a) : prQs, pr)
-        (Instance y b ibs ob : qQs, q) -> -- TODO: is this kosher? does it apply?
-          let (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs, q)
-          in (Instance y b ibs ob : Universal x (TermBound a) : pqQs, pq)
+          in (q : Universal x (TermBound a) : prQs, pr)
         ([], q) -> (Universal x (TermBound a) : pQs, p `And` q)
     (Universal x FieldMaxBound : pQs, p) ->
       \case
@@ -182,24 +179,18 @@ mergeQuantifiersConjunctive =
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs', q')
           in (Universal x FieldMaxBound : pqQs, pq)
-        (Existential q : rQs, r) ->
+        (q : rQs, r) ->
           let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (rQs, r)
-          in (Existential q : Universal x FieldMaxBound : prQs, pr)
-        (Instance y b ibs ob : qQs, q) -> -- TODO: is this kosher? does it apply?
-          let (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs, q)
-          in (Instance y b ibs ob : Universal x FieldMaxBound : pqQs, pq)
+          in (q : Universal x FieldMaxBound : prQs, pr)
         ([], q) -> (Universal x FieldMaxBound : pQs, p `And` q)
     (Existential q : pQs, p) ->
       \case
         (Universal x a : rQs, r) ->
           let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (Universal x a : rQs, r)
           in (Existential q : prQs, pr)
-        (Existential r : sQs, s) ->
+        (r : sQs, s) ->
           let (psQs, ps) = mergeQuantifiersConjunctive (pQs, p) (sQs, s)
-          in (Existential q : Existential r : psQs, ps)
-        (Instance x a ibs ob : rQs, r) -> -- TODO: is this kosher? does this apply?
-          let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (rQs, r)
-          in (Instance x a ibs ob : Existential q : prQs, pr)
+          in (r : Existential q : psQs, ps)
         ([], r) -> (Existential q : pQs, p `And` r)
     (Instance x a ibs ob : pQs, p) ->
       \(qQs, q) ->
