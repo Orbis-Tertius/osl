@@ -31,7 +31,7 @@ import Control.Monad.State (State, evalState, get, put)
 import Data.List.Extra (foldl', (!?))
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe, catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Data.Text (Text, pack)
 import Die (die)
@@ -141,16 +141,17 @@ instanceQuantifierMappings ::
   State S (Map Name NameMapping)
 instanceQuantifierMappings q = do
   outMapping <- OutputMapping <$> nextCol ColType.Instance
-  argMappings <- replicateM
-    (q ^. #name . #arity . #unArity)
-    (ArgMapping <$> nextCol ColType.Instance)
+  argMappings <-
+    replicateM
+      (q ^. #name . #arity . #unArity)
+      (ArgMapping <$> nextCol ColType.Instance)
   pure . Map.fromList $
-    [(q ^. #name, NameMapping outMapping argMappings)] <>
-    catMaybes
-      [ (, NameMapping (OutputMapping (m ^. #unArgMapping)) [])
-          <$> getInputName ib
-      | (ib, m) <- zip (q ^. #inputBounds) argMappings
-      ]
+    [(q ^. #name, NameMapping outMapping argMappings)]
+      <> catMaybes
+        [ (,NameMapping (OutputMapping (m ^. #unArgMapping)) [])
+            <$> getInputName ib
+          | (ib, m) <- zip (q ^. #inputBounds) argMappings
+        ]
 
 existentialQuantifiersMappings ::
   Semicircuit ->
@@ -167,25 +168,26 @@ existentialQuantifierMappings =
   \case
     Some x _ ibs _ -> do
       outMapping <- OutputMapping <$> nextCol ColType.Advice
-      argMappings <- replicateM
-        (x ^. #arity . #unArity)
-        (ArgMapping <$> nextCol ColType.Advice)
+      argMappings <-
+        replicateM
+          (x ^. #arity . #unArity)
+          (ArgMapping <$> nextCol ColType.Advice)
       pure . Map.fromList $
-        [(x, NameMapping outMapping argMappings)] <>
-        catMaybes
-          [ (, NameMapping (OutputMapping (m ^. #unArgMapping)) [])
-              <$> getInputName ib
-          | (ib, m) <- zip ibs argMappings
-          ]
+        [(x, NameMapping outMapping argMappings)]
+          <> catMaybes
+            [ (,NameMapping (OutputMapping (m ^. #unArgMapping)) [])
+                <$> getInputName ib
+              | (ib, m) <- zip ibs argMappings
+            ]
     SomeP x _ ib _ -> do
       outMapping <- OutputMapping <$> nextCol ColType.Advice
       argMapping <- ArgMapping <$> nextCol ColType.Advice
       pure . Map.fromList $
-        [(x, NameMapping outMapping [argMapping])] <>
-        catMaybes
-          [ (, NameMapping (OutputMapping (argMapping ^. #unArgMapping)) [])
-              <$> getInputName ib
-          ]
+        [(x, NameMapping outMapping [argMapping])]
+          <> catMaybes
+            [ (,NameMapping (OutputMapping (argMapping ^. #unArgMapping)) [])
+                <$> getInputName ib
+            ]
 
 freeVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
 freeVariableMappings x =
