@@ -18,13 +18,13 @@ import Halo2.Prelude
 import Halo2.Types.Circuit (Circuit)
 import Halo2.Types.Coefficient (Coefficient (getCoefficient))
 import Halo2.Types.InputExpression (InputExpression (..))
-import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), Term (Const, IndLess, Max, Plus, Times, Var))
+import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), Term (Const, IndLess, Lookup, Max, Plus, Times, Var))
 import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArgument (LookupArgument)
 import Halo2.Types.LookupArguments (LookupArguments (getLookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn)
 import Halo2.Types.Polynomial (Polynomial)
-import Halo2.Types.PolynomialVariable (PolynomialVariable)
+import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (getPowerProduct))
 import Stark.Types.Scalar (Scalar)
 
@@ -42,6 +42,9 @@ instance HasPolynomialVariables Term where
   getPolynomialVariables =
     \case
       Var x -> Set.singleton x
+      Lookup is o ->
+        mconcat (rec . (^. #getInputExpression) . fst <$> is)
+          <> Set.singleton (PolynomialVariable (o ^. #unLookupTableOutputColumn . #unLookupTableColumn) 0)
       Const _ -> mempty
       Plus x y -> rec x <> rec y
       Times x y -> rec x <> rec y
@@ -109,6 +112,7 @@ instance HasScalars Term where
   getScalars =
     \case
       Var _ -> mempty
+      Lookup is _ -> mconcat (getScalars . fst <$> is)
       Const x -> Set.singleton x
       Plus x y -> getScalars x <> getScalars y
       Times x y -> getScalars x <> getScalars y

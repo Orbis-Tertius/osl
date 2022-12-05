@@ -6,7 +6,6 @@ module Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
   ( OutputMapping (OutputMapping),
     ArgMapping (ArgMapping),
     NameMapping (NameMapping),
-    TermMapping (TermMapping),
     OneVectorIndex (OneVectorIndex),
     ZeroVectorIndex (ZeroVectorIndex),
     LastRowIndicatorColumnIndex (LastRowIndicatorColumnIndex),
@@ -21,11 +20,7 @@ import GHC.Generics (Generic)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnTypes (ColumnTypes)
 import Semicircuit.Types.NameMapping (ArgMapping (ArgMapping), NameMapping (NameMapping), OutputMapping (OutputMapping))
-import Semicircuit.Types.Sigma11 (Name, Term)
-
-newtype TermMapping = TermMapping {unTermMapping :: ColumnIndex}
-  deriving stock (Generic)
-  deriving newtype (Show)
+import Semicircuit.Types.Sigma11 (Name)
 
 newtype ZeroVectorIndex = ZeroVectorIndex {unZeroVectorIndex :: ColumnIndex}
   deriving stock (Generic)
@@ -55,7 +50,6 @@ newtype DummyRowAdviceColumn = DummyRowAdviceColumn
 data SemicircuitToLogicCircuitColumnLayout = SemicircuitToLogicCircuitColumnLayout
   { columnTypes :: ColumnTypes,
     nameMappings :: Map Name NameMapping,
-    termMappings :: Map Term TermMapping,
     fixedColumns :: FixedColumns,
     dummyRowAdviceColumn :: DummyRowAdviceColumn
   }

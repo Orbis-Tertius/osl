@@ -5,9 +5,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.LogicConstraint
-  ( Term (Var, Const, Plus, Times, Max, IndLess),
+  ( Term (Var, Lookup, Const, Plus, Times, Max, IndLess),
     AtomicLogicConstraint (Equals, LessThan),
     LogicConstraint (Atom, Not, And, Or, Iff, Top, Bottom),
+    LookupTableOutputColumn (LookupTableOutputColumn),
     atomicConstraintArgs,
   )
 where
@@ -19,16 +20,16 @@ import Halo2.Types.LookupTableColumn (LookupTableColumn)
 import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Stark.Types.Scalar (Scalar)
 
-newtype LookupTableOutputColumn =
-  LookupTableOutputColumn
-    { unLookupTableOutputColumn :: LookupTableColumn }
+newtype LookupTableOutputColumn = LookupTableOutputColumn
+  {unLookupTableOutputColumn :: LookupTableColumn}
   deriving stock (Eq, Ord, Generic)
   deriving newtype (Show)
 
 data Term
   = Var PolynomialVariable
-  | Lookup [(InputExpression Term, LookupTableColumn)]
-           LookupTableOutputColumn
+  | Lookup
+      [(InputExpression Term, LookupTableColumn)]
+      LookupTableOutputColumn
   | Const Scalar
   | Plus Term Term
   | Times Term Term

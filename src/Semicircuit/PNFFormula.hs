@@ -5,20 +5,18 @@
 
 module Semicircuit.PNFFormula
   ( toPNFFormula,
-    functionCalls,
     toSemicircuit,
   )
 where
 
 import Control.Lens ((^.))
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Set (Set)
 import qualified Data.Set as Set
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Sigma11 (existentialQuantifierName)
 import qualified Semicircuit.Types.PNFFormula as PNF
 import qualified Semicircuit.Types.QFFormula as QF
-import Semicircuit.Types.Semicircuit (AdviceTerms (..), FreeVariables (..), FunctionCall (..), FunctionCalls (..), Semicircuit (..))
+import Semicircuit.Types.Semicircuit (FreeVariables (..), Semicircuit (..))
 import qualified Semicircuit.Types.Sigma11 as S11
 
 -- Turns a strong prenex normal form into a PNF formula.
@@ -73,81 +71,6 @@ toPNFFormula ann =
           Left . ErrorMessage ann $
             "input formula is not a prenex normal form"
 
-functionCalls :: PNF.Formula -> FunctionCalls
-functionCalls (PNF.Formula qf (PNF.Quantifiers es us gs)) =
-  qff qf <> mconcat (eQ <$> es) <> mconcat (uQ <$> us) <> mconcat (gQ <$> gs)
-  where
-    qff :: QF.Formula -> FunctionCalls
-    qff =
-      \case
-        QF.Equal x y -> term x <> term y
-        QF.LessOrEqual x y -> term x <> term y
-        QF.Predicate _ xs -> mconcat $ term <$> xs
-        QF.Not p -> qff p
-        QF.And p q -> qff p <> qff q
-        QF.Or p q -> qff p <> qff q
-        QF.Implies p q -> qff p <> qff q
-        QF.Iff p q -> qff p <> qff q
-        QF.Top -> mempty
-        QF.Bottom -> mempty
-
-    eQ ::
-      PNF.ExistentialQuantifier ->
-      FunctionCalls
-    eQ =
-      \case
-        S11.Some _ _ inBounds outBound ->
-          mconcat (bound . (^. #bound) <$> inBounds)
-            <> bound (outBound ^. #unOutputBound)
-        S11.SomeP _ _ inBound outBound ->
-          bound (inBound ^. #bound)
-            <> bound (outBound ^. #unOutputBound)
-
-    uQ ::
-      PNF.UniversalQuantifier ->
-      FunctionCalls
-    uQ (PNF.All _ b) = bound b
-
-    gQ :: PNF.InstanceQuantifier -> FunctionCalls
-    gQ (PNF.Instance _ _ ibs ob) =
-      mconcat (bound . (^. #bound) <$> ibs) <> bound (ob ^. #unOutputBound)
-
-    bound ::
-      S11.Bound ->
-      FunctionCalls
-    bound =
-      \case
-        S11.TermBound x -> term x
-        S11.FieldMaxBound -> mempty
-
-    term ::
-      S11.Term ->
-      FunctionCalls
-    term =
-      \case
-        S11.App f xs ->
-          mconcat (term <$> xs)
-            <> ( case NonEmpty.nonEmpty xs of
-                   Just xs' -> FunctionCalls (Set.singleton (FunctionCall f xs'))
-                   Nothing -> mempty
-               )
-        S11.AppInverse f x ->
-          term x
-            <> FunctionCalls (Set.singleton (FunctionCall f [x])) -- TODO: invert
-        S11.Add x y -> term x <> term y
-        S11.Mul x y -> term x <> term y
-        S11.IndLess x y -> term x <> term y
-        S11.Max x y -> term x <> term y
-        S11.Const _ -> mempty
-
-functionCallsArguments :: FunctionCalls -> AdviceTerms
-functionCallsArguments =
-  mconcat . fmap functionCallArguments . Set.toList . unFunctionCalls
-
-functionCallArguments :: FunctionCall -> AdviceTerms
-functionCallArguments (FunctionCall _ ts) =
-  AdviceTerms (Set.fromList (NonEmpty.toList ts))
-
 freeVariables :: PNF.Formula -> FreeVariables
 freeVariables (PNF.Formula qf qs) =
   FreeVariables (Set.difference (allVariables qf) (quantifiedVariables qs))
@@ -187,19 +110,4 @@ allVariables =
 
 -- Turns a PNF formula into a semicircuit.
 toSemicircuit :: PNF.Formula -> Semicircuit
-toSemicircuit f =
-  let fvs = freeVariables f
-      fs = functionCalls f
-      ts =
-        AdviceTerms
-          ( Set.fromList
-              ( functionCallToTerm
-                  <$> Set.toList (unFunctionCalls fs)
-              )
-          )
-          <> functionCallsArguments fs
-   in Semicircuit fvs fs ts f
-
-functionCallToTerm :: FunctionCall -> S11.Term
-functionCallToTerm (FunctionCall f xs) =
-  S11.App f (NonEmpty.toList xs)
+toSemicircuit f = Semicircuit (freeVariables f) f
