@@ -14,6 +14,7 @@ module Halo2.Types.CircuitMetrics
     GateConstraintCount (GateConstraintCount),
     LookupArgumentCount (LookupArgumentCount),
     LookupTableSize (LookupTableSize),
+    RowOffsetMagnitude (RowOffsetMagnitude),
   )
 where
 
@@ -28,7 +29,8 @@ data CircuitMetrics = CircuitMetrics
     polyDegreeBound :: PolynomialDegreeBound,
     gateConstraintCount :: GateConstraintCount,
     lookupArgumentCount :: LookupArgumentCount,
-    lookupTableSize :: LookupTableSize
+    lookupTableSize :: LookupTableSize,
+    rowOffsetMagnitude :: RowOffsetMagnitude
   }
   deriving stock (Generic, Show)
 
@@ -62,5 +64,11 @@ newtype LookupArgumentCount = LookupArgumentCount {unLookupArgumentCount :: Int}
   deriving newtype (Show)
 
 newtype LookupTableSize = LookupTableSize {unLookupTableSize :: Int}
+  deriving stock (Generic)
+  deriving newtype (Eq, Ord, Num, Show)
+
+-- The maximum absolute value of a relative row offset in a
+-- polynomial variable.
+newtype RowOffsetMagnitude = RowOffsetMagnitude {unRowOffsetMagnitude :: Int}
   deriving stock (Generic)
   deriving newtype (Eq, Ord, Num, Show)
