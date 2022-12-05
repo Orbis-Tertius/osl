@@ -209,6 +209,7 @@ prependQuantifier (Instance x n ibs ob) f =
 -- to account for name shadowing, since all gensyms
 -- are globally unique.
 prependArguments :: Name -> [Term] -> Formula -> Formula
+prependArguments _ [] = id
 prependArguments f xs =
   \case
     Equal a b -> Equal (term a) (term b)

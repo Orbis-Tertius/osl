@@ -11,7 +11,6 @@ module OSL.EntryPoint
   )
 where
 
--- import Control.Lens ((^.))
 import Control.Monad.Trans.State.Strict (runStateT)
 import Data.ByteString (readFile)
 import Data.Either.Extra (mapLeft)
@@ -141,6 +140,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
                      <> show pnf
                      <> "\n\nStrong prenex normal form: "
                      <> show spnf
+                     <> "\n\nSuper strong prenex normal form: "
+                     <> show sspnf
                      <> "\n\nPNF formula: "
                      <> show pnff
                      <> "\n\nSemicircuit: "

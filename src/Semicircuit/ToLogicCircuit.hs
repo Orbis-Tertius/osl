@@ -31,7 +31,7 @@ import Control.Monad.State (State, evalState, get, put)
 import Data.List.Extra (foldl', (!?))
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, catMaybes)
 import qualified Data.Set as Set
 import Data.Text (Text, pack)
 import Die (die)
@@ -54,7 +54,7 @@ import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative))
-import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound)
+import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound, getInputName)
 import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), InstanceQuantifier (Instance), UniversalQuantifier (All))
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit)
@@ -110,7 +110,7 @@ nameMappings x =
       [ freeVariableMappings x,
         instanceVariableMappings x,
         universalVariableMappings x,
-        existentialVariableMappings x
+        existentialQuantifiersMappings x
       ]
 
 universalVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
@@ -148,33 +148,40 @@ instanceVariableMapping q =
               (ArgMapping <$> nextCol ColType.Instance)
         )
 
-existentialVariableMappings ::
+existentialQuantifiersMappings ::
   Semicircuit ->
   State S (Map Name NameMapping)
-existentialVariableMappings x =
-  Map.fromList
+existentialQuantifiersMappings x =
+  mconcat
     <$> mapM
-      existentialVariableMapping
+      existentialQuantifierMappings
       (x ^. #formula . #quantifiers . #existentialQuantifiers)
 
-existentialVariableMapping ::
-  ExistentialQuantifier -> State S (Name, NameMapping)
-existentialVariableMapping =
+existentialQuantifierMappings ::
+  ExistentialQuantifier -> State S (Map Name NameMapping)
+existentialQuantifierMappings =
   \case
-    Some x _ _ _ ->
-      (x,)
-        <$> ( NameMapping
-                <$> (OutputMapping <$> nextCol ColType.Advice)
-                <*> replicateM
-                  (x ^. #arity . #unArity)
-                  (ArgMapping <$> nextCol ColType.Advice)
-            )
-    SomeP x _ _ _ ->
-      (x,)
-        <$> ( NameMapping
-                <$> (OutputMapping <$> nextCol ColType.Advice)
-                <*> ((: []) . ArgMapping <$> nextCol ColType.Advice)
-            )
+    Some x _ ibs _ -> do
+      outMapping <- OutputMapping <$> nextCol ColType.Advice
+      argMappings <- replicateM
+        (x ^. #arity . #unArity)
+        (ArgMapping <$> nextCol ColType.Advice)
+      pure . Map.fromList $
+        [(x, NameMapping outMapping argMappings)] <>
+        catMaybes
+          [ (, NameMapping (OutputMapping (m ^. #unArgMapping)) [])
+              <$> getInputName ib
+          | (ib, m) <- zip ibs argMappings
+          ]
+    SomeP x _ ib _ -> do
+      outMapping <- OutputMapping <$> nextCol ColType.Advice
+      argMapping <- ArgMapping <$> nextCol ColType.Advice
+      pure . Map.fromList $
+        [(x, NameMapping outMapping [argMapping])] <>
+        catMaybes
+          [ (, NameMapping (OutputMapping (argMapping ^. #unArgMapping)) [])
+              <$> getInputName ib
+          ]
 
 freeVariableMappings :: Semicircuit -> State S (Map Name NameMapping)
 freeVariableMappings x =

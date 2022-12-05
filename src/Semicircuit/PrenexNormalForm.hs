@@ -38,9 +38,9 @@ toSuperStrongPrenexNormalForm ::
   Formula ->
   ([Quantifier], Formula)
 toSuperStrongPrenexNormalForm qs f =
-  let (qs', substitutions) = unzip $
-        mergeQuantifiers nextSym <$> groupMergeableQuantifiers qs
-  in (qs', foldl' (flip ($)) f substitutions)
+  let (qs', substitutions) = unzip . flip evalState nextSym $
+        mapM mergeQuantifiers (groupMergeableQuantifiers qs)
+  in (qs', foldl' (.) id substitutions $ f)
   where
     nextSym :: NextSym
     nextSym = NextSym (1 + foldl' max 0 ((^. #sym) <$> Set.toList (mconcat (getNames <$> qs) <> getNames f)))
@@ -51,14 +51,13 @@ toSuperStrongPrenexNormalForm qs f =
 -- quantified variables with applications of the merged quantified
 -- variable.
 mergeQuantifiers ::
-  NextSym ->
   [Quantifier] ->
-  (Quantifier, Formula -> Formula)
-mergeQuantifiers _ [q] = (q, id)
-mergeQuantifiers nextSym qs =
+  State NextSym (Quantifier, Formula -> Formula)
+mergeQuantifiers [q] = pure (q, id)
+mergeQuantifiers qs = do
   let (qs', padSubst) = padToSameArity qs
-      (q, mergeSubst) = evalState (mergePaddedQuantifiers qs') nextSym
-  in (q, mergeSubst . padSubst)
+  (q, mergeSubst) <- mergePaddedQuantifiers qs'
+  pure (q, mergeSubst . padSubst)
 
 -- Assumes the quantifier sequence is mergeable into a single
 -- quantifier. Returns the same quantifier sequence but with all
@@ -87,13 +86,15 @@ padToArity arity =
     Universal {} -> die "padToArity: saw a universal quantifier (this is a compiler bug)"
     Existential (SomeP {}) -> die "padToArity: saw a permutation quantifier (this is a compiler bug)"
     Existential (Some x n ibs ob) ->
-      let d = (arity ^. #unArity) - length ibs in
-      ( Existential $ Some x n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
+      let d = (arity ^. #unArity) - length ibs
+          x' = Name arity (x ^. #sym) in
+      ( Existential $ Some x' n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
         prependArguments x (replicate d (Const 0))
       )
     Instance x n ibs ob ->
-      let d = (arity ^. #unArity) - length ibs in
-      ( Instance x n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
+      let d = (arity ^. #unArity) - length ibs
+          x' = Name arity (x ^. #sym) in
+      ( Instance x' n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
         prependArguments x (replicate d (Const 0))
       )
 
@@ -146,16 +147,16 @@ mergePaddedQuantifierSigs ::
   [(Name, Cardinality, [InputBound], OutputBound)] ->
   State NextSym ((Name, Cardinality, [InputBound], OutputBound), Formula -> Formula)
 mergePaddedQuantifierSigs [] = die "mergePaddedQuantifierSigs: no signatures provided (this is a compiler bug)"
-mergePaddedQuantifierSigs sigs@((f0, _, ibs, _):_) = do
+mergePaddedQuantifierSigs sigs@((_, _, ibs, _):_) = do
   h <- Name (Arity (length ibs + 1)) <$> getNextSym
-  (,) <$> (uncurry (f0, cardinality,,) <$> mergedBounds)
+  (,) <$> (uncurry (h, cardinality,,) <$> mergedBounds)
       <*> pure (substitutions h)
   where
     cardinality :: Cardinality
     cardinality = foldl' (+) 0 $ (^. _2) <$> sigs
 
-    names :: [Name]
-    names = sigs <&> (^. _1)
+    quantifierNames :: [Name]
+    quantifierNames = sigs <&> (^. _1)
 
     mergedBounds :: State NextSym ([InputBound], OutputBound)
     mergedBounds = do
@@ -225,7 +226,7 @@ mergePaddedQuantifierSigs sigs@((f0, _, ibs, _):_) = do
     functionNameSubstitutions h =
       foldl (.) id
         [ substitute (FromName f') (ToName h)
-        | f <- names,
+        | f <- quantifierNames,
           let f' = Name (f ^. #arity + 1) (f ^. #sym)
         ]
 
@@ -233,7 +234,7 @@ mergePaddedQuantifierSigs sigs@((f0, _, ibs, _):_) = do
     tagPrependingSubstitutions =
       foldl (.) id
         [ prependArguments f [Const i]
-        | (i, f) <- zip [0..] names
+        | (i, f) <- zip [0..] quantifierNames
         ]
 
 getNextSym :: State NextSym Int
