@@ -44,7 +44,7 @@ import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
-import Halo2.Types.PolynomialVariable (PolynomialVariable)
+import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Types.Arity (Arity (Arity))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero)
@@ -289,16 +289,17 @@ getMapping bitsPerByte c =
     nextEid' = SubexpressionIdOf <$> nextEid
 
     go :: State S Mapping
-    go =
-      Mapping
-        <$> (CaseNumberColumnIndex <$> nextCol)
-        <*> (StepTypeColumnIndex <$> nextCol)
-        <*> (StepIndicatorColumnIndex <$> nextCol)
-        <*> replicateM
+    go = do
+      cnc <- CaseNumberColumnIndex <$> nextCol
+      stc <- StepTypeColumnIndex <$> nextCol
+      sic <- StepIndicatorColumnIndex <$> nextCol
+      ins <-
+        replicateM
           (getStepArity c ^. #unArity)
           (InputColumnIndex <$> nextCol)
-        <*> (OutputColumnIndex <$> nextCol)
-        <*> ( ByteDecompositionMapping bitsPerByte
+      out <- OutputColumnIndex <$> nextCol
+      Mapping cnc stc sic ins out
+        <$> ( ByteDecompositionMapping bitsPerByte
                 <$> (SignColumnIndex <$> nextCol)
                 <*> replicateM
                   (getByteDecompositionLength bitsPerByte c)
@@ -350,68 +351,70 @@ getMapping bitsPerByte c =
                             <$> replicateM (length scalars) nextEid'
                         )
                     <*> pure mempty
-                traverseLookupArguments (c ^. #lookupArguments)
-                  =<< traverseLogicConstraints m0 (c ^. #gateConstraints)
+                traverseLookupArguments out (c ^. #lookupArguments)
+                  =<< traverseLogicConstraints out m0 (c ^. #gateConstraints)
             )
 
-    traverseLookupArguments :: LookupArguments LC.Term -> SubexpressionIdMapping -> State S SubexpressionIdMapping
-    traverseLookupArguments args m' =
-      foldM traverseLookupArgument m' (args ^. #getLookupArguments)
+    traverseLookupArguments :: OutputColumnIndex -> LookupArguments LC.Term -> SubexpressionIdMapping -> State S SubexpressionIdMapping
+    traverseLookupArguments out args m' =
+      foldM (traverseLookupArgument out) m' (args ^. #getLookupArguments)
 
-    traverseLookupArgument :: SubexpressionIdMapping -> LookupArgument LC.Term -> State S SubexpressionIdMapping
-    traverseLookupArgument m' arg = do
-      (gateId, m'') <- traverseLookupGate m' (arg ^. #gate)
-      (bareLookupId, m''') <- traverseBareLookupArgument m'' (BareLookupArgument (arg ^. #tableMap))
+    traverseLookupArgument :: OutputColumnIndex -> SubexpressionIdMapping -> LookupArgument LC.Term -> State S SubexpressionIdMapping
+    traverseLookupArgument out m' arg = do
+      (gateId, m'') <- traverseLookupGate out m' (arg ^. #gate)
+      (bareLookupId, m''') <- traverseBareLookupArgument out m'' (BareLookupArgument (arg ^. #tableMap))
       addLookupAssertion m''' . LookupAssertion bareLookupId gateId
         . OutputSubexpressionId
         <$> nextEid
 
-    traverseLookupGate :: SubexpressionIdMapping -> LC.Term -> State S (GateSubexpressionIds, SubexpressionIdMapping)
-    traverseLookupGate m' x = do
-      (inId, m'') <- traverseTerm m' x
+    traverseLookupGate :: OutputColumnIndex -> SubexpressionIdMapping -> LC.Term -> State S (GateSubexpressionIds, SubexpressionIdMapping)
+    traverseLookupGate out m' x = do
+      (inId, m'') <- traverseTerm out m' x
       (outId, m''') <- addOp m'' (Equals' (zeroEid m'') inId) <$> nextEid'
       pure (GateSubexpressionIds (InputSubexpressionId inId) (OutputSubexpressionId outId), m''')
 
-    traverseBareLookupArgument :: SubexpressionIdMapping -> BareLookupArgument -> State S (BareLookupSubexpressionId, SubexpressionIdMapping)
-    traverseBareLookupArgument m' arg =
+    traverseBareLookupArgument :: OutputColumnIndex -> SubexpressionIdMapping -> BareLookupArgument -> State S (BareLookupSubexpressionId, SubexpressionIdMapping)
+    traverseBareLookupArgument out m' arg = do
+      m'' <-
+        foldM
+          (\m'' e -> snd <$> traverseTerm out m'' (fst e ^. #getInputExpression))
+          m'
+          (arg ^. #getBareLookupArgument)
       case Map.lookup arg (m' ^. #bareLookups) of
-        Just bareLookupId -> do
-          m'' <-
-            foldM
-              (\m'' e -> snd <$> traverseTerm m'' (fst e ^. #getInputExpression))
-              m'
-              (arg ^. #getBareLookupArgument)
-          pure (bareLookupId, m'')
-        Nothing -> die "traverseBareLookupArgument: argument id not found (this is a compiler bug)"
+        Just bareLookupId -> pure (bareLookupId, m'')
+        Nothing -> do
+          eid <- BareLookupSubexpressionId <$> nextEid
+          let m''' = m'' <> SubexpressionIdMapping mzero mempty mempty (Map.singleton arg eid) mempty mempty mempty
+          pure (eid, m''')
 
-    traverseLogicConstraints :: SubexpressionIdMapping -> LogicConstraints -> State S SubexpressionIdMapping
-    traverseLogicConstraints m' lcs =
-      foldM traverseAssertion m' (lcs ^. #constraints)
+    traverseLogicConstraints :: OutputColumnIndex -> SubexpressionIdMapping -> LogicConstraints -> State S SubexpressionIdMapping
+    traverseLogicConstraints out m' lcs =
+      foldM (traverseAssertion out) m' (lcs ^. #constraints)
 
-    traverseAssertion :: SubexpressionIdMapping -> LogicConstraint -> State S SubexpressionIdMapping
-    traverseAssertion m' lc = do
-      (inEid, m'') <- traverseConstraint m' lc
+    traverseAssertion :: OutputColumnIndex -> SubexpressionIdMapping -> LogicConstraint -> State S SubexpressionIdMapping
+    traverseAssertion out m' lc = do
+      (inEid, m'') <- traverseConstraint out m' lc
       outEid <- OutputSubexpressionId <$> nextEid
       pure (addAssertion m'' (Assertion (InputSubexpressionId inEid) outEid))
 
-    traverseConstraint :: SubexpressionIdMapping -> LogicConstraint -> State S (SubexpressionId, SubexpressionIdMapping)
-    traverseConstraint m' =
+    traverseConstraint :: OutputColumnIndex -> SubexpressionIdMapping -> LogicConstraint -> State S (SubexpressionId, SubexpressionIdMapping)
+    traverseConstraint out m' =
       \case
-        LC.Atom x -> traverseAtom m' x
+        LC.Atom x -> traverseAtom out m' x
         LC.Not x -> do
-          (xId, m'') <- traverseConstraint m' x
+          (xId, m'') <- traverseConstraint out m' x
           addOp m'' (Not' xId) <$> nextEid'
         LC.And x y -> do
-          (xId, m'') <- traverseConstraint m' x
-          (yId, m''') <- traverseConstraint m'' y
+          (xId, m'') <- traverseConstraint out m' x
+          (yId, m''') <- traverseConstraint out m'' y
           addOp m''' (TimesAnd' xId yId) <$> nextEid'
         LC.Or x y -> do
-          (xId, m'') <- traverseConstraint m' x
-          (yId, m''') <- traverseConstraint m'' y
+          (xId, m'') <- traverseConstraint out m' x
+          (yId, m''') <- traverseConstraint out m'' y
           addOp m''' (Or' xId yId) <$> nextEid'
         LC.Iff x y -> do
-          (xId, m'') <- traverseConstraint m' x
-          (yId, m''') <- traverseConstraint m'' y
+          (xId, m'') <- traverseConstraint out m' x
+          (yId, m''') <- traverseConstraint out m'' y
           addOp m''' (Iff' xId yId) <$> nextEid'
         LC.Top -> pure (oneEid m', m')
         LC.Bottom -> pure (zeroEid m', m')
@@ -451,43 +454,54 @@ getMapping bitsPerByte c =
       m' <> SubexpressionIdMapping mzero mempty mempty mempty (Set.singleton a) mempty mempty
 
     traverseAtom ::
+      OutputColumnIndex ->
       SubexpressionIdMapping ->
       AtomicLogicConstraint ->
       State S (SubexpressionId, SubexpressionIdMapping)
-    traverseAtom m' =
+    traverseAtom out m' =
       \case
         LC.Equals x y -> do
-          (xId, m'') <- traverseTerm m' x
-          (yId, m''') <- traverseTerm m'' y
+          (xId, m'') <- traverseTerm out m' x
+          (yId, m''') <- traverseTerm out m'' y
           addOp m''' (Equals' xId yId) <$> nextEid'
         LC.LessThan x y -> do
-          (xId, m'') <- traverseTerm m' x
-          (yId, m''') <- traverseTerm m'' y
+          (xId, m'') <- traverseTerm out m' x
+          (yId, m''') <- traverseTerm out m'' y
           addOp m''' (LessThan' xId yId) <$> nextEid'
 
     traverseTerm ::
+      OutputColumnIndex ->
       SubexpressionIdMapping ->
       LC.Term ->
       State S (SubexpressionId, SubexpressionIdMapping)
-    traverseTerm m' =
+    traverseTerm out m' =
       \case
         LC.Var x -> pure (varEid m' x, m')
+        LC.Lookup is (LC.LookupTableOutputColumn o) -> do
+          (eid, m'') <-
+            traverseBareLookupArgument out m' . BareLookupArgument $
+              is
+                <> [ ( InputExpression (LC.Var (PolynomialVariable (out ^. #unOutputColumnIndex) 0)),
+                       o
+                     )
+                   ]
+          pure (eid ^. #unBareLookupSubexpressionId, m'')
         LC.Const x -> pure (constantEid m' x, m')
         LC.Plus x y -> do
-          (xEid, m'') <- traverseTerm m' x
-          (yEid, m''') <- traverseTerm m'' y
+          (xEid, m'') <- traverseTerm out m' x
+          (yEid, m''') <- traverseTerm out m'' y
           addOp m''' (Plus' xEid yEid) <$> nextEid'
         LC.Times x y -> do
-          (xEid, m'') <- traverseTerm m' x
-          (yEid, m''') <- traverseTerm m'' y
+          (xEid, m'') <- traverseTerm out m' x
+          (yEid, m''') <- traverseTerm out m'' y
           addOp m''' (TimesAnd' xEid yEid) <$> nextEid'
         LC.Max x y -> do
-          (xEid, m'') <- traverseTerm m' x
-          (yEid, m''') <- traverseTerm m'' y
+          (xEid, m'') <- traverseTerm out m' x
+          (yEid, m''') <- traverseTerm out m'' y
           addOp m''' (Max' xEid yEid) <$> nextEid'
         LC.IndLess x y -> do
-          (xEid, m'') <- traverseTerm m' x
-          (yEid, m''') <- traverseTerm m'' y
+          (xEid, m'') <- traverseTerm out m' x
+          (yEid, m''') <- traverseTerm out m'' y
           addOp m''' (LessThan' xEid yEid) <$> nextEid'
 
     varEid :: SubexpressionIdMapping -> PolynomialVariable -> SubexpressionId
