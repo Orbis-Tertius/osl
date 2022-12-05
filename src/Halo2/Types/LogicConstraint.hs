@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -9,12 +12,23 @@ module Halo2.Types.LogicConstraint
   )
 where
 
+import Data.List (intercalate)
 import Halo2.Prelude
+import Halo2.Types.InputExpression (InputExpression)
+import Halo2.Types.LookupTableColumn (LookupTableColumn)
 import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Stark.Types.Scalar (Scalar)
 
+newtype LookupTableOutputColumn =
+  LookupTableOutputColumn
+    { unLookupTableOutputColumn :: LookupTableColumn }
+  deriving stock (Eq, Ord, Generic)
+  deriving newtype (Show)
+
 data Term
   = Var PolynomialVariable
+  | Lookup [(InputExpression Term, LookupTableColumn)]
+           LookupTableOutputColumn
   | Const Scalar
   | Plus Term Term
   | Times Term Term
@@ -26,6 +40,7 @@ instance Show Term where
   show =
     \case
       Var x -> show x
+      Lookup is o -> show o <> "(" <> intercalate ", " (show <$> is) <> ")"
       Const x -> show x
       Plus x y -> "(" <> show x <> " + " <> show y <> ")"
       Times x y -> "(" <> show x <> " + " <> show y <> ")"

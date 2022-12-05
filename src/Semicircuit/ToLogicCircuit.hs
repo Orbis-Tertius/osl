@@ -61,7 +61,7 @@ import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative))
 import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound)
 import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), InstanceQuantifier (Instance), UniversalQuantifier (All))
 import qualified Semicircuit.Types.QFFormula as QF
-import Semicircuit.Types.Semicircuit (FunctionCall (..), Semicircuit)
+import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), TermMapping (..), ZeroVectorIndex (..))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), InputBound, Name, OutputBound (OutputBound), Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
 import Stark.Types.Scalar (minusOne, one, order, scalarToInt, zero)
@@ -484,50 +484,6 @@ universalQuantifierBounds ::
   LogicConstraints
 universalQuantifierBounds x layout (All name bound) =
   quantifierBounds "universal" x layout name [] (OutputBound bound)
-
-functionCallOutputColumnBounds ::
-  Semicircuit ->
-  Layout ->
-  LogicConstraints ->
-  LogicConstraints
-functionCallOutputColumnBounds x layout =
-  foldl'
-    (.)
-    id
-    ( functionCallOutputColumnBound layout
-        <$> Set.toList (x ^. #functionCalls . #unFunctionCalls)
-    )
-
-functionCallOutputColumnBound ::
-  Layout ->
-  FunctionCall ->
-  LogicConstraints ->
-  LogicConstraints
-functionCallOutputColumnBound layout (FunctionCall name _) constraints =
-  case Map.lookup name (layout ^. #nameMappings) of
-    Just (NameMapping (OutputMapping i) _) ->
-      case Map.lookup i (constraints ^. #bounds) of
-        Just b ->
-          constraints <> LogicConstraints mempty (Map.singleton i b)
-        Nothing ->
-          die $
-            "functionCallOutputColumnBound: output bound lookup failed (this is a compiler bug)"
-              <> pack (show (name, i, constraints ^. #bounds))
-    Nothing -> die "functionCallOutputColumnBound: name mapping lookup failed (this is a compiler bug)"
-
-adviceTermColumnBounds ::
-  Semicircuit ->
-  Layout ->
-  LogicConstraints ->
-  LogicConstraints
-adviceTermColumnBounds x layout constraints =
-  constraints
-    <> mconcat
-      [ LogicConstraints
-          mempty
-          (Map.singleton i (termToFixedBound x layout constraints term))
-        | (term, TermMapping i) <- Map.toList (layout ^. #termMappings)
-      ]
 
 dummyRowAdviceColumnBounds ::
   Layout ->
