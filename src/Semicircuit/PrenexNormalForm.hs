@@ -28,6 +28,26 @@ toSuperStrongPrenexNormalForm ::
   Either (ErrorMessage ann) ([Quantifier], Formula)
 toSuperStrongPrenexNormalForm = todo
 
+-- Partitions the quantifier sequence into maximal subsequences
+-- which are each mergeable into a single quantifier.
+groupMergeableQuantifiers ::
+  [Quantifier] ->
+  [[Quantifier]]
+groupMergeableQuantifiers =
+  \case
+    (Universal x a : qs) ->
+      -- Universals are never mergeable, and there is never another
+      -- quantifier type after a universal.
+      ([Universal x a] : ((:[]) <$> qs))
+    (Existential q : Universal x a : qs) ->
+      ([Existential q] : [Universal x a] : ((:[]) <$> qs))
+    (Existential q : Existential r@(SomeP {}) : qs) ->
+      ([Existential q] : [Existential r] : rec qs)
+    (Existential q@(SomeP {}) : qs) ->
+      ([Existential q] : rec qs)
+  where
+    rec = groupMergeableQuantifiers
+
 todo :: a
 todo = todo
 
