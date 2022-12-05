@@ -17,7 +17,7 @@ import Data.ByteString (readFile)
 import Data.Either.Extra (mapLeft)
 import Data.Text (Text, pack)
 import Data.Text.Encoding (decodeUtf8')
-import Halo2.CircuitMetrics (getCircuitMetrics)
+-- import Halo2.CircuitMetrics (getCircuitMetrics)
 import Halo2.Types.BitsPerByte (BitsPerByte (BitsPerByte))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.BuildTranslationContext (buildTranslationContext)
@@ -35,7 +35,7 @@ import Semicircuit.Sigma11 (prependQuantifiers)
 import Semicircuit.ToLogicCircuit (semicircuitToLogicCircuit)
 import System.Environment (getArgs)
 import Trace.FromLogicCircuit (logicCircuitToTraceType)
-import Trace.Metrics (getTraceTypeMetrics)
+-- import Trace.Metrics (getTraceTypeMetrics)
 import Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit)
 import Prelude hiding (readFile)
 
@@ -125,19 +125,19 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
           (logic, layout) = semicircuitToLogicCircuit rowCount semi
           traceType = logicCircuitToTraceType bitsPerByte logic
           circuit = traceTypeToArithmeticCircuit traceType
-          circuitMetrics = getCircuitMetrics circuit
-          traceTypeMetrics = getTraceTypeMetrics traceType
+          -- circuitMetrics = getCircuitMetrics circuit
+          -- traceTypeMetrics = getTraceTypeMetrics traceType
       pure . SuccessfulOutput $
         "Translated OSL:\n"
           <> show translated
           <> (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
           <> ( case compileToCircuit of
                  CompileToCircuit ->
-                   "\n\nTrace type metrics: "
+                   {-"\n\nTrace type metrics: "
                      <> show traceTypeMetrics
                      <> "\n\nCircuit metrics: "
                      <> show circuitMetrics
-                     <> "\n\nPrenex normal form: "
+                     <>-} "\n\nPrenex normal form: "
                      <> show pnf
                      <> "\n\nStrong prenex normal form: "
                      <> show spnf
