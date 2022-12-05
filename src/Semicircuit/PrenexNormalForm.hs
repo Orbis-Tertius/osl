@@ -11,11 +11,12 @@ module Semicircuit.PrenexNormalForm
 where
 
 import Control.Lens ((^.))
-import Data.Bifunctor (second)
+import Data.Bifunctor (first, second)
 import Data.List (foldl')
 import Die (die)
 import qualified Data.Set as Set
 import OSL.Types.Arity (Arity)
+import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Sigma11 (FromName (FromName), ToName (ToName), prependArguments, prependBounds, substitute, foldConstants, HasNames (getNames), HasArity (getArity))
 import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name, OutputBound (..), Quantifier (..), Term (Add, Const, Max), someFirstOrder, var)
@@ -46,8 +47,8 @@ mergeQuantifiers ::
   (Quantifier, Formula -> Formula)
 mergeQuantifiers [q] = (q, id)
 mergeQuantifiers qs =
-  let (qs', arity, padSubst) = padToSameArity qs
-      (q, mergeSubst) = mergePaddedQuantifiers qs' arity
+  let (qs', padSubst) = padToSameArity qs
+      (q, mergeSubst) = mergePaddedQuantifiers qs'
   in (q, mergeSubst . padSubst)
 
 -- Assumes the quantifier sequence is mergeable into a single
@@ -58,11 +59,11 @@ mergeQuantifiers qs =
 -- zeroes as needed to be consistent.
 padToSameArity ::
   [Quantifier] ->
-  ([Quantifier], Arity, Formula -> Formula)
+  ([Quantifier], Formula -> Formula)
 padToSameArity qs =
   let arity = foldl' max 0 (getArity <$> qs)
       (qs', subs) = unzip (padToArity arity <$> qs)
-  in (qs', arity, foldl' (.) id subs)
+  in (qs', foldl' (.) id subs)
 
 -- Returns the given quantifier padded with extra arguments as
 -- needed to bring it to the given arity. Assumes that this can
@@ -95,9 +96,47 @@ padToArity arity =
 -- variable.
 mergePaddedQuantifiers ::
   [Quantifier] ->
-  Arity ->
   (Quantifier, Formula -> Formula)
-mergePaddedQuantifiers = todo
+mergePaddedQuantifiers =
+  \case
+    [] -> die "mergePaddedQuantifiers: empty quantifier list (this is a compiler bug)"
+    qs@(Existential _ : _) ->
+      mergePaddedExistentialQuantifiers qs
+    qs@(Instance {} : _) ->
+      mergePaddedInstanceQuantifiers qs
+    Universal {} : _ ->
+      die "mergePaddedQuantifiers: saw a universal quantifier (this is a compiler bug)"
+
+mergePaddedExistentialQuantifiers ::
+  [Quantifier] ->
+  (Quantifier, Formula -> Formula)
+mergePaddedExistentialQuantifiers qs =
+  first sigToExistential (mergePaddedQuantifierSigs (quantifierSig <$> qs))
+
+mergePaddedInstanceQuantifiers ::
+  [Quantifier] ->
+  (Quantifier, Formula -> Formula)
+mergePaddedInstanceQuantifiers qs =
+  first sigToInstance (mergePaddedQuantifierSigs (quantifierSig <$> qs))
+
+quantifierSig :: Quantifier -> (Name, Cardinality, [InputBound], OutputBound)
+quantifierSig =
+  \case
+    Existential (Some x n ibs ob) -> (x, n, ibs, ob)
+    Existential (SomeP {}) -> die "quantifierSig: saw a permutation quantifier (this is a compiler bug)"
+    Instance x n ibs ob -> (x, n, ibs, ob)
+    Universal {} -> die "quantifierSig: saw a universal quantifier (this is a compiler bug)"
+
+sigToExistential :: (Name, Cardinality, [InputBound], OutputBound) -> Quantifier
+sigToExistential (x, n, ibs, ob) = Existential (Some x n ibs ob)
+
+sigToInstance :: (Name, Cardinality, [InputBound], OutputBound) -> Quantifier
+sigToInstance (x, n, ibs, ob) = Instance x n ibs ob
+
+mergePaddedQuantifierSigs ::
+  [(Name, Cardinality, [InputBound], OutputBound)] ->
+  ((Name, Cardinality, [InputBound], OutputBound), Formula -> Formula)
+mergePaddedQuantifierSigs = todo
 
 -- Assumes the quantifier sequence is in strong prenex normal form.
 -- Partitions the quantifier sequence into maximal subsequences
