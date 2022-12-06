@@ -2,12 +2,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module Halo2.Circuit
   ( HasPolynomialVariables (getPolynomialVariables),
     HasScalars (getScalars),
+    HasLookupArguments (getLookupArguments),
     getLookupTables,
   )
 where
@@ -15,19 +17,19 @@ where
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.Prelude
-import Halo2.Types.Circuit (Circuit)
+import Halo2.Types.Circuit (Circuit, LogicCircuit)
 import Halo2.Types.Coefficient (Coefficient (getCoefficient))
 import Halo2.Types.InputExpression (InputExpression (..))
-import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), Term (Const, IndLess, Lookup, Max, Plus, Times, Var))
+import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), Term (Const, IndLess, Lookup, Max, Plus, Times, Var), LookupTableOutputColumn (LookupTableOutputColumn))
 import Halo2.Types.LogicConstraints (LogicConstraints)
-import Halo2.Types.LookupArgument (LookupArgument)
-import Halo2.Types.LookupArguments (LookupArguments (getLookupArguments))
+import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
+import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn)
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (getPowerProduct))
-import Stark.Types.Scalar (Scalar)
+import Stark.Types.Scalar (Scalar, zero)
 
 class HasPolynomialVariables a where
   getPolynomialVariables :: a -> Set PolynomialVariable
@@ -92,7 +94,7 @@ instance HasPolynomialVariables a => HasPolynomialVariables (LookupArgument a) w
 
 instance HasPolynomialVariables a => HasPolynomialVariables (LookupArguments a) where
   getPolynomialVariables =
-    mconcat . fmap getPolynomialVariables . Set.toList . getLookupArguments
+    mconcat . fmap getPolynomialVariables . Set.toList . (^. #getLookupArguments)
 
 instance
   (HasPolynomialVariables a, HasPolynomialVariables b) =>
@@ -158,7 +160,7 @@ instance HasScalars a => HasScalars (LookupArgument a) where
 
 instance HasScalars a => HasScalars (LookupArguments a) where
   getScalars =
-    mconcat . fmap getScalars . Set.toList . getLookupArguments
+    mconcat . fmap getScalars . Set.toList . (^. #getLookupArguments)
 
 instance (HasScalars a, HasScalars b) => HasScalars (Circuit a b) where
   getScalars x =
@@ -167,9 +169,54 @@ instance (HasScalars a, HasScalars b) => HasScalars (Circuit a b) where
         getScalars (x ^. #lookupArguments)
       ]
 
-getLookupTables :: Ord b => Circuit a b -> Set (b, [LookupTableColumn])
-getLookupTables c =
+class HasLookupArguments a b where
+  getLookupArguments :: a -> LookupArguments b
+
+instance ( Ord b, HasLookupArguments a b ) => HasLookupArguments [a] b where
+  getLookupArguments = mconcat . fmap getLookupArguments
+
+instance HasLookupArguments (InputExpression Term) Term where
+  getLookupArguments = getLookupArguments . (^. #getInputExpression)
+
+instance HasLookupArguments Term Term where
+  getLookupArguments =
+    \case
+      Const _ -> mempty
+      Var _ -> mempty
+      Lookup is (LookupTableOutputColumn o) ->
+        LookupArguments
+          (Set.singleton
+            (LookupArgument "application" (Const zero) (is <> [(InputExpression (Const zero), o)]))) -- good enough for what we need it for, finding the lookup tables
+          <> getLookupArguments (fst <$> is)
+      Plus x y -> rec x <> rec y
+      Times x y -> rec x <> rec y
+      Max x y -> rec x <> rec y
+      IndLess x y -> rec x <> rec y
+    where
+      rec = getLookupArguments
+
+instance HasLookupArguments LogicConstraint Term where
+  getLookupArguments =
+    \case
+      Atom (Equals x y) -> term x <> term y
+      Atom (LessThan x y) -> term x <> term y
+      Not p -> rec p
+      And p q -> rec p <> rec q
+      Or p q -> rec p <> rec q
+      Iff p q -> rec p <> rec q
+      Top -> mempty
+      Bottom -> mempty
+    where
+      term = getLookupArguments
+      rec = getLookupArguments
+
+instance HasLookupArguments LogicCircuit Term where
+  getLookupArguments c =
+    (c ^. #lookupArguments) <> getLookupArguments (c ^. #gateConstraints . #constraints)
+
+getLookupTables :: HasLookupArguments a b => Ord b => a -> Set (b, [LookupTableColumn])
+getLookupTables x =
   Set.fromList
     [ (a ^. #gate, snd <$> (a ^. #tableMap))
-      | a <- Set.toList (c ^. #lookupArguments . #getLookupArguments)
+      | a <- Set.toList (getLookupArguments x ^. #getLookupArguments)
     ]

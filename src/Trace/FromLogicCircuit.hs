@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Trace.FromLogicCircuit
   ( logicCircuitToTraceType,
@@ -24,7 +25,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Die (die)
 import Halo2.ByteDecomposition (countBytes)
-import Halo2.Circuit (getLookupTables, getPolynomialVariables, getScalars)
+import Halo2.Circuit (getLookupTables, getPolynomialVariables, getScalars, getLookupArguments)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
@@ -570,13 +571,13 @@ getMapping bitsPerByte c =
     lookupTables' :: [LookupTable]
     lookupTables' =
       LookupTable . snd
-        <$> Set.toList (getLookupTables c)
+        <$> Set.toList (getLookupTables @LogicCircuit @LC.Term c)
 
     bareLookupArguments :: [BareLookupArgument]
     bareLookupArguments =
       Set.toList . Set.fromList $ -- this appears redundant but is actually there to eliminate redundancy
         BareLookupArgument . (^. #tableMap)
-          <$> Set.toList (c ^. #lookupArguments . #getLookupArguments)
+          <$> Set.toList (getLookupArguments c ^. #getLookupArguments)
 
     rowIndexToScalar :: RowIndex a -> Scalar
     rowIndexToScalar =
