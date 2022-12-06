@@ -4,7 +4,7 @@ module Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit) where
 
 import qualified Algebra.Additive as Group
 import Control.Lens ((<&>))
-import Data.List.Extra (foldl', mconcatMap)
+import Data.List.Extra (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Halo2.AIR (toCircuit)
@@ -24,7 +24,7 @@ import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.RowIndex (RowIndex (..))
 import Stark.Types.Scalar (one, scalarToInt, zero)
 import Trace.ToArithmeticAIR (Mappings, mappings, traceTypeToArithmeticAIR)
-import Trace.Types (StepType, StepTypeId, TraceType)
+import Trace.Types (StepTypeId, TraceType)
 
 traceTypeToArithmeticCircuit ::
   TraceType ->
@@ -145,25 +145,36 @@ traceStepTypeLookupArguments ::
   TraceType ->
   LookupArguments Polynomial
 traceStepTypeLookupArguments t =
-  mconcatMap (gatedStepTypeLookupArguments t) (Map.toList (t ^. #stepTypes))
+  gatedStepTypeLookupArguments t argMap
+  where
+    args :: LookupArguments Polynomial
+    args = mconcat (Map.elems (t ^. #stepTypes) <&> (^. #lookupArguments))
+
+    argMap :: Map (LookupArgument Polynomial) (Set StepTypeId)
+    argMap =
+      Map.fromList
+      [ (arg, Map.keysSet (Map.filter ((arg `Set.member`) . (^. #lookupArguments . #getLookupArguments)) (t ^. #stepTypes)))
+      | arg <- Set.toList (args ^. #getLookupArguments)
+      ]
 
 gatedStepTypeLookupArguments ::
   TraceType ->
-  (StepTypeId, StepType) ->
+  Map (LookupArgument Polynomial) (Set StepTypeId) ->
   LookupArguments Polynomial
-gatedStepTypeLookupArguments t (sId, s) =
-  mconcatMap
-    (LookupArguments . Set.singleton . gateStepTypeLookupArgument t sId)
-    (Set.toList (s ^. #lookupArguments . #getLookupArguments))
+gatedStepTypeLookupArguments t argMap =
+  LookupArguments $ Set.fromList
+    [ gateStepTypeLookupArgument t sIds arg
+    | (arg, sIds) <- Map.toList argMap
+    ]
 
 gateStepTypeLookupArgument ::
   TraceType ->
-  StepTypeId ->
+  Set StepTypeId ->
   LookupArgument Polynomial ->
   LookupArgument Polynomial
-gateStepTypeLookupArgument t sId arg =
+gateStepTypeLookupArgument t sIds arg =
   LookupArgument
-    (P.plus (P.times alpha (stepIndicatorGate t)) (stepTypeGate t sId))
+    (P.plus (P.times alpha (stepIndicatorGate t)) (stepTypesGate t sIds))
     (arg ^. #tableMap)
   where
     alpha =
@@ -187,6 +198,13 @@ stepTypeGate ::
 stepTypeGate t sId =
   P.constant (sId ^. #unStepTypeId)
     `P.minus` P.var' (t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex)
+
+stepTypesGate ::
+  TraceType ->
+  Set StepTypeId ->
+  Polynomial
+stepTypesGate t sIds =
+  foldl' P.times P.one [stepTypeGate t sId | sId <- Set.toList sIds]
 
 traceTypeEqualityConstraints ::
   TraceType ->
