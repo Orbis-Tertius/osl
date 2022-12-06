@@ -823,8 +823,6 @@ iffStepType m =
 voidStepType m =
   Map.singleton (m ^. #stepTypeIds . #voidT . #unOf) mempty
 
--- TODO: shouldn't equalsStepType and lessThanStepType
--- involve their outputs (true or false)?
 equalsStepType,
   lessThanStepType,
   maxStepType ::
