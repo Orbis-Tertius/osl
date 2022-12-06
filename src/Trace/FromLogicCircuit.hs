@@ -683,7 +683,7 @@ loadFromDifferentCaseStepType m =
   StepType
     mempty
     ( LookupArguments . Set.singleton $
-        LookupArgument
+        LookupArgument "loadFromDifferentCase"
           P.zero
           [(o, os), (c, cs), (t, ts)]
     )
@@ -723,7 +723,8 @@ lookupStepType ::
 lookupStepType m p (LookupTable t) =
   StepType
     mempty
-    (LookupArguments . Set.singleton $ LookupArgument p (zip inputExprs t))
+    (LookupArguments . Set.singleton
+       $ LookupArgument ("lookup-" <> show t) p (zip inputExprs t))
     mempty
   where
     inputExprs :: [InputExpression Polynomial]
@@ -1028,7 +1029,7 @@ byteRangeAndTruthChecks ::
 byteRangeAndTruthChecks m =
   LookupArguments $
     Set.fromList
-      [ LookupArgument
+      [ LookupArgument "byteRangeAndTruthCheck"
           P.zero
           [ ( InputExpression (P.var' (byteCol ^. #unByteColumnIndex)),
               LookupTableColumn (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex)

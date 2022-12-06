@@ -10,14 +10,16 @@ import Halo2.Types.InputExpression (InputExpression)
 import Halo2.Types.LookupTableColumn (LookupTableColumn)
 
 data LookupArgument a = LookupArgument
-  { gate :: a,
+  { label :: String,
+    gate :: a,
     tableMap :: [(InputExpression a, LookupTableColumn)]
   }
   deriving (Eq, Ord, Generic)
 
 instance Show a => Show (LookupArgument a) where
   show arg =
-    show (arg ^. #gate) <> " = 0 => ("
+    arg ^. #label
+      <> ":" <> show (arg ^. #gate) <> " = 0 => ("
       <> intercalate ", " (show <$> inputs)
       <> ") ∈ ("
       <> intercalate ", " (show <$> cols)
