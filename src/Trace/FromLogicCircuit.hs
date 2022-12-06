@@ -295,7 +295,7 @@ getMapping bitsPerByte c =
       sic <- StepIndicatorColumnIndex <$> nextCol
       ins <-
         replicateM
-          (getStepArity c ^. #unArity)
+          (getStepArity c ^. #unArity) -- TODO: this is not correct
           (InputColumnIndex <$> nextCol)
       out <- OutputColumnIndex <$> nextCol
       Mapping cnc stc sic ins out
