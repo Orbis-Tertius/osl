@@ -233,7 +233,42 @@ instance Semigroup SubexpressionIdMapping where
       (h <> p)
 
 getStepArity :: LogicCircuit -> Arity
-getStepArity = max 2 . getLookupArgumentsArity . (^. #lookupArguments)
+getStepArity c =
+  max (max 2 (foldl' max 0 (getConstraintArity <$> (c ^. #gateConstraints . #constraints)))) $
+    getLookupArgumentsArity (c ^. #lookupArguments)
+
+getConstraintArity :: LogicConstraint -> Arity
+getConstraintArity =
+  \case
+    LC.Atom (LC.Equals x y) -> term x `max` term y
+    LC.Atom (LC.LessThan x y) -> term x `max` term y
+    LC.And p q -> rec p `max` rec q
+    LC.Or p q -> rec p `max` rec q
+    LC.Iff p q -> rec p `max` rec q
+    LC.Not p -> rec p
+    LC.Top -> 0
+    LC.Bottom -> 0
+  where
+    term = getTermArity
+    rec = getConstraintArity
+
+getTermArity :: LC.Term -> Arity
+getTermArity =
+  \case
+    LC.Const _ -> 0
+    LC.Var _ -> 0
+    LC.Lookup is _ ->
+      (1 + Arity (length is))
+        `max` foldl' max 0 (getInputExpressionArity . fst <$> is)
+    LC.Plus x y -> rec x `max` rec y
+    LC.Times x y -> rec x `max` rec y
+    LC.Max x y -> rec x `max` rec y
+    LC.IndLess x y -> rec x `max` rec y
+  where
+    rec = getTermArity
+
+getInputExpressionArity :: InputExpression LC.Term -> Arity
+getInputExpressionArity = getTermArity . (^. #getInputExpression)
 
 getLookupArgumentsArity :: LookupArguments a -> Arity
 getLookupArgumentsArity =
@@ -823,8 +858,6 @@ iffStepType m =
 voidStepType m =
   Map.singleton (m ^. #stepTypeIds . #voidT . #unOf) mempty
 
--- TODO: shouldn't equalsStepType and lessThanStepType
--- involve their outputs (true or false)?
 equalsStepType,
   lessThanStepType,
   maxStepType ::
