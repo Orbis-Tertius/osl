@@ -53,6 +53,7 @@ data Type ann
   | Maybe ann (Type ann)
   | List ann Cardinality (Type ann)
   | Map ann Cardinality (Type ann) (Type ann)
+  deriving (Eq, Ord)
 
 instance Show (Type ann) where
   show (Prop _) = "Prop"

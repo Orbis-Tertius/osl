@@ -73,6 +73,8 @@ library
     OSL.Translate
     OSL.TranslationContext
     OSL.Type
+    OSL.Types.ArgumentForm
+    OSL.Types.Argument
     OSL.Types.Arity
     OSL.Types.Cardinality
     OSL.Types.DeBruijnIndex
@@ -83,6 +85,7 @@ library
     OSL.Types.Token
     OSL.Types.Translation
     OSL.Types.TranslationContext
+    OSL.Types.Value
     OSL.ValidContext
     OSL.ValidateContext
     Semicircuit.DNFFormula
