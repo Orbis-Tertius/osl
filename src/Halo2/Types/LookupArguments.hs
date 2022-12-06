@@ -3,7 +3,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.Types.LookupArguments
-  ( LookupArguments (LookupArguments, getLookupArguments),
+  ( LookupArguments (LookupArguments),
   )
 where
 

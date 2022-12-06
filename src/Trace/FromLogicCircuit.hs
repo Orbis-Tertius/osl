@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Trace.FromLogicCircuit
   ( logicCircuitToTraceType,
@@ -24,7 +25,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Die (die)
 import Halo2.ByteDecomposition (countBytes)
-import Halo2.Circuit (getLookupTables, getPolynomialVariables, getScalars)
+import Halo2.Circuit (getLookupArguments, getLookupTables, getPolynomialVariables, getScalars)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
@@ -570,13 +571,13 @@ getMapping bitsPerByte c =
     lookupTables' :: [LookupTable]
     lookupTables' =
       LookupTable . snd
-        <$> Set.toList (getLookupTables c)
+        <$> Set.toList (getLookupTables @LogicCircuit @LC.Term c)
 
     bareLookupArguments :: [BareLookupArgument]
     bareLookupArguments =
       Set.toList . Set.fromList $ -- this appears redundant but is actually there to eliminate redundancy
         BareLookupArgument . (^. #tableMap)
-          <$> Set.toList (c ^. #lookupArguments . #getLookupArguments)
+          <$> Set.toList (getLookupArguments c ^. #getLookupArguments)
 
     rowIndexToScalar :: RowIndex a -> Scalar
     rowIndexToScalar =
@@ -684,6 +685,7 @@ loadFromDifferentCaseStepType m =
     mempty
     ( LookupArguments . Set.singleton $
         LookupArgument
+          "loadFromDifferentCase"
           P.zero
           [(o, os), (c, cs), (t, ts)]
     )
@@ -723,7 +725,9 @@ lookupStepType ::
 lookupStepType m p (LookupTable t) =
   StepType
     mempty
-    (LookupArguments . Set.singleton $ LookupArgument p (zip inputExprs t))
+    ( LookupArguments . Set.singleton $
+        LookupArgument ("lookup-" <> show t) p (zip inputExprs t)
+    )
     mempty
   where
     inputExprs :: [InputExpression Polynomial]
@@ -1001,11 +1005,12 @@ byteDecompositionCheck (BitsPerByte bitsPerByte) c m =
                             P.plus
                             P.zero
                             (zipWith P.times byteCoefs byteVars)
-                      )
+                      ),
+          s `P.times` (s `P.minus` P.one)
         ]
         (PolynomialDegreeBound 2)
     )
-    (byteRangeAndTruthChecks m <> signRangeCheck m)
+    (byteRangeAndTruthChecks m)
     (truthTables m)
   where
     (i0, i1) = firstTwoInputs m
@@ -1028,6 +1033,7 @@ byteRangeAndTruthChecks m =
   LookupArguments $
     Set.fromList
       [ LookupArgument
+          "byteRangeAndTruthCheck"
           P.zero
           [ ( InputExpression (P.var' (byteCol ^. #unByteColumnIndex)),
               LookupTableColumn (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex)
@@ -1037,20 +1043,6 @@ byteRangeAndTruthChecks m =
             )
           ]
         | (byteCol, truthCol) <- m ^. #byteDecomposition . #bytes
-      ]
-
-signRangeCheck ::
-  Mapping ->
-  LookupArguments Polynomial
-signRangeCheck m =
-  LookupArguments $
-    Set.fromList
-      [ LookupArgument
-          P.zero
-          [ ( InputExpression (P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)),
-              LookupTableColumn (m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex)
-            )
-          ]
       ]
 
 truthTables ::
