@@ -11,12 +11,14 @@ import Cast (intToInteger)
 import Control.Lens ((^.))
 import Control.Monad (join)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.Text (pack)
+import Data.Tuple (swap)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext)
-import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, Apply), Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F))
-import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun))
+import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply), Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct))
+import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2'))
 import OSL.ValidateContext (checkTerm, inferType)
 import Stark.Types.Scalar (Scalar, integerToScalar)
 
@@ -90,6 +92,8 @@ evaluate gc lc t x e = do
         Z _ -> pure (Int yV)
         Fp _ -> pure (Fp' yV)
         Fin _ _ -> pure (Fin' yV) 
+        _ -> Left . ErrorMessage ann $
+          "cast only works on basic numeric types"
     ConstF ann f ->
       case t of
         F _ mn a b -> do
@@ -102,8 +106,82 @@ evaluate gc lc t x e = do
               else Left . ErrorMessage ann $
                 "function constant larger than function type cardinality"
             Nothing -> pure (Fun (Map.fromList (zip xs ys)))
+        _ -> Left . ErrorMessage ann $
+          "encountered a function constant in a non-function context"
+    AddN ann -> partialApplication ann
+    MulN ann -> partialApplication ann
+    AddZ ann -> partialApplication ann
+    MulZ ann -> partialApplication ann
+    AddFp ann -> partialApplication ann
+    MulFp ann -> partialApplication ann
+    Cast ann -> partialApplication ann
+    ConstSet ann xs ->
+      case t of
+        F _ mn a (Prop _) -> do
+          xs' <- mapM (\x' -> rec a x' e) xs
+          case mn of
+            Just (Cardinality n) ->
+              if intToInteger (length xs) <= n
+              then pure (Predicate (Set.fromList xs'))
+              else Left . ErrorMessage ann $
+                "set constant larger than type cardinality"
+            Nothing ->
+              pure (Predicate (Set.fromList xs'))
+        _ -> Left . ErrorMessage ann $
+          "encountered a set constant in a non-predicate context"
+    Apply ann (Inverse _) f -> do
+      f' <- rec t f e
+      case f' of
+        Fun f'' ->
+          pure (Fun (Map.fromList (swap <$> Map.toList f'')))
+        _ ->
+          Left . ErrorMessage ann $
+            "inverse: expected a function"
+    Inverse ann -> partialApplication ann
+    Apply ann (Apply _ (Pair _) y) z ->
+      case t of
+        Product _ a b ->
+          Pair' <$> rec a y e <*> rec b z e
+        _ ->
+          Left . ErrorMessage ann $
+            "encountered a pair in a non-product context"
+    Pair ann -> partialApplication ann
+    Apply ann (Pi1 _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        Pair' z _ -> pure z
+        _ -> Left . ErrorMessage ann $
+          "pi1: expected a pair"
+    Pi1 ann -> partialApplication ann
+    Apply ann (Pi2 _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        Pair' _ z -> pure z
+        _ -> Left . ErrorMessage ann $
+          "pi2: expected a pair"
+    Pi2 ann -> partialApplication ann
+    Apply ann (Iota1 _) y ->
+      case t of
+        Coproduct _ a _ ->
+          Iota1' <$> rec a y e
+        _ ->
+          Left . ErrorMessage ann $
+            "encountered iota1 in a non-coproduct context"
+    Apply ann (Iota2 _) y ->
+      case t of
+        Coproduct _ _ b ->
+          Iota2' <$> rec b y e
+        _ ->
+          Left . ErrorMessage ann $
+            "encountered iota2 in a non-coproduct context"
   where
     rec = evaluate gc lc
+
+    partialApplication ann =
+      Left . ErrorMessage ann $
+        "encountered a partial application of a primitive function"
 
 evalName ::
   Show ann =>
