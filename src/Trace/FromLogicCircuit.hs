@@ -648,7 +648,6 @@ loadFromSameCaseStepType m i =
     mempty
     mempty
 
--- TODO: this appears to be wrong
 loadFromDifferentCaseStepType ::
   Mapping ->
   PolynomialVariable ->
@@ -659,25 +658,32 @@ loadFromDifferentCaseStepType m x =
     ( LookupArguments . Set.singleton $
         LookupArgument
           P.zero
-          [(o, xs), (c, cs)]
+          [(o, os), (c, cs), (t, ts)]
     )
     mempty
   where
-    o, c :: InputExpression Polynomial
+    o, c, t :: InputExpression Polynomial
     o = InputExpression (P.var' (m ^. #output . #unOutputColumnIndex))
     c =
       InputExpression $
         P.var' (m ^. #caseNumber . #unCaseNumberColumnIndex)
           `P.plus` j
+    t =
+      InputExpression . P.constant $
+        case Map.lookup (PolynomialVariable (x ^. #colIndex) 0)
+             (m ^. #stepTypeIds . #loads) of
+          Just stepId -> stepId ^. #unStepTypeId
+          Nothing -> die "loadFromDifferentCaseStepType: same variable with index 0 is not in the mapping (this is a compiler bug" -- TODO: ensure this does not happen
 
     j :: Polynomial
     j =
       P.constant . fromMaybe (die "loadFromDifferentCaseStepType: relative row index out of range of scalar (this is a compiler bug)") $
         integerToScalar (intToInteger (x ^. #rowIndex . #getRowIndex))
 
-    xs, cs :: LookupTableColumn
-    xs = LookupTableColumn (x ^. #colIndex)
+    os, cs, ts :: LookupTableColumn
+    os = LookupTableColumn (m ^. #output . #unOutputColumnIndex)
     cs = LookupTableColumn (m ^. #caseNumber . #unCaseNumberColumnIndex)
+    ts = LookupTableColumn (m ^. #stepType . #unStepTypeColumnIndex)
 
 bareLookupStepTypes ::
   Mapping ->
