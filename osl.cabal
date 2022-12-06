@@ -66,7 +66,9 @@ library
     OSL.Bound
     OSL.BuildTranslationContext
     OSL.EntryPoint
+    OSL.Evaluation
     OSL.Parse
+    OSL.Satisfaction
     OSL.Sigma11
     OSL.Term
     OSL.Tokenize

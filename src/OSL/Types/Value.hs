@@ -22,6 +22,7 @@ data Value
   | Maybe (Maybe Value)
   | List [Value]
   | Map (Map Value Value)
+  | Fun (Map Value Value)
   deriving (Eq, Ord)
 
 instance Show Value where
@@ -38,4 +39,5 @@ instance Show Value where
       Maybe (Just x) -> "just(" <> show x <> ")"
       Maybe Nothing -> "nothing"
       List xs -> "[" <> intercalate ", " (show <$> xs) <> "]"
-      Map xs -> "{" <> intercalate ", " (show <$> Map.toList xs) <> "}"
+      Map xs -> "map(" <> intercalate ", " (show <$> Map.toList xs) <> ")"
+      Fun xs -> "fun(" <> intercalate ", " (show <$> Map.toList xs) <> ")"
