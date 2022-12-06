@@ -25,7 +25,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Die (die)
 import Halo2.ByteDecomposition (countBytes)
-import Halo2.Circuit (getLookupTables, getPolynomialVariables, getScalars, getLookupArguments)
+import Halo2.Circuit (getLookupArguments, getLookupTables, getPolynomialVariables, getScalars)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
@@ -684,7 +684,8 @@ loadFromDifferentCaseStepType m =
   StepType
     mempty
     ( LookupArguments . Set.singleton $
-        LookupArgument "loadFromDifferentCase"
+        LookupArgument
+          "loadFromDifferentCase"
           P.zero
           [(o, os), (c, cs), (t, ts)]
     )
@@ -724,8 +725,9 @@ lookupStepType ::
 lookupStepType m p (LookupTable t) =
   StepType
     mempty
-    (LookupArguments . Set.singleton
-       $ LookupArgument ("lookup-" <> show t) p (zip inputExprs t))
+    ( LookupArguments . Set.singleton $
+        LookupArgument ("lookup-" <> show t) p (zip inputExprs t)
+    )
     mempty
   where
     inputExprs :: [InputExpression Polynomial]
@@ -1030,7 +1032,8 @@ byteRangeAndTruthChecks ::
 byteRangeAndTruthChecks m =
   LookupArguments $
     Set.fromList
-      [ LookupArgument "byteRangeAndTruthCheck"
+      [ LookupArgument
+          "byteRangeAndTruthCheck"
           P.zero
           [ ( InputExpression (P.var' (byteCol ^. #unByteColumnIndex)),
               LookupTableColumn (m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex)

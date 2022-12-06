@@ -66,14 +66,16 @@ inputChecks ::
 inputChecks t m =
   LookupArguments $
     Set.fromList
-      [ LookupArgument ("input-" <> show i)
+      [ LookupArgument
+          ("input-" <> show i)
           (stepIndicatorGate t)
           [ (InputExpression alpha, LookupTableColumn beta),
             (InputExpression sigma', LookupTableColumn sigma),
             (InputExpression x, LookupTableColumn y)
           ]
         | (i, iIdCol, iCol) <-
-            zip3 ([0..] :: [Integer])
+            zip3
+              ([0 ..] :: [Integer])
               ((m ^. #advice . #inputs) <&> (^. #unMapping))
               ((t ^. #inputColumnIndices) <&> (^. #unInputColumnIndex)),
           let alpha = P.var' iIdCol,
@@ -91,7 +93,8 @@ linkChecks ::
 linkChecks t m =
   LookupArguments $
     Set.fromList
-      [ LookupArgument "linkCheck"
+      [ LookupArgument
+          "linkCheck"
           (stepIndicatorGate t)
           ( zip
               (InputExpression <$> ([currentCase, tau] <> alphas <> [beta]))
@@ -121,14 +124,16 @@ resultChecks ::
 resultChecks t m =
   LookupArguments $
     Set.fromList
-      [ LookupArgument "resultCheck1"
+      [ LookupArgument
+          "resultCheck1"
           ( P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex)
               `P.minus` P.one
           )
           [ (InputExpression (P.var' traceCase), LookupTableColumn fixedCase),
             (InputExpression P.one, LookupTableColumn used)
           ],
-        LookupArgument "resultCheck2"
+        LookupArgument
+          "resultCheck2"
           (P.var' used `P.minus` P.one)
           [ (InputExpression (P.var' fixedCase), LookupTableColumn traceCase),
             (InputExpression (P.var' fixedResultId), LookupTableColumn outputExpressionId)
@@ -174,7 +179,8 @@ gateStepTypeLookupArgument ::
   LookupArgument Polynomial ->
   LookupArgument Polynomial
 gateStepTypeLookupArgument t sIds arg =
-  LookupArgument (arg ^. #label)
+  LookupArgument
+    (arg ^. #label)
     (P.plus (P.times alpha (stepIndicatorGate t)) (stepTypesGate t sIds))
     (arg ^. #tableMap)
   where

@@ -20,7 +20,7 @@ import Halo2.Prelude
 import Halo2.Types.Circuit (Circuit, LogicCircuit)
 import Halo2.Types.Coefficient (Coefficient (getCoefficient))
 import Halo2.Types.InputExpression (InputExpression (..))
-import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), Term (Const, IndLess, Lookup, Max, Plus, Times, Var), LookupTableOutputColumn (LookupTableOutputColumn))
+import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), LookupTableOutputColumn (LookupTableOutputColumn), Term (Const, IndLess, Lookup, Max, Plus, Times, Var))
 import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
@@ -172,7 +172,7 @@ instance (HasScalars a, HasScalars b) => HasScalars (Circuit a b) where
 class HasLookupArguments a b where
   getLookupArguments :: a -> LookupArguments b
 
-instance ( Ord b, HasLookupArguments a b ) => HasLookupArguments [a] b where
+instance (Ord b, HasLookupArguments a b) => HasLookupArguments [a] b where
   getLookupArguments = mconcat . fmap getLookupArguments
 
 instance HasLookupArguments (InputExpression Term) Term where
@@ -185,8 +185,9 @@ instance HasLookupArguments Term Term where
       Var _ -> mempty
       Lookup is (LookupTableOutputColumn o) ->
         LookupArguments
-          (Set.singleton
-            (LookupArgument "application" (Const zero) (is <> [(InputExpression (Const zero), o)]))) -- good enough for what we need it for, finding the lookup tables
+          ( Set.singleton
+              (LookupArgument "application" (Const zero) (is <> [(InputExpression (Const zero), o)])) -- good enough for what we need it for, finding the lookup tables
+          )
           <> getLookupArguments (fst <$> is)
       Plus x y -> rec x <> rec y
       Times x y -> rec x <> rec y
