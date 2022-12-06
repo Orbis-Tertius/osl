@@ -20,7 +20,7 @@ import Control.Monad (foldM, mzero, replicateM)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (foldl')
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Die (die)
 import Halo2.ByteDecomposition (countBytes)
@@ -46,6 +46,7 @@ import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (RowCount))
+import Halo2.Types.RowIndex (RowIndex)
 import OSL.Types.Arity (Arity (Arity))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero)
 import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType))
@@ -138,6 +139,7 @@ data Operator
   | VoidT
   | AssertT
   | AssertLookupT
+  | LoadFromDifferentCase
 
 type StepTypeIdOf :: Operator -> Type
 newtype StepTypeIdOf a = StepTypeIdOf {unOf :: StepTypeId}
@@ -154,6 +156,7 @@ newtype BareLookupArgument = BareLookupArgument
 
 data StepTypeIdMapping = StepTypeIdMapping
   { loads :: Map PolynomialVariable StepTypeId,
+    loadFromDifferentCase :: StepTypeIdOf LoadFromDifferentCase,
     lookupTables :: Map LookupTable StepTypeId,
     assertLookup :: StepTypeIdOf AssertLookupT,
     constants :: Map Scalar StepTypeId,
@@ -333,6 +336,10 @@ getMapping bitsPerByte c =
           (getStepArity c ^. #unArity)
           (InputColumnIndex <$> nextCol)
       out <- OutputColumnIndex <$> nextCol
+      polyVarsZeroOffsetMapping <-
+        Map.fromList . zip polyVarsZeroOffset
+          <$> replicateM (length polyVarsZeroOffset) nextSid
+      let scalars' = scalars polyVarsZeroOffsetMapping
       Mapping cnc stc sic ins out
         <$> ( ByteDecompositionMapping bitsPerByte
                 <$> (SignColumnIndex <$> nextCol)
@@ -346,16 +353,14 @@ getMapping bitsPerByte c =
                 <$> (ByteRangeColumnIndex <$> nextCol)
                 <*> (ZeroIndicatorColumnIndex <$> nextCol)
             )
-        <*> ( StepTypeIdMapping
-                <$> ( Map.fromList . zip polyVars
-                        <$> replicateM (length polyVars) nextSid
-                    )
+        <*> ( StepTypeIdMapping polyVarsZeroOffsetMapping
+                <$> (nextSid' :: State S (StepTypeIdOf LoadFromDifferentCase))
                 <*> ( Map.fromList . zip lookupTables'
                         <$> replicateM (length lookupTables') nextSid
                     )
                 <*> (nextSid' :: State S (StepTypeIdOf AssertLookupT))
-                <*> ( Map.fromList . zip scalars
-                        <$> replicateM (length scalars) nextSid
+                <*> ( Map.fromList . zip scalars'
+                        <$> replicateM (length scalars') nextSid
                     )
                 <*> (nextSid' :: State S (StepTypeIdOf Plus))
                 <*> (nextSid' :: State S (StepTypeIdOf TimesAnd))
@@ -382,8 +387,8 @@ getMapping bitsPerByte c =
                               (BareLookupSubexpressionId <$> nextEid)
                         )
                     <*> pure mempty
-                    <*> ( Map.fromList . zip scalars
-                            <$> replicateM (length scalars) nextEid'
+                    <*> ( Map.fromList . zip scalars'
+                            <$> replicateM (length scalars') nextEid'
                         )
                     <*> pure mempty
                 traverseLookupArguments out (c ^. #lookupArguments)
@@ -555,7 +560,12 @@ getMapping bitsPerByte c =
         Nothing -> die "coefficientEid: coefficient lookup failed (this is a compiler bug)"
 
     polyVars :: [PolynomialVariable]
-    polyVars = Set.toList (getPolynomialVariables c)
+    polyVars =
+      let vs = getPolynomialVariables c
+       in Set.toList (vs <> Set.map (\x -> PolynomialVariable (x ^. #colIndex) 0) vs)
+
+    polyVarsZeroOffset :: [PolynomialVariable]
+    polyVarsZeroOffset = filter ((== 0) . (^. #rowIndex)) polyVars
 
     lookupTables' :: [LookupTable]
     lookupTables' =
@@ -568,8 +578,21 @@ getMapping bitsPerByte c =
         BareLookupArgument . (^. #tableMap)
           <$> Set.toList (c ^. #lookupArguments . #getLookupArguments)
 
-    scalars :: [Scalar]
-    scalars = Set.toList (getScalars c)
+    rowIndexToScalar :: RowIndex a -> Scalar
+    rowIndexToScalar =
+      fromMaybe (die "getMapping: could not convert row index to scalar (this is a compiler bug)")
+        . integerToScalar
+        . intToInteger
+        . (^. #getRowIndex)
+
+    scalars :: Map PolynomialVariable StepTypeId -> [Scalar]
+    scalars polyVarsZeroOffsetMapping =
+      Set.toList $
+        mconcat
+          [ getScalars c,
+            Set.fromList ((^. #unStepTypeId) <$> Map.elems polyVarsZeroOffsetMapping),
+            Set.fromList (rowIndexToScalar . (^. #rowIndex) <$> polyVars)
+          ]
 
 getColumnTypes :: LogicCircuit -> Mapping -> ColumnTypes
 getColumnTypes c mapping =
@@ -618,19 +641,24 @@ loadStepTypes ::
   Mapping ->
   Map StepTypeId StepType
 loadStepTypes m =
-  Map.fromList
-    [ (sId, loadStepType m x)
-      | (x, sId) <- Map.toList (m ^. #stepTypeIds . #loads)
+  Map.fromList $
+    [ ( m ^. #stepTypeIds . #loadFromDifferentCase . #unOf,
+        loadFromDifferentCaseStepType m
+      )
     ]
+      <> catMaybes
+        [ (sId,) <$> loadStepType m x
+          | (x, sId) <- Map.toList (m ^. #stepTypeIds . #loads)
+        ]
 
 loadStepType ::
   Mapping ->
   PolynomialVariable ->
-  StepType
+  Maybe StepType
 loadStepType m x =
   if (x ^. #rowIndex) == 0
-    then loadFromSameCaseStepType m (x ^. #colIndex)
-    else loadFromDifferentCaseStepType m x
+    then Just $ loadFromSameCaseStepType m (x ^. #colIndex)
+    else Nothing
 
 loadFromSameCaseStepType ::
   Mapping ->
@@ -650,33 +678,31 @@ loadFromSameCaseStepType m i =
 
 loadFromDifferentCaseStepType ::
   Mapping ->
-  PolynomialVariable ->
   StepType
-loadFromDifferentCaseStepType m x =
+loadFromDifferentCaseStepType m =
   StepType
     mempty
     ( LookupArguments . Set.singleton $
         LookupArgument
           P.zero
-          [(o, xs), (c, cs)]
+          [(o, os), (c, cs), (t, ts)]
     )
     mempty
   where
-    o, c :: InputExpression Polynomial
+    (i0, i1) = firstTwoInputs m
+
+    o, c, t :: InputExpression Polynomial
     o = InputExpression (P.var' (m ^. #output . #unOutputColumnIndex))
     c =
       InputExpression $
         P.var' (m ^. #caseNumber . #unCaseNumberColumnIndex)
-          `P.plus` j
+          `P.plus` P.var' (i1 ^. #unInputColumnIndex)
+    t = InputExpression (P.var' (i0 ^. #unInputColumnIndex))
 
-    j :: Polynomial
-    j =
-      P.constant . fromMaybe (die "loadFromDifferentCaseStepType: relative row index out of range of scalar (this is a compiler bug)") $
-        integerToScalar (intToInteger (x ^. #rowIndex . #getRowIndex))
-
-    xs, cs :: LookupTableColumn
-    xs = LookupTableColumn (x ^. #colIndex)
+    os, cs, ts :: LookupTableColumn
+    os = LookupTableColumn (m ^. #output . #unOutputColumnIndex)
     cs = LookupTableColumn (m ^. #caseNumber . #unCaseNumberColumnIndex)
+    ts = LookupTableColumn (m ^. #stepType . #unStepTypeColumnIndex)
 
 bareLookupStepTypes ::
   Mapping ->
@@ -1105,7 +1131,7 @@ getSubexpressionLinks ::
   Mapping ->
   Set SubexpressionLink
 getSubexpressionLinks m =
-  toVoid <> toVar <> toConst <> toOp <> toAssert <> toAssertLookup
+  toVoid <> toVarSameCase <> toVarDifferentCase <> toConst <> toOp <> toAssert <> toAssertLookup
   where
     voidEid :: SubexpressionIdOf Void
     voidEid =
@@ -1116,7 +1142,7 @@ getSubexpressionLinks m =
     nInputs :: Int
     nInputs = length (m ^. #inputs)
 
-    toVoid, toVar, toConst, toOp :: Set SubexpressionLink
+    toVoid, toVarSameCase, toVarDifferentCase, toConst, toOp :: Set SubexpressionLink
     toVoid =
       Set.singleton $
         SubexpressionLink
@@ -1124,7 +1150,7 @@ getSubexpressionLinks m =
           (replicate nInputs (InputSubexpressionId (voidEid ^. #unOf)))
           (OutputSubexpressionId (voidEid ^. #unOf))
 
-    toVar =
+    toVarSameCase =
       Set.fromList $
         [ SubexpressionLink
             stepTypeId
@@ -1137,6 +1163,38 @@ getSubexpressionLinks m =
                   (m ^. #stepTypeIds . #loads)
                   (m ^. #subexpressionIds . #variables)
         ]
+
+    toVarDifferentCase =
+      Set.fromList $
+        [ SubexpressionLink
+            (m ^. #stepTypeIds . #loadFromDifferentCase . #unOf)
+            (padInputs (InputSubexpressionId <$> [rowIndexEid, stepTypeEid]))
+            (OutputSubexpressionId (outEid ^. #unOf))
+          | (v, outEid) <- Map.toList $ m ^. #subexpressionIds . #variables,
+            let rowIndex = v ^. #rowIndex,
+            rowIndex /= 0,
+            let rowIndexEid = scalarMapping (rowIndexToScalar rowIndex) ^. #unOf,
+            let stepTypeEid = scalarMapping (polyVarStepTypeId (PolynomialVariable (v ^. #colIndex) 0) ^. #unStepTypeId) ^. #unOf
+        ]
+
+    rowIndexToScalar :: RowIndex a -> Scalar
+    rowIndexToScalar =
+      fromMaybe (die "getSubexpressionLinks: could not convert row index to scalar (this is a compiler bug)")
+        . integerToScalar
+        . intToInteger
+        . (^. #getRowIndex)
+
+    polyVarStepTypeId :: PolynomialVariable -> StepTypeId
+    polyVarStepTypeId x =
+      case Map.lookup x (m ^. #stepTypeIds . #loads) of
+        Just sid -> sid
+        Nothing -> die "getSubexpressionLinks: polynomial variable mapping lookup failed (this is a compiler bug)"
+
+    scalarMapping :: Scalar -> SubexpressionIdOf Scalar
+    scalarMapping x =
+      case Map.lookup x (m ^. #subexpressionIds . #constants) of
+        Just eid -> eid
+        Nothing -> die "getSubexpressionLinks: scalar mapping lookup failed (this is a compiler bug)"
 
     toConst =
       Set.fromList $
