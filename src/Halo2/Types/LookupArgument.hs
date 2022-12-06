@@ -19,7 +19,7 @@ instance Show a => Show (LookupArgument a) where
   show arg =
     show (arg ^. #gate) <> " = 0 => ("
       <> intercalate ", " (show <$> inputs)
-      <> " ∈ ("
+      <> ") ∈ ("
       <> intercalate ", " (show <$> cols)
       <> ")"
     where
