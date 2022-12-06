@@ -4,6 +4,7 @@
 module OSL.ValidateContext
   ( validateContext,
     inferType,
+    checkTerm,
   )
 where
 

@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 
 module OSL.Types.OSL
@@ -190,4 +191,4 @@ data ContextType = Global | Local
   deriving (Show)
 
 newtype ValidContext (t :: ContextType) ann = ValidContext {unValidContext :: Map Name (Declaration ann)}
-  deriving (Show)
+  deriving (Generic, Show, Semigroup, Monoid)

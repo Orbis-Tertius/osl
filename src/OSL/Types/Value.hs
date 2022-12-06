@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 module OSL.Types.Value
-  ( Value (Nat, Int, Fin, Fp, Pair, Iota1, Iota2, To, Maybe, List, Map)
+  ( Value (Nat, Int, Fin', Fp', Pair, Iota1, Iota2, To, Maybe, List, Map, Fun, Bool)
   ) where
 
 import Data.List (intercalate)
@@ -13,8 +13,8 @@ import Stark.Types.Scalar (Scalar)
 data Value
   = Nat Scalar
   | Int Scalar
-  | Fin Scalar
-  | Fp Scalar
+  | Fp' Scalar
+  | Fin' Scalar
   | Pair Value Value
   | Iota1 Value
   | Iota2 Value
@@ -23,6 +23,7 @@ data Value
   | List [Value]
   | Map (Map Value Value)
   | Fun (Map Value Value)
+  | Bool Bool
   deriving (Eq, Ord)
 
 instance Show Value where
@@ -30,8 +31,8 @@ instance Show Value where
     \case
       Nat x -> show x <> "N"
       Int x -> show x <> "Z"
-      Fin x -> "fin(" <> show x <> ")"
-      Fp x -> show x <> "F"
+      Fin' x -> "fin(" <> show x <> ")"
+      Fp' x -> show x <> "F"
       Pair x y -> "(" <> show x <> ", " <> show y <> ")"
       Iota1 x -> "iota1(" <> show x <> ")"
       Iota2 x -> "iota2(" <> show x <> ")"
@@ -41,3 +42,4 @@ instance Show Value where
       List xs -> "[" <> intercalate ", " (show <$> xs) <> "]"
       Map xs -> "map(" <> intercalate ", " (show <$> Map.toList xs) <> ")"
       Fun xs -> "fun(" <> intercalate ", " (show <$> Map.toList xs) <> ")"
+      Bool x -> show x

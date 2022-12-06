@@ -81,6 +81,7 @@ library
     OSL.Types.Cardinality
     OSL.Types.DeBruijnIndex
     OSL.Types.ErrorMessage
+    OSL.Types.EvaluationContext
     OSL.Types.Keyword
     OSL.Types.OSL
     OSL.Types.Sigma11
