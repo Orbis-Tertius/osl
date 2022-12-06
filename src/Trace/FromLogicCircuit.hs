@@ -555,7 +555,9 @@ getMapping bitsPerByte c =
         Nothing -> die "coefficientEid: coefficient lookup failed (this is a compiler bug)"
 
     polyVars :: [PolynomialVariable]
-    polyVars = Set.toList (getPolynomialVariables c)
+    polyVars =
+      let vs = getPolynomialVariables c
+      in Set.toList (vs <> Set.map (\x -> PolynomialVariable (x ^. #colIndex) 0) vs)
 
     lookupTables' :: [LookupTable]
     lookupTables' =
@@ -673,7 +675,7 @@ loadFromDifferentCaseStepType m x =
         case Map.lookup (PolynomialVariable (x ^. #colIndex) 0)
              (m ^. #stepTypeIds . #loads) of
           Just stepId -> stepId ^. #unStepTypeId
-          Nothing -> die "loadFromDifferentCaseStepType: same variable with index 0 is not in the mapping (this is a compiler bug" -- TODO: ensure this does not happen
+          Nothing -> die "loadFromDifferentCaseStepType: same variable with index 0 is not in the mapping (this is a compiler bug"
 
     j :: Polynomial
     j =
