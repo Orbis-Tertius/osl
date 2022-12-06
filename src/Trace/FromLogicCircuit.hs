@@ -648,6 +648,7 @@ loadFromSameCaseStepType m i =
     mempty
     mempty
 
+-- TODO: this appears to be wrong
 loadFromDifferentCaseStepType ::
   Mapping ->
   PolynomialVariable ->
