@@ -1,13 +1,14 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 
 module OSL.Evaluation (evaluate) where
 
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
-import Cast (intToInteger)
+import Cast (intToInteger, integerToInt)
 import Control.Lens ((^.))
 import Control.Monad (join)
 import qualified Data.Map as Map
@@ -17,12 +18,13 @@ import Data.Tuple (swap)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
-import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp),
+import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp, Exists, Length, Nth, ListCast, ListPi1, ListPi2),
   Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe))
-import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool))
+import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool, List''))
 import OSL.ValidContext (getFreeOSLName)
 import OSL.ValidateContext (checkTerm, inferType, checkTypeInclusion)
-import Stark.Types.Scalar (Scalar, integerToScalar)
+import Safe (atMay)
+import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInteger)
 
 evaluate ::
   Show ann =>
@@ -89,13 +91,8 @@ evaluate gc lc t x e = do
     Apply ann (Cast _) y -> do
       yT <- inferType lc y
       yV <- decodeScalar ann =<< rec yT y e
-      case t of
-        N _ -> pure (Nat yV)
-        Z _ -> pure (Int yV)
-        Fp _ -> pure (Fp' yV)
-        Fin _ _ -> pure (Fin' yV) 
-        _ -> Left . ErrorMessage ann $
-          "cast only works on basic numeric types"
+      castF ann yV
+
     ConstF ann f ->
       case t of
         F _ mn a b -> do
@@ -343,8 +340,95 @@ evaluate gc lc t x e = do
                <$> rec t y e
                <*> rec t z e)
     MaxFp ann -> partialApplication ann
+    Apply ann (Exists _) y -> do
+      y' <- rec (Maybe ann t) y e
+      case y' of
+        Maybe'' (Just y'') -> pure y''
+        Maybe'' Nothing -> Left . ErrorMessage ann $
+          "applied exists to nothing"
+        _ -> Left . ErrorMessage ann $
+          "exists: expected a Maybe"
+    Exists ann -> partialApplication ann
+    Apply ann (Length _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        List'' xs ->
+          case integerToScalar (intToInteger (length xs)) of
+            Just l -> pure (Nat l)
+            Nothing -> Left . ErrorMessage ann $
+              "length of list is out of range of scalar field"
+        _ -> Left . ErrorMessage ann $
+          "length: expected a list"
+    Length ann -> partialApplication ann
+    Apply ann (Apply _ (Nth _) xs) i -> do
+      i' <- rec (N ann) i e
+      xsT <- inferType lc xs
+      xs' <- rec xsT xs e
+      case i' of
+        Nat i'' ->
+          case integerToInt (scalarToInteger i'') of
+            Just i''' ->
+              case xs' of
+                List'' xs'' ->
+                  case xs'' `atMay` i''' of
+                    Just y -> pure y
+                    Nothing -> Left . ErrorMessage ann $
+                      "nth: index out of range"
+                _ -> Left . ErrorMessage ann $
+                  "nth: expected a list"
+            Nothing -> Left . ErrorMessage ann $
+              "nth: index out of range of scalar field"
+        _ -> Left . ErrorMessage ann $
+          "nth: expected a natural number"
+    Nth ann -> partialApplication ann
+    Apply ann (ListCast _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        List'' xs ->
+          List'' <$> mapM ((castF ann =<<) . decodeScalar ann) xs
+        _ -> Left . ErrorMessage ann $
+          "List(cast): expected a list"
+    ListCast ann -> partialApplication ann
+    Apply ann (ListPi1 _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        List'' xs -> List'' <$> mapM (fst' ann) xs
+        _ -> Left . ErrorMessage ann $ "List(pi1): expected a list"
+    ListPi1 ann -> partialApplication ann
+    Apply ann (ListPi2 _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        List'' xs -> List'' <$> mapM (snd' ann) xs
+        _ -> Left . ErrorMessage ann $ "List(pi2): expected a list"
+    ListPi2 ann -> partialApplication ann
   where
     rec = evaluate gc lc
+
+    castF :: ann -> Scalar -> Either (ErrorMessage ann) Value
+    castF ann yV =
+      case t of
+        N _ -> pure (Nat yV)
+        Z _ -> pure (Int yV)
+        Fp _ -> pure (Fp' yV)
+        Fin _ _ -> pure (Fin' yV) 
+        _ -> Left . ErrorMessage ann $
+          "cast only works on basic numeric types"
+
+    fst' :: ann -> Value -> Either (ErrorMessage ann) Value
+    fst' ann =
+      \case
+        Pair' y _ -> pure y
+        _ -> Left . ErrorMessage ann $ "pi1: expected a pair"
+
+    snd' :: ann -> Value -> Either (ErrorMessage ann) Value
+    snd' ann =
+      \case
+        Pair' _ y -> pure y
+        _ -> Left . ErrorMessage ann $ "pi2: expected a pair"
 
     partialApplication ann =
       Left . ErrorMessage ann $

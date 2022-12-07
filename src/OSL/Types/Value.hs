@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 module OSL.Types.Value
-  ( Value (Nat, Int, Fin', Fp', Pair', Iota1', Iota2', To', Maybe'', List, Map, Fun, Bool, Predicate)
+  ( Value (Nat, Int, Fin', Fp', Pair', Iota1', Iota2', To', Maybe'', List'', Map, Fun, Bool, Predicate)
   ) where
 
 import Data.List (intercalate)
@@ -22,7 +22,7 @@ data Value
   | Iota2' Value
   | To' Name Value
   | Maybe'' (Maybe Value)
-  | List [Value]
+  | List'' [Value]
   | Map (Map Value Value)
   | Fun (Map Value Value)
   | Bool Bool
@@ -42,7 +42,7 @@ instance Show Value where
       To' t x -> "to(" <> show t <> ", " <> show x <> ")"
       Maybe'' (Just x) -> "just(" <> show x <> ")"
       Maybe'' Nothing -> "nothing"
-      List xs -> "[" <> intercalate ", " (show <$> xs) <> "]"
+      List'' xs -> "[" <> intercalate ", " (show <$> xs) <> "]"
       Map xs -> "map(" <> intercalate ", " (show <$> Map.toList xs) <> ")"
       Fun xs -> "fun(" <> intercalate ", " (show <$> Map.toList xs) <> ")"
       Bool x -> show x

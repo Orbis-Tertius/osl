@@ -138,6 +138,7 @@ library
     process,
     QuickCheck,
     random,
+    safe,
     sydtest,
     sydtest-discover,
     text -any,
