@@ -33,11 +33,11 @@ import OSL.Type (typeAnnotation)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.OSL (Declaration (..), Name (GenSym, Sym), Type (..), ValidContext (..))
+import OSL.Types.OSL (Declaration (..), Type (..), ValidContext (..))
 import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.TranslationContext (ChoiceMapping (..), KeysMapping (..), LeftMapping (..), LengthMapping (..), Mapping (..), RightMapping (..), TranslationContext (..), ValuesMapping (..))
-import OSL.ValidContext (addDeclaration, getExistingDeclaration)
+import OSL.ValidContext (addDeclaration, getExistingDeclaration, getFreeOSLName)
 
 -- builds a translation context providing mappings
 -- for the given free variables.
@@ -285,18 +285,9 @@ addGensym ::
   Type ann ->
   StateT (TranslationContext t ann) m OSL.Name
 addGensym t = do
-  name <- getFreeOSLName <$> get
+  name <- getFreeOSLName . (^. #context) <$> get
   addFreeVariableDeclaration name t
   pure name
-
-getFreeOSLName ::
-  TranslationContext t ann ->
-  OSL.Name
-getFreeOSLName (TranslationContext (ValidContext c) _) =
-  case fst <$> Map.lookupMax c of
-    Nothing -> GenSym 0
-    Just (Sym _) -> GenSym 0
-    Just (GenSym i) -> GenSym (i + 1)
 
 mapAritiesInMapping ::
   (Arity -> Arity) ->

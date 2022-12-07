@@ -17,9 +17,10 @@ import Data.Tuple (swap)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
-import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing'),
+import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe'),
   Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe))
 import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool))
+import OSL.ValidContext (getFreeOSLName)
 import OSL.ValidateContext (checkTerm, inferType, checkTypeInclusion)
 import Stark.Types.Scalar (Scalar, integerToScalar)
 
@@ -246,7 +247,7 @@ evaluate gc lc t x e = do
         _ -> Left . ErrorMessage ann $
           "expected a Maybe value"
     IsNothing ann -> partialApplication ann
-    Apply ann (Just' _) y -> do
+    Apply ann (Just' _) y ->
       case t of
         Maybe _ a ->
           Maybe'' . Just <$> rec a y e
@@ -254,6 +255,21 @@ evaluate gc lc t x e = do
           "saw just in a non-Maybe context"
     Just' ann -> partialApplication ann
     Nothing' _ -> pure (Maybe'' Nothing)
+    Apply ann (Apply _ (Maybe' ann' f) y) z -> do
+      fT <- inferType lc f
+      case fT of
+        F _ _ a _ -> do
+          z' <- rec (Maybe ann' a) z e
+          let v = getFreeOSLName lc
+          case z' of
+             Maybe'' (Just z'') ->
+               rec t (Apply ann f (NamedTerm ann v))
+                 $ e <> EvaluationContext (Map.singleton v z'')
+             Maybe'' Nothing -> rec t y e
+             _ -> Left . ErrorMessage ann $
+               "maybe: expected a Maybe value"
+        _ -> Left . ErrorMessage ann' $
+          "maybe: expected a function"
   where
     rec = evaluate gc lc
 
