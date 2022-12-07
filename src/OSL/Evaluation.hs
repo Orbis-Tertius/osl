@@ -16,10 +16,11 @@ import Data.Text (pack)
 import Data.Tuple (swap)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.EvaluationContext (EvaluationContext)
-import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply), Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct))
-import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2'))
-import OSL.ValidateContext (checkTerm, inferType)
+import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
+import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing'),
+  Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe))
+import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool))
+import OSL.ValidateContext (checkTerm, inferType, checkTypeInclusion)
 import Stark.Types.Scalar (Scalar, integerToScalar)
 
 evaluate ::
@@ -169,6 +170,7 @@ evaluate gc lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "encountered iota1 in a non-coproduct context"
+    Iota1 ann -> partialApplication ann
     Apply ann (Iota2 _) y ->
       case t of
         Coproduct _ _ b ->
@@ -176,6 +178,82 @@ evaluate gc lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "encountered iota2 in a non-coproduct context"
+    Iota2 ann -> partialApplication ann
+    FunctionProduct ann f g ->
+      case t of
+        F ann' n a (Product _ b c) -> do
+          f' <- rec (F ann' n a b) f e
+          g' <- rec (F ann' n a c) g e
+          case (f', g') of
+            (Fun f'', Fun g'') ->
+              pure . Fun
+                $ Map.unionWith Pair' f'' g''
+            _ -> Left . ErrorMessage ann $
+              "function product arguments expected to be functions"
+        _ ->
+          Left . ErrorMessage ann $
+            "encountered a function product in a non-function-product context"
+    FunctionCoproduct ann f g ->
+      case t of
+        F ann' n (Coproduct _ a b) c -> do
+          f' <- rec (F ann' n a c) f e
+          g' <- rec (F ann' n b c) g e
+          case (f', g') of
+            (Fun f'', Fun g'') ->
+              pure . Fun
+                $ Map.mapKeys Iota1' f'' <>
+                  Map.mapKeys Iota2' g''
+            _ -> Left . ErrorMessage ann $
+             "function coproduct arguments expected to be functions"
+        _ -> Left . ErrorMessage ann $
+          "encountered a function coproduct in a non-function-coproduct context"
+    Apply _ (Lambda _ v a y) z -> do
+      z' <- rec a z e
+      rec t y $ e <> EvaluationContext (Map.singleton v z')
+    Lambda ann _ _ _ -> partialApplication ann
+    Apply _ (To ann name) y ->
+      case Map.lookup name (gc ^. #unValidContext) of
+        Just (Data a) -> do
+          To' name <$> rec a y e
+        _ -> Left . ErrorMessage ann $
+          "expected the name of a type"
+    To ann _ -> partialApplication ann
+    Apply ann (From ann' name) y ->
+      case Map.lookup name (gc ^. #unValidContext) of
+        Just (Data a) -> do
+          checkTypeInclusion lc ann t a
+          y' <- rec (NamedType ann name) y e
+          case y' of
+            To' name' y'' ->
+              if name' == name
+              then pure y''
+              else Left . ErrorMessage ann' $
+                "From: named type mismatch"
+            _ -> Left . ErrorMessage ann' $
+              "expected a To value"
+        _ -> Left . ErrorMessage ann $
+          "expected the name of a type"
+    From ann _ -> partialApplication ann
+    Let _ v a d y -> do
+      d' <- rec a d e
+      rec t y $ e <> EvaluationContext (Map.singleton v d')
+    Apply ann (IsNothing _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        Maybe'' Nothing -> pure (Bool True)
+        Maybe'' (Just _) -> pure (Bool False)
+        _ -> Left . ErrorMessage ann $
+          "expected a Maybe value"
+    IsNothing ann -> partialApplication ann
+    Apply ann (Just' _) y -> do
+      case t of
+        Maybe _ a ->
+          Maybe'' . Just <$> rec a y e
+        _ -> Left . ErrorMessage ann $
+          "saw just in a non-Maybe context"
+    Just' ann -> partialApplication ann
+    Nothing' _ -> pure (Maybe'' Nothing)
   where
     rec = evaluate gc lc
 
