@@ -17,7 +17,7 @@ import Data.Tuple (swap)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
-import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe'),
+import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp),
   Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe))
 import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool))
 import OSL.ValidContext (getFreeOSLName)
@@ -214,7 +214,7 @@ evaluate gc lc t x e = do
     Lambda ann _ _ _ -> partialApplication ann
     Apply _ (To ann name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
-        Just (Data a) -> do
+        Just (Data a) ->
           To' name <$> rec a y e
         _ -> Left . ErrorMessage ann $
           "expected the name of a type"
@@ -229,7 +229,7 @@ evaluate gc lc t x e = do
               if name' == name
               then pure y''
               else Left . ErrorMessage ann' $
-                "From: named type mismatch"
+                "from(-): named type mismatch"
             _ -> Left . ErrorMessage ann' $
               "expected a To value"
         _ -> Left . ErrorMessage ann $
@@ -270,12 +270,85 @@ evaluate gc lc t x e = do
                "maybe: expected a Maybe value"
         _ -> Left . ErrorMessage ann' $
           "maybe: expected a function"
+    Maybe' ann _ -> partialApplication ann
+    Apply ann (MaybePi1 _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        Maybe'' (Just (Pair' z _)) ->
+          pure (Maybe'' (Just z))
+        Maybe'' Nothing ->
+          pure (Maybe'' Nothing)
+        _ -> Left . ErrorMessage ann $
+          "Maybe(pi1): expected a Maybe-pair"
+    MaybePi1 ann -> partialApplication ann
+    Apply ann (MaybePi2 _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        Maybe'' (Just (Pair' _ z)) ->
+          pure (Maybe'' (Just z))
+        Maybe'' Nothing ->
+          pure (Maybe'' Nothing)
+        _ -> Left . ErrorMessage ann $
+          "Maybe(pi2): expected a Maybe-pair"
+    MaybePi2 ann -> partialApplication ann
+    Apply ann (MaybeTo ann' name) y ->
+      case Map.lookup name (gc ^. #unValidContext) of
+        Just (Data a) -> do
+          y' <- rec (Maybe ann' a) y e
+          case y' of
+            Maybe'' (Just y'') ->
+              pure (Maybe'' (Just (To' name y'')))
+            Maybe'' Nothing ->
+              pure (Maybe'' Nothing)
+            _ -> Left . ErrorMessage ann $
+              "Maybe(to(-)): expected a Maybe"
+        _ -> Left . ErrorMessage ann' $
+          "expected the name of a type"
+    MaybeTo ann _ -> partialApplication ann
+    Apply ann (MaybeFrom ann' name) y ->
+      case Map.lookup name (gc ^. #unValidContext) of
+        Just (Data a) -> do
+          checkTypeInclusion lc ann t (Maybe ann' a)
+          y' <- rec (Maybe ann' (NamedType ann' name)) y e
+          case y' of
+            Maybe'' (Just (To' name' y'')) ->
+              if name' == name
+              then pure (Maybe'' (Just y''))
+              else Left . ErrorMessage ann' $
+                "Maybe(from(-)): named type mismatch"
+            Maybe'' Nothing ->
+              pure (Maybe'' Nothing)
+            _ -> Left . ErrorMessage ann $
+              "expected a Maybe(" <> pack (show name) <> ")"
+        _ -> Left . ErrorMessage ann' $
+          "expected the name of a type"
+    MaybeFrom ann _ -> partialApplication ann
+    Apply ann (Apply _ (MaxN _) y) z ->
+      Nat <$>
+      (join $ liftMath ann max
+               <$> rec t y e
+               <*> rec t z e)
+    MaxN ann -> partialApplication ann
+    Apply ann (Apply _ (MaxZ _) y) z ->
+      Int <$>
+      (join $ liftMath ann max
+                <$> rec t y e
+                <*> rec t z e)
+    MaxZ ann -> partialApplication ann
+    Apply ann (Apply _ (MaxFp _) y) z ->
+      Fp' <$>
+      (join $ liftMath ann max
+               <$> rec t y e
+               <*> rec t z e)
+    MaxFp ann -> partialApplication ann
   where
     rec = evaluate gc lc
 
     partialApplication ann =
       Left . ErrorMessage ann $
-        "encountered a partial application of a primitive function"
+        "encountered a partial function application"
 
 evalName ::
   Show ann =>
