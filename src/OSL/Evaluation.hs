@@ -18,7 +18,7 @@ import Data.Tuple (swap)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
-import OSL.Types.OSL (ValidContext, Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp, Exists, Length, Nth, ListCast, ListPi1, ListPi2),
+import OSL.Types.OSL (ValidContext (ValidContext), Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp, Exists, Length, Nth, ListCast, ListPi1, ListPi2, ListTo, ListFrom, ListLength, ListMaybePi1, ListMaybePi2, ListMaybeLength),
   Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe))
 import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool, List''))
 import OSL.ValidContext (getFreeOSLName)
@@ -207,7 +207,8 @@ evaluate gc lc t x e = do
           "encountered a function coproduct in a non-function-coproduct context"
     Apply _ (Lambda _ v a y) z -> do
       z' <- rec a z e
-      rec t y $ e <> EvaluationContext (Map.singleton v z')
+      let lc' = lc <> ValidContext (Map.singleton v (FreeVariable a))
+      evaluate gc lc' t y $ e <> EvaluationContext (Map.singleton v z')
     Lambda ann _ _ _ -> partialApplication ann
     Apply _ (To ann name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
@@ -405,8 +406,65 @@ evaluate gc lc t x e = do
         List'' xs -> List'' <$> mapM (snd' ann) xs
         _ -> Left . ErrorMessage ann $ "List(pi2): expected a list"
     ListPi2 ann -> partialApplication ann
+    Apply ann (ListTo _ name) y -> do
+      yT <- inferType lc y 
+      y' <- rec yT y e
+      case y' of
+        List'' ys -> pure (List'' (To' name <$> ys))
+        _ -> Left . ErrorMessage ann $ "List(to(-)): expected a list"
+    ListTo ann _ -> partialApplication ann
+    Apply ann (ListFrom _ name) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        List'' ys -> List'' <$> mapM (castFrom ann name) ys
+        _ -> Left . ErrorMessage ann $ "List(from(-)): expected a list"
+    ListFrom ann _ -> partialApplication ann
+    Apply ann (ListLength _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        List'' ys -> List'' <$> mapM (listLength ann) ys
+        _ -> Left . ErrorMessage ann $ "List(length): expected a list"
+    ListLength ann -> partialApplication ann
+    Apply ann (ListMaybePi1 _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        List'' ys -> List'' <$> mapM (maybeFunctor fst' ann) ys
+        _ -> Left . ErrorMessage ann $ "List(Maybe(pi1)): expected a list"
+    Apply ann (ListMaybePi2 _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        List'' ys -> List'' <$> mapM (maybeFunctor snd' ann) ys
+        _ -> Left . ErrorMessage ann $ "List(Maybe(pi2)): expected a list"
+    Apply ann (ListMaybeLength _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        List'' ys -> List'' <$> mapM (maybeFunctor listLength ann) ys
+        _ -> Left . ErrorMessage ann $ "List(length): expected a list"
   where
     rec = evaluate gc lc
+
+    listLength :: ann -> Value -> Either (ErrorMessage ann) Value
+    listLength ann =
+      \case
+        List'' ys ->
+          case integerToScalar (intToInteger (length ys)) of
+            Just l -> pure (Nat l)
+            Nothing -> Left . ErrorMessage ann $
+              "length of list out of range of scalar field"
+        _ -> Left . ErrorMessage ann $ "expected a list"
+    castFrom :: ann -> Name -> Value -> Either (ErrorMessage ann) Value
+    castFrom ann name =
+      \case
+        To' name' y ->
+          if name == name'
+          then pure y
+          else Left . ErrorMessage ann $ "from(-): name type mismatch"
+        _ -> Left . ErrorMessage ann $ "from(-): expected a To value"
 
     castF :: ann -> Scalar -> Either (ErrorMessage ann) Value
     castF ann yV =
@@ -429,6 +487,15 @@ evaluate gc lc t x e = do
       \case
         Pair' _ y -> pure y
         _ -> Left . ErrorMessage ann $ "pi2: expected a pair"
+
+    maybeFunctor ::
+      (ann -> Value -> Either (ErrorMessage ann) Value) ->
+      ann -> Value -> Either (ErrorMessage ann) Value
+    maybeFunctor f ann =
+      \case
+        Maybe'' (Just y) -> f ann y
+        Maybe'' Nothing -> pure (Maybe'' Nothing)
+        _ -> Left . ErrorMessage ann $ "Maybe functor: expected a Maybe value"
 
     partialApplication ann =
       Left . ErrorMessage ann $
