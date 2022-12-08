@@ -386,32 +386,22 @@ evaluate gc lc t x e = do
     Apply ann (ListCast _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      case y' of
-        List'' xs ->
-          List'' <$> mapM ((castF ann =<<) . decodeScalar ann) xs
-        _ -> Left . ErrorMessage ann $
-          "List(cast): expected a list"
+      listFunctor (\ann -> (castF ann =<<) . decodeScalar ann) ann y'
     ListCast ann -> partialApplication ann
     Apply ann (ListPi1 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      case y' of
-        List'' xs -> List'' <$> mapM (fst' ann) xs
-        _ -> Left . ErrorMessage ann $ "List(pi1): expected a list"
+      listFunctor snd' ann y'
     ListPi1 ann -> partialApplication ann
     Apply ann (ListPi2 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      case y' of
-        List'' xs -> List'' <$> mapM (snd' ann) xs
-        _ -> Left . ErrorMessage ann $ "List(pi2): expected a list"
+      listFunctor snd' ann y'
     ListPi2 ann -> partialApplication ann
     Apply ann (ListTo _ name) y -> do
       yT <- inferType lc y 
       y' <- rec yT y e
-      case y' of
-        List'' ys -> pure (List'' (To' name <$> ys))
-        _ -> Left . ErrorMessage ann $ "List(to(-)): expected a list"
+      listFunctor (const (pure . To' name)) ann y'
     ListTo ann _ -> partialApplication ann
     Apply ann (ListFrom _ name) y -> do
       yT <- inferType lc y
@@ -423,28 +413,23 @@ evaluate gc lc t x e = do
     Apply ann (ListLength _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      case y' of
-        List'' ys -> List'' <$> mapM (listLength ann) ys
-        _ -> Left . ErrorMessage ann $ "List(length): expected a list"
+      listFunctor listLength ann y'
     ListLength ann -> partialApplication ann
     Apply ann (ListMaybePi1 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      case y' of
-        List'' ys -> List'' <$> mapM (maybeFunctor fst' ann) ys
-        _ -> Left . ErrorMessage ann $ "List(Maybe(pi1)): expected a list"
+      listFunctor (maybeFunctor fst') ann y'
+    ListMaybePi1 ann -> partialApplication ann
     Apply ann (ListMaybePi2 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      case y' of
-        List'' ys -> List'' <$> mapM (maybeFunctor snd' ann) ys
-        _ -> Left . ErrorMessage ann $ "List(Maybe(pi2)): expected a list"
+      listFunctor (maybeFunctor snd') ann y'
+    ListMaybePi2 ann -> partialApplication ann
     Apply ann (ListMaybeLength _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      case y' of
-        List'' ys -> List'' <$> mapM (maybeFunctor listLength ann) ys
-        _ -> Left . ErrorMessage ann $ "List(length): expected a list"
+      listFunctor (maybeFunctor listLength) ann y'
+    ListMaybeLength ann -> partialApplication ann
   where
     rec = evaluate gc lc
 
@@ -496,6 +481,15 @@ evaluate gc lc t x e = do
         Maybe'' (Just y) -> f ann y
         Maybe'' Nothing -> pure (Maybe'' Nothing)
         _ -> Left . ErrorMessage ann $ "Maybe functor: expected a Maybe value"
+
+    listFunctor ::
+      (ann -> Value -> Either (ErrorMessage ann) Value) ->
+      ann -> Value -> Either (ErrorMessage ann) Value
+    listFunctor f ann =
+      \case
+        List'' xs -> List'' <$> mapM (f ann) xs
+        _ -> Left . ErrorMessage ann $
+          "List functor: expected a list"
 
     partialApplication ann =
       Left . ErrorMessage ann $
