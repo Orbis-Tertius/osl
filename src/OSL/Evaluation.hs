@@ -20,6 +20,7 @@ import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.OSL (ValidContext (ValidContext), Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp, Exists, Length, Nth, ListCast, ListPi1, ListPi2, ListTo, ListFrom, ListLength, ListMaybePi1, ListMaybePi2, ListMaybeLength, ListMaybeFrom, ListMaybeTo, Sum, Lookup, Keys, MapPi1, MapPi2, MapFrom, MapTo, SumMapLength, SumListLookup, Equal, LessOrEqual, And, Or, Not, Implies, Iff, ForAll, ForSome, Top, Bottom),
   Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe, List, Map))
+import OSL.Types.PreprocessedWitness (PreprocessedWitness)
 import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool, List'', Map''))
 import OSL.ValidContext (getFreeOSLName)
 import OSL.ValidateContext (checkTerm, inferType, checkTypeInclusion)
@@ -29,15 +30,16 @@ import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInteger, zero)
 evaluate ::
   Show ann =>
   ValidContext 'Global ann ->
+  PreprocessedWitness ann ->
   ValidContext 'Local ann ->
   Type ann ->
   Term ann ->
   EvaluationContext ->
   Either (ErrorMessage ann) Value
-evaluate gc lc t x e = do
+evaluate gc witness lc t x e = do
   checkTerm lc t x
   case x of
-    NamedTerm ann name -> evalName gc lc e ann name
+    NamedTerm ann name -> evalName gc witness lc e ann name
     Apply ann (Apply _ (AddN _) y) z ->
       Nat <$>
       (join $ liftMath ann (Group.+)
@@ -208,7 +210,7 @@ evaluate gc lc t x e = do
     Apply _ (Lambda _ v a y) z -> do
       z' <- rec a z e
       let lc' = lc <> ValidContext (Map.singleton v (FreeVariable a))
-      evaluate gc lc' t y $ e <> EvaluationContext (Map.singleton v z')
+      evaluate gc witness lc' t y $ e <> EvaluationContext (Map.singleton v z')
     Lambda ann _ _ _ -> partialApplication ann
     Apply _ (To ann name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
@@ -539,7 +541,7 @@ evaluate gc lc t x e = do
               yT <- inferType lc y
               y' <- rec yT y e
               let v = getFreeOSLName gc
-              evaluate gc mempty t (Apply ann def (NamedTerm ann v)) $
+              evaluate gc witness mempty t (Apply ann def (NamedTerm ann v)) $
                 EvaluationContext
                   (Map.singleton v y')
             Just _ -> Left . ErrorMessage ann' $
@@ -547,7 +549,7 @@ evaluate gc lc t x e = do
             Nothing -> Left . ErrorMessage ann' $
               "undefined name"
   where
-    rec = evaluate gc lc
+    rec = evaluate gc witness lc
 
     liftLogic :: ann -> (Bool -> Bool -> Bool) ->
        Value -> Value -> Either (ErrorMessage ann) Value
@@ -654,17 +656,18 @@ evaluate gc lc t x e = do
 evalName ::
   Show ann =>
   ValidContext 'Global ann ->
+  PreprocessedWitness ann ->
   ValidContext 'Local ann ->
   EvaluationContext ->
   ann ->
   Name ->
   Either (ErrorMessage ann) Value
-evalName gc lc e ann name =
+evalName gc witness lc e ann name =
   case Map.lookup name (e ^. #unEvaluationContext) of
     Just v -> pure v
     Nothing ->
       case Map.lookup name (lc ^. #unValidContext) of
-        Just (Defined u y) -> evaluate gc mempty u y mempty
+        Just (Defined u y) -> evaluate gc witness mempty u y mempty
         Just (FreeVariable _) -> Left . ErrorMessage ann $
           "undefined free variable"
         Just (Data _) -> Left . ErrorMessage ann $
