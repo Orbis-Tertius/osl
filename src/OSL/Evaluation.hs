@@ -548,6 +548,12 @@ evaluate gc witness lc t x e = do
               "expected the name of a defined function"
             Nothing -> Left . ErrorMessage ann' $
               "undefined name"
+    ForSome ann name a _bound y -> do
+      w <- (witness ^. #unPreprocessedWitness) ann e
+      -- TODO: check w is in bound
+      rec (Prop ann) y $
+        e <> EvaluationContext
+             (Map.singleton name w)
   where
     rec = evaluate gc witness lc
 
