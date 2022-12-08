@@ -18,7 +18,7 @@ import Data.Tuple (swap)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
-import OSL.Types.OSL (ValidContext (ValidContext), Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp, Exists, Length, Nth, ListCast, ListPi1, ListPi2, ListTo, ListFrom, ListLength, ListMaybePi1, ListMaybePi2, ListMaybeLength),
+import OSL.Types.OSL (ValidContext (ValidContext), Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp, Exists, Length, Nth, ListCast, ListPi1, ListPi2, ListTo, ListFrom, ListLength, ListMaybePi1, ListMaybePi2, ListMaybeLength, ListMaybeFrom),
   Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe))
 import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool, List''))
 import OSL.ValidContext (getFreeOSLName)
@@ -386,7 +386,7 @@ evaluate gc lc t x e = do
     Apply ann (ListCast _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      listFunctor (\ann -> (castF ann =<<) . decodeScalar ann) ann y'
+      listFunctor (\ann' -> (castF ann' =<<) . decodeScalar ann') ann y'
     ListCast ann -> partialApplication ann
     Apply ann (ListPi1 _) y -> do
       yT <- inferType lc y
@@ -430,6 +430,10 @@ evaluate gc lc t x e = do
       y' <- rec yT y e
       listFunctor (maybeFunctor listLength) ann y'
     ListMaybeLength ann -> partialApplication ann
+    Apply ann (ListMaybeFrom _ name) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      listFunctor (\ann' -> castFrom ann' name) ann y'
   where
     rec = evaluate gc lc
 
