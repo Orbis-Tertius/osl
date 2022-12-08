@@ -10,7 +10,7 @@ import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Lens ((^.))
-import Control.Monad (join)
+import Control.Monad (join, liftM2)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (pack)
@@ -18,13 +18,13 @@ import Data.Tuple (swap)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
-import OSL.Types.OSL (ValidContext (ValidContext), Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp, Exists, Length, Nth, ListCast, ListPi1, ListPi2, ListTo, ListFrom, ListLength, ListMaybePi1, ListMaybePi2, ListMaybeLength, ListMaybeFrom, ListMaybeTo, Sum),
-  Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe))
-import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool, List''))
+import OSL.Types.OSL (ValidContext (ValidContext), Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp, Exists, Length, Nth, ListCast, ListPi1, ListPi2, ListTo, ListFrom, ListLength, ListMaybePi1, ListMaybePi2, ListMaybeLength, ListMaybeFrom, ListMaybeTo, Sum, Lookup, Keys, MapPi1, MapPi2, MapFrom, MapTo, SumMapLength, SumListLookup, Equal, LessOrEqual, And, Or, Not, Implies, Iff, ForAll, ForSome, Top, Bottom),
+  Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe, List, Map))
+import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool, List'', Map''))
 import OSL.ValidContext (getFreeOSLName)
 import OSL.ValidateContext (checkTerm, inferType, checkTypeInclusion)
 import Safe (atMay)
-import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInteger)
+import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInteger, zero)
 
 evaluate ::
   Show ann =>
@@ -443,16 +443,152 @@ evaluate gc lc t x e = do
     Apply ann (Sum _) y -> do
       yT <- inferType lc y
       listSum ann =<< rec yT y e
+    Sum ann -> partialApplication ann
+    Apply ann (Apply _ (Lookup _) k) m -> do
+      mT <- inferType lc m
+      m' <- rec mT m e
+      kT <- inferType lc k
+      k' <- rec kT k e
+      mapLookup ann k' m'
+    Lookup ann -> partialApplication ann
+    Apply ann (Keys _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case y' of
+        Map'' y'' -> pure (List'' (Map.keys y''))
+        _ -> Left . ErrorMessage ann $
+          "keys: expected a map"
+    Keys ann -> partialApplication ann
+    Apply ann (MapPi1 _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      mapFunctor fst' ann y'
+    MapPi1 ann -> partialApplication ann
+    Apply ann (MapPi2 _) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      mapFunctor snd' ann y'
+    MapPi2 ann -> partialApplication ann
+    Apply ann (MapTo _ name) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      mapFunctor (const (pure . To' name)) ann y'
+    MapTo ann _ -> partialApplication ann
+    Apply ann (MapFrom _ name) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      mapFunctor (flip castFrom name) ann y'
+    MapFrom ann _ -> partialApplication ann
+    Apply ann (SumMapLength _) y -> do
+      yT <- inferType lc y
+      listSum ann . List'' =<< mapElems ann =<<
+        mapFunctor listLength ann =<< rec yT y e
+    SumMapLength ann -> partialApplication ann
+    Apply ann (SumListLookup ann' k) y -> do
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case yT of
+        List _ _ (Map _ _ a _) -> do
+          k' <- rec a k e
+          listSum ann =<< listFunctor (flip mapLookup k') ann y'
+    SumListLookup ann _ -> partialApplication ann
+    Equal _ y z -> do
+      yT <- inferType lc y
+      Bool <$> ((==) <$> rec yT y e <*> rec yT z e)
+    LessOrEqual _ y z -> do
+      yT <- inferType lc y
+      Bool <$> ((<=) <$> rec yT y e <*> rec yT z e)
+    And ann p q ->
+      join $ liftM2 (liftLogic ann (&&))
+               (rec (Prop ann) p e)
+               (rec (Prop ann) q e)
+    Or ann p q ->
+      join $ liftM2 (liftLogic ann (||))
+               (rec (Prop ann) p e)
+               (rec (Prop ann) q e)
+    Not ann p -> do
+      p' <- rec (Prop ann) p e
+      case p' of
+        Bool y -> pure (Bool (not y))
+        _ -> Left . ErrorMessage ann $
+          "expected a boolean value"
+    Implies ann p q ->
+      join $ liftM2 (liftLogic ann (\p' q' -> not p' || q'))
+               (rec (Prop ann) p e)
+               (rec (Prop ann) q e)
+    Iff ann p q ->
+      join $ liftM2 (liftLogic ann (==))
+               (rec (Prop ann) p e)
+               (rec (Prop ann) q e)
+    Top _ -> pure (Bool True)
+    Bottom _ -> pure (Bool True)
+    Apply ann (NamedTerm ann' fName) y -> do
+      case Map.lookup fName (e ^. #unEvaluationContext) of
+        Just (Fun f) -> do
+          yT <- inferType lc y
+          y' <- rec yT y e
+          case Map.lookup y' f of
+            Just v -> pure v
+            Nothing -> Left . ErrorMessage ann $
+              "input not in function domain"
+        Just _ -> Left . ErrorMessage ann $
+          "apply: expected a function"
+        Nothing ->
+          case Map.lookup fName (gc ^. #unValidContext) of
+            Just (Defined _ def) -> do
+              yT <- inferType lc y
+              y' <- rec yT y e
+              let v = getFreeOSLName gc
+              evaluate gc mempty t (Apply ann def (NamedTerm ann v)) $
+                EvaluationContext
+                  (Map.singleton v y')
+            Just _ -> Left . ErrorMessage ann' $
+              "expected the name of a defined function"
+            Nothing -> Left . ErrorMessage ann' $
+              "undefined name"
   where
     rec = evaluate gc lc
+
+    liftLogic :: ann -> (Bool -> Bool -> Bool) ->
+       Value -> Value -> Either (ErrorMessage ann) Value
+    liftLogic ann f =
+      curry $
+        \case
+          (Bool y, Bool z) -> pure (Bool (f y z))
+          _ -> Left . ErrorMessage ann $
+            "expected boolean values"
+
+    mapElems :: ann -> Value -> Either (ErrorMessage ann) [Value]
+    mapElems ann =
+      \case
+        Map'' m -> pure (Map.elems m)
+        _ -> Left . ErrorMessage ann $
+          "expected a map"
+
+    mapFunctor :: (ann -> Value -> Either (ErrorMessage ann) Value) -> ann -> Value -> Either (ErrorMessage ann) Value
+    mapFunctor f ann y =
+      case y of
+        Map'' m -> Map'' <$> mapM (f ann) m
+        _ -> Left . ErrorMessage ann $
+          "Map functor: expected a map"
+
+    mapLookup :: ann -> Value -> Value -> Either (ErrorMessage ann) Value
+    mapLookup ann k m =
+      case m of
+        Map'' m' ->
+          case Map.lookup k m' of
+            Just v -> pure v
+            Nothing -> Left . ErrorMessage ann $
+              "lookup: key does not exist"
+        _ -> Left . ErrorMessage ann $
+          "lookup: expected a map"
 
     listSum :: ann -> Value -> Either (ErrorMessage ann) Value
     listSum ann =
       \case
         List'' ys -> castF ann . foldl (Group.+) zero
-          =<< mapM 
-    todo :: a
-    todo = todo
+          =<< mapM (decodeScalar ann) ys
+        _ -> Left . ErrorMessage ann $ "expected a list"
     listLength :: ann -> Value -> Either (ErrorMessage ann) Value
     listLength ann =
       \case
