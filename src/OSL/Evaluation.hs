@@ -16,16 +16,18 @@ import qualified Data.Set as Set
 import Data.Text (pack)
 import Data.Tuple (swap)
 import Die (die)
+import OSL.Bound (boundAnnotation)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.OSL
-  ( Bound (ScalarBound),
+  ( Bound (ScalarBound, FieldMaxBound, ProductBound, CoproductBound, ToBound),
+    LeftBound (LeftBound), RightBound (RightBound),
     ContextType (Global, Local),
     Declaration (Data, Defined, FreeVariable),
     Name,
     Term (AddFp, AddN, AddZ, And, Apply, Bottom, Cast, ConstF, ConstFin, ConstFp, ConstN, ConstSet, ConstZ, Equal, Exists, ForAll, ForSome, From, FunctionCoproduct, FunctionProduct, Iff, Implies, Inverse, Iota1, Iota2, IsNothing, Just', Keys, Lambda, Length, LessOrEqual, Let, ListCast, ListFrom, ListLength, ListMaybeFrom, ListMaybeLength, ListMaybePi1, ListMaybePi2, ListMaybeTo, ListPi1, ListPi2, ListTo, Lookup, MapFrom, MapPi1, MapPi2, MapTo, MaxFp, MaxN, MaxZ, Maybe', MaybeFrom, MaybePi1, MaybePi2, MaybeTo, MulFp, MulN, MulZ, NamedTerm, Not, Nothing', Nth, Or, Pair, Pi1, Pi2, Sum, SumListLookup, SumMapLength, To, Top),
-    Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe, List, Map),
+    Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe, List, Map, P),
     ValidContext (ValidContext),
   )
 import OSL.Types.PreprocessedWitness (PreprocessedWitness)
@@ -720,6 +722,8 @@ evaluate gc witness lc t x e = do
           $ "quantification over Prop not supported"
         F ann _ _ _ -> const . Left . ErrorMessage ann
           $ "universal quantification over functions not supported"
+        P ann _ _ _ -> const . Left . ErrorMessage ann
+          $ "quantification over predicates not supported"
         N ann ->
           \case
             Nothing -> Left . ErrorMessage ann $
@@ -727,6 +731,66 @@ evaluate gc witness lc t x e = do
             Just (ScalarBound ann' bound) -> do
               bound' <- decodeScalar ann' =<< rec (N ann') bound e
               pure (Nat . integerToScalarUnsafe <$> [0 .. scalarToInteger bound'])
+            Just (FieldMaxBound ann') ->
+              Left . ErrorMessage ann' $ "field max bound is not allowed for universal quantifiers"
+            Just b -> Left . ErrorMessage (boundAnnotation b) $ "bound type mismatch"
+        Z ann ->
+          \case
+            Nothing -> Left . ErrorMessage ann $
+              "universal quantification over Z requires a bound"
+            Just (ScalarBound ann' bound) -> do
+              bound' <- decodeScalar ann' =<< rec (Z ann') bound e
+              pure (Int . integerToScalarUnsafe <$> [0 .. scalarToInteger bound'])
+            Just (FieldMaxBound ann') ->
+              Left . ErrorMessage ann' $ "field max bound is not allowed for universal quantifiers"
+            Just b -> Left . ErrorMessage (boundAnnotation b) $ "bound type mismatch"
+        Fp ann ->
+          \case
+            Nothing -> Left . ErrorMessage ann $
+              "universal quantification over F requires a bound"
+            Just (ScalarBound ann' bound) -> do
+              bound' <- decodeScalar ann' =<< rec (Fp ann') bound e
+              pure (Fp' . integerToScalarUnsafe <$> [0 .. scalarToInteger bound'])
+            Just (FieldMaxBound ann') ->
+              Left . ErrorMessage ann' $ "field max bound is not allowed for universal quantifiers"
+            Just b -> Left . ErrorMessage (boundAnnotation b) $ "bound type mismatch"
+        Fin _ n ->
+          \case
+            Nothing ->
+              pure (Fin' . integerToScalarUnsafe <$> [0 .. n])
+            Just (ScalarBound ann' bound) -> do
+              bound' <- decodeScalar ann' =<< rec (Fin ann' n) bound e
+              pure (Fin' . integerToScalarUnsafe <$> [0 .. scalarToInteger bound'])
+            Just b -> Left . ErrorMessage (boundAnnotation b) $ "bound type mismatch"
+        Product ann a b ->
+          \case
+            Nothing -> do
+              aVs <- getUniversalQuantifierValues a Nothing
+              bVs <- getUniversalQuantifierValues b Nothing
+              pure [Pair' aV bV | aV <- aVs, bV <- bVs]
+            Just (ProductBound ann' (LeftBound aBound) (RightBound bBound)) -> do
+              aVs <- getUniversalQuantifierValues a (Just aBound)
+              bVs <- getUniversalQuantifierValues b (Just bBound)
+              pure [Pair' aV bV | aV <- aVs, bV <- bVs]
+        Coproduct ann a b ->
+          \case
+            Nothing -> do
+              aVs <- getUniversalQuantifierValues a Nothing
+              bVs <- getUniversalQuantifierValues b Nothing
+              pure $ (Iota1' <$> aVs) <> (Iota2' <$> bVs) 
+            Just (CoproductBound ann' (LeftBound aBound) (RightBound bBound)) -> do
+              aVs <- getUniversalQuantifierValues a (Just aBound)
+              bVs <- getUniversalQuantifierValues b (Just bBound)
+              pure $ (Iota1' <$> aVs) <> (Iota2' <$> bVs)
+        NamedType ann name ->
+          case Map.lookup name (lc ^. #unValidContext) of
+            Just (Data a) ->
+              \case
+                Nothing -> fmap (To' name) <$> getUniversalQuantifierValues a Nothing
+                Just (ToBound ann' name' bound) ->
+                  if name == name'
+                  then fmap (To' name) <$> getUniversalQuantifierValues a (Just bound)
+                  else Left . ErrorMessage ann' $ "bound type name mismatch"
 
     integerToScalarUnsafe :: Integer -> Scalar
     integerToScalarUnsafe y =
