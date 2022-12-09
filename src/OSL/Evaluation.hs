@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 
 module OSL.Evaluation (evaluate) where
@@ -18,12 +18,19 @@ import Data.Tuple (swap)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
-import OSL.Types.OSL (ValidContext (ValidContext), Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp, Exists, Length, Nth, ListCast, ListPi1, ListPi2, ListTo, ListFrom, ListLength, ListMaybePi1, ListMaybePi2, ListMaybeLength, ListMaybeFrom, ListMaybeTo, Sum, Lookup, Keys, MapPi1, MapPi2, MapFrom, MapTo, SumMapLength, SumListLookup, Equal, LessOrEqual, And, Or, Not, Implies, Iff, ForAll, ForSome, Top, Bottom),
-  Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe, List, Map), Bound)
+import OSL.Types.OSL
+  ( Bound,
+    ContextType (Global, Local),
+    Declaration (Data, Defined, FreeVariable),
+    Name,
+    Term (AddFp, AddN, AddZ, And, Apply, Bottom, Cast, ConstF, ConstFin, ConstFp, ConstN, ConstSet, ConstZ, Equal, Exists, ForAll, ForSome, From, FunctionCoproduct, FunctionProduct, Iff, Implies, Inverse, Iota1, Iota2, IsNothing, Just', Keys, Lambda, Length, LessOrEqual, Let, ListCast, ListFrom, ListLength, ListMaybeFrom, ListMaybeLength, ListMaybePi1, ListMaybePi2, ListMaybeTo, ListPi1, ListPi2, ListTo, Lookup, MapFrom, MapPi1, MapPi2, MapTo, MaxFp, MaxN, MaxZ, Maybe', MaybeFrom, MaybePi1, MaybePi2, MaybeTo, MulFp, MulN, MulZ, NamedTerm, Not, Nothing', Nth, Or, Pair, Pi1, Pi2, Sum, SumListLookup, SumMapLength, To, Top),
+    Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe, List, Map),
+    ValidContext (ValidContext),
+  )
 import OSL.Types.PreprocessedWitness (PreprocessedWitness)
-import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool, List'', Map''))
+import OSL.Types.Value (Value (Bool, Fin', Fp', Fun, Int, Iota1', Iota2', List'', Map'', Maybe'', Nat, Pair', Predicate, To'))
 import OSL.ValidContext (getFreeOSLName)
-import OSL.ValidateContext (checkTerm, inferType, checkTypeInclusion)
+import OSL.ValidateContext (checkTerm, checkTypeInclusion, inferType)
 import Safe (atMay)
 import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInteger, zero)
 
@@ -41,60 +48,75 @@ evaluate gc witness lc t x e = do
   case x of
     NamedTerm ann name -> evalName gc witness lc e ann name
     Apply ann (Apply _ (AddN _) y) z ->
-      Nat <$>
-      (join $ liftMath ann (Group.+)
-               <$> rec t y e
-               <*> rec t z e)
+      Nat
+        <$> ( join $
+                liftMath ann (Group.+)
+                  <$> rec t y e
+                  <*> rec t z e
+            )
     Apply ann (Apply _ (MulN _) y) z ->
-      Nat <$>
-      (join $ liftMath ann (Ring.*)
-                <$> rec t y e
-                <*> rec t z e)
+      Nat
+        <$> ( join $
+                liftMath ann (Ring.*)
+                  <$> rec t y e
+                  <*> rec t z e
+            )
     ConstN ann y ->
       case integerToScalar y of
         Just y' -> pure (Nat y')
-        Nothing -> Left . ErrorMessage ann $
-          "constant out of range of scalar field"
+        Nothing ->
+          Left . ErrorMessage ann $
+            "constant out of range of scalar field"
     Apply ann (Apply _ (AddZ _) y) z ->
-      Int <$>
-      (join $ liftMath ann (Group.+)
-               <$> rec t y e
-               <*> rec t z e)
+      Int
+        <$> ( join $
+                liftMath ann (Group.+)
+                  <$> rec t y e
+                  <*> rec t z e
+            )
     Apply ann (Apply _ (MulZ _) y) z ->
-      Int <$>
-      (join $ liftMath ann (Ring.*)
-                <$> rec t y e
-                <*> rec t z e)
+      Int
+        <$> ( join $
+                liftMath ann (Ring.*)
+                  <$> rec t y e
+                  <*> rec t z e
+            )
     ConstZ ann y ->
       case integerToScalar y of
         Just y' -> pure (Int y')
-        Nothing -> Left . ErrorMessage ann $
-          "constant out of range of scalar field"
+        Nothing ->
+          Left . ErrorMessage ann $
+            "constant out of range of scalar field"
     Apply ann (Apply _ (AddFp _) y) z ->
-      Fp' <$>
-      (join $ liftMath ann (Group.+)
-               <$> rec t y e
-               <*> rec t z e)
+      Fp'
+        <$> ( join $
+                liftMath ann (Group.+)
+                  <$> rec t y e
+                  <*> rec t z e
+            )
     Apply ann (Apply _ (MulFp _) y) z ->
-      Fp' <$>
-      (join $ liftMath ann (Ring.*)
-               <$> rec t y e
-               <*> rec t z e)
+      Fp'
+        <$> ( join $
+                liftMath ann (Ring.*)
+                  <$> rec t y e
+                  <*> rec t z e
+            )
     ConstFp ann y ->
       case integerToScalar y of
         Just y' -> pure (Fp' y')
-        Nothing -> Left . ErrorMessage ann $
-          "constant out of range of scalar field"
+        Nothing ->
+          Left . ErrorMessage ann $
+            "constant out of range of scalar field"
     ConstFin ann y ->
       case integerToScalar y of
         Just y' -> pure (Fin' y')
-        Nothing -> Left . ErrorMessage ann $
-          "constant out of range of scalar field"
+        Nothing ->
+          Left . ErrorMessage ann $
+            "constant out of range of scalar field"
     Apply ann (Cast _) y -> do
       yT <- inferType lc y
       yV <- decodeScalar ann =<< rec yT y e
       castF ann yV
-
     ConstF ann f ->
       case t of
         F _ mn a b -> do
@@ -103,12 +125,14 @@ evaluate gc witness lc t x e = do
           case mn of
             Just (Cardinality n) ->
               if intToInteger (length f) <= n
-              then pure (Fun (Map.fromList (zip xs ys)))
-              else Left . ErrorMessage ann $
-                "function constant larger than function type cardinality"
+                then pure (Fun (Map.fromList (zip xs ys)))
+                else
+                  Left . ErrorMessage ann $
+                    "function constant larger than function type cardinality"
             Nothing -> pure (Fun (Map.fromList (zip xs ys)))
-        _ -> Left . ErrorMessage ann $
-          "encountered a function constant in a non-function context"
+        _ ->
+          Left . ErrorMessage ann $
+            "encountered a function constant in a non-function context"
     AddN ann -> partialApplication ann
     MulN ann -> partialApplication ann
     AddZ ann -> partialApplication ann
@@ -123,13 +147,15 @@ evaluate gc witness lc t x e = do
           case mn of
             Just (Cardinality n) ->
               if intToInteger (length xs) <= n
-              then pure (Predicate (Set.fromList xs'))
-              else Left . ErrorMessage ann $
-                "set constant larger than type cardinality"
+                then pure (Predicate (Set.fromList xs'))
+                else
+                  Left . ErrorMessage ann $
+                    "set constant larger than type cardinality"
             Nothing ->
               pure (Predicate (Set.fromList xs'))
-        _ -> Left . ErrorMessage ann $
-          "encountered a set constant in a non-predicate context"
+        _ ->
+          Left . ErrorMessage ann $
+            "encountered a set constant in a non-predicate context"
     Apply ann (Inverse _) f -> do
       f' <- rec t f e
       case f' of
@@ -152,16 +178,18 @@ evaluate gc witness lc t x e = do
       y' <- rec yT y e
       case y' of
         Pair' z _ -> pure z
-        _ -> Left . ErrorMessage ann $
-          "pi1: expected a pair"
+        _ ->
+          Left . ErrorMessage ann $
+            "pi1: expected a pair"
     Pi1 ann -> partialApplication ann
     Apply ann (Pi2 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       case y' of
         Pair' _ z -> pure z
-        _ -> Left . ErrorMessage ann $
-          "pi2: expected a pair"
+        _ ->
+          Left . ErrorMessage ann $
+            "pi2: expected a pair"
     Pi2 ann -> partialApplication ann
     Apply ann (Iota1 _) y ->
       case t of
@@ -186,10 +214,11 @@ evaluate gc witness lc t x e = do
           g' <- rec (F ann' n a c) g e
           case (f', g') of
             (Fun f'', Fun g'') ->
-              pure . Fun
-                $ Map.unionWith Pair' f'' g''
-            _ -> Left . ErrorMessage ann $
-              "function product arguments expected to be functions"
+              pure . Fun $
+                Map.unionWith Pair' f'' g''
+            _ ->
+              Left . ErrorMessage ann $
+                "function product arguments expected to be functions"
         _ ->
           Left . ErrorMessage ann $
             "encountered a function product in a non-function-product context"
@@ -200,13 +229,15 @@ evaluate gc witness lc t x e = do
           g' <- rec (F ann' n b c) g e
           case (f', g') of
             (Fun f'', Fun g'') ->
-              pure . Fun
-                $ Map.mapKeys Iota1' f'' <>
-                  Map.mapKeys Iota2' g''
-            _ -> Left . ErrorMessage ann $
-             "function coproduct arguments expected to be functions"
-        _ -> Left . ErrorMessage ann $
-          "encountered a function coproduct in a non-function-coproduct context"
+              pure . Fun $
+                Map.mapKeys Iota1' f''
+                  <> Map.mapKeys Iota2' g''
+            _ ->
+              Left . ErrorMessage ann $
+                "function coproduct arguments expected to be functions"
+        _ ->
+          Left . ErrorMessage ann $
+            "encountered a function coproduct in a non-function-coproduct context"
     Apply _ (Lambda _ v a y) z -> do
       z' <- rec a z e
       let lc' = lc <> ValidContext (Map.singleton v (FreeVariable a))
@@ -216,8 +247,9 @@ evaluate gc witness lc t x e = do
       case Map.lookup name (gc ^. #unValidContext) of
         Just (Data a) ->
           To' name <$> rec a y e
-        _ -> Left . ErrorMessage ann $
-          "expected the name of a type"
+        _ ->
+          Left . ErrorMessage ann $
+            "expected the name of a type"
     To ann _ -> partialApplication ann
     Apply ann (From ann' name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
@@ -227,13 +259,16 @@ evaluate gc witness lc t x e = do
           case y' of
             To' name' y'' ->
               if name' == name
-              then pure y''
-              else Left . ErrorMessage ann' $
-                "from(-): named type mismatch"
-            _ -> Left . ErrorMessage ann' $
-              "expected a To value"
-        _ -> Left . ErrorMessage ann $
-          "expected the name of a type"
+                then pure y''
+                else
+                  Left . ErrorMessage ann' $
+                    "from(-): named type mismatch"
+            _ ->
+              Left . ErrorMessage ann' $
+                "expected a To value"
+        _ ->
+          Left . ErrorMessage ann $
+            "expected the name of a type"
     From ann _ -> partialApplication ann
     Let _ v a d y -> do
       d' <- rec a d e
@@ -244,15 +279,17 @@ evaluate gc witness lc t x e = do
       case y' of
         Maybe'' Nothing -> pure (Bool True)
         Maybe'' (Just _) -> pure (Bool False)
-        _ -> Left . ErrorMessage ann $
-          "expected a Maybe value"
+        _ ->
+          Left . ErrorMessage ann $
+            "expected a Maybe value"
     IsNothing ann -> partialApplication ann
     Apply ann (Just' _) y ->
       case t of
         Maybe _ a ->
           Maybe'' . Just <$> rec a y e
-        _ -> Left . ErrorMessage ann $
-          "saw just in a non-Maybe context"
+        _ ->
+          Left . ErrorMessage ann $
+            "saw just in a non-Maybe context"
     Just' ann -> partialApplication ann
     Nothing' _ -> pure (Maybe'' Nothing)
     Apply ann (Apply _ (Maybe' ann' f) y) z -> do
@@ -262,14 +299,16 @@ evaluate gc witness lc t x e = do
           z' <- rec (Maybe ann' a) z e
           let v = getFreeOSLName lc
           case z' of
-             Maybe'' (Just z'') ->
-               rec t (Apply ann f (NamedTerm ann v))
-                 $ e <> EvaluationContext (Map.singleton v z'')
-             Maybe'' Nothing -> rec t y e
-             _ -> Left . ErrorMessage ann $
-               "maybe: expected a Maybe value"
-        _ -> Left . ErrorMessage ann' $
-          "maybe: expected a function"
+            Maybe'' (Just z'') ->
+              rec t (Apply ann f (NamedTerm ann v)) $
+                e <> EvaluationContext (Map.singleton v z'')
+            Maybe'' Nothing -> rec t y e
+            _ ->
+              Left . ErrorMessage ann $
+                "maybe: expected a Maybe value"
+        _ ->
+          Left . ErrorMessage ann' $
+            "maybe: expected a function"
     Maybe' ann _ -> partialApplication ann
     Apply ann (MaybePi1 _) y -> do
       yT <- inferType lc y
@@ -279,8 +318,9 @@ evaluate gc witness lc t x e = do
           pure (Maybe'' (Just z))
         Maybe'' Nothing ->
           pure (Maybe'' Nothing)
-        _ -> Left . ErrorMessage ann $
-          "Maybe(pi1): expected a Maybe-pair"
+        _ ->
+          Left . ErrorMessage ann $
+            "Maybe(pi1): expected a Maybe-pair"
     MaybePi1 ann -> partialApplication ann
     Apply ann (MaybePi2 _) y -> do
       yT <- inferType lc y
@@ -290,8 +330,9 @@ evaluate gc witness lc t x e = do
           pure (Maybe'' (Just z))
         Maybe'' Nothing ->
           pure (Maybe'' Nothing)
-        _ -> Left . ErrorMessage ann $
-          "Maybe(pi2): expected a Maybe-pair"
+        _ ->
+          Left . ErrorMessage ann $
+            "Maybe(pi2): expected a Maybe-pair"
     MaybePi2 ann -> partialApplication ann
     Apply ann (MaybeTo ann' name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
@@ -302,10 +343,12 @@ evaluate gc witness lc t x e = do
               pure (Maybe'' (Just (To' name y'')))
             Maybe'' Nothing ->
               pure (Maybe'' Nothing)
-            _ -> Left . ErrorMessage ann $
-              "Maybe(to(-)): expected a Maybe"
-        _ -> Left . ErrorMessage ann' $
-          "expected the name of a type"
+            _ ->
+              Left . ErrorMessage ann $
+                "Maybe(to(-)): expected a Maybe"
+        _ ->
+          Left . ErrorMessage ann' $
+            "expected the name of a type"
     MaybeTo ann _ -> partialApplication ann
     Apply ann (MaybeFrom ann' name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
@@ -315,42 +358,53 @@ evaluate gc witness lc t x e = do
           case y' of
             Maybe'' (Just (To' name' y'')) ->
               if name' == name
-              then pure (Maybe'' (Just y''))
-              else Left . ErrorMessage ann' $
-                "Maybe(from(-)): named type mismatch"
+                then pure (Maybe'' (Just y''))
+                else
+                  Left . ErrorMessage ann' $
+                    "Maybe(from(-)): named type mismatch"
             Maybe'' Nothing ->
               pure (Maybe'' Nothing)
-            _ -> Left . ErrorMessage ann $
-              "expected a Maybe(" <> pack (show name) <> ")"
-        _ -> Left . ErrorMessage ann' $
-          "expected the name of a type"
+            _ ->
+              Left . ErrorMessage ann $
+                "expected a Maybe(" <> pack (show name) <> ")"
+        _ ->
+          Left . ErrorMessage ann' $
+            "expected the name of a type"
     MaybeFrom ann _ -> partialApplication ann
     Apply ann (Apply _ (MaxN _) y) z ->
-      Nat <$>
-      (join $ liftMath ann max
-               <$> rec t y e
-               <*> rec t z e)
+      Nat
+        <$> ( join $
+                liftMath ann max
+                  <$> rec t y e
+                  <*> rec t z e
+            )
     MaxN ann -> partialApplication ann
     Apply ann (Apply _ (MaxZ _) y) z ->
-      Int <$>
-      (join $ liftMath ann max
-                <$> rec t y e
-                <*> rec t z e)
+      Int
+        <$> ( join $
+                liftMath ann max
+                  <$> rec t y e
+                  <*> rec t z e
+            )
     MaxZ ann -> partialApplication ann
     Apply ann (Apply _ (MaxFp _) y) z ->
-      Fp' <$>
-      (join $ liftMath ann max
-               <$> rec t y e
-               <*> rec t z e)
+      Fp'
+        <$> ( join $
+                liftMath ann max
+                  <$> rec t y e
+                  <*> rec t z e
+            )
     MaxFp ann -> partialApplication ann
     Apply ann (Exists _) y -> do
       y' <- rec (Maybe ann t) y e
       case y' of
         Maybe'' (Just y'') -> pure y''
-        Maybe'' Nothing -> Left . ErrorMessage ann $
-          "applied exists to nothing"
-        _ -> Left . ErrorMessage ann $
-          "exists: expected a Maybe"
+        Maybe'' Nothing ->
+          Left . ErrorMessage ann $
+            "applied exists to nothing"
+        _ ->
+          Left . ErrorMessage ann $
+            "exists: expected a Maybe"
     Exists ann -> partialApplication ann
     Apply ann (Length _) y -> do
       yT <- inferType lc y
@@ -359,10 +413,12 @@ evaluate gc witness lc t x e = do
         List'' xs ->
           case integerToScalar (intToInteger (length xs)) of
             Just l -> pure (Nat l)
-            Nothing -> Left . ErrorMessage ann $
-              "length of list is out of range of scalar field"
-        _ -> Left . ErrorMessage ann $
-          "length: expected a list"
+            Nothing ->
+              Left . ErrorMessage ann $
+                "length of list is out of range of scalar field"
+        _ ->
+          Left . ErrorMessage ann $
+            "length: expected a list"
     Length ann -> partialApplication ann
     Apply ann (Apply _ (Nth _) xs) i -> do
       i' <- rec (N ann) i e
@@ -376,14 +432,18 @@ evaluate gc witness lc t x e = do
                 List'' xs'' ->
                   case xs'' `atMay` i''' of
                     Just y -> pure y
-                    Nothing -> Left . ErrorMessage ann $
-                      "nth: index out of range"
-                _ -> Left . ErrorMessage ann $
-                  "nth: expected a list"
-            Nothing -> Left . ErrorMessage ann $
-              "nth: index out of range of scalar field"
-        _ -> Left . ErrorMessage ann $
-          "nth: expected a natural number"
+                    Nothing ->
+                      Left . ErrorMessage ann $
+                        "nth: index out of range"
+                _ ->
+                  Left . ErrorMessage ann $
+                    "nth: expected a list"
+            Nothing ->
+              Left . ErrorMessage ann $
+                "nth: index out of range of scalar field"
+        _ ->
+          Left . ErrorMessage ann $
+            "nth: expected a natural number"
     Nth ann -> partialApplication ann
     Apply ann (ListCast _) y -> do
       yT <- inferType lc y
@@ -401,7 +461,7 @@ evaluate gc witness lc t x e = do
       listFunctor snd' ann y'
     ListPi2 ann -> partialApplication ann
     Apply ann (ListTo _ name) y -> do
-      yT <- inferType lc y 
+      yT <- inferType lc y
       y' <- rec yT y e
       listFunctor (const (pure . To' name)) ann y'
     ListTo ann _ -> partialApplication ann
@@ -458,8 +518,9 @@ evaluate gc witness lc t x e = do
       y' <- rec yT y e
       case y' of
         Map'' y'' -> pure (List'' (Map.keys y''))
-        _ -> Left . ErrorMessage ann $
-          "keys: expected a map"
+        _ ->
+          Left . ErrorMessage ann $
+            "keys: expected a map"
     Keys ann -> partialApplication ann
     Apply ann (MapPi1 _) y -> do
       yT <- inferType lc y
@@ -483,8 +544,9 @@ evaluate gc witness lc t x e = do
     MapFrom ann _ -> partialApplication ann
     Apply ann (SumMapLength _) y -> do
       yT <- inferType lc y
-      listSum ann . List'' =<< mapElems ann =<<
-        mapFunctor listLength ann =<< rec yT y e
+      listSum ann . List'' =<< mapElems ann
+        =<< mapFunctor listLength ann
+        =<< rec yT y e
     SumMapLength ann -> partialApplication ann
     Apply ann (SumListLookup _ k) y -> do
       yT <- inferType lc y
@@ -493,8 +555,9 @@ evaluate gc witness lc t x e = do
         List _ _ (Map _ _ a _) -> do
           k' <- rec a k e
           listSum ann =<< listFunctor (flip mapLookup k') ann y'
-        _ -> Left . ErrorMessage ann $
-          "sumListLookup: expected a list of maps"
+        _ ->
+          Left . ErrorMessage ann $
+            "sumListLookup: expected a list of maps"
     SumListLookup ann _ -> partialApplication ann
     Equal _ y z -> do
       yT <- inferType lc y
@@ -503,27 +566,36 @@ evaluate gc witness lc t x e = do
       yT <- inferType lc y
       Bool <$> ((<=) <$> rec yT y e <*> rec yT z e)
     And ann p q ->
-      join $ liftM2 (liftLogic ann (&&))
-               (rec (Prop ann) p e)
-               (rec (Prop ann) q e)
+      join $
+        liftM2
+          (liftLogic ann (&&))
+          (rec (Prop ann) p e)
+          (rec (Prop ann) q e)
     Or ann p q ->
-      join $ liftM2 (liftLogic ann (||))
-               (rec (Prop ann) p e)
-               (rec (Prop ann) q e)
+      join $
+        liftM2
+          (liftLogic ann (||))
+          (rec (Prop ann) p e)
+          (rec (Prop ann) q e)
     Not ann p -> do
       p' <- rec (Prop ann) p e
       case p' of
         Bool y -> pure (Bool (not y))
-        _ -> Left . ErrorMessage ann $
-          "expected a boolean value"
+        _ ->
+          Left . ErrorMessage ann $
+            "expected a boolean value"
     Implies ann p q ->
-      join $ liftM2 (liftLogic ann (\p' q' -> not p' || q'))
-               (rec (Prop ann) p e)
-               (rec (Prop ann) q e)
+      join $
+        liftM2
+          (liftLogic ann (\p' q' -> not p' || q'))
+          (rec (Prop ann) p e)
+          (rec (Prop ann) q e)
     Iff ann p q ->
-      join $ liftM2 (liftLogic ann (==))
-               (rec (Prop ann) p e)
-               (rec (Prop ann) q e)
+      join $
+        liftM2
+          (liftLogic ann (==))
+          (rec (Prop ann) p e)
+          (rec (Prop ann) q e)
     Top _ -> pure (Bool True)
     Bottom _ -> pure (Bool True)
     Apply ann (NamedTerm ann' fName) y -> do
@@ -533,10 +605,12 @@ evaluate gc witness lc t x e = do
           y' <- rec yT y e
           case Map.lookup y' f of
             Just v -> pure v
-            Nothing -> Left . ErrorMessage ann $
-              "input not in function domain"
-        Just _ -> Left . ErrorMessage ann $
-          "apply: expected a function"
+            Nothing ->
+              Left . ErrorMessage ann $
+                "input not in function domain"
+        Just _ ->
+          Left . ErrorMessage ann $
+            "apply: expected a function"
         Nothing ->
           case Map.lookup fName (gc ^. #unValidContext) of
             Just (Defined _ def) -> do
@@ -546,20 +620,24 @@ evaluate gc witness lc t x e = do
               evaluate gc witness mempty t (Apply ann def (NamedTerm ann v)) $
                 EvaluationContext
                   (Map.singleton v y')
-            Just _ -> Left . ErrorMessage ann' $
-              "expected the name of a defined function"
-            Nothing -> Left . ErrorMessage ann' $
-              "undefined name"
+            Just _ ->
+              Left . ErrorMessage ann' $
+                "expected the name of a defined function"
+            Nothing ->
+              Left . ErrorMessage ann' $
+                "undefined name"
     ForSome ann name _a _bound y -> do
       w <- (witness ^. #unPreprocessedWitness) ann e
       -- TODO: check w is in bound
       rec (Prop ann) y $
-        e <> EvaluationContext
-             (Map.singleton name w)
+        e
+          <> EvaluationContext
+            (Map.singleton name w)
     ForAll ann name a bound y -> do
       vs <- getUniversalQuantifierValues a bound
-      let p v = (decodeBool ann =<<) . rec (Prop ann) y . (e <>) . EvaluationContext
-                 $ Map.singleton name v
+      let p v =
+            (decodeBool ann =<<) . rec (Prop ann) y . (e <>) . EvaluationContext $
+              Map.singleton name v
       Bool . all id <$> mapM p vs
     Apply ann (AddN _) _ -> partialApplication ann
     Apply ann (MulN _) _ -> partialApplication ann
@@ -585,8 +663,9 @@ evaluate gc witness lc t x e = do
       case s of
         Predicate s' ->
           pure (Bool (y' `Set.member` s'))
-        _ -> Left . ErrorMessage ann' $
-          "expected a set"
+        _ ->
+          Left . ErrorMessage ann' $
+            "expected a set"
     Apply ann (Pair _) _ -> partialApplication ann
     Apply ann fE@(FunctionProduct {}) y -> do
       fT <- inferType lc fE
@@ -636,28 +715,35 @@ evaluate gc witness lc t x e = do
     getUniversalQuantifierValues :: Type ann -> Maybe (Bound ann) -> Either (ErrorMessage ann) [Value]
     getUniversalQuantifierValues = todo
 
-    liftLogic :: ann -> (Bool -> Bool -> Bool) ->
-       Value -> Value -> Either (ErrorMessage ann) Value
+    liftLogic ::
+      ann ->
+      (Bool -> Bool -> Bool) ->
+      Value ->
+      Value ->
+      Either (ErrorMessage ann) Value
     liftLogic ann f =
       curry $
         \case
           (Bool y, Bool z) -> pure (Bool (f y z))
-          _ -> Left . ErrorMessage ann $
-            "expected boolean values"
+          _ ->
+            Left . ErrorMessage ann $
+              "expected boolean values"
 
     mapElems :: ann -> Value -> Either (ErrorMessage ann) [Value]
     mapElems ann =
       \case
         Map'' m -> pure (Map.elems m)
-        _ -> Left . ErrorMessage ann $
-          "expected a map"
+        _ ->
+          Left . ErrorMessage ann $
+            "expected a map"
 
     mapFunctor :: (ann -> Value -> Either (ErrorMessage ann) Value) -> ann -> Value -> Either (ErrorMessage ann) Value
     mapFunctor f ann y =
       case y of
         Map'' m -> Map'' <$> mapM (f ann) m
-        _ -> Left . ErrorMessage ann $
-          "Map functor: expected a map"
+        _ ->
+          Left . ErrorMessage ann $
+            "Map functor: expected a map"
 
     mapLookup :: ann -> Value -> Value -> Either (ErrorMessage ann) Value
     mapLookup ann k m =
@@ -665,16 +751,19 @@ evaluate gc witness lc t x e = do
         Map'' m' ->
           case Map.lookup k m' of
             Just v -> pure v
-            Nothing -> Left . ErrorMessage ann $
-              "lookup: key does not exist"
-        _ -> Left . ErrorMessage ann $
-          "lookup: expected a map"
+            Nothing ->
+              Left . ErrorMessage ann $
+                "lookup: key does not exist"
+        _ ->
+          Left . ErrorMessage ann $
+            "lookup: expected a map"
 
     listSum :: ann -> Value -> Either (ErrorMessage ann) Value
     listSum ann =
       \case
-        List'' ys -> castF ann . foldl (Group.+) zero
-          =<< mapM (decodeScalar ann) ys
+        List'' ys ->
+          castF ann . foldl (Group.+) zero
+            =<< mapM (decodeScalar ann) ys
         _ -> Left . ErrorMessage ann $ "expected a list"
     listLength :: ann -> Value -> Either (ErrorMessage ann) Value
     listLength ann =
@@ -682,16 +771,17 @@ evaluate gc witness lc t x e = do
         List'' ys ->
           case integerToScalar (intToInteger (length ys)) of
             Just l -> pure (Nat l)
-            Nothing -> Left . ErrorMessage ann $
-              "length of list out of range of scalar field"
+            Nothing ->
+              Left . ErrorMessage ann $
+                "length of list out of range of scalar field"
         _ -> Left . ErrorMessage ann $ "expected a list"
     castFrom :: ann -> Name -> Value -> Either (ErrorMessage ann) Value
     castFrom ann name =
       \case
         To' name' y ->
           if name == name'
-          then pure y
-          else Left . ErrorMessage ann $ "from(-): name type mismatch"
+            then pure y
+            else Left . ErrorMessage ann $ "from(-): name type mismatch"
         _ -> Left . ErrorMessage ann $ "from(-): expected a To value"
 
     castF :: ann -> Scalar -> Either (ErrorMessage ann) Value
@@ -700,9 +790,10 @@ evaluate gc witness lc t x e = do
         N _ -> pure (Nat yV)
         Z _ -> pure (Int yV)
         Fp _ -> pure (Fp' yV)
-        Fin _ _ -> pure (Fin' yV) 
-        _ -> Left . ErrorMessage ann $
-          "cast only works on basic numeric types"
+        Fin _ _ -> pure (Fin' yV)
+        _ ->
+          Left . ErrorMessage ann $
+            "cast only works on basic numeric types"
 
     fst' :: ann -> Value -> Either (ErrorMessage ann) Value
     fst' ann =
@@ -718,7 +809,9 @@ evaluate gc witness lc t x e = do
 
     maybeFunctor ::
       (ann -> Value -> Either (ErrorMessage ann) Value) ->
-      ann -> Value -> Either (ErrorMessage ann) Value
+      ann ->
+      Value ->
+      Either (ErrorMessage ann) Value
     maybeFunctor f ann =
       \case
         Maybe'' (Just y) -> f ann y
@@ -727,12 +820,15 @@ evaluate gc witness lc t x e = do
 
     listFunctor ::
       (ann -> Value -> Either (ErrorMessage ann) Value) ->
-      ann -> Value -> Either (ErrorMessage ann) Value
+      ann ->
+      Value ->
+      Either (ErrorMessage ann) Value
     listFunctor f ann =
       \case
         List'' xs -> List'' <$> mapM (f ann) xs
-        _ -> Left . ErrorMessage ann $
-          "List functor: expected a list"
+        _ ->
+          Left . ErrorMessage ann $
+            "List functor: expected a list"
 
     applyFun :: ann -> Value -> Value -> Either (ErrorMessage ann) Value
     applyFun ann f y =
@@ -740,8 +836,9 @@ evaluate gc witness lc t x e = do
         Fun f' ->
           case Map.lookup y f' of
             Just y' -> pure y'
-            Nothing -> Left . ErrorMessage ann $
-              "input outside of function domain"
+            Nothing ->
+              Left . ErrorMessage ann $
+                "input outside of function domain"
         _ -> Left . ErrorMessage ann $ "expected a function"
 
     partialApplication ann =
@@ -767,12 +864,15 @@ evalName gc witness lc e ann name =
     Nothing ->
       case Map.lookup name (lc ^. #unValidContext) of
         Just (Defined u y) -> evaluate gc witness mempty u y mempty
-        Just (FreeVariable _) -> Left . ErrorMessage ann $
-          "undefined free variable"
-        Just (Data _) -> Left . ErrorMessage ann $
-          "expected a term denoting a value"
-        Nothing -> Left . ErrorMessage ann $
-          "undefined name: " <> pack (show name)
+        Just (FreeVariable _) ->
+          Left . ErrorMessage ann $
+            "undefined free variable"
+        Just (Data _) ->
+          Left . ErrorMessage ann $
+            "expected a term denoting a value"
+        Nothing ->
+          Left . ErrorMessage ann $
+            "undefined name: " <> pack (show name)
 
 liftMath :: ann -> (Scalar -> Scalar -> a) -> Value -> Value -> Either (ErrorMessage ann) a
 liftMath ann f x y =

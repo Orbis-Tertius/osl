@@ -4,15 +4,14 @@
 
 module OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext)) where
 
-import GHC.Generics (Generic)
 import Data.Map (Map, toList)
+import GHC.Generics (Generic)
 import OSL.Types.OSL (Name)
 import OSL.Types.Value (Value)
 
-newtype EvaluationContext =
-  EvaluationContext
+newtype EvaluationContext = EvaluationContext
   { unEvaluationContext ::
-    Map Name Value
+      Map Name Value
   }
   deriving stock (Eq, Ord, Generic)
   deriving newtype (Semigroup, Monoid)

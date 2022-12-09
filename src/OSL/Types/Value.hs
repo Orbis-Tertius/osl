@@ -1,8 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
 
 module OSL.Types.Value
-  ( Value (Nat, Int, Fin', Fp', Pair', Iota1', Iota2', To', Maybe'', List'', Map'', Fun, Bool, Predicate)
-  ) where
+  ( Value (Nat, Int, Fin', Fp', Pair', Iota1', Iota2', To', Maybe'', List'', Map'', Fun, Bool, Predicate),
+  )
+where
 
 import Data.List (intercalate)
 import Data.Map (Map)
