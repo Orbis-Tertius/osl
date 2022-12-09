@@ -882,7 +882,14 @@ todo :: a
 todo = todo
 
 decodeScalar :: ann -> Value -> Either (ErrorMessage ann) Scalar
-decodeScalar = todo
+decodeScalar ann =
+  \case
+    Nat v -> pure v
+    Int v -> pure v
+    Fin' v -> pure v
+    Fp' v -> pure v
+    To' _ v -> decodeScalar ann v
+    _ -> Left . ErrorMessage ann $ "expected a scalar value"
 
 decodeBool :: ann -> Value -> Either (ErrorMessage ann) Bool
 decodeBool = todo
