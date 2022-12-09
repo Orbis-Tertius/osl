@@ -15,11 +15,12 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Data.Tuple (swap)
+import Die (die)
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.OSL
-  ( Bound,
+  ( Bound (ScalarBound),
     ContextType (Global, Local),
     Declaration (Data, Defined, FreeVariable),
     Name,
@@ -712,8 +713,26 @@ evaluate gc witness lc t x e = do
   where
     rec = evaluate gc witness lc
 
-    getUniversalQuantifierValues :: Type ann -> Maybe (Bound ann) -> Either (ErrorMessage ann) [Value]
-    getUniversalQuantifierValues = todo
+    -- getUniversalQuantifierValues :: Type ann -> Maybe (Bound ann) -> Either (ErrorMessage ann) [Value]
+    getUniversalQuantifierValues =
+      \case
+        Prop ann -> const . Left . ErrorMessage ann
+          $ "quantification over Prop not supported"
+        F ann _ _ _ -> const . Left . ErrorMessage ann
+          $ "universal quantification over functions not supported"
+        N ann ->
+          \case
+            Nothing -> Left . ErrorMessage ann $
+              "universal quantification over N requires a bound"
+            Just (ScalarBound ann' bound) -> do
+              bound' <- decodeScalar ann' =<< rec (N ann') bound e
+              pure (Nat . integerToScalarUnsafe <$> [0 .. scalarToInteger bound'])
+
+    integerToScalarUnsafe :: Integer -> Scalar
+    integerToScalarUnsafe y =
+      case integerToScalar y of
+        Just y' -> y'
+        Nothing -> die "evaluate: integerToScalarUnsafe: integer out of range of scalar (this is a compiler bug)"
 
     liftLogic ::
       ann ->
@@ -877,9 +896,6 @@ evalName gc witness lc e ann name =
 liftMath :: ann -> (Scalar -> Scalar -> a) -> Value -> Value -> Either (ErrorMessage ann) a
 liftMath ann f x y =
   f <$> decodeScalar ann x <*> decodeScalar ann y
-
-todo :: a
-todo = todo
 
 decodeScalar :: ann -> Value -> Either (ErrorMessage ann) Scalar
 decodeScalar ann =
