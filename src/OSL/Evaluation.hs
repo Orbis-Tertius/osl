@@ -10,7 +10,8 @@ import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Lens ((^.))
-import Control.Monad (join, liftM2)
+import Control.Monad (join, liftM2, (<=<))
+import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (pack)
@@ -54,18 +55,18 @@ evaluate gc witness lc t x e = do
     NamedTerm ann name -> evalName gc witness lc e ann name
     Apply ann (Apply _ (AddN _) y) z ->
       Nat
-        <$> ( join $
-                liftMath ann (Group.+)
-                  <$> rec t y e
-                  <*> rec t z e
-            )
+        <$> join
+          ( liftMath ann (Group.+)
+              <$> rec t y e
+              <*> rec t z e
+          )
     Apply ann (Apply _ (MulN _) y) z ->
       Nat
-        <$> ( join $
-                liftMath ann (Ring.*)
-                  <$> rec t y e
-                  <*> rec t z e
-            )
+        <$> join
+          ( liftMath ann (Ring.*)
+              <$> rec t y e
+              <*> rec t z e
+          )
     ConstN ann y ->
       case integerToScalar y of
         Just y' -> pure (Nat y')
@@ -74,18 +75,18 @@ evaluate gc witness lc t x e = do
             "constant out of range of scalar field"
     Apply ann (Apply _ (AddZ _) y) z ->
       Int
-        <$> ( join $
-                liftMath ann (Group.+)
-                  <$> rec t y e
-                  <*> rec t z e
-            )
+        <$> join
+          ( liftMath ann (Group.+)
+              <$> rec t y e
+              <*> rec t z e
+          )
     Apply ann (Apply _ (MulZ _) y) z ->
       Int
-        <$> ( join $
-                liftMath ann (Ring.*)
-                  <$> rec t y e
-                  <*> rec t z e
-            )
+        <$> join
+          ( liftMath ann (Ring.*)
+              <$> rec t y e
+              <*> rec t z e
+          )
     ConstZ ann y ->
       case integerToScalar y of
         Just y' -> pure (Int y')
@@ -94,18 +95,18 @@ evaluate gc witness lc t x e = do
             "constant out of range of scalar field"
     Apply ann (Apply _ (AddFp _) y) z ->
       Fp'
-        <$> ( join $
-                liftMath ann (Group.+)
-                  <$> rec t y e
-                  <*> rec t z e
-            )
+        <$> join
+          ( liftMath ann (Group.+)
+              <$> rec t y e
+              <*> rec t z e
+          )
     Apply ann (Apply _ (MulFp _) y) z ->
       Fp'
-        <$> ( join $
-                liftMath ann (Ring.*)
-                  <$> rec t y e
-                  <*> rec t z e
-            )
+        <$> join
+          ( liftMath ann (Ring.*)
+              <$> rec t y e
+              <*> rec t z e
+          )
     ConstFp ann y ->
       case integerToScalar y of
         Just y' -> pure (Fp' y')
@@ -378,27 +379,27 @@ evaluate gc witness lc t x e = do
     MaybeFrom ann _ -> partialApplication ann
     Apply ann (Apply _ (MaxN _) y) z ->
       Nat
-        <$> ( join $
-                liftMath ann max
-                  <$> rec t y e
-                  <*> rec t z e
-            )
+        <$> join
+          ( liftMath ann max
+              <$> rec t y e
+              <*> rec t z e
+          )
     MaxN ann -> partialApplication ann
     Apply ann (Apply _ (MaxZ _) y) z ->
       Int
-        <$> ( join $
-                liftMath ann max
-                  <$> rec t y e
-                  <*> rec t z e
-            )
+        <$> join
+          ( liftMath ann max
+              <$> rec t y e
+              <*> rec t z e
+          )
     MaxZ ann -> partialApplication ann
     Apply ann (Apply _ (MaxFp _) y) z ->
       Fp'
-        <$> ( join $
-                liftMath ann max
-                  <$> rec t y e
-                  <*> rec t z e
-            )
+        <$> join
+          ( liftMath ann max
+              <$> rec t y e
+              <*> rec t z e
+          )
     MaxFp ann -> partialApplication ann
     Apply ann (Exists _) y -> do
       y' <- rec (Maybe ann t) y e
@@ -453,7 +454,7 @@ evaluate gc witness lc t x e = do
     Apply ann (ListCast _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      listFunctor (\ann' -> (castF ann' =<<) . decodeScalar ann') ann y'
+      listFunctor (\ann' -> castF ann' <=< decodeScalar ann') ann y'
     ListCast ann -> partialApplication ann
     Apply ann (ListPi1 _) y -> do
       yT <- inferType lc y
@@ -500,7 +501,7 @@ evaluate gc witness lc t x e = do
     Apply ann (ListMaybeFrom _ name) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      listFunctor (maybeFunctor (\ann' -> castFrom ann' name)) ann y'
+      listFunctor (maybeFunctor (`castFrom` name)) ann y'
     ListMaybeFrom ann _ -> partialApplication ann
     Apply ann (ListMaybeTo _ name) y -> do
       yT <- inferType lc y
@@ -545,7 +546,7 @@ evaluate gc witness lc t x e = do
     Apply ann (MapFrom _ name) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
-      mapFunctor (flip castFrom name) ann y'
+      mapFunctor (`castFrom` name) ann y'
     MapFrom ann _ -> partialApplication ann
     Apply ann (SumMapLength _) y -> do
       yT <- inferType lc y
@@ -559,7 +560,7 @@ evaluate gc witness lc t x e = do
       case yT of
         List _ _ (Map _ _ a _) -> do
           k' <- rec a k e
-          listSum ann =<< listFunctor (flip mapLookup k') ann y'
+          listSum ann =<< listFunctor (`mapLookup` k') ann y'
         _ ->
           Left . ErrorMessage ann $
             "sumListLookup: expected a list of maps"
@@ -641,9 +642,9 @@ evaluate gc witness lc t x e = do
     ForAll ann name a bound y -> do
       vs <- getUniversalQuantifierValues a bound
       let p v =
-            (decodeBool ann =<<) . rec (Prop ann) y . (e <>) . EvaluationContext $
+            decodeBool ann <=< rec (Prop ann) y . (e <>) . EvaluationContext $
               Map.singleton name v
-      Bool . all id <$> mapM p vs
+      Bool . and <$> mapM p vs
     Apply ann (AddN _) _ -> partialApplication ann
     Apply ann (MulN _) _ -> partialApplication ann
     Apply ann (ConstN _ _) _ -> expectedFunction ann
@@ -880,7 +881,7 @@ evaluate gc witness lc t x e = do
     listSum ann =
       \case
         List'' ys ->
-          castF ann . foldl (Group.+) zero
+          castF ann . foldl' (Group.+) zero
             =<< mapM (decodeScalar ann) ys
         _ -> Left . ErrorMessage ann $ "expected a list"
     listLength :: ann -> Value -> Either (ErrorMessage ann) Value
