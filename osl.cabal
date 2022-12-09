@@ -66,23 +66,30 @@ library
     OSL.Bound
     OSL.BuildTranslationContext
     OSL.EntryPoint
+    OSL.Evaluation
     OSL.Parse
+    OSL.Satisfaction
     OSL.Sigma11
     OSL.Term
     OSL.Tokenize
     OSL.Translate
     OSL.TranslationContext
     OSL.Type
+    OSL.Types.ArgumentForm
+    OSL.Types.Argument
     OSL.Types.Arity
     OSL.Types.Cardinality
     OSL.Types.DeBruijnIndex
     OSL.Types.ErrorMessage
+    OSL.Types.EvaluationContext
     OSL.Types.Keyword
     OSL.Types.OSL
+    OSL.Types.PreprocessedWitness
     OSL.Types.Sigma11
     OSL.Types.Token
     OSL.Types.Translation
     OSL.Types.TranslationContext
+    OSL.Types.Value
     OSL.ValidContext
     OSL.ValidateContext
     Semicircuit.DNFFormula
@@ -132,6 +139,7 @@ library
     process,
     QuickCheck,
     random,
+    safe,
     sydtest,
     sydtest-discover,
     text -any,

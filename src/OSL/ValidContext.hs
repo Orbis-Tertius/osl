@@ -4,6 +4,7 @@ module OSL.ValidContext
   ( getDeclaration,
     getExistingDeclaration,
     addDeclaration,
+    getFreeOSLName,
   )
 where
 
@@ -11,7 +12,7 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Die (die)
-import OSL.Types.OSL (Declaration, Name, ValidContext (..))
+import OSL.Types.OSL (Declaration, Name (GenSym, Sym), ValidContext (..))
 
 getDeclaration :: ValidContext t ann -> Name -> Maybe (Declaration ann)
 getDeclaration (ValidContext decls) name = Map.lookup name decls
@@ -32,3 +33,12 @@ addDeclaration ::
   ValidContext t ann
 addDeclaration name decl (ValidContext c) =
   ValidContext (Map.insert name decl c)
+
+getFreeOSLName ::
+  ValidContext t ann ->
+  Name
+getFreeOSLName (ValidContext c) =
+  case fst <$> Map.lookupMax c of
+    Nothing -> GenSym 0
+    Just (Sym _) -> GenSym 0
+    Just (GenSym i) -> GenSym (i + 1)

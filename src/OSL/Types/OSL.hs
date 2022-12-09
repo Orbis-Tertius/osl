@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 
 module OSL.Types.OSL
@@ -53,6 +54,7 @@ data Type ann
   | Maybe ann (Type ann)
   | List ann Cardinality (Type ann)
   | Map ann Cardinality (Type ann) (Type ann)
+  deriving (Eq, Ord)
 
 instance Show (Type ann) where
   show (Prop _) = "Prop"
@@ -189,4 +191,4 @@ data ContextType = Global | Local
   deriving (Show)
 
 newtype ValidContext (t :: ContextType) ann = ValidContext {unValidContext :: Map Name (Declaration ann)}
-  deriving (Show)
+  deriving (Generic, Show, Semigroup, Monoid)

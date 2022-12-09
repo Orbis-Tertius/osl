@@ -997,7 +997,7 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
     OSL.List ann (OSL.Cardinality n) a -> do
       (lQs, lM) <- rec lc (OSL.N ann)
       let decls' = addDeclaration lSym (OSL.FreeVariable (OSL.Fin ann n)) decls
-          lSym = getFreeOSLName lc
+          lSym = getFreeOSLName (lc ^. #context)
           lc' =
             TranslationContext decls' $
               mappings <> Map.singleton lSym lM
@@ -1119,7 +1119,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
           let cQ = S11.someFirstOrder (S11.TermBound (S11.Const 2))
               cT = S11.var (S11.Name 0 0)
               cM = ChoiceMapping (ScalarMapping cT)
-              cSym = getFreeOSLName lc
+              cSym = getFreeOSLName (lc ^. #context)
               decls' = addDeclaration cSym (OSL.FreeVariable (OSL.Fin ann 2)) decls
               lc' = TranslationContext decls' mappings
           -- TODO: can this result in overlap between cM and bM/aM?
@@ -1165,7 +1165,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
         OSL.ListBound _ (OSL.ValuesBound aBound) -> do
           let lQ = S11.someFirstOrder (S11.TermBound (S11.Const n))
               lT = S11.var (S11.Name 0 0)
-              lSym = getFreeOSLName lc
+              lSym = getFreeOSLName (lc ^. #context)
               decls' = addDeclaration lSym (OSL.FreeVariable (OSL.N ann)) decls
               lc' = TranslationContext decls' mappings
           lc'' <-
