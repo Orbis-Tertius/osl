@@ -606,6 +606,30 @@ evaluate gc witness lc t x e = do
       yT <- inferType lc y
       y' <- rec yT y e
       applyFun ann f y'
+    Apply ann fE@(Apply {}) y -> do
+      fT <- inferType lc fE
+      f <- rec fT fE e
+      yT <- inferType lc y
+      y' <- rec yT y e
+      applyFun ann f y'
+    Apply ann (Nothing' _) _ -> expectedFunction ann
+    Apply ann (Maybe' {}) _ -> partialApplication ann
+    Apply ann (MaxN _) _ -> partialApplication ann
+    Apply ann (MaxZ _) _ -> partialApplication ann
+    Apply ann (MaxFp _) _ -> partialApplication ann
+    Apply ann (Nth _) _ -> partialApplication ann
+    Apply ann (Lookup _) _ -> partialApplication ann
+    Apply ann (Equal {}) _ -> expectedFunction ann
+    Apply ann (LessOrEqual {}) _ -> expectedFunction ann
+    Apply ann (And {}) _ -> expectedFunction ann
+    Apply ann (Or {}) _ -> expectedFunction ann
+    Apply ann (Not {}) _ -> expectedFunction ann
+    Apply ann (Implies {}) _ -> expectedFunction ann
+    Apply ann (Iff {}) _ -> expectedFunction ann
+    Apply ann (ForAll {}) _ -> expectedFunction ann
+    Apply ann (ForSome {}) _ -> expectedFunction ann
+    Apply ann (Top _) _ -> expectedFunction ann
+    Apply ann (Bottom _) _ -> expectedFunction ann
   where
     rec = evaluate gc witness lc
 
