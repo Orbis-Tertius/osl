@@ -147,7 +147,7 @@ data Term ann
   | ForSome ann Name (Type ann) (Maybe (Bound ann)) (Term ann)
   | Top ann
   | Bottom ann
-  deriving (Show)
+  deriving (Eq, Ord, Show)
 
 data Bound ann
   = ScalarBound ann (Term ann)
@@ -159,25 +159,25 @@ data Bound ann
   | MaybeBound ann (ValuesBound ann)
   | MapBound ann (KeysBound ann) (ValuesBound ann)
   | ToBound ann Name (Bound ann)
-  deriving (Show)
+  deriving (Eq, Ord, Show)
 
 newtype LeftBound ann = LeftBound {unLeftBound :: Bound ann}
-  deriving (Show)
+  deriving (Eq, Ord, Show)
 
 newtype RightBound ann = RightBound {unRightBound :: Bound ann}
-  deriving (Show)
+  deriving (Eq, Ord, Show)
 
 newtype DomainBound ann = DomainBound {unDomainBound :: Bound ann}
-  deriving (Show)
+  deriving (Eq, Ord, Show)
 
 newtype CodomainBound ann = CodomainBound {unCodomainBound :: Bound ann}
-  deriving (Show)
+  deriving (Eq, Ord, Show)
 
 newtype ValuesBound ann = ValuesBound {unValuesBound :: Bound ann}
-  deriving (Show)
+  deriving (Eq, Ord, Show)
 
 newtype KeysBound ann = KeysBound {unKeysBound :: Bound ann}
-  deriving (Show)
+  deriving (Eq, Ord, Show)
 
 data Declaration ann
   = FreeVariable (Type ann)
