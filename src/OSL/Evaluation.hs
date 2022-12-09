@@ -892,4 +892,7 @@ decodeScalar ann =
     _ -> Left . ErrorMessage ann $ "expected a scalar value"
 
 decodeBool :: ann -> Value -> Either (ErrorMessage ann) Bool
-decodeBool = todo
+decodeBool ann =
+  \case
+    Bool v -> pure v
+    _ -> Left . ErrorMessage ann $ "expected a boolean value"
