@@ -93,6 +93,7 @@ library
     OSL.Types.Value
     OSL.ValidContext
     OSL.ValidateContext
+    OSL.Witness
     Semicircuit.DNFFormula
     Semicircuit.Gensyms
     Semicircuit.PrenexNormalForm
