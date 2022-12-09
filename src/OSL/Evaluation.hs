@@ -19,7 +19,7 @@ import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.OSL (ValidContext (ValidContext), Type, Term (NamedTerm, AddN, MulN, ConstN, AddZ, MulZ, ConstZ, ConstFp, AddFp, MulFp, Cast, ConstFin, ConstF, ConstSet, Inverse, Pair, Pi1, Pi2, Iota1, Iota2, Apply, FunctionProduct, FunctionCoproduct, Lambda, To, From, Let, IsNothing, Just', Nothing', Maybe', MaybePi1, MaybePi2, MaybeTo, MaybeFrom, MaxN, MaxZ, MaxFp, Exists, Length, Nth, ListCast, ListPi1, ListPi2, ListTo, ListFrom, ListLength, ListMaybePi1, ListMaybePi2, ListMaybeLength, ListMaybeFrom, ListMaybeTo, Sum, Lookup, Keys, MapPi1, MapPi2, MapFrom, MapTo, SumMapLength, SumListLookup, Equal, LessOrEqual, And, Or, Not, Implies, Iff, ForAll, ForSome, Top, Bottom),
-  Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe, List, Map))
+  Name, ContextType (Global, Local), Declaration (Defined, Data, FreeVariable), Type (N, Z, Fin, Fp, F, Prop, Product, Coproduct, NamedType, Maybe, List, Map), Bound)
 import OSL.Types.PreprocessedWitness (PreprocessedWitness)
 import OSL.Types.Value (Value (Nat, Int, Fp', Fin', Fun, Predicate, Pair', Iota1', Iota2', To', Maybe'', Bool, List'', Map''))
 import OSL.ValidContext (getFreeOSLName)
@@ -486,13 +486,15 @@ evaluate gc witness lc t x e = do
       listSum ann . List'' =<< mapElems ann =<<
         mapFunctor listLength ann =<< rec yT y e
     SumMapLength ann -> partialApplication ann
-    Apply ann (SumListLookup ann' k) y -> do
+    Apply ann (SumListLookup _ k) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       case yT of
         List _ _ (Map _ _ a _) -> do
           k' <- rec a k e
           listSum ann =<< listFunctor (flip mapLookup k') ann y'
+        _ -> Left . ErrorMessage ann $
+          "sumListLookup: expected a list of maps"
     SumListLookup ann _ -> partialApplication ann
     Equal _ y z -> do
       yT <- inferType lc y
@@ -548,14 +550,67 @@ evaluate gc witness lc t x e = do
               "expected the name of a defined function"
             Nothing -> Left . ErrorMessage ann' $
               "undefined name"
-    ForSome ann name a _bound y -> do
+    ForSome ann name _a _bound y -> do
       w <- (witness ^. #unPreprocessedWitness) ann e
       -- TODO: check w is in bound
       rec (Prop ann) y $
         e <> EvaluationContext
              (Map.singleton name w)
+    ForAll ann name a bound y -> do
+      vs <- getUniversalQuantifierValues a bound
+      let p v = (decodeBool ann =<<) . rec (Prop ann) y . (e <>) . EvaluationContext
+                 $ Map.singleton name v
+      Bool . all id <$> mapM p vs
+    Apply ann (AddN _) _ -> partialApplication ann
+    Apply ann (MulN _) _ -> partialApplication ann
+    Apply ann (ConstN _ _) _ -> expectedFunction ann
+    Apply ann (AddZ _) _ -> partialApplication ann
+    Apply ann (MulZ _) _ -> partialApplication ann
+    Apply ann (ConstZ _ _) _ -> expectedFunction ann
+    Apply ann (ConstFp _ _) _ -> expectedFunction ann
+    Apply ann (AddFp _) _ -> partialApplication ann
+    Apply ann (MulFp _) _ -> partialApplication ann
+    Apply ann (ConstFin _ _) _ -> expectedFunction ann
+    Apply _ fE@(ConstF ann' _) y -> do
+      fT <- inferType lc fE
+      f <- rec fT fE e
+      yT <- inferType lc y
+      y' <- rec yT y e
+      applyFun ann' f y'
+    Apply _ sE@(ConstSet ann' _) y -> do
+      sT <- inferType lc sE
+      s <- rec sT sE e
+      yT <- inferType lc y
+      y' <- rec yT y e
+      case s of
+        Predicate s' ->
+          pure (Bool (y' `Set.member` s'))
+        _ -> Left . ErrorMessage ann' $
+          "expected a set"
+    Apply ann (Pair _) _ -> partialApplication ann
+    Apply ann fE@(FunctionProduct {}) y -> do
+      fT <- inferType lc fE
+      f <- rec fT fE e
+      yT <- inferType lc y
+      y' <- rec yT y e
+      applyFun ann f y'
+    Apply ann fE@(FunctionCoproduct {}) y -> do
+      fT <- inferType lc fE
+      f <- rec fT fE e
+      yT <- inferType lc y
+      y' <- rec yT y e
+      applyFun ann f y'
+    Apply ann fE@(Let {}) y -> do
+      fT <- inferType lc fE
+      f <- rec fT fE e
+      yT <- inferType lc y
+      y' <- rec yT y e
+      applyFun ann f y'
   where
     rec = evaluate gc witness lc
+
+    getUniversalQuantifierValues :: Type ann -> Maybe (Bound ann) -> Either (ErrorMessage ann) [Value]
+    getUniversalQuantifierValues = todo
 
     liftLogic :: ann -> (Bool -> Bool -> Bool) ->
        Value -> Value -> Either (ErrorMessage ann) Value
@@ -655,9 +710,23 @@ evaluate gc witness lc t x e = do
         _ -> Left . ErrorMessage ann $
           "List functor: expected a list"
 
+    applyFun :: ann -> Value -> Value -> Either (ErrorMessage ann) Value
+    applyFun ann f y =
+      case f of
+        Fun f' ->
+          case Map.lookup y f' of
+            Just y' -> pure y'
+            Nothing -> Left . ErrorMessage ann $
+              "input outside of function domain"
+        _ -> Left . ErrorMessage ann $ "expected a function"
+
     partialApplication ann =
       Left . ErrorMessage ann $
         "encountered a partial function application"
+
+    expectedFunction ann =
+      Left . ErrorMessage ann $
+        "expected a function in function application head"
 
 evalName ::
   Show ann =>
@@ -690,3 +759,6 @@ todo = todo
 
 decodeScalar :: ann -> Value -> Either (ErrorMessage ann) Scalar
 decodeScalar = todo
+
+decodeBool :: ann -> Value -> Either (ErrorMessage ann) Bool
+decodeBool = todo
