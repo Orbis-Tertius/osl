@@ -5,7 +5,6 @@ module OSL.Witness (preprocessWitness) where
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import OSL.Term (termAnnotation)
 import OSL.Types.Argument (Witness (Witness))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
@@ -25,12 +24,13 @@ preprocessWitness x0 w0 =
           Nothing -> Left . ErrorMessage ann $ "telescope not found (this is a compiler bug)"
           Just (Telescope []) ->
             Left . ErrorMessage ann $ "empty telescope (this is a compiler bug)"
-          Just (Telescope (t0:ts)) ->
+          Just (Telescope [_]) ->
+            Left . ErrorMessage ann $ "premature end of telescope (this is a compiler bug)"
+          Just (Telescope (t0:t1:ts)) ->
             if t0 == x
             then do
-              let telescopeAnns = Set.fromList (termAnnotation <$> ts)
               branches <- getDirectSubformulasAndPairedWitnesses x (Witness w) e
-              case find ((`Set.member` telescopeAnns) . termAnnotation . fst) branches of
+              case find ((== termAnnotation t1) . termAnnotation . fst) branches of
                 Just (u, v) -> todo u v
                 Nothing -> Left . ErrorMessage ann $
                   "telescope traversal failed (this is a compiler bug)"
