@@ -23,8 +23,6 @@ newtype StatementType = StatementType {unStatementType :: Type ()}
   deriving newtype (Show)
 
 instance Semigroup StatementType where
-  StatementType (Fin () 1) <> b = b
-  a <> StatementType (Fin () 1) = a
   StatementType a <> StatementType b =
     StatementType (Product () a b)
 
@@ -36,8 +34,6 @@ newtype WitnessType = WitnessType {unWitnessType :: Type ()}
   deriving newtype (Show)
 
 instance Semigroup WitnessType where
-  WitnessType (Fin () 1) <> b = b
-  a <> WitnessType (Fin () 1) = a
   WitnessType a <> WitnessType b =
     WitnessType (Product () a b)
 
