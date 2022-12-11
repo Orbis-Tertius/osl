@@ -26,6 +26,7 @@ instance Semigroup StatementType where
   StatementType a <> StatementType b =
     StatementType (Product () a b)
 
+-- TODO: make this satisfy the monoid laws
 instance Monoid StatementType where
   mempty = StatementType (Fin () 1)
 

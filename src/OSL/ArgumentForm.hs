@@ -76,9 +76,7 @@ getWitnessType c =
       case Map.lookup f (c ^. #unValidContext) of
         Just (Defined _ def) -> rec def
         _ -> Left . ErrorMessage ann $ "expected the name of a defined predicate"
-    Apply _ (Lambda _ _ _ body) _ -> rec body
-    Apply _ (Let _ _ _ _ body) _ -> rec body
-    Apply {} -> pure mempty
+    Apply _ f _ -> rec f
     Iff _ p q -> rec p <> rec q
     Implies _ p q -> rec p <> rec q
     Not _ p -> rec p

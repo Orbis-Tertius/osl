@@ -10,8 +10,8 @@ import Data.Text (pack)
 import OSL.ArgumentForm (getArgumentForm)
 import OSL.Parse (parseContext)
 import OSL.Tokenize (tokenize)
-import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm))
-import OSL.Types.OSL (ValidContext, ContextType (Global), Declaration (Defined), Name (Sym))
+import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
+import OSL.Types.OSL (ValidContext, ContextType (Global), Declaration (Defined), Name (Sym), Type (Product, NamedType, Fin))
 import OSL.ValidateContext (validateContext)
 import Test.Syd (Spec, describe, liftIO, expectationFailure, it, shouldBe)
 import Text.Parsec (SourcePos)
@@ -46,7 +46,9 @@ argumentFormSpec c =
            (c ^. #unValidContext) of
       Just (Defined t x) ->
         getArgumentForm c t x `shouldBe`
-          Right (ArgumentForm mempty mempty)
+          Right (ArgumentForm
+                   (StatementType (Product () (NamedType () (Sym "Problem")) (Fin () 1)))
+                   (WitnessType (Product () (NamedType () (Sym "Solution")) (Fin () 1))))
       _ ->
         liftIO . expectationFailure $
           "problemIsSolvable definition not found"
