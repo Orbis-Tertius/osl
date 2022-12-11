@@ -20,7 +20,8 @@ getStatementType c =
   \case
     Prop _ -> pure unit
     F _ _ a b -> do
-      (StatementType (dropTypeAnnotations a) <>) <$> getStatementType c b
+      prod (StatementType (dropTypeAnnotations a))
+        <$> getStatementType c b
     P ann _ _ _ ->
       Left . ErrorMessage ann $
         "getArgumentForm: an argument cannot be a permutation"
@@ -58,92 +59,102 @@ getStatementType c =
     unit :: StatementType
     unit = StatementType (Fin () 1)
 
+    prod :: StatementType -> StatementType -> StatementType
+    prod (StatementType a) (StatementType b) =
+      StatementType (Product () a b)
+
 -- TODO: must carry local context around to correctly handle
 -- Prop-valued lambdas in let expressions.
 getWitnessType :: ValidContext 'Global ann -> Term ann -> Either (ErrorMessage ann) WitnessType
 getWitnessType c =
   \case
-    Top _ -> pure mempty
-    Bottom _ -> pure mempty
+    Top _ -> pure empty
+    Bottom _ -> pure empty
     ForAll _ _ a _ p -> do
       WitnessType pT <- rec p
       pure (WitnessType (F () Nothing (dropTypeAnnotations a) pT))
     ForSome _ _ a _ p ->
-      (WitnessType (dropTypeAnnotations a) <>) <$> rec p
+      prod (WitnessType (dropTypeAnnotations a)) <$> rec p
     Let _ _ _ _ body -> rec body
     Lambda _ _ _ body -> rec body
-    Apply _ (NamedTerm ann f) _ -> do
-      case Map.lookup f (c ^. #unValidContext) of
+    NamedTerm ann name ->
+      case Map.lookup name (c ^. #unValidContext) of
         Just (Defined _ def) -> rec def
-        _ -> Left . ErrorMessage ann $ "expected the name of a defined predicate"
+        _ -> Left . ErrorMessage ann $ "undefined term"
     Apply _ f _ -> rec f
-    Iff _ p q -> rec p <> rec q
-    Implies _ p q -> rec p <> rec q
+    Iff _ p q -> prod <$> rec p <*> rec q
+    Implies _ p q -> prod <$> rec p <*> rec q
     Not _ p -> rec p
-    Or _ p q -> rec p <> rec q
-    And _ p q -> rec p <> rec q
-    LessOrEqual {} -> pure mempty
-    Equal {} -> pure mempty
-    SumListLookup {} -> pure mempty
-    SumMapLength {} -> pure mempty
-    MapFrom {} -> pure mempty
-    MapTo {} -> pure mempty
-    MapPi2 {} -> pure mempty
-    MapPi1 {} -> pure mempty
-    Keys {} -> pure mempty
-    Lookup {} -> pure mempty
-    Sum {} -> pure mempty
-    ListMaybeTo {} -> pure mempty
-    ListMaybeFrom {} -> pure mempty
-    ListMaybeLength {} -> pure mempty
-    ListMaybePi1 {} -> pure mempty
-    ListMaybePi2 {} -> pure mempty
-    ListFrom {} -> pure mempty
-    ListTo {} -> pure mempty
-    ListPi1 {} -> pure mempty
-    ListPi2 {} -> pure mempty
-    ListCast {} -> pure mempty
-    Nth {} -> pure mempty
-    Length {} -> pure mempty
-    Exists {} -> pure mempty
-    MaxFp {} -> pure mempty
-    MaxZ {} -> pure mempty
-    MaxN {} -> pure mempty
-    MaybeFrom {} -> pure mempty
-    MaybeTo {} -> pure mempty
-    MaybePi1 {} -> pure mempty
-    MaybePi2 {} -> pure mempty
-    Maybe' {} -> pure mempty
-    Nothing' {} -> pure mempty
-    Just' {} -> pure mempty
-    IsNothing {} -> pure mempty
-    To {} -> pure mempty
-    From {} -> pure mempty
-    FunctionCoproduct {} -> pure mempty
-    FunctionProduct {} -> pure mempty
-    Iota1 {} -> pure mempty
-    Iota2 {} -> pure mempty
-    Pi1 {} -> pure mempty
-    Pi2 {} -> pure mempty
-    Pair {} -> pure mempty
-    Inverse {} -> pure mempty
-    ConstSet {} -> pure mempty
-    ConstF {} -> pure mempty
-    ConstFin {} -> pure mempty
-    ConstFp {} -> pure mempty
-    ConstZ {} -> pure mempty
-    Cast {} -> pure mempty
-    AddFp {} -> pure mempty
-    MulFp {} -> pure mempty
-    AddZ {} -> pure mempty
-    MulZ {} -> pure mempty
-    ConstN {} -> pure mempty
-    AddN {} -> pure mempty
-    MulN {} -> pure mempty
-    NamedTerm {} -> pure mempty
-    ListLength {} -> pure mempty
+    Or _ p q -> prod <$> rec p <*> rec q
+    And _ p q -> prod <$> rec p <*> rec q
+    LessOrEqual {} -> pure empty
+    Equal {} -> pure empty
+    SumListLookup {} -> pure empty
+    SumMapLength {} -> pure empty
+    MapFrom {} -> pure empty
+    MapTo {} -> pure empty
+    MapPi2 {} -> pure empty
+    MapPi1 {} -> pure empty
+    Keys {} -> pure empty
+    Lookup {} -> pure empty
+    Sum {} -> pure empty
+    ListMaybeTo {} -> pure empty
+    ListMaybeFrom {} -> pure empty
+    ListMaybeLength {} -> pure empty
+    ListMaybePi1 {} -> pure empty
+    ListMaybePi2 {} -> pure empty
+    ListFrom {} -> pure empty
+    ListTo {} -> pure empty
+    ListPi1 {} -> pure empty
+    ListPi2 {} -> pure empty
+    ListCast {} -> pure empty
+    Nth {} -> pure empty
+    Length {} -> pure empty
+    Exists {} -> pure empty
+    MaxFp {} -> pure empty
+    MaxZ {} -> pure empty
+    MaxN {} -> pure empty
+    MaybeFrom {} -> pure empty
+    MaybeTo {} -> pure empty
+    MaybePi1 {} -> pure empty
+    MaybePi2 {} -> pure empty
+    Maybe' {} -> pure empty
+    Nothing' {} -> pure empty
+    Just' {} -> pure empty
+    IsNothing {} -> pure empty
+    To {} -> pure empty
+    From {} -> pure empty
+    FunctionCoproduct {} -> pure empty
+    FunctionProduct {} -> pure empty
+    Iota1 {} -> pure empty
+    Iota2 {} -> pure empty
+    Pi1 {} -> pure empty
+    Pi2 {} -> pure empty
+    Pair {} -> pure empty
+    Inverse {} -> pure empty
+    ConstSet {} -> pure empty
+    ConstF {} -> pure empty
+    ConstFin {} -> pure empty
+    ConstFp {} -> pure empty
+    ConstZ {} -> pure empty
+    Cast {} -> pure empty
+    AddFp {} -> pure empty
+    MulFp {} -> pure empty
+    AddZ {} -> pure empty
+    MulZ {} -> pure empty
+    ConstN {} -> pure empty
+    AddN {} -> pure empty
+    MulN {} -> pure empty
+    ListLength {} -> pure empty
   where
     rec = getWitnessType c
+
+    empty :: WitnessType
+    empty = WitnessType (Fin () 1)
+
+    prod :: WitnessType -> WitnessType -> WitnessType
+    prod (WitnessType a) (WitnessType b) =
+      WitnessType (Product () a b)
 
 dropTypeAnnotations :: Type ann -> Type ()
 dropTypeAnnotations =
