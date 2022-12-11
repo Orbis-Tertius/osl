@@ -162,6 +162,7 @@ test-suite spec
 
   other-modules:
     OSL.Spec.OSLSpec
+    OSL.Spec.SudokuSpec
 
   build-tools:
     sydtest-discover
@@ -183,6 +184,7 @@ test-suite spec
     lens,
     mtl,
     optparse-applicative,
+    parsec,
     process,
     QuickCheck,
     random,
