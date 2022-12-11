@@ -1,3 +1,5 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module OSL.Witness (preprocessWitness) where
@@ -26,15 +28,15 @@ preprocessWitness x0 w0 =
             Left . ErrorMessage ann $ "empty telescope (this is a compiler bug)"
           Just (Telescope [_]) ->
             Left . ErrorMessage ann $ "premature end of telescope (this is a compiler bug)"
-          Just (Telescope (t0:t1:ts)) ->
+          Just (Telescope (t0:t1:_)) ->
             if t0 == x
             then do
               branches <- getDirectSubformulasAndPairedWitnesses x (Witness w) e
               case find ((== termAnnotation t1) . termAnnotation . fst) branches of
-                Just (u, v) -> todo u v
+                Just (u, v) -> go u v ann e
                 Nothing -> Left . ErrorMessage ann $
                   "telescope traversal failed (this is a compiler bug)"
-            else todo
+            else pure w
     telescopes = getSubformulaTelescopes x0
 
 -- The telescope of a subterm is the sequence of its enclosing subterms, beginning with
@@ -43,10 +45,14 @@ preprocessWitness x0 w0 =
 -- the witness in order to find the piece of the witness that is relevant to the
 -- given annotation and the evaluation context.
 newtype Telescope ann = Telescope [Term ann]
+  deriving newtype (Eq, Ord, Show, Semigroup, Monoid)
 
 -- Get the map of subformula annotations to their telescopes.
 getSubformulaTelescopes :: Ord ann => Term ann -> Map ann (Telescope ann)
-getSubformulaTelescopes = todo
+getSubformulaTelescopes x =
+  let t = Telescope [x]
+      ts = mconcat $ getSubformulaTelescopes <$> getDirectSubformulas x
+  in ((t <>) <$> ts) <> Map.singleton (termAnnotation x) t
 
 getDirectSubformulas :: Term ann -> [Term ann]
 getDirectSubformulas = todo
