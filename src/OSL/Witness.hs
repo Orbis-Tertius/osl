@@ -16,7 +16,7 @@ import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext)
 import OSL.Types.OSL (Term (AddFp, AddN, AddZ, And, Apply, Bottom, Cast, ConstF, ConstFin, ConstFp, ConstN, ConstSet, ConstZ, Equal, Exists, ForAll, ForSome, From, FunctionCoproduct, FunctionProduct, Iff, Implies, Inverse, Iota1, Iota2, IsNothing, Just', Keys, Lambda, Length, LessOrEqual, Let, ListCast, ListFrom, ListLength, ListMaybeFrom, ListMaybeLength, ListMaybePi1, ListMaybePi2, ListMaybeTo, ListPi1, ListPi2, ListTo, Lookup, MapFrom, MapPi1, MapPi2, MapTo, MaxFp, MaxN, MaxZ, Maybe', MaybeFrom, MaybePi1, MaybePi2, MaybeTo, MulFp, MulN, MulZ, NamedTerm, Not, Nothing', Nth, Or, Pair, Pi1, Pi2, Sum, SumListLookup, SumMapLength, To, Top))
 import OSL.Types.PreprocessedWitness (PreprocessedWitness (PreprocessedWitness))
-import OSL.Types.Value (Value (Pair', Fun))
+import OSL.Types.Value (Value (Fun, Pair'))
 
 preprocessWitness :: Ord ann => Term ann -> Witness -> Either (ErrorMessage ann) (PreprocessedWitness ann)
 preprocessWitness x0 w0 =
@@ -24,28 +24,29 @@ preprocessWitness x0 w0 =
   where
     go x (Witness w) ann e =
       if termAnnotation x == ann
-      then
-        case x of
+        then case x of
           ForSome {} ->
             (^. #unWitness) . fst <$> splitWitness ann (Witness w)
-          _ -> Left . ErrorMessage ann $
-                "tried to apply preprocessed witness to the annotation of a term which is not an existential quantifier (this is a compiler bug)"
-      else -- traverse term and witness
+          _ ->
+            Left . ErrorMessage ann $
+              "tried to apply preprocessed witness to the annotation of a term which is not an existential quantifier (this is a compiler bug)"
+        else -- traverse term and witness
         case Map.lookup ann telescopes of
           Nothing -> Left . ErrorMessage ann $ "telescope not found (this is a compiler bug)"
           Just (Telescope []) ->
             Left . ErrorMessage ann $ "empty telescope (this is a compiler bug)"
           Just (Telescope [_]) ->
             Left . ErrorMessage ann $ "premature end of telescope (this is a compiler bug)"
-          Just (Telescope (t0:t1:_)) ->
+          Just (Telescope (t0 : t1 : _)) ->
             if t0 == x
-            then do
-              branches <- getDirectSubformulasAndPairedWitnesses x (Witness w) e
-              case find ((== termAnnotation t1) . termAnnotation . fst) branches of
-                Just (u, v) -> go u v ann e
-                Nothing -> Left . ErrorMessage ann $
-                  "telescope traversal failed (this is a compiler bug)"
-            else pure w
+              then do
+                branches <- getDirectSubformulasAndPairedWitnesses x (Witness w) e
+                case find ((== termAnnotation t1) . termAnnotation . fst) branches of
+                  Just (u, v) -> go u v ann e
+                  Nothing ->
+                    Left . ErrorMessage ann $
+                      "telescope traversal failed (this is a compiler bug)"
+              else pure w
     telescopes = getSubformulaTelescopes x0
 
 -- The telescope of a subterm is the sequence of its enclosing subterms, beginning with
@@ -61,7 +62,7 @@ getSubformulaTelescopes :: Ord ann => Term ann -> Map ann (Telescope ann)
 getSubformulaTelescopes x =
   let t = Telescope [x]
       ts = mconcat $ getSubformulaTelescopes <$> getDirectSubformulas x
-  in ((t <>) <$> ts) <> Map.singleton (termAnnotation x) t
+   in ((t <>) <$> ts) <> Map.singleton (termAnnotation x) t
 
 getDirectSubformulas :: Term ann -> [Term ann]
 getDirectSubformulas =
@@ -227,18 +228,21 @@ getDirectSubformulasAndPairedWitnesses x w e =
             Witness (Fun f) ->
               case Map.lookup vv f of
                 Just w' -> pure [(p, Witness w')]
-                Nothing -> Left . ErrorMessage ann $
-                  "witness is undefined for the current evaluation context"
-            _ -> Left . ErrorMessage ann $
-              "witness type does not match context; expected a function"
+                Nothing ->
+                  Left . ErrorMessage ann $
+                    "witness is undefined for the current evaluation context"
+            _ ->
+              Left . ErrorMessage ann $
+                "witness type does not match context; expected a function"
         Nothing ->
           Left . ErrorMessage ann $
             "universal quantifier variable is undefined in the current evaluation context"
     ForSome ann _v _a _bound p ->
       case w of
         Witness (Pair' _vw pw) -> pure [(p, Witness pw)]
-        _ -> Left . ErrorMessage ann $
-          "witness type does not match context; expected a pair"
+        _ ->
+          Left . ErrorMessage ann $
+            "witness type does not match context; expected a pair"
 
 splitWitness :: ann -> Witness -> Either (ErrorMessage ann) (Witness, Witness)
 splitWitness ann =
