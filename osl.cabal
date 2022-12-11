@@ -71,6 +71,7 @@ library
     OSL.Parse
     OSL.Satisfaction
     OSL.Sigma11
+    OSL.SimplifyType
     OSL.Term
     OSL.Tokenize
     OSL.Translate
