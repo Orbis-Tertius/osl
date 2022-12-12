@@ -128,6 +128,10 @@ simplifyValue =
                [ (,) <$> simplifyValue a x <*> simplifyValue b y
                | (x,y) <- Map.toList xs
                ]
+      (N ann, Nat x) -> pure (Nat x)
+      (Z ann, Int x) -> pure (Int x)
+      (Fp ann, Fp' x) -> pure (Fp' x)
+      (Fin ann _, Fin' x) -> pure (Fin' x)
       (t, _) -> Left . ErrorMessage (typeAnnotation t)
         $ "simplifyValue: type error"
 
