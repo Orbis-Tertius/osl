@@ -131,8 +131,40 @@ simplifyValue =
       (t, _) -> Left . ErrorMessage (typeAnnotation t)
         $ "simplifyValue: type error"
 
-complexifyValue :: Type ann -> Value -> Value
-complexifyValue = todo
+complexifyValue :: Type ann -> Value -> Either (ErrorMessage ann) Value
+complexifyValue =
+  curry $
+    \case
+      (Prop _, Bool x) -> pure (Bool x)
+      (F _ann _n a b, x) ->
+        case simplifyType a of
+          Nothing -> do
+            k <- rec a (Fin' 0)
+            x' <- rec b x
+            pure (Fun (Map.singleton k x'))
+          Just _ ->
+            case x of
+              Fun f ->
+                Fun . Map.fromList <$> sequence
+                  [ (,) <$> rec a y <*> rec b z
+                  | (y,z) <- Map.toList f
+                  ]
+      (P _ann _n a b, x) ->
+        case simplifyType a of
+          Nothing -> pure (Fun (Map.fromList [(Fin' 0, Fin' 0)]))
+          Just _ ->
+            case x of
+              Fun f ->
+                Fun . Map.fromList <$> sequence
+                  [ (,) <$> rec a y <*> rec b z
+                  | (y,z) <- Map.toList f
+                  ]
+      (N _, Nat x) -> pure (Nat x) 
+      (Z _, Int x) -> pure (Int x)
+      (Fp _, Fp' x) -> pure (Fp' x)
+      (Fin {}, Fin' x) -> pure (Fin' x)
+  where
+    rec = complexifyValue
 
 todo :: a
 todo = todo
