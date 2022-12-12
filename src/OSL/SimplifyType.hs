@@ -9,9 +9,10 @@ module OSL.SimplifyType
 
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
+import OSL.Type (typeAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.OSL (Type (Prop, F, P, N, Z, Fp, Fin, Product, Coproduct, NamedType, Maybe, List, Map))
-import OSL.Types.Value (Value (Bool, Fun, Fin', Nat, Int, Fp', Pair', Iota1', Iota2'))
+import OSL.Types.Value (Value (Bool, Fun, Fin', Nat, Int, Fp', Pair', Iota1', Iota2', Maybe'', List'', Map''))
 
 -- This operation cannot fail. A result of Nothing
 -- signifies that the type simplifies to the unit type
@@ -80,7 +81,7 @@ simplifyValue =
                   [ (,) <$> simplifyValue a x <*> simplifyValue b y
                   | (x,y) <- Map.toList f
                   ]
-      (P ann _n a b, Fun f) ->
+      (P _ann _n a b, Fun f) ->
         case simplifyType b of
           Nothing -> pure (Fin' 0)
           Just _ ->
@@ -91,11 +92,11 @@ simplifyValue =
                   [ (,) <$> simplifyValue a x <*> simplifyValue b y
                   | (x,y) <- Map.toList f
                   ]
-      (N ann, Nat x) -> pure (Nat x)
-      (Z ann, Int x) -> pure (Int x)
-      (Fp ann, Fp' x) -> pure (Fp' x)
-      (Fin ann _, Fin' x) -> pure (Fin' x)
-      (Product ann a b, Pair' x y) ->
+      (N _ann, Nat x) -> pure (Nat x)
+      (Z _ann, Int x) -> pure (Int x)
+      (Fp _ann, Fp' x) -> pure (Fp' x)
+      (Fin _ann _, Fin' x) -> pure (Fin' x)
+      (Product _ann a b, Pair' x y) ->
         case simplifyType a of
           Nothing ->
             case simplifyType b of
@@ -113,6 +114,22 @@ simplifyValue =
               Iota1' y -> Iota1' <$> simplifyValue a y
               Iota2' y -> Iota2' <$> simplifyValue b y
               _ -> Left . ErrorMessage ann $ "simplifyValue: type error"
+      (NamedType {}, x) -> pure x
+      (Maybe _ann _a, Maybe'' Nothing) -> pure (Maybe'' Nothing)
+      (Maybe _ann a, Maybe'' (Just x)) ->
+        Maybe'' . Just <$> simplifyValue a x
+      (List _ann _n a, List'' xs) ->
+        List'' <$> mapM (simplifyValue a) xs
+      (Map _ann _n a b, Map'' xs) ->
+         case simplifyType b of
+           Nothing -> pure (Fin' 0)
+           Just _ ->
+             Map'' . Map.fromList <$> sequence
+               [ (,) <$> simplifyValue a x <*> simplifyValue b y
+               | (x,y) <- Map.toList xs
+               ]
+      (t, _) -> Left . ErrorMessage (typeAnnotation t)
+        $ "simplifyValue: type error"
 
 complexifyValue :: Type ann -> Value -> Value
 complexifyValue = todo
