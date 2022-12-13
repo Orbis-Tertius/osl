@@ -342,7 +342,7 @@ simpleWitnessType =
 
 solutionToValue :: Solution -> Value
 solutionToValue (Solution s) =
-  Fun . Map.fromList $
+  To' "Solution" . Fun . Map.fromList $
     [ (cellToValue c, digitToValue (s c))
     | c <- Cell <$> ((,) <$> [0..8] <*> [0..8])
     ]
