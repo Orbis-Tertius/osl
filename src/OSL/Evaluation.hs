@@ -623,7 +623,7 @@ evaluate gc witness lc t x e = do
               yT <- inferType lc y
               y' <- rec yT y e
               let v = getFreeOSLName gc
-              evaluate gc witness mempty t (Apply ann def (NamedTerm ann v)) $
+              evaluate gc witness gcAsLc t (Apply ann def (NamedTerm ann v)) $
                 EvaluationContext
                   (Map.singleton v y')
             Just _ ->
@@ -717,6 +717,8 @@ evaluate gc witness lc t x e = do
     Apply ann (Bottom _) _ -> expectedFunction ann
   where
     rec = evaluate gc witness lc
+
+    gcAsLc = ValidContext (gc ^. #unValidContext)
 
     -- getUniversalQuantifierValues :: Type ann -> Maybe (Bound ann) -> Either (ErrorMessage ann) [Value]
     getUniversalQuantifierValues =
@@ -982,7 +984,7 @@ evalName gc witness lc e ann name =
     Just v -> pure v
     Nothing ->
       case Map.lookup name (lc ^. #unValidContext) of
-        Just (Defined u y) -> evaluate gc witness mempty u y mempty
+        Just (Defined u y) -> evaluate gc witness gcAsLc u y mempty
         Just (FreeVariable _) ->
           Left . ErrorMessage ann $
             "undefined free variable"
@@ -992,6 +994,8 @@ evalName gc witness lc e ann name =
         Nothing ->
           Left . ErrorMessage ann $
             "undefined name: " <> pack (show name)
+  where
+    gcAsLc = ValidContext (gc ^. #unValidContext)
 
 liftMath :: ann -> (Scalar -> Scalar -> a) -> Value -> Value -> Either (ErrorMessage ann) a
 liftMath ann f x y =
