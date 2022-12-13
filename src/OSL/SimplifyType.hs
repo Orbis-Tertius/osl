@@ -1,4 +1,6 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module OSL.SimplifyType
@@ -7,12 +9,13 @@ module OSL.SimplifyType
     complexifyValue
   ) where
 
+import Control.Lens ((^.))
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import OSL.Type (typeAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.OSL (Type (Prop, F, P, N, Z, Fp, Fin, Product, Coproduct, NamedType, Maybe, List, Map))
-import OSL.Types.Value (Value (Bool, Fun, Fin', Nat, Int, Fp', Pair', Iota1', Iota2', Maybe'', List'', Map''))
+import OSL.Types.OSL (Type (Prop, F, P, N, Z, Fp, Fin, Product, Coproduct, NamedType, Maybe, List, Map), ValidContext, ContextType (Global), Declaration (Data))
+import OSL.Types.Value (Value (Bool, Fun, Fin', Nat, Int, Fp', Pair', Iota1', Iota2', Maybe'', List'', Map'', To', Maybe''))
 
 -- This operation cannot fail. A result of Nothing
 -- signifies that the type simplifies to the unit type
@@ -128,19 +131,15 @@ simplifyValue =
                [ (,) <$> simplifyValue a x <*> simplifyValue b y
                | (x,y) <- Map.toList xs
                ]
-      (N ann, Nat x) -> pure (Nat x)
-      (Z ann, Int x) -> pure (Int x)
-      (Fp ann, Fp' x) -> pure (Fp' x)
-      (Fin ann _, Fin' x) -> pure (Fin' x)
       (t, _) -> Left . ErrorMessage (typeAnnotation t)
         $ "simplifyValue: type error"
 
-complexifyValue :: Type ann -> Value -> Either (ErrorMessage ann) Value
-complexifyValue =
+complexifyValue :: ValidContext 'Global ann -> Type ann -> Value -> Either (ErrorMessage ann) Value
+complexifyValue c =
   curry $
     \case
       (Prop _, Bool x) -> pure (Bool x)
-      (F _ann _n a b, x) ->
+      (F ann _n a b, x) ->
         case simplifyType a of
           Nothing -> do
             k <- rec a (Fin' 0)
@@ -153,7 +152,9 @@ complexifyValue =
                   [ (,) <$> rec a y <*> rec b z
                   | (y,z) <- Map.toList f
                   ]
-      (P _ann _n a b, x) ->
+              _ -> Left . ErrorMessage ann $
+                "complexifyValue: type error"
+      (P ann _n a b, x) ->
         case simplifyType a of
           Nothing -> pure (Fun (Map.fromList [(Fin' 0, Fin' 0)]))
           Just _ ->
@@ -163,12 +164,44 @@ complexifyValue =
                   [ (,) <$> rec a y <*> rec b z
                   | (y,z) <- Map.toList f
                   ]
+              _ -> Left . ErrorMessage ann $
+                "complexifyValue: type error"
       (N _, Nat x) -> pure (Nat x) 
       (Z _, Int x) -> pure (Int x)
       (Fp _, Fp' x) -> pure (Fp' x)
       (Fin {}, Fin' x) -> pure (Fin' x)
+      (Product _ann a b, Pair' x y) ->
+        Pair' <$> rec a x <*> rec b y
+      (Product _ann a b, Fin' 0) ->
+        Pair' <$> rec a (Fin' 0) <*> rec b (Fin' 0)
+      (Coproduct _ann a _b, Iota1' x) ->
+        Iota1' <$> rec a x
+      (Coproduct _ann _a b, Iota2' x) ->
+        Iota2' <$> rec b x
+      (Coproduct _ann a _b, Fin' 0) ->
+        Iota1' <$> rec a (Fin' 0)
+      (NamedType ann name, To' name' x) ->
+        case Map.lookup name (c ^. #unValidContext) of
+          Just (Data a) ->
+            if name == name'
+            then To' name <$> rec a x
+            else Left . ErrorMessage ann $ "complexifyValue: type error"
+          _ -> Left . ErrorMessage ann $
+            "complexifyValue: expected the name of a type"
+      (Maybe {}, Maybe'' Nothing) ->
+        pure (Maybe'' Nothing)
+      (Maybe _ann a, Maybe'' (Just x)) ->
+        Maybe'' . Just <$> rec a x
+      (Maybe _ann _a, Fin' 0) -> pure (Maybe'' Nothing)
+      (List _ann _n a, List'' xs) ->
+        List'' <$> mapM (rec a) xs
+      (List _ann _n _a, Fin' 0) ->
+        pure (List'' [])
+      (Map _ann _n a b, Map'' xs) ->
+        Map'' . Map.fromList <$> sequence
+          [ (,) <$> rec a x <*> rec b y
+          | (x,y) <- Map.toList xs
+          ]
+      (Map {}, Fin' 0) -> pure (Map'' mempty)
   where
-    rec = complexifyValue
-
-todo :: a
-todo = todo
+    rec = complexifyValue c
