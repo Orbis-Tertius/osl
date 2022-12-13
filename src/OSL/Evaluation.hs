@@ -619,26 +619,32 @@ evaluate gc witness lc t x e = do
             "apply: expected a function"
         Nothing ->
           case Map.lookup fName (gc ^. #unValidContext) of
-            Just (Defined _ def) -> do
+            Just (Defined (F _ann _n a _b) def) -> do
               yT <- inferType lc y
               y' <- rec yT y e
               let v = getFreeOSLName gc
-              evaluate gc witness gcAsLc t (Apply ann def (NamedTerm ann v)) $
-                EvaluationContext
-                  (Map.singleton v y')
+              evaluate gc witness
+                (gcAsLc <> ValidContext (Map.singleton v (FreeVariable a)))
+                t
+                (Apply ann def (NamedTerm ann v))
+                (EvaluationContext
+                  (Map.singleton v y'))
             Just _ ->
               Left . ErrorMessage ann' $
                 "expected the name of a defined function"
             Nothing ->
               Left . ErrorMessage ann' $
                 "undefined name"
-    ForSome ann name _a _bound y -> do
+    ForSome ann name a _bound y -> do
       w <- (witness ^. #unPreprocessedWitness) ann e
       -- TODO: check w is in bound
-      rec (Prop ann) y $
-        e
+      evaluate gc witness
+        (lc <> ValidContext (Map.singleton name (FreeVariable a)))
+        (Prop ann)
+        y
+        (e
           <> EvaluationContext
-            (Map.singleton name w)
+            (Map.singleton name w))
     ForAll ann name a bound y -> do
       vs <- getUniversalQuantifierValues a bound
       let p v =
