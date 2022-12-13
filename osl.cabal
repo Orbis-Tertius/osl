@@ -163,6 +163,7 @@ test-suite spec
 
   other-modules:
     OSL.Spec.OSLSpec
+    OSL.Spec.SimplifyTypeSpec
     OSL.Spec.SudokuSpec
 
   build-tools:

@@ -173,10 +173,27 @@ complexifyValue c =
       (Fp _, Fp' x) -> pure (Fp' x)
       (Fp _, Fin' 0) -> pure (Fp' 0)
       (Fin {}, Fin' x) -> pure (Fin' x)
-      (Product _ann a b, Pair' x y) ->
-        Pair' <$> rec a x <*> rec b y
-      (Product _ann a b, Fin' 0) ->
-        Pair' <$> rec a (Fin' 0) <*> rec b (Fin' 0)
+      (Product ann a b, z) ->
+        case simplifyType a of
+          Nothing ->
+            case simplifyType b of
+              Nothing ->
+                case z of
+                  Fin' 0 ->
+                    Pair' <$> rec a (Fin' 0) <*> rec b (Fin' 0)
+                  _ -> Left . ErrorMessage ann $
+                    "complexifyValue: type error"
+              Just _ ->
+                Pair' <$> rec a (Fin' 0) <*> rec b z
+          Just _ ->
+            case simplifyType b of
+              Nothing ->
+                Pair' <$> rec a z <*> rec b (Fin' 0)
+              Just _ ->
+                case z of
+                  Pair' x y -> Pair' <$> rec a x <*> rec b y
+                  _ -> Left . ErrorMessage ann $
+                    "complexifyValue: type error"
       (Coproduct _ann a _b, Iota1' x) ->
         Iota1' <$> rec a x
       (Coproduct _ann _a b, Iota2' x) ->
