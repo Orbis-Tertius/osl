@@ -162,8 +162,9 @@ complexifyValue c =
                   [ (,) <$> rec a y <*> rec b z
                   | (y,z) <- Map.toList f
                   ]
+              Fin' 0 -> pure (Fun mempty)
               _ -> Left . ErrorMessage ann $
-                "complexifyValue: type error"
+                "complexifyValue: type error; expected a function"
       (P ann _n a b, x) ->
         case simplifyType a of
           Nothing -> pure (Fun (Map.fromList [(Fin' 0, Fin' 0)]))
@@ -175,7 +176,7 @@ complexifyValue c =
                   | (y,z) <- Map.toList f
                   ]
               _ -> Left . ErrorMessage ann $
-                "complexifyValue: type error"
+                "complexifyValue: type error; expected a permutation"
       (N _, Nat x) -> pure (Nat x) 
       (N _, Fin' 0) -> pure (Nat 0)
       (Z _, Int x) -> pure (Int x)
@@ -191,7 +192,7 @@ complexifyValue c =
                   Fin' 0 ->
                     Pair' <$> rec a (Fin' 0) <*> rec b (Fin' 0)
                   _ -> Left . ErrorMessage ann $
-                    "complexifyValue: type error"
+                    "complexifyValue: type error; expected Fin' 0"
               Just _ ->
                 Pair' <$> rec a (Fin' 0) <*> rec b z
           Just _ ->
@@ -202,7 +203,7 @@ complexifyValue c =
                 case z of
                   Pair' x y -> Pair' <$> rec a x <*> rec b y
                   _ -> Left . ErrorMessage ann $
-                    "complexifyValue: type error"
+                    "complexifyValue: type error; expected a pair"
       (Coproduct _ann a _b, Iota1' x) ->
         Iota1' <$> rec a x
       (Coproduct _ann _a b, Iota2' x) ->
@@ -214,7 +215,7 @@ complexifyValue c =
           Just (Data a) ->
             if name == name'
             then To' name <$> rec (dropTypeAnnotations a) x
-            else Left . ErrorMessage ann $ "complexifyValue: type error"
+            else Left . ErrorMessage ann $ "complexifyValue: type error; named type mismatch"
           _ -> Left . ErrorMessage ann $
             "complexifyValue: expected the name of a type"
       (NamedType ann name, Fin' 0) ->
@@ -238,7 +239,8 @@ complexifyValue c =
           | (x,y) <- Map.toList xs
           ]
       (Map {}, Fin' 0) -> pure (Map'' mempty)
-      (t, _) -> Left . ErrorMessage (typeAnnotation t)
-        $ "complexifyValue: type error"
+      (t, x) -> Left . ErrorMessage (typeAnnotation t)
+        $ "complexifyValue: type error; default case: "
+           <> pack (show (t, x))
   where
     rec = complexifyValue c
