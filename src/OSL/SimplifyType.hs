@@ -139,6 +139,7 @@ complexifyValue c =
   curry $
     \case
       (Prop _, Bool x) -> pure (Bool x)
+      (Prop _, Fin' 0) -> pure (Bool False)
       (F ann _n a b, x) ->
         case simplifyType a of
           Nothing -> do
@@ -167,8 +168,10 @@ complexifyValue c =
               _ -> Left . ErrorMessage ann $
                 "complexifyValue: type error"
       (N _, Nat x) -> pure (Nat x) 
+      (N _, Fin' 0) -> pure (Nat 0)
       (Z _, Int x) -> pure (Int x)
       (Fp _, Fp' x) -> pure (Fp' x)
+      (Fp _, Fin' 0) -> pure (Fp' 0)
       (Fin {}, Fin' x) -> pure (Fin' x)
       (Product _ann a b, Pair' x y) ->
         Pair' <$> rec a x <*> rec b y
@@ -188,6 +191,12 @@ complexifyValue c =
             else Left . ErrorMessage ann $ "complexifyValue: type error"
           _ -> Left . ErrorMessage ann $
             "complexifyValue: expected the name of a type"
+      (NamedType ann name, Fin' 0) ->
+        case Map.lookup name (c ^. #unValidContext) of
+          Just (Data a) ->
+            To' name <$> rec a (Fin' 0)
+          _ -> Left . ErrorMessage ann $
+            "complexifyValue: expected the name of a type"
       (Maybe {}, Maybe'' Nothing) ->
         pure (Maybe'' Nothing)
       (Maybe _ann a, Maybe'' (Just x)) ->
@@ -203,5 +212,7 @@ complexifyValue c =
           | (x,y) <- Map.toList xs
           ]
       (Map {}, Fin' 0) -> pure (Map'' mempty)
+      (t, _) -> Left . ErrorMessage (typeAnnotation t)
+        $ "complexifyValue: type error"
   where
     rec = complexifyValue c
