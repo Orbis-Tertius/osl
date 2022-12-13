@@ -7,6 +7,7 @@ module OSL.ArgumentForm (getArgumentForm) where
 
 import Control.Lens ((^.))
 import qualified Data.Map as Map
+import OSL.Type (dropTypeAnnotations)
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.OSL (ContextType (Global), Declaration (Defined), Term (AddFp, AddN, AddZ, And, Apply, Bottom, Cast, ConstF, ConstFin, ConstFp, ConstN, ConstSet, ConstZ, Equal, Exists, ForAll, ForSome, From, FunctionCoproduct, FunctionProduct, Iff, Implies, Inverse, Iota1, Iota2, IsNothing, Just', Keys, Lambda, Length, LessOrEqual, Let, ListCast, ListFrom, ListLength, ListMaybeFrom, ListMaybeLength, ListMaybePi1, ListMaybePi2, ListMaybeTo, ListPi1, ListPi2, ListTo, Lookup, MapFrom, MapPi1, MapPi2, MapTo, MaxFp, MaxN, MaxZ, Maybe', MaybeFrom, MaybePi1, MaybePi2, MaybeTo, MulFp, MulN, MulZ, NamedTerm, Not, Nothing', Nth, Or, Pair, Pi1, Pi2, Sum, SumListLookup, SumMapLength, To, Top), Type (Coproduct, F, Fin, Fp, List, Map, Maybe, N, NamedType, P, Product, Prop, Z), ValidContext)
@@ -155,22 +156,3 @@ getWitnessType c =
     prod :: WitnessType -> WitnessType -> WitnessType
     prod (WitnessType a) (WitnessType b) =
       WitnessType (Product () a b)
-
-dropTypeAnnotations :: Type ann -> Type ()
-dropTypeAnnotations =
-  \case
-    Prop _ -> Prop ()
-    F _ n a b -> F () n (rec a) (rec b)
-    P _ n a b -> P () n (rec a) (rec b)
-    N _ -> N ()
-    Z _ -> Z ()
-    Fp _ -> Fp ()
-    Fin _ i -> Fin () i
-    Product _ a b -> Product () (rec a) (rec b)
-    Coproduct _ a b -> Coproduct () (rec a) (rec b)
-    NamedType _ name -> NamedType () name
-    Maybe _ a -> Maybe () (rec a)
-    List _ n a -> List () n (rec a)
-    Map _ n a b -> Map () n (rec a) (rec b)
-  where
-    rec = dropTypeAnnotations

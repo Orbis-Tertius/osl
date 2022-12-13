@@ -3,6 +3,7 @@
 module OSL.ValidContext
   ( getDeclaration,
     getExistingDeclaration,
+    getNamedTermUnsafe,
     addDeclaration,
     getFreeOSLName,
   )
@@ -12,7 +13,15 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Die (die)
-import OSL.Types.OSL (Declaration, Name (GenSym, Sym), ValidContext (..))
+import OSL.Term (termAnnotation)
+import OSL.Types.OSL (Declaration (Defined), Name (GenSym, Sym), ValidContext (..), Term (NamedTerm))
+
+getNamedTermUnsafe :: ValidContext t ann -> Name -> Term ann
+getNamedTermUnsafe c name =
+  case getExistingDeclaration c name of
+    Defined _ x ->
+      NamedTerm (termAnnotation x) name
+    _ -> die "getNamedTermUnsafe: expected the name of a defined term"
 
 getDeclaration :: ValidContext t ann -> Name -> Maybe (Declaration ann)
 getDeclaration (ValidContext decls) name = Map.lookup name decls

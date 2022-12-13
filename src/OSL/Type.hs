@@ -1,6 +1,9 @@
+{-# LANGUAGE LambdaCase #-}
+
 module OSL.Type
   ( typeAnnotation,
     typeCardinality,
+    dropTypeAnnotations,
   )
 where
 
@@ -43,3 +46,22 @@ typeCardinality ctx t =
     Maybe _ _ -> Just 1
     List _ n _ -> Just n
     Map _ n _ _ -> Just n
+
+dropTypeAnnotations :: Type ann -> Type ()
+dropTypeAnnotations =
+  \case
+    Prop _ -> Prop ()
+    F _ n a b -> F () n (rec a) (rec b)
+    P _ n a b -> P () n (rec a) (rec b)
+    N _ -> N ()
+    Z _ -> Z ()
+    Fp _ -> Fp ()
+    Fin _ i -> Fin () i
+    Product _ a b -> Product () (rec a) (rec b)
+    Coproduct _ a b -> Coproduct () (rec a) (rec b)
+    NamedType _ name -> NamedType () name
+    Maybe _ a -> Maybe () (rec a)
+    List _ n a -> List () n (rec a)
+    Map _ n a b -> Map () n (rec a) (rec b)
+  where
+    rec = dropTypeAnnotations

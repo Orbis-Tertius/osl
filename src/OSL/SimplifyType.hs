@@ -6,13 +6,16 @@
 module OSL.SimplifyType
   ( simplifyType,
     simplifyValue,
-    complexifyValue
+    complexifyValue,
+    complexifyValueUnsafe
   ) where
 
 import Control.Lens ((^.))
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
-import OSL.Type (typeAnnotation)
+import Data.Text (pack)
+import Die (die)
+import OSL.Type (typeAnnotation, dropTypeAnnotations)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.OSL (Type (Prop, F, P, N, Z, Fp, Fin, Product, Coproduct, NamedType, Maybe, List, Map), ValidContext, ContextType (Global), Declaration (Data))
 import OSL.Types.Value (Value (Bool, Fun, Fin', Nat, Int, Fp', Pair', Iota1', Iota2', Maybe'', List'', Map'', To', Maybe''))
@@ -134,7 +137,13 @@ simplifyValue =
       (t, _) -> Left . ErrorMessage (typeAnnotation t)
         $ "simplifyValue: type error"
 
-complexifyValue :: ValidContext 'Global ann -> Type ann -> Value -> Either (ErrorMessage ann) Value
+complexifyValueUnsafe :: ValidContext 'Global ann -> Type () -> Value -> Value
+complexifyValueUnsafe c t x =
+  case complexifyValue c t x of
+    Right y -> y
+    Left err -> die (pack (show err))
+
+complexifyValue :: ValidContext 'Global ann -> Type () -> Value -> Either (ErrorMessage ()) Value
 complexifyValue c =
   curry $
     \case
@@ -204,14 +213,14 @@ complexifyValue c =
         case Map.lookup name (c ^. #unValidContext) of
           Just (Data a) ->
             if name == name'
-            then To' name <$> rec a x
+            then To' name <$> rec (dropTypeAnnotations a) x
             else Left . ErrorMessage ann $ "complexifyValue: type error"
           _ -> Left . ErrorMessage ann $
             "complexifyValue: expected the name of a type"
       (NamedType ann name, Fin' 0) ->
         case Map.lookup name (c ^. #unValidContext) of
           Just (Data a) ->
-            To' name <$> rec a (Fin' 0)
+            To' name <$> rec (dropTypeAnnotations a) (Fin' 0)
           _ -> Left . ErrorMessage ann $
             "complexifyValue: expected the name of a type"
       (Maybe {}, Maybe'' Nothing) ->
