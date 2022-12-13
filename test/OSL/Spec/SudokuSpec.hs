@@ -1,10 +1,12 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module OSL.Spec.SudokuSpec (spec) where
 
 import Control.Lens ((^.))
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (pack)
 import OSL.ArgumentForm (getArgumentForm)
@@ -39,6 +41,65 @@ spec =
 spec' :: ValidContext 'Global SourcePos -> Spec
 spec' c = do
   argumentFormSpec c
+
+newtype Value = Value { unValue :: Int }
+
+newtype Row = Row { unRow :: Int }
+  deriving (Eq, Ord, Num, Enum)
+
+newtype Col = Col { unCol :: Int }
+
+newtype Cell = Cell { unCell :: (Row, Col) }
+
+newtype Problem = Problem { unProblem :: Cell -> Maybe Value }
+
+newtype Solution = Solution { unSolution :: Cell -> Value }
+
+newtype X = X { unX :: Int }
+
+newtype Y = Y { unY :: Int }
+
+newtype Square = Square { unSquare :: (X, Y) }
+
+newtype SquareCell = SquareCell { unSquareCell :: (X, Y) }
+
+data SudokuWitness =
+  SudokuWitness
+  { solution :: Solution,
+    rowPermutations :: Map Row (Map Value Col),
+    colPermutations :: Map Col (Map Value Row),
+    squarePermutations :: Map Square (Map Value SquareCell)
+  }
+
+createWitness :: Solution -> Maybe SudokuWitness
+createWitness s =
+  SudokuWitness s
+    <$> getRowPermutations s
+    <*> getColPermutations s
+    <*> getSquarePermutations s
+
+getRowPermutations :: Solution -> Maybe (Map Row (Map Value Col))
+getRowPermutations s =
+  mconcat <$> sequence
+    [ Map.singleton r <$> getRowPermutation s r | r <- [0..8] ]
+
+getRowPermutation :: Solution -> Row -> Maybe (Map Value Col)
+getRowPermutation = todo
+
+getColPermutations :: Solution -> Maybe (Map Col (Map Value Row))
+getColPermutations = todo
+
+getColPermutation :: Solution -> Col -> Maybe (Map Value Row)
+getColPermutation = todo
+
+getSquarePermutations :: Solution -> Maybe (Map Square (Map Value SquareCell))
+getSquarePermutations = todo
+
+getSquarePermutation :: Solution -> Square -> Maybe (Map Value SquareCell)
+getSquarePermutation = todo
+
+todo :: a
+todo = todo
 
 complexStatementType :: Type ()
 complexStatementType =
