@@ -139,13 +139,13 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "encountered a function constant in a non-function context"
-    AddN ann -> partialApplication ann
-    MulN ann -> partialApplication ann
-    AddZ ann -> partialApplication ann
-    MulZ ann -> partialApplication ann
-    AddFp ann -> partialApplication ann
-    MulFp ann -> partialApplication ann
-    Cast ann -> partialApplication ann
+    AddN ann -> partialApplication "AddN" ann
+    MulN ann -> partialApplication "MulN" ann
+    AddZ ann -> partialApplication "AddZ" ann
+    MulZ ann -> partialApplication "MulZ" ann
+    AddFp ann -> partialApplication "AddFp" ann
+    MulFp ann -> partialApplication "MulFp" ann
+    Cast ann -> partialApplication "Cast" ann
     ConstSet ann xs ->
       case t of
         F _ mn a (Prop _) -> do
@@ -170,7 +170,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "inverse: expected a function"
-    Inverse ann -> partialApplication ann
+    Inverse ann -> partialApplication "Inverse" ann
     Apply ann (Apply _ (Pair _) y) z ->
       case t of
         Product _ a b ->
@@ -178,7 +178,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "encountered a pair in a non-product context"
-    Pair ann -> partialApplication ann
+    Pair ann -> partialApplication "Pair" ann
     Apply ann (Pi1 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
@@ -187,7 +187,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "pi1: expected a pair"
-    Pi1 ann -> partialApplication ann
+    Pi1 ann -> partialApplication "Pi1" ann
     Apply ann (Pi2 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
@@ -196,7 +196,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "pi2: expected a pair"
-    Pi2 ann -> partialApplication ann
+    Pi2 ann -> partialApplication "Pi2" ann
     Apply ann (Iota1 _) y ->
       case t of
         Coproduct _ a _ ->
@@ -204,7 +204,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "encountered iota1 in a non-coproduct context"
-    Iota1 ann -> partialApplication ann
+    Iota1 ann -> partialApplication "Iota1" ann
     Apply ann (Iota2 _) y ->
       case t of
         Coproduct _ _ b ->
@@ -212,7 +212,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "encountered iota2 in a non-coproduct context"
-    Iota2 ann -> partialApplication ann
+    Iota2 ann -> partialApplication "Iota2" ann
     FunctionProduct ann f g ->
       case t of
         F ann' n a (Product _ b c) -> do
@@ -248,7 +248,7 @@ evaluate gc witness lc t x e = do
       z' <- rec a z e
       let lc' = lc <> ValidContext (Map.singleton v (FreeVariable a))
       evaluate gc witness lc' t y $ e <> EvaluationContext (Map.singleton v z')
-    Lambda ann _ _ _ -> partialApplication ann
+    Lambda ann _ _ _ -> partialApplication "Lambda" ann
     Apply _ (To ann name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
         Just (Data a) ->
@@ -256,7 +256,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "expected the name of a type"
-    To ann _ -> partialApplication ann
+    To ann _ -> partialApplication "To" ann
     Apply ann (From ann' name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
         Just (Data a) -> do
@@ -275,7 +275,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "expected the name of a type"
-    From ann _ -> partialApplication ann
+    From ann _ -> partialApplication "From" ann
     Let _ v a d y -> do
       d' <- rec a d e
       rec t y $ e <> EvaluationContext (Map.singleton v d')
@@ -288,7 +288,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "expected a Maybe value"
-    IsNothing ann -> partialApplication ann
+    IsNothing ann -> partialApplication "IsNothing" ann
     Apply ann (Just' _) y ->
       case t of
         Maybe _ a ->
@@ -296,7 +296,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "saw just in a non-Maybe context"
-    Just' ann -> partialApplication ann
+    Just' ann -> partialApplication "Just'" ann
     Nothing' _ -> pure (Maybe'' Nothing)
     Apply ann (Apply _ (Maybe' ann' f) y) z -> do
       fT <- inferType lc f
@@ -315,7 +315,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann' $
             "maybe: expected a function"
-    Maybe' ann _ -> partialApplication ann
+    Maybe' ann _ -> partialApplication "Maybe'" ann
     Apply ann (MaybePi1 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
@@ -327,7 +327,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "Maybe(pi1): expected a Maybe-pair"
-    MaybePi1 ann -> partialApplication ann
+    MaybePi1 ann -> partialApplication "MaybePi1" ann
     Apply ann (MaybePi2 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
@@ -339,7 +339,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "Maybe(pi2): expected a Maybe-pair"
-    MaybePi2 ann -> partialApplication ann
+    MaybePi2 ann -> partialApplication "MaybePi2" ann
     Apply ann (MaybeTo ann' name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
         Just (Data a) -> do
@@ -355,7 +355,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann' $
             "expected the name of a type"
-    MaybeTo ann _ -> partialApplication ann
+    MaybeTo ann _ -> partialApplication "MaybeTo" ann
     Apply ann (MaybeFrom ann' name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
         Just (Data a) -> do
@@ -376,7 +376,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann' $
             "expected the name of a type"
-    MaybeFrom ann _ -> partialApplication ann
+    MaybeFrom ann _ -> partialApplication "MaybeFrom" ann
     Apply ann (Apply _ (MaxN _) y) z ->
       Nat
         <$> join
@@ -384,7 +384,7 @@ evaluate gc witness lc t x e = do
               <$> rec t y e
               <*> rec t z e
           )
-    MaxN ann -> partialApplication ann
+    MaxN ann -> partialApplication "MaxN" ann
     Apply ann (Apply _ (MaxZ _) y) z ->
       Int
         <$> join
@@ -392,7 +392,7 @@ evaluate gc witness lc t x e = do
               <$> rec t y e
               <*> rec t z e
           )
-    MaxZ ann -> partialApplication ann
+    MaxZ ann -> partialApplication "MaxZ" ann
     Apply ann (Apply _ (MaxFp _) y) z ->
       Fp'
         <$> join
@@ -400,7 +400,7 @@ evaluate gc witness lc t x e = do
               <$> rec t y e
               <*> rec t z e
           )
-    MaxFp ann -> partialApplication ann
+    MaxFp ann -> partialApplication "MaxFp" ann
     Apply ann (Exists _) y -> do
       y' <- rec (Maybe ann t) y e
       case y' of
@@ -411,7 +411,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "exists: expected a Maybe"
-    Exists ann -> partialApplication ann
+    Exists ann -> partialApplication "Exists" ann
     Apply ann (Length _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
@@ -425,7 +425,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "length: expected a list"
-    Length ann -> partialApplication ann
+    Length ann -> partialApplication "Length" ann
     Apply ann (Apply _ (Nth _) xs) i -> do
       i' <- rec (N ann) i e
       xsT <- inferType lc xs
@@ -450,75 +450,75 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "nth: expected a natural number"
-    Nth ann -> partialApplication ann
+    Nth ann -> partialApplication "Nth" ann
     Apply ann (ListCast _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       listFunctor (\ann' -> castF ann' <=< decodeScalar ann') ann y'
-    ListCast ann -> partialApplication ann
+    ListCast ann -> partialApplication "ListCast" ann
     Apply ann (ListPi1 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       listFunctor snd' ann y'
-    ListPi1 ann -> partialApplication ann
+    ListPi1 ann -> partialApplication "ListPi1" ann
     Apply ann (ListPi2 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       listFunctor snd' ann y'
-    ListPi2 ann -> partialApplication ann
+    ListPi2 ann -> partialApplication "ListPi2" ann
     Apply ann (ListTo _ name) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       listFunctor (const (pure . To' name)) ann y'
-    ListTo ann _ -> partialApplication ann
+    ListTo ann _ -> partialApplication "ListTo" ann
     Apply ann (ListFrom _ name) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       case y' of
         List'' ys -> List'' <$> mapM (castFrom ann name) ys
         _ -> Left . ErrorMessage ann $ "List(from(-)): expected a list"
-    ListFrom ann _ -> partialApplication ann
+    ListFrom ann _ -> partialApplication "ListFrom" ann
     Apply ann (ListLength _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       listFunctor listLength ann y'
-    ListLength ann -> partialApplication ann
+    ListLength ann -> partialApplication "ListLength" ann
     Apply ann (ListMaybePi1 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       listFunctor (maybeFunctor fst') ann y'
-    ListMaybePi1 ann -> partialApplication ann
+    ListMaybePi1 ann -> partialApplication "ListMaybePi1" ann
     Apply ann (ListMaybePi2 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       listFunctor (maybeFunctor snd') ann y'
-    ListMaybePi2 ann -> partialApplication ann
+    ListMaybePi2 ann -> partialApplication "ListMaybePi2" ann
     Apply ann (ListMaybeLength _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       listFunctor (maybeFunctor listLength) ann y'
-    ListMaybeLength ann -> partialApplication ann
+    ListMaybeLength ann -> partialApplication "ListMaybeLength" ann
     Apply ann (ListMaybeFrom _ name) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       listFunctor (maybeFunctor (`castFrom` name)) ann y'
-    ListMaybeFrom ann _ -> partialApplication ann
+    ListMaybeFrom ann _ -> partialApplication "ListMaybeFrom" ann
     Apply ann (ListMaybeTo _ name) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       listFunctor (maybeFunctor (const (pure . To' name))) ann y'
-    ListMaybeTo ann _ -> partialApplication ann
+    ListMaybeTo ann _ -> partialApplication "ListMaybeTo" ann
     Apply ann (Sum _) y -> do
       yT <- inferType lc y
       listSum ann =<< rec yT y e
-    Sum ann -> partialApplication ann
+    Sum ann -> partialApplication "Sum" ann
     Apply ann (Apply _ (Lookup _) k) m -> do
       mT <- inferType lc m
       m' <- rec mT m e
       kT <- inferType lc k
       k' <- rec kT k e
       mapLookup ann k' m'
-    Lookup ann -> partialApplication ann
+    Lookup ann -> partialApplication "Lookup" ann
     Apply ann (Keys _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
@@ -527,33 +527,33 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "keys: expected a map"
-    Keys ann -> partialApplication ann
+    Keys ann -> partialApplication "Keys" ann
     Apply ann (MapPi1 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       mapFunctor fst' ann y'
-    MapPi1 ann -> partialApplication ann
+    MapPi1 ann -> partialApplication "MapPi1" ann
     Apply ann (MapPi2 _) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       mapFunctor snd' ann y'
-    MapPi2 ann -> partialApplication ann
+    MapPi2 ann -> partialApplication "MapPi2" ann
     Apply ann (MapTo _ name) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       mapFunctor (const (pure . To' name)) ann y'
-    MapTo ann _ -> partialApplication ann
+    MapTo ann _ -> partialApplication "MapTo" ann
     Apply ann (MapFrom _ name) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
       mapFunctor (`castFrom` name) ann y'
-    MapFrom ann _ -> partialApplication ann
+    MapFrom ann _ -> partialApplication "MapFrom" ann
     Apply ann (SumMapLength _) y -> do
       yT <- inferType lc y
       listSum ann . List'' =<< mapElems ann
         =<< mapFunctor listLength ann
         =<< rec yT y e
-    SumMapLength ann -> partialApplication ann
+    SumMapLength ann -> partialApplication "SumMapLength" ann
     Apply ann (SumListLookup _ k) y -> do
       yT <- inferType lc y
       y' <- rec yT y e
@@ -564,7 +564,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann $
             "sumListLookup: expected a list of maps"
-    SumListLookup ann _ -> partialApplication ann
+    SumListLookup ann _ -> partialApplication "SumListLookup" ann
     Equal _ y z -> do
       yT <- inferType lc y
       Bool <$> ((==) <$> rec yT y e <*> rec yT z e)
@@ -651,15 +651,15 @@ evaluate gc witness lc t x e = do
             decodeBool ann <=< rec (Prop ann) y . (e <>) . EvaluationContext $
               Map.singleton name v
       Bool . and <$> mapM p vs
-    Apply ann (AddN _) _ -> partialApplication ann
-    Apply ann (MulN _) _ -> partialApplication ann
+    Apply ann (AddN _) _ -> partialApplication "AddN _" ann
+    Apply ann (MulN _) _ -> partialApplication "MulN _" ann
     Apply ann (ConstN _ _) _ -> expectedFunction ann
-    Apply ann (AddZ _) _ -> partialApplication ann
-    Apply ann (MulZ _) _ -> partialApplication ann
+    Apply ann (AddZ _) _ -> partialApplication "AddZ _" ann
+    Apply ann (MulZ _) _ -> partialApplication "MulZ _" ann
     Apply ann (ConstZ _ _) _ -> expectedFunction ann
     Apply ann (ConstFp _ _) _ -> expectedFunction ann
-    Apply ann (AddFp _) _ -> partialApplication ann
-    Apply ann (MulFp _) _ -> partialApplication ann
+    Apply ann (AddFp _) _ -> partialApplication "AddFp _" ann
+    Apply ann (MulFp _) _ -> partialApplication "MulFp _" ann
     Apply ann (ConstFin _ _) _ -> expectedFunction ann
     Apply _ fE@(ConstF ann' _) y -> do
       fT <- inferType lc fE
@@ -678,7 +678,7 @@ evaluate gc witness lc t x e = do
         _ ->
           Left . ErrorMessage ann' $
             "expected a set"
-    Apply ann (Pair _) _ -> partialApplication ann
+    Apply ann (Pair _) _ -> partialApplication "Pair _" ann
     Apply ann fE@(FunctionProduct {}) y -> do
       fT <- inferType lc fE
       f <- rec fT fE e
@@ -704,12 +704,12 @@ evaluate gc witness lc t x e = do
       y' <- rec yT y e
       applyFun ann f y'
     Apply ann (Nothing' _) _ -> expectedFunction ann
-    Apply ann (Maybe' {}) _ -> partialApplication ann
-    Apply ann (MaxN _) _ -> partialApplication ann
-    Apply ann (MaxZ _) _ -> partialApplication ann
-    Apply ann (MaxFp _) _ -> partialApplication ann
-    Apply ann (Nth _) _ -> partialApplication ann
-    Apply ann (Lookup _) _ -> partialApplication ann
+    Apply ann (Maybe' {}) _ -> partialApplication "Maybe _" ann
+    Apply ann (MaxN _) _ -> partialApplication "MaxN _" ann
+    Apply ann (MaxZ _) _ -> partialApplication "MaxZ _" ann
+    Apply ann (MaxFp _) _ -> partialApplication "MaxFp _" ann
+    Apply ann (Nth _) _ -> partialApplication "Nth _" ann
+    Apply ann (Lookup _) _ -> partialApplication "Lookup _" ann
     Apply ann (Equal {}) _ -> expectedFunction ann
     Apply ann (LessOrEqual {}) _ -> expectedFunction ann
     Apply ann (And {}) _ -> expectedFunction ann
@@ -968,9 +968,9 @@ evaluate gc witness lc t x e = do
                 "input outside of function domain"
         _ -> Left . ErrorMessage ann $ "expected a function"
 
-    partialApplication ann =
+    partialApplication label ann =
       Left . ErrorMessage ann $
-        "encountered a partial function application"
+        "encountered a partial function application: " <> pack label
 
     expectedFunction ann =
       Left . ErrorMessage ann $
