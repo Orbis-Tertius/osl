@@ -12,12 +12,14 @@ import qualified OSL.Types.Keyword as K
 import OSL.Types.OSL (Name (..))
 import OSL.Types.Token (Token)
 import qualified OSL.Types.Token as T
-import Text.Parsec (SourceName, SourcePos, anyChar, char, choice, eof, getPosition, lookAhead, many1, noneOf, oneOf, string, try, (<|>))
+import Text.Parsec (SourceName, SourcePos, anyChar, char, choice, eof, getPosition, lookAhead, many1, noneOf, oneOf, string, try, (<|>), errorPos)
 import Text.Parsec.Prim (many, parse)
 import Text.Parsec.Text (Parser)
 
-tokenize :: SourceName -> Text -> Either (ErrorMessage ()) [(Token, SourcePos)]
-tokenize sourceName = mapLeft (ErrorMessage () . pack . show) . parse tokens sourceName
+tokenize :: SourceName -> Text -> Either (ErrorMessage SourcePos) [(Token, SourcePos)]
+tokenize sourceName =
+  mapLeft (\e -> ErrorMessage (errorPos e) (pack (show e)))
+    . parse tokens sourceName
 
 tokens :: Parser [(Token, SourcePos)]
 tokens = do

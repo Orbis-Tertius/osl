@@ -68,6 +68,7 @@ library
     OSL.BuildTranslationContext
     OSL.EntryPoint
     OSL.Evaluation
+    OSL.LoadContext
     OSL.Parse
     OSL.Satisfaction
     OSL.Sigma11
@@ -84,6 +85,7 @@ library
     OSL.Types.DeBruijnIndex
     OSL.Types.ErrorMessage
     OSL.Types.EvaluationContext
+    OSL.Types.FileName
     OSL.Types.Keyword
     OSL.Types.OSL
     OSL.Types.PreprocessedWitness

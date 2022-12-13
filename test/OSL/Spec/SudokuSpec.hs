@@ -10,18 +10,16 @@ import Control.Lens ((^.))
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Text (pack)
 import Die (die)
 import OSL.ArgumentForm (getArgumentForm)
-import OSL.Parse (parseContext)
+import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.SimplifyType (simplifyType, complexifyValueUnsafe)
-import OSL.Tokenize (tokenize)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
+import OSL.Types.FileName (FileName (FileName))
 import OSL.Types.OSL (ValidContext, ContextType (Global), Declaration (Defined), Name (Sym), Type (Product, NamedType, Fin, F))
 import OSL.Types.Value (Value (Fun, Maybe'', To', Fin', Pair'))
-import OSL.ValidateContext (validateContext)
 import OSL.ValidContext (getNamedTermUnsafe)
 import Stark.Types.Scalar (integerToScalar)
 import Test.Syd (Spec, describe, liftIO, expectationFailure, it, shouldBe)
@@ -30,21 +28,10 @@ import Text.Parsec (SourcePos)
 spec :: Spec
 spec =
   describe "Sudoku" $ do
-    let sudokuSpecFile = "examples/sudoku.osl"
-    sudokuSpecTxt <- pack <$> liftIO (readFile sudokuSpecFile)
-    case tokenize sudokuSpecFile sudokuSpecTxt of
-      Right toks ->
-        case parseContext sudokuSpecFile toks of
-          Right rawCtx ->
-            case validateContext rawCtx of
-              Right validCtx ->
-                spec' validCtx
-              Left err -> liftIO . expectationFailure $
-                "invalid context: " <> show err
-          Left err -> liftIO . expectationFailure $
-            "parse error: " <> show err
-      Left err -> liftIO . expectationFailure $
-        "tokenizing error: " <> show err
+    mctx <- loadContext (FileName "examples/sudoku.osl")
+    case mctx of
+      Left err -> liftIO . expectationFailure $ show err
+      Right c -> spec' c
 
 spec' :: ValidContext 'Global SourcePos -> Spec
 spec' c = do
