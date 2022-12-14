@@ -9,7 +9,6 @@ module OSL.Spec.SudokuSpec (spec) where
 
 import Control.Lens ((^.))
 import Control.Monad (forM_)
-import Data.Either.Combinators (mapLeft)
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -75,14 +74,10 @@ exampleSpec c = do
           Just v -> (cell, v) `shouldBe` (cell, unSolution exampleSolution cell)
 
   it "Sudoku spec is satisfied on a true example" $
-    -- limiting the length of the error message prevents excessive computation
-    mapLeft
-      (take 1000 . show)
-      ( satisfiesSimple
-          c
-          (getNamedTermUnsafe c "problemIsSolvable")
-          (exampleArgument c)
-      )
+    satisfiesSimple
+      c
+      (getNamedTermUnsafe c "problemIsSolvable")
+      (exampleArgument c)
       `shouldBe` Right True
 
 exampleArgument :: ValidContext 'Global ann -> Argument

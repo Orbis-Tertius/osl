@@ -6,7 +6,9 @@
 module OSL.Satisfaction (satisfies, satisfiesSimple) where
 
 import Control.Lens ((^.))
+import Data.Either.Combinators (mapLeft)
 import qualified Data.Map as Map
+import qualified Data.Text as Text
 import Data.Tuple.Extra (curry3)
 import OSL.Evaluation (evaluate)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement))
@@ -20,7 +22,10 @@ import OSL.ValidateContext (inferType)
 satisfiesSimple :: (Ord ann, Show ann) => ValidContext 'Global ann -> Term ann -> Argument -> Either (ErrorMessage ann) Bool
 satisfiesSimple c x arg = do
   xT <- inferType c x
-  satisfies c (ValidContext (c ^. #unValidContext)) mempty xT x arg
+  -- limiting the length of the error message prevents excessive computation,
+  -- which is useful in order to be able to see the cause of the error
+  mapLeft (\err -> ErrorMessage (err ^. #annotation) (Text.take 1000 (err ^. #message))) $
+    satisfies c (ValidContext (c ^. #unValidContext)) mempty xT x arg
 
 satisfies :: (Ord ann, Show ann) => ValidContext 'Global ann -> ValidContext 'Local ann -> EvaluationContext ann -> Type ann -> Term ann -> Argument -> Either (ErrorMessage ann) Bool
 satisfies gc lc e = curry3 $
