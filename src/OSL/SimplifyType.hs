@@ -202,6 +202,7 @@ complexifyValue c =
               Just _ ->
                 case z of
                   Pair' x y -> Pair' <$> rec a x <*> rec b y
+                  -- Fin' 0 -> Pair' <$> rec a (Fin' 0) <*> rec b (Fin' 0)
                   _ -> Left . ErrorMessage ann $
                     "complexifyValue: type error; expected a pair"
       (Coproduct _ann a _b, Iota1' x) ->

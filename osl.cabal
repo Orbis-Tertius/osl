@@ -88,7 +88,6 @@ library
     OSL.Types.FileName
     OSL.Types.Keyword
     OSL.Types.OSL
-    OSL.Types.PreprocessedWitness
     OSL.Types.PreValue
     OSL.Types.Sigma11
     OSL.Types.Token
