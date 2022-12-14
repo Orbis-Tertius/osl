@@ -13,6 +13,7 @@ import OSL.Types.Argument (Argument (Argument), Statement (Statement))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.OSL (ContextType (Global, Local), Declaration (FreeVariable, Defined), Term (Lambda, NamedTerm), Type (F), ValidContext (ValidContext))
+import OSL.Types.PreValue (PreValue (Value))
 import OSL.Types.Value (Value (Bool, Pair'))
 import OSL.ValidateContext (inferType)
 import OSL.Witness (preprocessWitness)
@@ -22,7 +23,7 @@ satisfiesSimple c x arg = do
   xT <- inferType c x
   satisfies c (ValidContext (c ^. #unValidContext)) mempty xT x arg
 
-satisfies :: (Ord ann, Show ann) => ValidContext 'Global ann -> ValidContext 'Local ann -> EvaluationContext -> Type ann -> Term ann -> Argument -> Either (ErrorMessage ann) Bool
+satisfies :: (Ord ann, Show ann) => ValidContext 'Global ann -> ValidContext 'Local ann -> EvaluationContext ann -> Type ann -> Term ann -> Argument -> Either (ErrorMessage ann) Bool
 satisfies gc lc e = curry3 $
   \case
     ( F _ann _n a b,
@@ -32,7 +33,7 @@ satisfies gc lc e = curry3 $
         satisfies
           gc
           (lc <> ValidContext (Map.singleton v (FreeVariable a)))
-          (e <> EvaluationContext (Map.singleton v vs))
+          (e <> EvaluationContext (Map.singleton v (Value vs)))
           b
           body
           (Argument (Statement s') w)

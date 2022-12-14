@@ -20,15 +20,15 @@ def getCell : Square → SquareCell → Cell
 
 def solutionIsWellFormed : Solution → Prop
   := λs : Solution
-  ⇨ let f : Cell → Digit := from(Solution)(s);
+  ⇨ let f : Cell →^81 Digit := from(Solution)(s);
      (∀r : Row, ∀v : Digit, ∃c : Col, f(to(Cell)((r,c))) = v)
    ∧ (∀c : Col, ∀v : Digit, ∃r : Row, f(to(Cell)((r,c))) = v)
    ∧ (∀r : Square, ∀v : Digit, ∃c : SquareCell, f(getCell(r,c)) = v).
 
 def solutionMatchesProblem : Problem → Solution → Prop
   := λp : Problem ⇨ λs : Solution
-  ⇨ let f : Cell → Maybe(Digit) := from(Problem)(p);
-    let g : Cell → Digit := from(Solution)(s);
+  ⇨ let f : Cell →^81 Maybe(Digit) := from(Problem)(p);
+    let g : Cell →^81 Digit := from(Solution)(s);
     ∀c : Cell, ((f(c) = nothing) ∨ (f(c) = just(g(c)))).
 
 def problemIsSolvable : Problem → Prop

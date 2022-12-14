@@ -16,6 +16,7 @@ import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext)
 import OSL.Types.OSL (Term (AddFp, AddN, AddZ, And, Apply, Bottom, Cast, ConstF, ConstFin, ConstFp, ConstN, ConstSet, ConstZ, Equal, Exists, ForAll, ForSome, From, FunctionCoproduct, FunctionProduct, Iff, Implies, Inverse, Iota1, Iota2, IsNothing, Just', Keys, Lambda, Length, LessOrEqual, Let, ListCast, ListFrom, ListLength, ListMaybeFrom, ListMaybeLength, ListMaybePi1, ListMaybePi2, ListMaybeTo, ListPi1, ListPi2, ListTo, Lookup, MapFrom, MapPi1, MapPi2, MapTo, MaxFp, MaxN, MaxZ, Maybe', MaybeFrom, MaybePi1, MaybePi2, MaybeTo, MulFp, MulN, MulZ, NamedTerm, Not, Nothing', Nth, Or, Pair, Pi1, Pi2, Sum, SumListLookup, SumMapLength, To, Top))
 import OSL.Types.PreprocessedWitness (PreprocessedWitness (PreprocessedWitness))
+import OSL.Types.PreValue (PreValue (Value))
 import OSL.Types.Value (Value (Fun, Pair'))
 
 preprocessWitness :: Ord ann => Term ann -> Witness -> Either (ErrorMessage ann) (PreprocessedWitness ann)
@@ -140,7 +141,7 @@ getDirectSubformulas =
     To {} -> mempty
     Top _ -> mempty
 
-getDirectSubformulasAndPairedWitnesses :: Term ann -> Witness -> EvaluationContext -> Either (ErrorMessage ann) [(Term ann, Witness)]
+getDirectSubformulasAndPairedWitnesses :: Term ann -> Witness -> EvaluationContext ann -> Either (ErrorMessage ann) [(Term ann, Witness)]
 getDirectSubformulasAndPairedWitnesses x w e =
   case x of
     NamedTerm {} -> pure mempty
@@ -223,7 +224,7 @@ getDirectSubformulasAndPairedWitnesses x w e =
     Bottom _ -> pure mempty
     ForAll ann v _a _bound p ->
       case Map.lookup v (e ^. #unEvaluationContext) of
-        Just vv ->
+        Just (Value vv) ->
           case w of
             Witness (Fun f) ->
               case Map.lookup vv f of
@@ -234,6 +235,9 @@ getDirectSubformulasAndPairedWitnesses x w e =
             _ ->
               Left . ErrorMessage ann $
                 "witness type does not match context; expected a function"
+        Just _ ->
+          Left . ErrorMessage ann $
+            "universal variable evaluation does not match context; expected a value"
         Nothing ->
           Left . ErrorMessage ann $
             "universal quantifier variable is undefined in the current evaluation context"

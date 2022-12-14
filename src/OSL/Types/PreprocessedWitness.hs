@@ -13,7 +13,7 @@ import OSL.Types.Value (Value)
 newtype PreprocessedWitness ann = PreprocessedWitness
   { unPreprocessedWitness ::
       ann ->
-      EvaluationContext ->
+      EvaluationContext ann ->
       Either (ErrorMessage ann) Value
   }
   deriving (Generic)
