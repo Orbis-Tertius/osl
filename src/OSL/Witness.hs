@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -10,17 +11,18 @@ import Control.Lens ((^.))
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Die (die)
 import OSL.Term (termAnnotation)
 import OSL.Types.Argument (Witness (Witness))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext)
-import OSL.Types.OSL (Term (AddFp, AddN, AddZ, And, Apply, Bottom, Cast, ConstF, ConstFin, ConstFp, ConstN, ConstSet, ConstZ, Equal, Exists, ForAll, ForSome, From, FunctionCoproduct, FunctionProduct, Iff, Implies, Inverse, Iota1, Iota2, IsNothing, Just', Keys, Lambda, Length, LessOrEqual, Let, ListCast, ListFrom, ListLength, ListMaybeFrom, ListMaybeLength, ListMaybePi1, ListMaybePi2, ListMaybeTo, ListPi1, ListPi2, ListTo, Lookup, MapFrom, MapPi1, MapPi2, MapTo, MaxFp, MaxN, MaxZ, Maybe', MaybeFrom, MaybePi1, MaybePi2, MaybeTo, MulFp, MulN, MulZ, NamedTerm, Not, Nothing', Nth, Or, Pair, Pi1, Pi2, Sum, SumListLookup, SumMapLength, To, Top))
+import OSL.Types.OSL (Term (AddFp, AddN, AddZ, And, Apply, Bottom, Cast, ConstF, ConstFin, ConstFp, ConstN, ConstSet, ConstZ, Equal, Exists, ForAll, ForSome, From, FunctionCoproduct, FunctionProduct, Iff, Implies, Inverse, Iota1, Iota2, IsNothing, Just', Keys, Lambda, Length, LessOrEqual, Let, ListCast, ListFrom, ListLength, ListMaybeFrom, ListMaybeLength, ListMaybePi1, ListMaybePi2, ListMaybeTo, ListPi1, ListPi2, ListTo, Lookup, MapFrom, MapPi1, MapPi2, MapTo, MaxFp, MaxN, MaxZ, Maybe', MaybeFrom, MaybePi1, MaybePi2, MaybeTo, MulFp, MulN, MulZ, NamedTerm, Not, Nothing', Nth, Or, Pair, Pi1, Pi2, Sum, SumListLookup, SumMapLength, To, Top), ValidContext, ContextType (Local), Declaration (Defined, FreeVariable))
 import OSL.Types.PreprocessedWitness (PreprocessedWitness (PreprocessedWitness))
 import OSL.Types.PreValue (PreValue (Value))
 import OSL.Types.Value (Value (Fun, Pair'))
 
-preprocessWitness :: Ord ann => Term ann -> Witness -> Either (ErrorMessage ann) (PreprocessedWitness ann)
-preprocessWitness x0 w0 =
+preprocessWitness :: Ord ann => (ann -> ValidContext 'Local ann) -> Term ann -> Witness -> Either (ErrorMessage ann) (PreprocessedWitness ann)
+preprocessWitness lc x0 w0 =
   pure $ PreprocessedWitness (go x0 w0)
   where
     go x (Witness w) ann e =
@@ -41,14 +43,14 @@ preprocessWitness x0 w0 =
           Just (Telescope (t0 : t1 : _)) ->
             if t0 == x
               then do
-                branches <- getDirectSubformulasAndPairedWitnesses x (Witness w) e
+                branches <- getDirectSubformulasAndPairedWitnesses lc x (Witness w) e
                 case find ((== termAnnotation t1) . termAnnotation . fst) branches of
                   Just (u, v) -> go u v ann e
                   Nothing ->
                     Left . ErrorMessage ann $
                       "telescope traversal failed (this is a compiler bug)"
               else pure w
-    telescopes = getSubformulaTelescopes x0
+    telescopes = getSubformulaTelescopes lc x0
 
 -- The telescope of a subterm is the sequence of its enclosing subterms, beginning with
 -- the overall term and ending with the subterm itself. Having the telescope
@@ -59,21 +61,26 @@ newtype Telescope ann = Telescope [Term ann]
   deriving newtype (Eq, Ord, Show, Semigroup, Monoid)
 
 -- Get the map of subformula annotations to their telescopes.
-getSubformulaTelescopes :: Ord ann => Term ann -> Map ann (Telescope ann)
-getSubformulaTelescopes x =
+getSubformulaTelescopes :: Ord ann => (ann -> ValidContext 'Local ann) -> Term ann -> Map ann (Telescope ann)
+getSubformulaTelescopes lc x =
   let t = Telescope [x]
-      ts = mconcat $ getSubformulaTelescopes <$> getDirectSubformulas x
+      ts = mconcat $ getSubformulaTelescopes lc <$> getDirectSubformulas lc x
    in ((t <>) <$> ts) <> Map.singleton (termAnnotation x) t
 
-getDirectSubformulas :: Term ann -> [Term ann]
-getDirectSubformulas =
+getDirectSubformulas :: (ann -> ValidContext 'Local ann) -> Term ann -> [Term ann]
+getDirectSubformulas lc =
   \case
-    NamedTerm {} -> mempty
+    NamedTerm ann name ->
+      case Map.lookup name (lc ann ^. #unValidContext) of
+        Just (Defined _ def) ->
+          getDirectSubformulas lc def
+        Just (FreeVariable _) -> mempty
+        _ -> die "getDirectSubformulas: expected the name of a term (this is a compiler bug)"
     AddN _ -> mempty
     AddFp _ -> mempty
     AddZ _ -> mempty
     And _ p q -> [p, q]
-    Apply _ f z -> [f, z]
+    Apply _ f _ -> [f]
     Bottom _ -> mempty
     Cast _ -> mempty
     ConstF {} -> mempty
@@ -141,10 +148,15 @@ getDirectSubformulas =
     To {} -> mempty
     Top _ -> mempty
 
-getDirectSubformulasAndPairedWitnesses :: Term ann -> Witness -> EvaluationContext ann -> Either (ErrorMessage ann) [(Term ann, Witness)]
-getDirectSubformulasAndPairedWitnesses x w e =
+getDirectSubformulasAndPairedWitnesses :: (ann -> ValidContext 'Local ann) -> Term ann -> Witness -> EvaluationContext ann -> Either (ErrorMessage ann) [(Term ann, Witness)]
+getDirectSubformulasAndPairedWitnesses lc x w e =
   case x of
-    NamedTerm {} -> pure mempty
+    NamedTerm ann name ->
+      case Map.lookup name (lc ann ^. #unValidContext) of
+        Just (Defined _ def) ->
+          getDirectSubformulasAndPairedWitnesses lc def w e -- TODO: does e need to change?
+        Just (FreeVariable _) -> pure mempty
+        _ -> die "getDirectSubformulasAndPairedWitnesses: expected the name of a term (this is a compiler bug)"
     AddN _ -> pure mempty
     MulN _ -> pure mempty
     ConstN {} -> pure mempty
