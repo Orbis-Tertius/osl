@@ -8,6 +8,7 @@
 module OSL.Spec.SudokuSpec (spec) where
 
 import Control.Lens ((^.))
+import Control.Monad (forM_)
 import Data.Either.Combinators (mapLeft)
 import Data.List (find)
 import Data.Map (Map)
@@ -38,7 +39,8 @@ spec =
 
 spec' :: ValidContext 'Global SourcePos -> Spec
 spec' c = do
-  argumentFormSpec c
+  describe "argument form" $ argumentFormSpec c
+  describe "example" $ exampleSpec c
 
 argumentFormSpec :: ValidContext 'Global SourcePos -> Spec
 argumentFormSpec c = do
@@ -60,7 +62,16 @@ argumentFormSpec c = do
   it "has the correct simplified witness type" $
     simplifyType complexWitnessType `shouldBe` Just simpleWitnessType
 
-  it "is satisfied on a true example" $
+exampleSpec :: ValidContext 'Global SourcePos -> Spec
+exampleSpec c = do
+  it "example problem matches example solution" $
+    forM_ (Cell <$> ((,) <$> [0..8] <*> [0..8])) $
+      \cell ->
+        case unProblem exampleProblem cell of
+          Nothing -> pure ()
+          Just v -> (cell, v) `shouldBe` (cell, unSolution exampleSolution cell)
+
+  it "Sudoku spec is satisfied on a true example" $
     -- limiting the length of the error message prevents excessive computation
     mapLeft (take 1000 . show) (satisfiesSimple c
       (getNamedTermUnsafe c "problemIsSolvable")
@@ -88,8 +99,8 @@ exampleProblemMap =
   Map.fromList
   [ (Cell (0, 3), 1),
     (Cell (0, 4), 5),
-    (Cell (0, 6), 7),
-    (Cell (0, 8), 1),
+    (Cell (0, 6), 6),
+    (Cell (0, 8), 0),
     (Cell (1, 0), 5),
     (Cell (1, 1), 7),
     (Cell (1, 4), 6),
@@ -114,10 +125,10 @@ exampleProblemMap =
     (Cell (6, 3), 2),
     (Cell (6, 7), 6),
     (Cell (6, 8), 3),
-    (Cell (7, 2), 3),
+    (Cell (7, 2), 7),
     (Cell (7, 4), 4),
     (Cell (7, 7), 2),
-    (Cell (7, 8), 6),
+    (Cell (7, 8), 5),
     (Cell (8, 0), 6),
     (Cell (8, 2), 2),
     (Cell (8, 4), 0),
@@ -158,20 +169,20 @@ exampleWitness =
     Nothing -> die "exampleWitness: failed to create a witness"
 
 newtype Digit = Digit Integer
-  deriving (Eq, Ord, Num, Enum)
+  deriving (Eq, Ord, Num, Enum, Show)
 
 newtype Row = Row Integer
-  deriving (Eq, Ord, Num, Enum)
+  deriving (Eq, Ord, Num, Enum, Show)
 
 newtype Col = Col Integer
-  deriving (Eq, Ord, Num, Enum)
+  deriving (Eq, Ord, Num, Enum, Show)
 
 newtype Cell = Cell (Row, Col)
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
-newtype Problem = Problem (Cell -> Maybe Digit)
+newtype Problem = Problem { unProblem :: Cell -> Maybe Digit }
 
-newtype Solution = Solution (Cell -> Digit)
+newtype Solution = Solution { unSolution :: Cell -> Digit }
 
 newtype X = X Integer
   deriving (Eq, Ord, Num, Enum)
