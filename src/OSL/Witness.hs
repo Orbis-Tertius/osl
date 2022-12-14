@@ -8,12 +8,15 @@
 module OSL.Witness (preprocessWitness) where
 
 import Control.Lens ((^.))
-import Control.Monad.Trans.State (State, evalState, get, put)
+import Control.Monad (when)
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.State (State, evalState, evalStateT, get, put)
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Text (pack)
 import Die (die)
 import OSL.Term (termAnnotation)
 import OSL.Types.Argument (Witness (Witness))
@@ -24,33 +27,43 @@ import OSL.Types.PreprocessedWitness (PreprocessedWitness (PreprocessedWitness))
 import OSL.Types.PreValue (PreValue (Value))
 import OSL.Types.Value (Value (Fun, Pair'))
 
-preprocessWitness :: Ord ann => (ann -> ValidContext 'Local ann) -> Term ann -> Witness -> Either (ErrorMessage ann) (PreprocessedWitness ann)
+preprocessWitness ::
+  (Ord ann, Show ann) =>
+  (ann -> ValidContext 'Local ann) ->
+  Term ann ->
+  Witness ->
+  Either (ErrorMessage ann) (PreprocessedWitness ann)
 preprocessWitness lc x0 w0 =
-  pure $ PreprocessedWitness (go x0 w0)
+  pure $ PreprocessedWitness (\ann e -> go x0 w0 ann e `evalStateT` mempty)
   where
-    go x (Witness w) ann e =
-      if termAnnotation x == ann
+    go x (Witness w) ann e = do
+      let xAnn = termAnnotation x
+      visited <- get
+      when (xAnn `Set.member` visited) . lift . Left . ErrorMessage ann
+        $ "preprocessWitness: go: infinite loop detected: " <> pack (show ann)
+      put (visited <> Set.singleton xAnn)
+      if xAnn == ann
         then case x of
           ForSome {} ->
-            (^. #unWitness) . fst <$> splitWitness ann (Witness w)
+            (^. #unWitness) . fst <$> lift (splitWitness ann (Witness w))
           _ ->
-            Left . ErrorMessage ann $
+            lift . Left . ErrorMessage ann $
               "tried to apply preprocessed witness to the annotation of a term which is not an existential quantifier (this is a compiler bug)"
         else -- traverse term and witness
         case Map.lookup ann telescopes of
-          Nothing -> Left . ErrorMessage ann $ "telescope not found (this is a compiler bug)"
+          Nothing -> lift . Left . ErrorMessage ann $ "telescope not found (this is a compiler bug)"
           Just (Telescope []) ->
-            Left . ErrorMessage ann $ "empty telescope (this is a compiler bug)"
+            lift . Left . ErrorMessage ann $ "empty telescope (this is a compiler bug)"
           Just (Telescope [_]) ->
-            Left . ErrorMessage ann $ "premature end of telescope (this is a compiler bug)"
+            lift . Left . ErrorMessage ann $ "premature end of telescope (this is a compiler bug)"
           Just (Telescope (t0 : t1 : _)) ->
             if t0 == x
               then do
-                branches <- getDirectSubformulasAndPairedWitnesses lc x (Witness w) e
+                branches <- lift $ getDirectSubformulasAndPairedWitnesses lc x (Witness w) e
                 case find ((== termAnnotation t1) . termAnnotation . fst) branches of
                   Just (u, v) -> go u v ann e
                   Nothing ->
-                    Left . ErrorMessage ann $
+                    lift . Left . ErrorMessage ann $
                       "telescope traversal failed (this is a compiler bug)"
               else pure w
     telescopes = getSubformulaTelescopes lc x0 `evalState` mempty
@@ -85,8 +98,7 @@ getDirectSubformulas lc =
   \case
     NamedTerm ann name ->
       case Map.lookup name (lc ann ^. #unValidContext) of
-        Just (Defined _ def) ->
-          getDirectSubformulas lc def
+        Just (Defined _ def) -> [def]
         Just (FreeVariable _) -> mempty
         _ -> die "getDirectSubformulas: expected the name of a term (this is a compiler bug)"
     AddN _ -> mempty
@@ -167,7 +179,7 @@ getDirectSubformulasAndPairedWitnesses lc x w e =
     NamedTerm ann name ->
       case Map.lookup name (lc ann ^. #unValidContext) of
         Just (Defined _ def) ->
-          getDirectSubformulasAndPairedWitnesses lc def w e -- TODO: does e need to change?
+          pure [(def, w)]
         Just (FreeVariable _) -> pure mempty
         _ -> die "getDirectSubformulasAndPairedWitnesses: expected the name of a term (this is a compiler bug)"
     AddN _ -> pure mempty
