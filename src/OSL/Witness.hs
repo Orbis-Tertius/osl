@@ -7,7 +7,7 @@
 
 module OSL.Witness (preprocessWitness) where
 
-import Control.Lens ((^.))
+import Control.Lens ((^.), _1)
 import Control.Monad (when)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.State (State, evalState, evalStateT, get, put)
@@ -60,8 +60,8 @@ preprocessWitness lc x0 w0 =
             if t0 == x
               then do
                 branches <- lift $ getDirectSubformulasAndPairedWitnesses lc x (Witness w) e
-                case find ((== termAnnotation t1) . termAnnotation . fst) branches of
-                  Just (u, v) -> go u v ann e
+                case find ((== termAnnotation t1) . termAnnotation . (^. _1)) branches of
+                  Just (u, v, e') -> go u v ann e'
                   Nothing ->
                     lift . Left . ErrorMessage ann $
                       "telescope traversal failed (this is a compiler bug)"
@@ -173,13 +173,18 @@ getDirectSubformulas lc =
     To {} -> mempty
     Top _ -> mempty
 
-getDirectSubformulasAndPairedWitnesses :: (ann -> ValidContext 'Local ann) -> Term ann -> Witness -> EvaluationContext ann -> Either (ErrorMessage ann) [(Term ann, Witness)]
+getDirectSubformulasAndPairedWitnesses ::
+  (ann -> ValidContext 'Local ann) ->
+  Term ann ->
+  Witness ->
+  EvaluationContext ann ->
+  Either (ErrorMessage ann) [(Term ann, Witness, EvaluationContext ann)]
 getDirectSubformulasAndPairedWitnesses lc x w e =
   case x of
     NamedTerm ann name ->
       case Map.lookup name (lc ann ^. #unValidContext) of
         Just (Defined _ def) ->
-          pure [(def, w)]
+          pure [(def, w, die "TODO")]
         Just (FreeVariable _) -> pure mempty
         _ -> die "getDirectSubformulasAndPairedWitnesses: expected the name of a term (this is a compiler bug)"
     AddN _ -> pure mempty
@@ -203,7 +208,7 @@ getDirectSubformulasAndPairedWitnesses lc x w e =
     Iota2 _ -> pure mempty
     FunctionProduct {} -> pure mempty
     FunctionCoproduct {} -> pure mempty
-    Lambda _ann _v _a body -> pure [(body, w)]
+    Lambda _ann _v _a body -> pure [(body, w, die "TODO")]
     Apply _ann f z -> pure [(f, w), (z, w)]
     To {} -> pure mempty
     From {} -> pure mempty
