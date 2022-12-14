@@ -6,15 +6,18 @@
 module OSL.ArgumentForm (getArgumentForm) where
 
 import Control.Lens ((^.))
+import Data.Map (Map)
 import qualified Data.Map as Map
 import OSL.Type (dropTypeAnnotations)
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.OSL (ContextType (Global), Declaration (Defined), Term (AddFp, AddN, AddZ, And, Apply, Bottom, Cast, ConstF, ConstFin, ConstFp, ConstN, ConstSet, ConstZ, Equal, Exists, ForAll, ForSome, From, FunctionCoproduct, FunctionProduct, Iff, Implies, Inverse, Iota1, Iota2, IsNothing, Just', Keys, Lambda, Length, LessOrEqual, Let, ListCast, ListFrom, ListLength, ListMaybeFrom, ListMaybeLength, ListMaybePi1, ListMaybePi2, ListMaybeTo, ListPi1, ListPi2, ListTo, Lookup, MapFrom, MapPi1, MapPi2, MapTo, MaxFp, MaxN, MaxZ, Maybe', MaybeFrom, MaybePi1, MaybePi2, MaybeTo, MulFp, MulN, MulZ, NamedTerm, Not, Nothing', Nth, Or, Pair, Pi1, Pi2, Sum, SumListLookup, SumMapLength, To, Top), Type (Coproduct, F, Fin, Fp, List, Map, Maybe, N, NamedType, P, Product, Prop, Z), ValidContext)
+import OSL.Types.OSL (ContextType (Global, Local), Declaration (Defined, FreeVariable), Name, Term (AddFp, AddN, AddZ, And, Apply, Bottom, Cast, ConstF, ConstFin, ConstFp, ConstN, ConstSet, ConstZ, Equal, Exists, ForAll, ForSome, From, FunctionCoproduct, FunctionProduct, Iff, Implies, Inverse, Iota1, Iota2, IsNothing, Just', Keys, Lambda, Length, LessOrEqual, Let, ListCast, ListFrom, ListLength, ListMaybeFrom, ListMaybeLength, ListMaybePi1, ListMaybePi2, ListMaybeTo, ListPi1, ListPi2, ListTo, Lookup, MapFrom, MapPi1, MapPi2, MapTo, MaxFp, MaxN, MaxZ, Maybe', MaybeFrom, MaybePi1, MaybePi2, MaybeTo, MulFp, MulN, MulZ, NamedTerm, Not, Nothing', Nth, Or, Pair, Pi1, Pi2, Sum, SumListLookup, SumMapLength, To, Top), Type (Coproduct, F, Fin, Fp, List, Map, Maybe, N, NamedType, P, Product, Prop, Z), ValidContext (ValidContext))
 
 getArgumentForm :: ValidContext 'Global ann -> Type ann -> Term ann -> Either (ErrorMessage ann) ArgumentForm
-getArgumentForm c t x =
-  ArgumentForm <$> getStatementType c t <*> getWitnessType c x
+getArgumentForm gc t x =
+  ArgumentForm <$> getStatementType gc t <*> getWitnessType gc lc (ContextBacklinks mempty) x
+  where
+    lc = ValidContext (gc ^. #unValidContext)
 
 getStatementType :: ValidContext 'Global ann -> Type ann -> Either (ErrorMessage ann) StatementType
 getStatementType c =
@@ -64,30 +67,51 @@ getStatementType c =
     prod (StatementType a) (StatementType b) =
       StatementType (Product () a b)
 
--- TODO: must carry local context around to correctly handle
--- Prop-valued lambdas in let expressions.
-getWitnessType :: ValidContext 'Global ann -> Term ann -> Either (ErrorMessage ann) WitnessType
-getWitnessType c =
+newtype ContextBacklinks ann = ContextBacklinks
+  { unContextBacklinks ::
+      Map Name (ValidContext 'Local ann, ContextBacklinks ann)
+  }
+
+getWitnessType ::
+  ValidContext 'Global ann ->
+  ValidContext 'Local ann ->
+  ContextBacklinks ann ->
+  Term ann ->
+  Either (ErrorMessage ann) WitnessType
+getWitnessType gc lc lcs =
   \case
     Top _ -> pure empty
     Bottom _ -> pure empty
-    ForAll _ _ a _ p -> do
-      WitnessType pT <- rec p
+    ForAll _ v a _ p -> do
+      let lc' = lc <> ValidContext (Map.singleton v (FreeVariable a))
+      WitnessType pT <- rec lc' lcs p
       pure (WitnessType (F () Nothing (dropTypeAnnotations a) pT))
-    ForSome _ _ a _ p ->
-      prod (WitnessType (dropTypeAnnotations a)) <$> rec p
-    Let _ _ _ _ body -> rec body
-    Lambda _ _ _ body -> rec body
+    ForSome _ v a _ p -> do
+      let lc' = lc <> ValidContext (Map.singleton v (FreeVariable a))
+      prod (WitnessType (dropTypeAnnotations a)) <$> rec lc' lcs p
+    Let _ v a def body -> do
+      let lc' = lc <> ValidContext (Map.singleton v (Defined a def))
+          lcs' = ContextBacklinks (Map.insert v (lc, lcs) (unContextBacklinks lcs))
+      rec lc' lcs' body
+    Lambda _ v a body -> do
+      let lc' = lc <> ValidContext (Map.singleton v (FreeVariable a))
+          lcs' = ContextBacklinks (Map.insert v (lc, lcs) (unContextBacklinks lcs))
+      rec lc' lcs' body
     NamedTerm ann name ->
-      case Map.lookup name (c ^. #unValidContext) of
-        Just (Defined _ def) -> rec def
+      case Map.lookup name (lc ^. #unValidContext) of
+        Just (Defined _ def) ->
+          case Map.lookup name (unContextBacklinks lcs) of
+            Just (lc', lcs') ->
+              rec lc' lcs' def
+            Nothing ->
+              rec gcAsLc (ContextBacklinks mempty) def
         _ -> Left . ErrorMessage ann $ "undefined term"
-    Apply _ f _ -> rec f
-    Iff _ p q -> prod <$> rec p <*> rec q
-    Implies _ p q -> prod <$> rec p <*> rec q
-    Not _ p -> rec p
-    Or _ p q -> prod <$> rec p <*> rec q
-    And _ p q -> prod <$> rec p <*> rec q
+    Apply _ f _ -> rec lc lcs f
+    Iff _ p q -> prod <$> rec lc lcs p <*> rec lc lcs q
+    Implies _ p q -> prod <$> rec lc lcs p <*> rec lc lcs q
+    Not _ p -> rec lc lcs p
+    Or _ p q -> prod <$> rec lc lcs p <*> rec lc lcs q
+    And _ p q -> prod <$> rec lc lcs p <*> rec lc lcs q
     LessOrEqual {} -> pure empty
     Equal {} -> pure empty
     SumListLookup {} -> pure empty
@@ -148,7 +172,7 @@ getWitnessType c =
     MulN {} -> pure empty
     ListLength {} -> pure empty
   where
-    rec = getWitnessType c
+    rec = getWitnessType gc
 
     empty :: WitnessType
     empty = WitnessType (Fin () 1)
@@ -156,3 +180,5 @@ getWitnessType c =
     prod :: WitnessType -> WitnessType -> WitnessType
     prod (WitnessType a) (WitnessType b) =
       WitnessType (Product () a b)
+
+    gcAsLc = ValidContext (gc ^. #unValidContext)

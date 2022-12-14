@@ -114,14 +114,14 @@ exampleUnsoundArgument c =
             complexStatementType
             (problemToValue unsoundExampleProblem)
         )
-     )
-     ( Witness
+    )
+    ( Witness
         ( complexifyValueUnsafe
             c
             complexWitnessType
             (sudokuWitnessToValue exampleWitness)
         )
-     )
+    )
 
 exampleProblem :: Problem
 exampleProblem =
