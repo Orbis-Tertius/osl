@@ -374,12 +374,12 @@ evaluate' gc lc t x w e = do
           Left . ErrorMessage ann $
             "expected the name of a type"
     From ann _ -> partialApplication "From" ann
-    Let _ v a d y -> do
-      -- TODO: correctly handle Prop-valued let expressions in lambdas
-      d' <- rec' a d (Witness (Fin' 0)) e
+    Let ann v a d y -> do
+      (w0, w1) <- splitWitness ann w
+      d' <- rec' a d w0 e
       let lc' = lc <> ValidContext (Map.singleton v (FreeVariable a))
       let e' = e <> EvaluationContext (Map.singleton v d')
-      evaluate' gc lc' t y w e'
+      evaluate' gc lc' t y w1 e'
     Apply ann (IsNothing _) y -> do
       yT <- inferType lc y
       y' <- rec yT y w e

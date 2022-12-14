@@ -369,59 +369,71 @@ complexWitnessType =
     (NamedType () "Solution")
     ( Product
         ()
-        ( F
+        ( Product
             ()
-            Nothing
-            (NamedType () "Cell")
-            (Product () (Fin () 1) (Fin () 1))
+            (Fin () 1)
+            ( Product
+                ()
+                (Fin () 1)
+                ( F
+                    ()
+                    Nothing
+                    (NamedType () "Cell")
+                    (Product () (Fin () 1) (Fin () 1))
+                )
+            )
         )
         ( Product
             ()
+            (Fin () 1)
             ( Product
                 ()
-                ( F
+                ( Product
                     ()
-                    Nothing
-                    (NamedType () "Row")
                     ( F
                         ()
                         Nothing
-                        (NamedType () "Digit")
-                        ( Product
+                        (NamedType () "Row")
+                        ( F
                             ()
-                            (NamedType () "Col")
-                            (Fin () 1)
+                            Nothing
+                            (NamedType () "Digit")
+                            ( Product
+                                ()
+                                (NamedType () "Col")
+                                (Fin () 1)
+                            )
+                        )
+                    )
+                    ( F
+                        ()
+                        Nothing
+                        (NamedType () "Col")
+                        ( F
+                            ()
+                            Nothing
+                            (NamedType () "Digit")
+                            ( Product
+                                ()
+                                (NamedType () "Row")
+                                (Fin () 1)
+                            )
                         )
                     )
                 )
                 ( F
                     ()
                     Nothing
-                    (NamedType () "Col")
+                    (NamedType () "Square")
                     ( F
                         ()
                         Nothing
                         (NamedType () "Digit")
                         ( Product
                             ()
-                            (NamedType () "Row")
+                            (NamedType () "SquareCell")
                             (Fin () 1)
                         )
-                    )
-                )
-            )
-            ( F
-                ()
-                Nothing
-                (NamedType () "Square")
-                ( F
-                    ()
-                    Nothing
-                    (NamedType () "Digit")
-                    ( Product
-                        ()
-                        (NamedType () "SquareCell")
-                        (Fin () 1)
                     )
                 )
             )
