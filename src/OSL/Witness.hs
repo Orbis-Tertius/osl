@@ -8,9 +8,12 @@
 module OSL.Witness (preprocessWitness) where
 
 import Control.Lens ((^.))
+import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Die (die)
 import OSL.Term (termAnnotation)
 import OSL.Types.Argument (Witness (Witness))
@@ -50,7 +53,7 @@ preprocessWitness lc x0 w0 =
                     Left . ErrorMessage ann $
                       "telescope traversal failed (this is a compiler bug)"
               else pure w
-    telescopes = getSubformulaTelescopes lc x0
+    telescopes = getSubformulaTelescopes lc x0 `evalState` mempty
 
 -- The telescope of a subterm is the sequence of its enclosing subterms, beginning with
 -- the overall term and ending with the subterm itself. Having the telescope
@@ -61,11 +64,21 @@ newtype Telescope ann = Telescope [Term ann]
   deriving newtype (Eq, Ord, Show, Semigroup, Monoid)
 
 -- Get the map of subformula annotations to their telescopes.
-getSubformulaTelescopes :: Ord ann => (ann -> ValidContext 'Local ann) -> Term ann -> Map ann (Telescope ann)
-getSubformulaTelescopes lc x =
-  let t = Telescope [x]
-      ts = mconcat $ getSubformulaTelescopes lc <$> getDirectSubformulas lc x
-   in ((t <>) <$> ts) <> Map.singleton (termAnnotation x) t
+-- In order to terminate, it carries a set of annotations that have
+-- been visited.
+getSubformulaTelescopes ::
+  Ord ann =>
+  (ann -> ValidContext 'Local ann) ->
+  Term ann ->
+  State (Set ann) (Map ann (Telescope ann))
+getSubformulaTelescopes lc x = do
+  visited <- get
+  put (Set.singleton (termAnnotation x) <> visited)
+  let newSubformulas = filter (not . (`Set.member` visited) . termAnnotation) $
+        getDirectSubformulas lc x
+      t = Telescope [x]
+  ts <- mconcat <$> mapM (getSubformulaTelescopes lc) newSubformulas
+  pure $ ((t <>) <$> ts) <> Map.singleton (termAnnotation x) t
 
 getDirectSubformulas :: (ann -> ValidContext 'Local ann) -> Term ann -> [Term ann]
 getDirectSubformulas lc =
