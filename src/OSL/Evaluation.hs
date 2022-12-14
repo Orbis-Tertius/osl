@@ -10,7 +10,7 @@ import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Lens ((^.))
-import Control.Monad (join, liftM2, (<=<))
+import Control.Monad (join, liftM2, (<=<), when, void)
 import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -749,9 +749,9 @@ evaluate' gc lc t x w e = do
             Nothing ->
               Left . ErrorMessage ann' $
                 "undefined name"
-    ForSome ann name a _bound y -> do
-      -- TODO: check w is in bound
+    ForSome ann name a bound y -> do
       (Witness w0, w1) <- splitWitness ann w
+      checkValueIsInBound gc lc e a bound w0
       evaluate'
         gc
         (lc <> ValidContext (Map.singleton name (FreeVariable a)))
@@ -1160,3 +1160,34 @@ decodeBool ann =
   \case
     Bool v -> pure v
     _ -> Left . ErrorMessage ann $ "expected a boolean value"
+
+checkValueIsInBound ::
+  Show ann =>
+  ValidContext 'Global ann ->
+  ValidContext 'Local ann ->
+  EvaluationContext ann ->
+  Type ann ->
+  Maybe (Bound ann) ->
+  Value ->
+  Either (ErrorMessage ann) ()
+checkValueIsInBound gc lc e t bound x = do
+  checkValueIsInType lc t x
+  case bound of
+    Nothing -> pure ()
+    Just (ScalarBound ann b) -> do
+      b' <- decodeScalar ann =<< evaluate gc lc t b (Witness (Fin' 0)) e
+      x' <- decodeScalar ann x
+      when (x' >= b') . Left . ErrorMessage ann $ "witness is out of bound"
+    Just (FieldMaxBound ann) ->
+      void $ decodeScalar ann x
+    Just (ProductBound ann (LeftBound a) (RightBound b)) -> do
+      case (t, x) of
+        (Product _ aT bT, Pair' y z) -> do
+          checkValueIsInBound gc lc e aT (Just a) y
+          checkValueIsInBound gc lc e bT (Just b) z
+
+checkValueIsInType :: ValidContext 'Local ann -> Type ann -> Value -> Either (ErrorMessage ann) ()
+checkValueIsInType = todo
+
+todo :: a
+todo = todo
