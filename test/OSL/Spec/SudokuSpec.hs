@@ -80,6 +80,13 @@ exampleSpec c = do
       (exampleArgument c)
       `shouldBe` Right True
 
+  it "Sudoku spec is unsatisfied on a false example" $
+    satisfiesSimple
+      c
+      (getNamedTermUnsafe c "problemIsSolvable")
+      (exampleUnsoundArgument c)
+      `shouldBe` Right False
+
 exampleArgument :: ValidContext 'Global ann -> Argument
 exampleArgument c =
   Argument
@@ -97,6 +104,24 @@ exampleArgument c =
             (sudokuWitnessToValue exampleWitness)
         )
     )
+
+exampleUnsoundArgument :: ValidContext 'Global ann -> Argument
+exampleUnsoundArgument c =
+  Argument
+    ( Statement
+        ( complexifyValueUnsafe
+            c
+            complexStatementType
+            (problemToValue unsoundExampleProblem)
+        )
+     )
+     ( Witness
+        ( complexifyValueUnsafe
+            c
+            complexWitnessType
+            (sudokuWitnessToValue exampleWitness)
+        )
+     )
 
 exampleProblem :: Problem
 exampleProblem =
@@ -146,6 +171,15 @@ exampleProblemMap =
       (Cell (8, 4), 0),
       (Cell (8, 5), 7)
     ]
+
+unsoundExampleProblem :: Problem
+unsoundExampleProblem =
+  Problem $ \cell ->
+    Map.lookup cell unsoundExampleProblemMap
+
+unsoundExampleProblemMap :: Map Cell Digit
+unsoundExampleProblemMap =
+  Map.singleton (Cell (8, 5)) 6
 
 exampleSolution :: Solution
 exampleSolution =
