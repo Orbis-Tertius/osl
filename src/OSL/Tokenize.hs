@@ -12,7 +12,7 @@ import qualified OSL.Types.Keyword as K
 import OSL.Types.OSL (Name (..))
 import OSL.Types.Token (Token)
 import qualified OSL.Types.Token as T
-import Text.Parsec (SourceName, SourcePos, anyChar, char, choice, eof, getPosition, lookAhead, many1, noneOf, oneOf, string, try, (<|>), errorPos)
+import Text.Parsec (SourceName, SourcePos, anyChar, char, choice, eof, errorPos, getPosition, lookAhead, many1, noneOf, oneOf, string, try, (<|>))
 import Text.Parsec.Prim (many, parse)
 import Text.Parsec.Text (Parser)
 

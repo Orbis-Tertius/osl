@@ -14,7 +14,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Die (die)
 import OSL.Term (termAnnotation)
-import OSL.Types.OSL (Declaration (Defined), Name (GenSym, Sym), ValidContext (..), Term (NamedTerm))
+import OSL.Types.OSL (Declaration (Defined), Name (GenSym, Sym), Term (NamedTerm), ValidContext (..))
 
 getNamedTermUnsafe :: ValidContext t ann -> Name -> Term ann
 getNamedTermUnsafe c name =

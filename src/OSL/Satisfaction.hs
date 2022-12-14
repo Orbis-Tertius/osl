@@ -12,7 +12,7 @@ import OSL.Evaluation (evaluate)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
-import OSL.Types.OSL (ContextType (Global, Local), Declaration (FreeVariable, Defined), Term (Lambda, NamedTerm), Type (F), ValidContext (ValidContext))
+import OSL.Types.OSL (ContextType (Global, Local), Declaration (Defined, FreeVariable), Term (Lambda, NamedTerm), Type (F), ValidContext (ValidContext))
 import OSL.Types.PreValue (PreValue (Value))
 import OSL.Types.Value (Value (Bool, Pair'))
 import OSL.ValidateContext (inferType)
@@ -36,16 +36,17 @@ satisfies gc lc e = curry3 $
           b
           body
           (Argument (Statement s') w)
-    ( F {}, Lambda ann _v _a _body, _ ) ->
+    (F {}, Lambda ann _v _a _body, _) ->
       Left . ErrorMessage ann $
         "expected statement to be a pair but it was not"
-    ( _, Lambda ann _v _a _Body, _ ) ->
+    (_, Lambda ann _v _a _Body, _) ->
       Left . ErrorMessage ann $
         "expected lambda type to be a function type but it was not"
     (a, NamedTerm ann name, arg) ->
       case Map.lookup name (lc ^. #unValidContext) of
         Just (Defined _ def) -> satisfies gc lc e a def arg
-        _ -> Left . ErrorMessage ann $
-          "expected the name of a defined predicate"
+        _ ->
+          Left . ErrorMessage ann $
+            "expected the name of a defined predicate"
     (a, x, Argument _ w) -> do
       (== Bool True) <$> evaluate gc lc a x w e

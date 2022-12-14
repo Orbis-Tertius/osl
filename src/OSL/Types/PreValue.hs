@@ -4,8 +4,8 @@ import OSL.Types.ErrorMessage (ErrorMessage)
 import OSL.Types.OSL (Name)
 import OSL.Types.Value (Value)
 
-data PreValue ann =
-    Value Value
+data PreValue ann
+  = Value Value
   | LambdaClosure (PreValue ann -> Either (ErrorMessage ann) (PreValue ann))
   | PrePair (PreValue ann) (PreValue ann)
   | PreTo Name (PreValue ann)

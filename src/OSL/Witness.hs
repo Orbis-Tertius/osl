@@ -6,12 +6,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module OSL.Witness
-  ( splitWitness
-  ) where
+  ( splitWitness,
+  )
+where
 
 import OSL.Types.Argument (Witness (Witness))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.Value (Value (Pair', Fin'))
+import OSL.Types.Value (Value (Fin', Pair'))
 
 splitWitness :: ann -> Witness -> Either (ErrorMessage ann) (Witness, Witness)
 splitWitness ann =

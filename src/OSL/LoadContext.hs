@@ -5,10 +5,10 @@ module OSL.LoadContext (loadContext) where
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Text (pack)
 import OSL.Parse (parseContext)
+import OSL.Tokenize (tokenize)
 import OSL.Types.ErrorMessage (ErrorMessage)
 import OSL.Types.FileName (FileName (FileName))
-import OSL.Types.OSL (ValidContext, ContextType (Global))
-import OSL.Tokenize (tokenize)
+import OSL.Types.OSL (ContextType (Global), ValidContext)
 import OSL.ValidateContext (validateContext)
 import Text.Parsec (SourcePos)
 

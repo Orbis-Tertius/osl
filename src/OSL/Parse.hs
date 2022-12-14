@@ -14,7 +14,7 @@ import qualified OSL.Types.Keyword as K
 import OSL.Types.OSL (Bound (..), Cardinality (..), CodomainBound (..), Context (..), Declaration (..), DomainBound (..), KeysBound (..), LeftBound (..), Name, RightBound (..), Term (..), Type (..), ValuesBound (..))
 import OSL.Types.Token (Token)
 import qualified OSL.Types.Token as T
-import Text.Parsec (Parsec, SourceName, SourcePos, choice, eof, getPosition, many, many1, option, optionMaybe, token, try, (<|>), errorPos)
+import Text.Parsec (Parsec, SourceName, SourcePos, choice, eof, errorPos, getPosition, many, many1, option, optionMaybe, token, try, (<|>))
 import qualified Text.Parsec.Prim as Prim
 
 parseContext ::

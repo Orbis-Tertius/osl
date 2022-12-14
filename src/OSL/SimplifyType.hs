@@ -7,18 +7,19 @@ module OSL.SimplifyType
   ( simplifyType,
     simplifyValue,
     complexifyValue,
-    complexifyValueUnsafe
-  ) where
+    complexifyValueUnsafe,
+  )
+where
 
 import Control.Lens ((^.))
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Die (die)
-import OSL.Type (typeAnnotation, dropTypeAnnotations)
+import OSL.Type (dropTypeAnnotations, typeAnnotation)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.OSL (Type (Prop, F, P, N, Z, Fp, Fin, Product, Coproduct, NamedType, Maybe, List, Map), ValidContext, ContextType (Global), Declaration (Data))
-import OSL.Types.Value (Value (Bool, Fun, Fin', Nat, Int, Fp', Pair', Iota1', Iota2', Maybe'', List'', Map'', To', Maybe''))
+import OSL.Types.OSL (ContextType (Global), Declaration (Data), Type (Coproduct, F, Fin, Fp, List, Map, Maybe, N, NamedType, P, Product, Prop, Z), ValidContext)
+import OSL.Types.Value (Value (Bool, Fin', Fp', Fun, Int, Iota1', Iota2', List'', Map'', Maybe'', Nat, Pair', To'))
 
 -- This operation cannot fail. A result of Nothing
 -- signifies that the type simplifies to the unit type
@@ -80,13 +81,15 @@ simplifyValue =
               Nothing ->
                 case Map.lookup (Fin' 0) f of
                   Just v -> simplifyValue b v
-                  Nothing -> Left . ErrorMessage ann $
-                    "function not defined on value fin(0)"
+                  Nothing ->
+                    Left . ErrorMessage ann $
+                      "function not defined on value fin(0)"
               Just _ ->
-                Fun . Map.fromList <$> sequence
-                  [ (,) <$> simplifyValue a x <*> simplifyValue b y
-                  | (x,y) <- Map.toList f
-                  ]
+                Fun . Map.fromList
+                  <$> sequence
+                    [ (,) <$> simplifyValue a x <*> simplifyValue b y
+                      | (x, y) <- Map.toList f
+                    ]
       (P _ann _n a b, Fun f) ->
         case simplifyType b of
           Nothing -> pure (Fin' 0)
@@ -94,10 +97,11 @@ simplifyValue =
             case simplifyType a of
               Nothing -> pure (Fin' 0)
               Just _ ->
-                Fun . Map.fromList <$> sequence
-                  [ (,) <$> simplifyValue a x <*> simplifyValue b y
-                  | (x,y) <- Map.toList f
-                  ]
+                Fun . Map.fromList
+                  <$> sequence
+                    [ (,) <$> simplifyValue a x <*> simplifyValue b y
+                      | (x, y) <- Map.toList f
+                    ]
       (N _ann, Nat x) -> pure (Nat x)
       (Z _ann, Int x) -> pure (Int x)
       (Fp _ann, Fp' x) -> pure (Fp' x)
@@ -127,15 +131,17 @@ simplifyValue =
       (List _ann _n a, List'' xs) ->
         List'' <$> mapM (simplifyValue a) xs
       (Map _ann _n a b, Map'' xs) ->
-         case simplifyType b of
-           Nothing -> pure (Fin' 0)
-           Just _ ->
-             Map'' . Map.fromList <$> sequence
-               [ (,) <$> simplifyValue a x <*> simplifyValue b y
-               | (x,y) <- Map.toList xs
-               ]
-      (t, _) -> Left . ErrorMessage (typeAnnotation t)
-        $ "simplifyValue: type error"
+        case simplifyType b of
+          Nothing -> pure (Fin' 0)
+          Just _ ->
+            Map'' . Map.fromList
+              <$> sequence
+                [ (,) <$> simplifyValue a x <*> simplifyValue b y
+                  | (x, y) <- Map.toList xs
+                ]
+      (t, _) ->
+        Left . ErrorMessage (typeAnnotation t) $
+          "simplifyValue: type error"
 
 complexifyValueUnsafe :: ValidContext 'Global ann -> Type () -> Value -> Value
 complexifyValueUnsafe c t x =
@@ -158,26 +164,30 @@ complexifyValue c =
           Just _ ->
             case x of
               Fun f ->
-                Fun . Map.fromList <$> sequence
-                  [ (,) <$> rec a y <*> rec b z
-                  | (y,z) <- Map.toList f
-                  ]
+                Fun . Map.fromList
+                  <$> sequence
+                    [ (,) <$> rec a y <*> rec b z
+                      | (y, z) <- Map.toList f
+                    ]
               Fin' 0 -> pure (Fun mempty)
-              _ -> Left . ErrorMessage ann $
-                "complexifyValue: type error; expected a function"
+              _ ->
+                Left . ErrorMessage ann $
+                  "complexifyValue: type error; expected a function"
       (P ann _n a b, x) ->
         case simplifyType a of
           Nothing -> pure (Fun (Map.fromList [(Fin' 0, Fin' 0)]))
           Just _ ->
             case x of
               Fun f ->
-                Fun . Map.fromList <$> sequence
-                  [ (,) <$> rec a y <*> rec b z
-                  | (y,z) <- Map.toList f
-                  ]
-              _ -> Left . ErrorMessage ann $
-                "complexifyValue: type error; expected a permutation"
-      (N _, Nat x) -> pure (Nat x) 
+                Fun . Map.fromList
+                  <$> sequence
+                    [ (,) <$> rec a y <*> rec b z
+                      | (y, z) <- Map.toList f
+                    ]
+              _ ->
+                Left . ErrorMessage ann $
+                  "complexifyValue: type error; expected a permutation"
+      (N _, Nat x) -> pure (Nat x)
       (N _, Fin' 0) -> pure (Nat 0)
       (Z _, Int x) -> pure (Int x)
       (Fp _, Fp' x) -> pure (Fp' x)
@@ -191,8 +201,9 @@ complexifyValue c =
                 case z of
                   Fin' 0 ->
                     Pair' <$> rec a (Fin' 0) <*> rec b (Fin' 0)
-                  _ -> Left . ErrorMessage ann $
-                    "complexifyValue: type error; expected Fin' 0"
+                  _ ->
+                    Left . ErrorMessage ann $
+                      "complexifyValue: type error; expected Fin' 0"
               Just _ ->
                 Pair' <$> rec a (Fin' 0) <*> rec b z
           Just _ ->
@@ -203,8 +214,9 @@ complexifyValue c =
                 case z of
                   Pair' x y -> Pair' <$> rec a x <*> rec b y
                   -- Fin' 0 -> Pair' <$> rec a (Fin' 0) <*> rec b (Fin' 0)
-                  _ -> Left . ErrorMessage ann $
-                    "complexifyValue: type error; expected a pair"
+                  _ ->
+                    Left . ErrorMessage ann $
+                      "complexifyValue: type error; expected a pair"
       (Coproduct _ann a _b, Iota1' x) ->
         Iota1' <$> rec a x
       (Coproduct _ann _a b, Iota2' x) ->
@@ -215,16 +227,18 @@ complexifyValue c =
         case Map.lookup name (c ^. #unValidContext) of
           Just (Data a) ->
             if name == name'
-            then To' name <$> rec (dropTypeAnnotations a) x
-            else Left . ErrorMessage ann $ "complexifyValue: type error; named type mismatch"
-          _ -> Left . ErrorMessage ann $
-            "complexifyValue: expected the name of a type"
+              then To' name <$> rec (dropTypeAnnotations a) x
+              else Left . ErrorMessage ann $ "complexifyValue: type error; named type mismatch"
+          _ ->
+            Left . ErrorMessage ann $
+              "complexifyValue: expected the name of a type"
       (NamedType ann name, Fin' 0) ->
         case Map.lookup name (c ^. #unValidContext) of
           Just (Data a) ->
             To' name <$> rec (dropTypeAnnotations a) (Fin' 0)
-          _ -> Left . ErrorMessage ann $
-            "complexifyValue: expected the name of a type"
+          _ ->
+            Left . ErrorMessage ann $
+              "complexifyValue: expected the name of a type"
       (Maybe {}, Maybe'' Nothing) ->
         pure (Maybe'' Nothing)
       (Maybe _ann a, Maybe'' (Just x)) ->
@@ -235,12 +249,14 @@ complexifyValue c =
       (List _ann _n _a, Fin' 0) ->
         pure (List'' [])
       (Map _ann _n a b, Map'' xs) ->
-        Map'' . Map.fromList <$> sequence
-          [ (,) <$> rec a x <*> rec b y
-          | (x,y) <- Map.toList xs
-          ]
+        Map'' . Map.fromList
+          <$> sequence
+            [ (,) <$> rec a x <*> rec b y
+              | (x, y) <- Map.toList xs
+            ]
       (Map {}, Fin' 0) -> pure (Map'' mempty)
-      (t, _) -> Left . ErrorMessage (typeAnnotation t)
-        $ "complexifyValue: type error; default case; " <> pack (show t)
+      (t, _) ->
+        Left . ErrorMessage (typeAnnotation t) $
+          "complexifyValue: type error; default case; " <> pack (show t)
   where
     rec = complexifyValue c

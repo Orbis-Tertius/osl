@@ -35,7 +35,7 @@ import OSL.Types.OSL
     ValidContext (ValidContext),
     ValuesBound (ValuesBound),
   )
-import OSL.Types.PreValue (PreValue (Value, LambdaClosure, PrePair, PreTo, PreIota1, PreIota2))
+import OSL.Types.PreValue (PreValue (LambdaClosure, PreIota1, PreIota2, PrePair, PreTo, Value))
 import OSL.Types.Value (Value (Bool, Fin', Fp', Fun, Int, Iota1', Iota2', List'', Map'', Maybe'', Nat, Pair', Predicate, To'))
 import OSL.ValidContext (getFreeOSLName)
 import OSL.ValidateContext (checkTerm, checkTypeInclusion, inferType)
@@ -63,8 +63,9 @@ preValueToValue ::
 preValueToValue ann =
   \case
     Value x -> pure x
-    LambdaClosure _ -> Left . ErrorMessage ann $
-      "expected a value but got a lambda closure"
+    LambdaClosure _ ->
+      Left . ErrorMessage ann $
+        "expected a value but got a lambda closure"
     PrePair x y ->
       Pair' <$> rec x <*> rec y
     PreTo name x ->
@@ -293,8 +294,9 @@ evaluate' gc lc t x w e = do
                   Value (Iota2' y) -> g'' (Value y)
                   PreIota1 y -> f'' y
                   PreIota2 y -> g'' y
-                  _ -> Left . ErrorMessage ann $
-                    "expected a coproduct value in function coproduct application"
+                  _ ->
+                    Left . ErrorMessage ann $
+                      "expected a coproduct value in function coproduct application"
             (Value (Fun f''), LambdaClosure g'') ->
               pure . LambdaClosure $
                 \case
@@ -302,8 +304,9 @@ evaluate' gc lc t x w e = do
                   PreIota1 y -> Value <$> applyFun ann (Fun f'') y
                   Value (Iota2' y) -> g'' (Value y)
                   PreIota2 y -> g'' y
-                  _ -> Left . ErrorMessage ann $
-                    "expected a coproduct value in function coproduct application"
+                  _ ->
+                    Left . ErrorMessage ann $
+                      "expected a coproduct value in function coproduct application"
             (LambdaClosure f'', Value (Fun g'')) ->
               pure . LambdaClosure $
                 \case
@@ -311,8 +314,9 @@ evaluate' gc lc t x w e = do
                   Value (Iota2' y) -> Value <$> applyFun ann (Fun g'') (Value y)
                   PreIota1 y -> f'' y
                   PreIota2 y -> Value <$> applyFun ann (Fun g'') y
-                  _ -> Left . ErrorMessage ann $
-                    "expected a coproduct value in function coproduct application"
+                  _ ->
+                    Left . ErrorMessage ann $
+                      "expected a coproduct value in function coproduct application"
             _ ->
               Left . ErrorMessage ann $
                 "function coproduct arguments expected to be functions"
@@ -328,14 +332,17 @@ evaluate' gc lc t x w e = do
       case t of
         F _ _ _ b ->
           pure . LambdaClosure $
-            \y -> evaluate' gc
-                  (lc <> ValidContext (Map.singleton v (FreeVariable a)))
-                  b
-                  body
-                  w
-                  (e <> EvaluationContext (Map.singleton v y))
-        _ -> Left . ErrorMessage ann $
-          "encountered a lambda in a non-function context"
+            \y ->
+              evaluate'
+                gc
+                (lc <> ValidContext (Map.singleton v (FreeVariable a)))
+                b
+                body
+                w
+                (e <> EvaluationContext (Map.singleton v y))
+        _ ->
+          Left . ErrorMessage ann $
+            "encountered a lambda in a non-function context"
     Apply _ (To ann name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
         Just (Data a) ->
@@ -644,9 +651,11 @@ evaluate' gc lc t x w e = do
     MapFrom ann _ -> partialApplication "MapFrom" ann
     Apply ann (SumMapLength _) y -> do
       yT <- inferType lc y
-      Value <$> (listSum ann . List'' =<< mapElems ann
-        =<< mapFunctor listLength ann
-        =<< rec yT y w e)
+      Value
+        <$> ( listSum ann . List'' =<< mapElems ann
+                =<< mapFunctor listLength ann
+                =<< rec yT y w e
+            )
     SumMapLength ann -> partialApplication "SumMapLength" ann
     Apply ann (SumListLookup _ k) y -> do
       yT <- inferType lc y
@@ -725,13 +734,15 @@ evaluate' gc lc t x w e = do
               yT <- inferType lc y
               y' <- rec' yT y w e
               let v = getFreeOSLName gc
-              evaluate' gc
+              evaluate'
+                gc
                 (gcAsLc <> ValidContext (Map.singleton v (FreeVariable a)))
                 t
                 (Apply ann def (NamedTerm ann v))
                 w
-                (EvaluationContext
-                  (Map.singleton v y'))
+                ( EvaluationContext
+                    (Map.singleton v y')
+                )
             Just _ ->
               Left . ErrorMessage ann' $
                 "expected the name of a defined function"
@@ -741,14 +752,16 @@ evaluate' gc lc t x w e = do
     ForSome ann name a _bound y -> do
       -- TODO: check w is in bound
       (Witness w0, w1) <- splitWitness ann w
-      evaluate' gc
+      evaluate'
+        gc
         (lc <> ValidContext (Map.singleton name (FreeVariable a)))
         (Prop ann)
         y
         w1
-        (e
-          <> EvaluationContext
-            (Map.singleton name (Value w0)))
+        ( e
+            <> EvaluationContext
+              (Map.singleton name (Value w0))
+        )
     ForAll ann name a bound y -> do
       vs <- getUniversalQuantifierValues a bound
       let lc' = lc <> ValidContext (Map.singleton name (FreeVariable a))
