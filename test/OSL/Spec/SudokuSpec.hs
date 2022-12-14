@@ -271,7 +271,7 @@ getSquarePermutation (Solution s) sq =
     <$> sequence
       [ (v,)
           <$> find
-            ((== v) . (\c -> s (getCell sq c)))
+            ((== v) . s . getCell sq)
             (SquareCell <$> ((,) <$> [0 .. 2] <*> [0 .. 2]))
         | v <- [0 .. 8]
       ]
