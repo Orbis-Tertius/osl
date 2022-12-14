@@ -8,6 +8,7 @@
 module OSL.Spec.SudokuSpec (spec) where
 
 import Control.Lens ((^.))
+import Data.Either.Combinators (mapLeft)
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -60,7 +61,10 @@ argumentFormSpec c = do
     simplifyType complexWitnessType `shouldBe` Just simpleWitnessType
 
   it "is satisfied on a true example" $
-    satisfiesSimple c (getNamedTermUnsafe c "problemIsSolvable") (exampleArgument c)
+    -- limiting the length of the error message prevents excessive computation
+    mapLeft (take 1000 . show) (satisfiesSimple c
+      (getNamedTermUnsafe c "problemIsSolvable")
+      (exampleArgument c))
       `shouldBe` Right True
 
 exampleArgument :: ValidContext 'Global ann -> Argument

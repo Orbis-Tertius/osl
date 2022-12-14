@@ -239,8 +239,7 @@ complexifyValue c =
           | (x,y) <- Map.toList xs
           ]
       (Map {}, Fin' 0) -> pure (Map'' mempty)
-      (t, x) -> Left . ErrorMessage (typeAnnotation t)
-        $ "complexifyValue: type error; default case: "
-           <> pack (show (t, x))
+      (t, _) -> Left . ErrorMessage (typeAnnotation t)
+        $ "complexifyValue: type error; default case; " <> pack (show t)
   where
     rec = complexifyValue c
