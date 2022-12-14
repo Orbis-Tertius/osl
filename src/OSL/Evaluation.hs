@@ -324,14 +324,18 @@ evaluate' gc lc t x w e = do
       let lc' = lc <> ValidContext (Map.singleton v (FreeVariable a))
       let e' = e <> EvaluationContext (Map.singleton v z')
       evaluate' gc lc' t y w e'
-    Lambda _ann v a body ->
-      pure . LambdaClosure $
-        \y -> evaluate' gc
-              (lc <> ValidContext (Map.singleton v (FreeVariable a)))
-              t
-              body
-              w
-              (e <> EvaluationContext (Map.singleton v y))
+    Lambda ann v a body ->
+      case t of
+        F _ _ _ b ->
+          pure . LambdaClosure $
+            \y -> evaluate' gc
+                  (lc <> ValidContext (Map.singleton v (FreeVariable a)))
+                  b
+                  body
+                  w
+                  (e <> EvaluationContext (Map.singleton v y))
+        _ -> Left . ErrorMessage ann $
+          "encountered a lambda in a non-function context"
     Apply _ (To ann name) y ->
       case Map.lookup name (gc ^. #unValidContext) of
         Just (Data a) ->
