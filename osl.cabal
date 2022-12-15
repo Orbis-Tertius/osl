@@ -63,6 +63,7 @@ library
     Halo2.Types.Witness
     Halo2.Types.WitnessColumns
     Halo2.Types.WitnessGenerationContext
+    OSL.Argument
     OSL.ArgumentForm
     OSL.Bound
     OSL.BuildTranslationContext
