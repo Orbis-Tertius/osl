@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
@@ -13,9 +14,14 @@ module OSL.Sigma11
     termIndices,
     PrependBounds (prependBounds),
     prependInstanceQuantifiers,
+    evalTerm,
+    evalFormula,
   )
 where
 
+import qualified Algebra.Additive as Group
+import qualified Algebra.Ring as Ring
+import Control.Lens ((^.))
 import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -25,8 +31,13 @@ import Die (die)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
+import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import OSL.Types.Sigma11.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
+import OSL.Types.Sigma11.EvaluationContext (EvaluationContext (EvaluationContext))
+import OSL.Types.Sigma11.Value (Value (Value))
 import OSL.Types.TranslationContext (Mapping (..))
+import Stark.Types.Scalar (Scalar, zero, one, integerToScalar)
 
 class MapNames a where
   mapNames :: (Name -> Name) -> a -> a
@@ -145,3 +156,128 @@ prependInstanceQuantifiers = foldl' (.) id . fmap prependInstanceQuantifier
 
 prependInstanceQuantifier :: InstanceQuantifier -> Formula -> Formula
 prependInstanceQuantifier (Instance n bs b) = Given n bs b
+
+evalTerm :: EvaluationContext -> Term -> Either (ErrorMessage ()) Scalar
+evalTerm (EvaluationContext c) =
+  \case
+    App f xs ->
+      case Map.lookup (Left f) c of
+        Just (Value f') -> do
+          xs' <- mapM rec xs
+          case Map.lookup xs' f' of
+            Just y -> pure y
+            Nothing -> Left . ErrorMessage () $
+              "value not defined on given inputs"
+        Nothing ->
+          Left . ErrorMessage () $
+            "name not defined in given evaluation context"
+    AppInverse f x ->
+      case Map.lookup (Left f) c of
+        Just (Value f') -> do
+          x' <- rec x
+          case Map.keys (Map.filter (== x') f') of
+            [[y]] -> pure y
+            [] ->
+              Left . ErrorMessage () $
+                "function inverse not defined on given input"
+            _ ->
+              Left . ErrorMessage () $
+                "function does not have a unique inverse on given input"
+        Nothing ->
+          Left . ErrorMessage () $
+            "name not defined in given evaluation context"
+    Add x y -> (Group.+) <$> rec x <*> rec y
+    Mul x y -> (Ring.*) <$> rec x <*> rec y
+    IndLess x y -> boolToScalar <$> ((<=) <$> rec x <*> rec y)
+    Max x y -> max <$> rec x <*> rec y
+    Const i ->
+      case integerToScalar i of
+        Just i' -> pure i'
+        Nothing -> Left . ErrorMessage () $
+          "constant out of range of scalar field"
+  where
+    rec = evalTerm (EvaluationContext c)
+
+boolToScalar :: Bool -> Scalar
+boolToScalar True = one
+boolToScalar False = zero
+
+evalFormula ::
+  EvaluationContext ->
+  Argument ->
+  Formula ->
+  Either (ErrorMessage ()) Bool
+evalFormula c arg =
+  \case
+    Equal x y ->
+      (==) <$> evalTerm c x <*> evalTerm c y
+    LessOrEqual x y ->
+      (<=) <$> evalTerm c x <*> evalTerm c y
+    Predicate p xs -> do
+       xs' <- mapM (evalTerm c) xs
+       case Map.lookup (Right p) (c ^. #unEvaluationContext) of
+         Just (Value p') ->
+           maybe (pure False) (const (pure True))
+             (Map.lookup xs' p')
+         Nothing ->
+           Left . ErrorMessage () $
+             "predicate not defined in given evaluation context"
+    Not p -> not <$> rec p
+    And p q -> (&&) <$> rec p <*> rec q
+    Or p q -> (||) <$> rec p <*> rec q
+    Implies p q -> (||) <$> (not <$> rec p) <*> rec q
+    Iff p q -> (==) <$> rec p <*> rec q
+    Top -> pure True
+    Bottom -> pure False
+    Given _n ibs _ob p ->
+      -- TODO: verify value is in bounds
+      case arg ^. #statement . #unStatement of
+        (i:is') -> do
+          let c' = addToEvalContext c (Arity (length ibs)) i
+          let arg' = Argument (Statement is') (arg ^. #witness)
+          evalFormula c' arg' p
+        [] -> Left . ErrorMessage () $ "statement is too short"
+    ForSome (Some _n ibs _ob) p ->
+      -- TODO: verify value is in bounds
+      existentialQuantifier (Arity (length ibs)) p
+    ForSome (SomeP {}) p ->
+      -- TODO: verify value is in bounds
+      existentialQuantifier (Arity 1) p
+    ForAll FieldMaxBound _ ->
+      Left . ErrorMessage () $
+        "field max bound unsupported in universal quantifier"
+    ForAll (TermBound b) p -> do
+      b' <- evalTerm c b
+      let go x = do
+            let c' = addToEvalContext c (Arity 0)
+                       (Value (Map.singleton [] x))
+                x' = x Group.+ one
+            r <- evalFormula c' arg p
+            if r && x' == b'
+              then pure True
+              else if r
+                   then go x'
+                   else pure False
+      go zero
+  where
+    rec = evalFormula c arg
+
+    existentialQuantifier arity p =
+      case arg ^. #witness . #unWitness of
+        (w:ws') -> do
+          let c' = addToEvalContext c arity w
+          let arg' = Argument (arg ^. #statement) (Witness ws')
+          evalFormula c' arg' p
+        [] -> Left . ErrorMessage () $
+          "witness is too short"
+
+addToEvalContext :: EvaluationContext -> Arity -> Value -> EvaluationContext
+addToEvalContext (EvaluationContext c) n x =
+  EvaluationContext . Map.insert (Left (Name n 0)) x
+    $ Map.mapKeys incIfN c
+  where
+    incIfN (Left (Name n' i)) =
+      if n == n'
+      then Left (Name n (i+1))
+      else Left (Name n' i)
+    incIfN (Right p) = Right p

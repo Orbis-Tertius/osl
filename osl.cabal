@@ -90,6 +90,9 @@ library
     OSL.Types.OSL
     OSL.Types.PreValue
     OSL.Types.Sigma11
+    OSL.Types.Sigma11.Argument
+    OSL.Types.Sigma11.EvaluationContext
+    OSL.Types.Sigma11.Value
     OSL.Types.Token
     OSL.Types.Translation
     OSL.Types.TranslationContext
