@@ -9,13 +9,15 @@ import OSL.Spec.Gen (genType, genValueOfType)
 import OSL.Types.OSL (Declaration (Data), ValidContext (ValidContext), Type (N))
 import OSL.Types.Value (Value (Fin'))
 import Test.Syd (Spec, describe, shouldBe, expectationFailure, it)
+import Test.Syd.Modify (modifyMaxSize)
 import Test.QuickCheck (forAll)
 
 spec :: Spec
 spec =
-  describe "OSL.SimplifyType" $ do
-    simplifyValueTypeSpec
-    complexifyRoundTripSpec
+  describe "OSL.SimplifyType"
+    . modifyMaxSize (const 13) $
+    do simplifyValueTypeSpec
+       complexifyRoundTripSpec
 
 exampleContext :: ValidContext t ()
 exampleContext =
