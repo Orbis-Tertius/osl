@@ -10,7 +10,7 @@ import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Lens ((^.))
-import Control.Monad (join, liftM2, (<=<), when, void)
+import Control.Monad (join, liftM2, void, when, (<=<))
 import Data.List (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -19,14 +19,18 @@ import Data.Tuple (swap)
 import Die (die)
 import OSL.Bound (boundAnnotation)
 import OSL.Term (termAnnotation)
+import OSL.Type (typeAnnotation)
 import OSL.Types.Argument (Witness (Witness))
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.OSL
-  ( Bound (CoproductBound, FieldMaxBound, MaybeBound, ProductBound, ScalarBound, ToBound),
+  ( Bound (CoproductBound, FieldMaxBound, FunctionBound, ListBound, MapBound, MaybeBound, ProductBound, ScalarBound, ToBound),
+    CodomainBound (CodomainBound),
     ContextType (Global, Local),
     Declaration (Data, Defined, FreeVariable),
+    DomainBound (DomainBound),
+    KeysBound (KeysBound),
     LeftBound (LeftBound),
     Name,
     RightBound (RightBound),
@@ -1185,9 +1189,129 @@ checkValueIsInBound gc lc e t bound x = do
         (Product _ aT bT, Pair' y z) -> do
           checkValueIsInBound gc lc e aT (Just a) y
           checkValueIsInBound gc lc e bT (Just b) z
+        _ -> Left . ErrorMessage ann $ "unexpected product bound"
+    Just (CoproductBound ann (LeftBound a) (RightBound b)) -> do
+      case t of
+        Coproduct _ aT bT ->
+          case x of
+            Iota1' y -> checkValueIsInBound gc lc e aT (Just a) y
+            Iota2' z -> checkValueIsInBound gc lc e bT (Just b) z
+            _ -> Left . ErrorMessage ann $ "expected a coproduct value"
+        _ -> Left . ErrorMessage ann $ "unexpected coproduct bound"
+    Just (FunctionBound ann (DomainBound a) (CodomainBound b)) -> do
+      case t of
+        F _ _ aT bT ->
+          case x of
+            Fun f -> do
+              let (xs, ys) = unzip (Map.toList f)
+              mapM_ (checkValueIsInBound gc lc e aT (Just a)) xs
+              mapM_ (checkValueIsInBound gc lc e bT (Just b)) ys
+            _ -> Left . ErrorMessage ann $ "expected a function value"
+        _ -> Left . ErrorMessage ann $ "unexpected function bound"
+    Just (ListBound ann (ValuesBound a)) ->
+      case t of
+        List _ (Cardinality n) aT ->
+          case x of
+            List'' xs -> do
+              when (intToInteger (length xs) > n) . Left . ErrorMessage ann $ "list is too long"
+              mapM_ (checkValueIsInBound gc lc e aT (Just a)) xs
+            _ -> Left . ErrorMessage ann $ "expected a list value"
+        _ -> Left . ErrorMessage ann $ "unexpected list bound"
+    Just (MaybeBound ann (ValuesBound a)) ->
+      case t of
+        Maybe _ aT ->
+          case x of
+            Maybe'' xs -> maybe (pure ()) (checkValueIsInBound gc lc e aT (Just a)) xs
+            _ -> Left . ErrorMessage ann $ "expected a maybe value"
+        _ -> Left . ErrorMessage ann $ "unexpected maybe bound"
+    Just (ToBound ann name a) ->
+      case t of
+        NamedType ann' name' ->
+          if name == name'
+            then case Map.lookup name (gc ^. #unValidContext) of
+              Just (Data aT) ->
+                case x of
+                  To' name'' x' ->
+                    if name'' == name
+                      then checkValueIsInBound gc lc e aT (Just a) x'
+                      else
+                        Left . ErrorMessage ann $
+                          "value is of the wrong To type"
+                  _ ->
+                    Left . ErrorMessage ann $
+                      "expected a To value"
+              _ ->
+                Left . ErrorMessage ann' $
+                  "expected the name of a type"
+            else
+              Left . ErrorMessage ann $
+                "bound is of the wrong To type"
+        _ -> Left . ErrorMessage ann $ "unexpected To bound"
+    Just (MapBound ann (KeysBound a) (ValuesBound b)) ->
+      case t of
+        Map _ (Cardinality n) aT bT ->
+          case x of
+            Map'' x' -> do
+              when (intToInteger (Map.size x') > n) . Left . ErrorMessage ann $
+                "map is too big"
+              let (xs, ys) = unzip (Map.toList x')
+              mapM_ (checkValueIsInBound gc lc e aT (Just a)) xs
+              mapM_ (checkValueIsInBound gc lc e bT (Just b)) ys
+            _ -> Left . ErrorMessage ann $ "expected a map value"
+        _ -> Left . ErrorMessage ann $ "unexpected map bound"
 
 checkValueIsInType :: ValidContext 'Local ann -> Type ann -> Value -> Either (ErrorMessage ann) ()
-checkValueIsInType = todo
-
-todo :: a
-todo = todo
+checkValueIsInType c =
+  curry $
+    \case
+      (N _, Nat _) -> pure ()
+      (Prop _, Bool _) -> pure ()
+      (F ann n a b, Fun f) ->
+        checkFunctionLike ann n a b f
+      (P ann n a b, Fun f) -> do
+        checkFunctionLike ann n a b f
+        when (Set.fromList (Map.elems f) /= Set.fromList (Map.keys f))
+          . Left
+          . ErrorMessage ann
+          $ "value is not a permutation"
+      (Z _, Int _) -> pure ()
+      (Fp _, Fp' _) -> pure ()
+      (Fin ann n, Fin' x) ->
+        when (scalarToInteger x >= n) . Left . ErrorMessage ann $
+          "value out of range of finite type"
+      (Product _ a b, Pair' x y) -> do
+        checkValueIsInType c a x
+        checkValueIsInType c b y
+      (Coproduct _ a _, Iota1' x) ->
+        checkValueIsInType c a x
+      (Coproduct _ _ b, Iota2' y) ->
+        checkValueIsInType c b y
+      (NamedType ann name, To' name' x) ->
+        if name == name'
+          then case Map.lookup name (c ^. #unValidContext) of
+            Just (Data a) ->
+              checkValueIsInType c a x
+            _ ->
+              Left . ErrorMessage ann $
+                "expected the name of a type"
+          else Left . ErrorMessage ann $ "named type mismatch"
+      (Maybe _ a, Maybe'' x) ->
+        maybe (pure ()) (checkValueIsInType c a) x
+      (List ann (Cardinality n) a, List'' x) ->
+        if intToInteger (length x) <= n
+          then mapM_ (checkValueIsInType c a) x
+          else Left . ErrorMessage ann $ "list is too long"
+      (Map ann n a b, Map'' x) ->
+        checkFunctionLike ann (Just n) a b x
+      (t, _) ->
+        Left . ErrorMessage (typeAnnotation t) $
+          "general type mismatch"
+  where
+    checkFunctionLike _ann Nothing a b f = do
+      let (xs, ys) = unzip (Map.toList f)
+      mapM_ (checkValueIsInType c a) xs
+      mapM_ (checkValueIsInType c b) ys
+    checkFunctionLike ann (Just (Cardinality n)) a b f =
+      if intToInteger (Map.size f) <= n
+        then checkFunctionLike ann Nothing a b f
+        else Left . ErrorMessage ann $ "too many values in map or function"
