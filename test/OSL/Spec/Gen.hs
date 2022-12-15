@@ -4,49 +4,59 @@
 
 module OSL.Spec.Gen
   ( genType,
-    genValueOfType
-  ) where
+    genValueOfType,
+  )
+where
 
 import Cast (integerToInt)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Data.Maybe (fromMaybe)
+import qualified Data.Set as Set
 import Die (die)
-import Test.QuickCheck (Gen, oneof, choose, listOf, shuffle, arbitrary)
-import OSL.Types.OSL (Type (Prop, F, P, N, Z, Fp, Fin, Product, Coproduct, NamedType, Maybe, List, Map),
-  Cardinality (Cardinality), Name, ValidContext (ValidContext), ContextType (Global), Declaration (Data))
-import OSL.Types.Value (Value (Bool, Fun, Nat, Int, Fp', Fin', Pair', Iota1', Iota2', To', Maybe'', List'', Map''))
+import OSL.Types.OSL
+  ( Cardinality (Cardinality),
+    ContextType (Global),
+    Declaration (Data),
+    Name,
+    Type (Coproduct, F, Fin, Fp, List, Map, Maybe, N, NamedType, P, Product, Prop, Z),
+    ValidContext (ValidContext),
+  )
+import OSL.Types.Value (Value (Bool, Fin', Fp', Fun, Int, Iota1', Iota2', List'', Map'', Maybe'', Nat, Pair', To'))
 import qualified Stark.Types.Scalar as Scalar
+import Test.QuickCheck (Gen, arbitrary, choose, listOf, oneof, shuffle)
 
 genType :: Gen ann -> Gen Name -> Gen (Type ann)
 genType ann name =
   oneof
-  [ Prop <$> ann,
-    F <$> ann <*> genMaybe genCardinality
-      <*> rec <*> rec,
-    do a <- rec
-       P <$> ann <*> genMaybe genCardinality
-         <*> pure a <*> pure a,
-    N <$> ann,
-    Z <$> ann,
-    Fp <$> ann,
-    Fin <$> ann <*> choose (0,1000),
-    Product <$> ann <*> rec <*> rec,
-    Coproduct <$> ann <*> rec <*> rec,
-    NamedType <$> ann <*> name,
-    Maybe <$> ann <*> rec,
-    List <$> ann <*> genCardinality <*> rec,
-    Map <$> ann <*> genCardinality <*> rec <*> rec
-  ]
+    [ Prop <$> ann,
+      F <$> ann <*> genMaybe genCardinality
+        <*> rec
+        <*> rec,
+      do
+        a <- rec
+        P <$> ann <*> genMaybe genCardinality
+          <*> pure a
+          <*> pure a,
+      N <$> ann,
+      Z <$> ann,
+      Fp <$> ann,
+      Fin <$> ann <*> choose (0, 1000),
+      Product <$> ann <*> rec <*> rec,
+      Coproduct <$> ann <*> rec <*> rec,
+      NamedType <$> ann <*> name,
+      Maybe <$> ann <*> rec,
+      List <$> ann <*> genCardinality <*> rec,
+      Map <$> ann <*> genCardinality <*> rec <*> rec
+    ]
   where
     rec = genType ann name
 
 genMaybe :: Gen a -> Gen (Maybe a)
 genMaybe g =
   oneof
-  [ pure Nothing,
-    Just <$> g
-  ]
+    [ pure Nothing,
+      Just <$> g
+    ]
 
 genCardinality :: Gen Cardinality
 genCardinality =
@@ -55,18 +65,19 @@ genCardinality =
 genValueOfType :: ValidContext 'Global ann -> Type ann -> Gen Value
 genValueOfType (ValidContext c) =
   \case
-    Prop _ -> Bool <$> oneof [ pure True, pure False ]
+    Prop _ -> Bool <$> oneof [pure True, pure False]
     F _ (Just (Cardinality n)) a b ->
-      let n' = fromMaybe 1000 $ integerToInt n in
-      Fun . Map.fromList . take n' <$>
-        listOf ((,) <$> rec a <*> rec b)
+      let n' = fromMaybe 1000 $ integerToInt n
+       in Fun . Map.fromList . take n'
+            <$> listOf ((,) <$> rec a <*> rec b)
     F _ Nothing a b ->
-      Fun . Map.fromList <$>
-        listOf ((,) <$> rec a <*> rec b)
+      Fun . Map.fromList
+        <$> listOf ((,) <$> rec a <*> rec b)
     P _ (Just (Cardinality n)) a _b -> do
       let n' = fromMaybe 1000 $ integerToInt n
-      vs <- Set.toList . Set.fromList . take n'
-        <$> listOf (rec a)
+      vs <-
+        Set.toList . Set.fromList . take n'
+          <$> listOf (rec a)
       vs' <- shuffle vs
       pure (Fun (Map.fromList (zip vs vs')))
     P _ Nothing a _b -> do
@@ -77,7 +88,7 @@ genValueOfType (ValidContext c) =
     Z _ -> Int <$> genScalar
     Fp _ -> Fp' <$> genScalar
     Fin _ n -> do
-      x <- choose (0,n-1)
+      x <- choose (0, n - 1)
       case Scalar.integerToScalar x of
         Just x' -> pure (Fin' x')
         Nothing -> die "genValueOfType: Fin out of range of scalar"
@@ -85,9 +96,9 @@ genValueOfType (ValidContext c) =
       Pair' <$> rec a <*> rec b
     Coproduct _ a b ->
       oneof
-      [ Iota1' <$> rec a,
-        Iota2' <$> rec b
-      ]
+        [ Iota1' <$> rec a,
+          Iota2' <$> rec b
+        ]
     NamedType _ name ->
       case Map.lookup name c of
         Just (Data a) ->

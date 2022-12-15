@@ -4,20 +4,21 @@ module OSL.Spec.SimplifyTypeSpec (spec) where
 
 import qualified Data.Map as Map
 import OSL.Evaluation (checkValueIsInType)
-import OSL.SimplifyType (simplifyType, simplifyValue, complexifyValue)
+import OSL.SimplifyType (complexifyValue, simplifyType, simplifyValue)
 import OSL.Spec.Gen (genType, genValueOfType)
-import OSL.Types.OSL (Declaration (Data), ValidContext (ValidContext), Type (N))
+import OSL.Types.OSL (Declaration (Data), Type (N), ValidContext (ValidContext))
 import OSL.Types.Value (Value (Fin'))
-import Test.Syd (Spec, describe, shouldBe, expectationFailure, it)
-import Test.Syd.Modify (modifyMaxSize)
 import Test.QuickCheck (forAll)
+import Test.Syd (Spec, describe, expectationFailure, it, shouldBe)
+import Test.Syd.Modify (modifyMaxSize)
 
 spec :: Spec
 spec =
   describe "OSL.SimplifyType"
-    . modifyMaxSize (const 13) $
-    do simplifyValueTypeSpec
-       complexifyRoundTripSpec
+    . modifyMaxSize (const 13)
+    $ do
+      simplifyValueTypeSpec
+      complexifyRoundTripSpec
 
 exampleContext :: ValidContext t ()
 exampleContext =
@@ -43,9 +44,9 @@ complexifyRoundTripSpec =
   it "round trips" $
     forAll (genType (pure ()) (pure "Foo")) $ \a ->
       forAll (genValueOfType exampleContext a) $ \x ->
-         case simplifyValue a x of
-           Right x' -> do
-             case complexifyValue exampleContext a x' of
-               Right x'' -> x'' `shouldBe` x
-               Left err -> expectationFailure ("complexifyValue: " <> show err)
-           Left err -> expectationFailure ("simplifyValue: " <> show err)
+        case simplifyValue a x of
+          Right x' -> do
+            case complexifyValue exampleContext a x' of
+              Right x'' -> x'' `shouldBe` x
+              Left err -> expectationFailure ("complexifyValue: " <> show err)
+          Left err -> expectationFailure ("simplifyValue: " <> show err)
