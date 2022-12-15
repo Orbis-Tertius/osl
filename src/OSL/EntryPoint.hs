@@ -24,6 +24,7 @@ import OSL.Parse (parseContext)
 import OSL.Tokenize (tokenize)
 import OSL.Translate (translateToFormula)
 import OSL.TranslationContext (toLocalTranslationContext)
+import OSL.Types.FileName (FileName (FileName))
 import OSL.Types.OSL (Declaration (Defined), Name (Sym))
 import OSL.ValidContext (getDeclaration)
 import OSL.ValidateContext (validateContext)
@@ -49,8 +50,6 @@ main = do
       putStrLn . unOutput
         =<< runMain (FileName fileName) (TargetName targetName) DONTCompileToCircuit
     _ -> putStrLn "Usage: osl FILE TARGET [--test]"
-
-newtype FileName = FileName String
 
 newtype TargetName = TargetName String
 

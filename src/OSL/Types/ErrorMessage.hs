@@ -9,4 +9,4 @@ data ErrorMessage ann = ErrorMessage
   { annotation :: ann,
     message :: Text
   }
-  deriving (Generic, Show)
+  deriving (Eq, Ord, Generic, Show)

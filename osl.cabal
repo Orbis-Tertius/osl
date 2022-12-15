@@ -68,9 +68,11 @@ library
     OSL.BuildTranslationContext
     OSL.EntryPoint
     OSL.Evaluation
+    OSL.LoadContext
     OSL.Parse
     OSL.Satisfaction
     OSL.Sigma11
+    OSL.SimplifyType
     OSL.Term
     OSL.Tokenize
     OSL.Translate
@@ -83,9 +85,10 @@ library
     OSL.Types.DeBruijnIndex
     OSL.Types.ErrorMessage
     OSL.Types.EvaluationContext
+    OSL.Types.FileName
     OSL.Types.Keyword
     OSL.Types.OSL
-    OSL.Types.PreprocessedWitness
+    OSL.Types.PreValue
     OSL.Types.Sigma11
     OSL.Types.Token
     OSL.Types.Translation
@@ -161,7 +164,10 @@ test-suite spec
   main-is: Spec.hs
 
   other-modules:
+    OSL.Spec.Gen
     OSL.Spec.OSLSpec
+    OSL.Spec.SimplifyTypeSpec
+    OSL.Spec.SudokuSpec
 
   build-tools:
     sydtest-discover
@@ -183,6 +189,7 @@ test-suite spec
     lens,
     mtl,
     optparse-applicative,
+    parsec,
     process,
     QuickCheck,
     random,

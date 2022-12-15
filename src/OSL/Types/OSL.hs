@@ -25,7 +25,8 @@ where
 
 import Data.Generics.Labels ()
 import Data.Map (Map)
-import Data.Text (Text, unpack)
+import Data.String (IsString (fromString))
+import Data.Text (Text, pack, unpack)
 import GHC.Generics (Generic)
 import OSL.Types.Cardinality (Cardinality (..))
 
@@ -33,6 +34,9 @@ data Name
   = Sym Text
   | GenSym Int
   deriving (Eq, Show, Generic)
+
+instance IsString Name where
+  fromString = Sym . pack
 
 instance Ord Name where
   Sym a <= Sym b = a <= b
