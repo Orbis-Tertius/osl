@@ -164,6 +164,7 @@ test-suite spec
   main-is: Spec.hs
 
   other-modules:
+    OSL.Spec.Gen
     OSL.Spec.OSLSpec
     OSL.Spec.SimplifyTypeSpec
     OSL.Spec.SudokuSpec
