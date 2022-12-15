@@ -118,6 +118,4 @@ genValueOfType (ValidContext c) =
 genScalar :: Gen Scalar.Scalar
 genScalar = do
   r <- Scalar.fromWord64 <$> arbitrary
-  case r of
-    Just r' -> pure r'
-    Nothing -> genScalar
+  maybe genScalar pure r
