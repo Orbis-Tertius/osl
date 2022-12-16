@@ -32,6 +32,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Text (pack)
 import Die (die)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
@@ -173,7 +174,7 @@ evalTerm (EvaluationContext c) =
           case Map.lookup xs' f' of
             Just y -> pure y
             Nothing -> Left . ErrorMessage () $
-              "value not defined on given inputs"
+              "value not defined on given inputs: " <> pack (show (xs', f'))
         Nothing ->
           Left . ErrorMessage () $
             "name not defined in given evaluation context"

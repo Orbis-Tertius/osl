@@ -125,12 +125,14 @@ toSigma11Values c t v =
               [ (x,) . OSL.Nat <$> maybeIndex y
               | (x,y) <- Map.toList f
               ],
-          rec (OSL.F ann n a b) . OSL.Fun . Map.fromList . catMaybes $
-           [ case y of
-               OSL.Maybe'' (Just y') -> pure (x, y')
-               _ -> Nothing
-           | (x, y) <- Map.toList f
-           ]
+          do rec (OSL.F ann n a b) . OSL.Fun . Map.fromList
+               =<< sequence
+                 [ case y of
+                     OSL.Maybe'' (Just y') -> pure (x, y')
+                     OSL.Maybe'' Nothing -> (x,) <$> OSL.defaultValue c b
+                     _ -> Left (ErrorMessage () "expected a maybe value")
+                 | (x, y) <- Map.toList f
+                 ]
         ]
     (OSL.F _ _ _ (OSL.Maybe {}), _) -> typeMismatch
     (OSL.F ann n a (OSL.NamedType _ name), OSL.Fun f) ->
