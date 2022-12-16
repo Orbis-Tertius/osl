@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
 
 module OSL.Sigma11
   ( MapNames (mapNames),
@@ -41,6 +42,7 @@ import OSL.Types.Sigma11.Argument (Argument (Argument), Statement (Statement), W
 import OSL.Types.Sigma11.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.Sigma11.Value (Value (Value))
 import OSL.Types.TranslationContext (Mapping (..))
+import Prelude hiding (fromInteger)
 import Stark.Types.Scalar (Scalar, zero, one, integerToScalar)
 
 class MapNames a where
@@ -327,11 +329,29 @@ auxTablesToEvalContext aux =
       predicateTablesToEvalContext (aux ^. #predicateTables)
     ]
 
-functionTablesToEvalContext :: Map Name (Map [Integer] Integer) -> Either (ErrorMessage ()) EvaluationContext
-functionTablesToEvalContext = todo
+functionTablesToEvalContext ::
+  Map Name (Map [Integer] Integer) ->
+  Either (ErrorMessage ()) EvaluationContext
+functionTablesToEvalContext m =
+  EvaluationContext . Map.fromList <$> sequence
+    [ (Left fName,) . Value . Map.fromList <$> sequence
+        [ (,) <$> mapM fromInteger xs <*> fromInteger y
+        | (xs, y) <- Map.toList f
+        ]
+    | (fName, f) <- Map.toList m
+    ]
 
-predicateTablesToEvalContext :: Map PredicateName (Set [Integer]) -> Either (ErrorMessage ()) EvaluationContext
-predicateTablesToEvalContext = todo
+predicateTablesToEvalContext ::
+  Map PredicateName (Set [Integer]) ->
+  Either (ErrorMessage ()) EvaluationContext
+predicateTablesToEvalContext m =
+  EvaluationContext . Map.fromList <$> sequence
+    [ (Right pName,) . Value . Map.fromList <$> sequence
+        [ (,zero) <$> mapM fromInteger xs
+        | xs <- Set.toList p
+        ]
+    | (pName, p) <- Map.toList m
+    ]
 
-todo :: a
-todo = todo
+fromInteger :: Integer -> Either (ErrorMessage ()) Scalar
+fromInteger = maybe (Left (ErrorMessage () "integer out of range of scalar field")) pure . integerToScalar
