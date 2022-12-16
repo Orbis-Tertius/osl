@@ -74,12 +74,12 @@ toSigma11Values c t v =
       mconcat <$> sequence
         [ pure [scalarValue zero],
           rec a x,
-          defaultSigma11Values b
+          defaultSigma11Values c b
         ]
     (OSL.Coproduct _ a b, OSL.Iota2' x) ->
       mconcat <$> sequence
         [ pure [scalarValue one],
-          defaultSigma11Values a,
+          defaultSigma11Values c a,
           rec b x
         ]
     (OSL.Coproduct {}, _) -> typeMismatch
@@ -203,7 +203,7 @@ toSigma11Values c t v =
     (OSL.Maybe _ a, OSL.Maybe'' Nothing) ->
       mconcat <$> sequence
         [ pure [scalarValue zero],
-          defaultSigma11Values a
+          defaultSigma11Values c a
         ]
     (OSL.Maybe _ a, OSL.Maybe'' (Just x)) ->
       mconcat <$> sequence
@@ -314,9 +314,46 @@ toSigma11Values c t v =
     typeMismatch = Left . ErrorMessage () $ "type mismatch"
 
 defaultSigma11Values ::
-  OSL.Type ann ->
+  OSL.ValidContext t ann ->
+  OSL.Type () ->
   Either (ErrorMessage ()) [S11.Value]
-defaultSigma11Values = todo
+defaultSigma11Values c =
+  \case
+    OSL.NamedType _ name ->
+      case Map.lookup name (c ^. #unValidContext) of
+        Just (OSL.Data a) -> rec (OSL.dropTypeAnnotations a)
+        _ -> Left (ErrorMessage () "expected the name of a type")
+    OSL.Prop _ -> pure scalarDefault
+    OSL.N _ -> pure scalarDefault
+    OSL.Z _ -> pure scalarDefault
+    OSL.Fp _ -> pure scalarDefault
+    OSL.Fin {} -> pure scalarDefault
+    OSL.F _ _ _ (OSL.P {}) ->
+      Left (ErrorMessage () "unsupported: families of permutations")
+    OSL.F _ _ _ (OSL.Prop _) ->
+      Left (ErrorMessage () "unsupported: Prop in function codomain")
+    OSL.F _ _ _ t ->
+      fmap (const (S11.Value mempty)) <$> rec t
+    OSL.P {} -> pure [S11.Value mempty]
+    OSL.Product _ a b ->
+      (<>) <$> rec a <*> rec b
+    OSL.Coproduct _ a b ->
+      mconcat <$> sequence
+        [ pure scalarDefault,
+          rec a,
+          rec b
+        ]
+    OSL.Maybe _ a ->
+      (scalarDefault <>) <$> rec a
+    OSL.List ann n a ->
+      (scalarDefault <>) <$> rec (OSL.F ann (Just n) (OSL.N ann) a)
+    OSL.Map ann n a b ->
+      mconcat <$> sequence
+        [ pure scalarDefault,
+          rec (OSL.F ann (Just n) (OSL.N ann) a),
+          rec (OSL.F ann (Just n) a b)
+        ]
+  where
+    rec = defaultSigma11Values c
 
-todo :: a
-todo = todo
+    scalarDefault = [S11.Value (Map.singleton [] zero)]
