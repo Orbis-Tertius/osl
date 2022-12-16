@@ -22,7 +22,9 @@ where
 
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
+import Cast (intToInteger)
 import Control.Lens ((^.))
+import Control.Monad (forM_, when)
 import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -230,20 +232,18 @@ evalFormula c arg =
     Iff p q -> (==) <$> rec p <*> rec q
     Top -> pure True
     Bottom -> pure False
-    Given _n ibs _ob p ->
-      -- TODO: verify value is in bounds
+    Given n ibs ob p ->
       case arg ^. #statement . #unStatement of
         (i:is') -> do
           let c' = addToEvalContext c (Arity (length ibs)) i
           let arg' = Argument (Statement is') (arg ^. #witness)
+          checkValueIsInBounds c n ibs ob i
           evalFormula c' arg' p
         [] -> Left . ErrorMessage () $ "statement is too short"
-    ForSome (Some _n ibs _ob) p ->
-      -- TODO: verify value is in bounds
-      existentialQuantifier (Arity (length ibs)) p
-    ForSome (SomeP {}) p ->
-      -- TODO: verify value is in bounds
-      existentialQuantifier (Arity 1) p
+    ForSome (Some n ibs ob) p ->
+      existentialQuantifier n ibs ob p
+    ForSome (SomeP n ib ob) p ->
+      existentialQuantifier n [ib] ob p
     ForAll FieldMaxBound _ ->
       Left . ErrorMessage () $
         "field max bound unsupported in universal quantifier"
@@ -263,14 +263,50 @@ evalFormula c arg =
   where
     rec = evalFormula c arg
 
-    existentialQuantifier arity p =
+    existentialQuantifier n ibs ob p =
+      let arity = Arity (length ibs) in
       case arg ^. #witness . #unWitness of
         (w:ws') -> do
           let c' = addToEvalContext c arity w
           let arg' = Argument (arg ^. #statement) (Witness ws')
+          checkValueIsInBounds c n ibs ob w
           evalFormula c' arg' p
         [] -> Left . ErrorMessage () $
           "witness is too short"
+
+checkValueIsInBounds ::
+  EvaluationContext ->
+  Cardinality ->
+  [InputBound] ->
+  OutputBound ->
+  Value ->
+  Either (ErrorMessage ()) ()
+checkValueIsInBounds c (Cardinality n) ibs ob (Value v) =
+  if intToInteger (Map.size v) <= n
+  then forM_ (Map.toList v) $ \(xs,y) ->
+         if length xs == length ibs
+         then do
+           checkPointIsInBounds c (zip xs ibs) (y, ob)
+         else Left (ErrorMessage () "point has wrong number of inputs")
+  else Left (ErrorMessage () "value is too big")
+
+checkPointIsInBounds ::
+  EvaluationContext ->
+  [(Scalar, InputBound)] ->
+  (Scalar, OutputBound) ->
+  Either (ErrorMessage ()) ()
+checkPointIsInBounds _ [] (_, OutputBound FieldMaxBound) = pure ()
+checkPointIsInBounds c [] (y, OutputBound (TermBound ob)) = do
+  ob' <- evalTerm c ob
+  when (y >= ob') (Left (ErrorMessage () "output is out of bounds"))
+checkPointIsInBounds c ((x, InputBound FieldMaxBound) : ibs) (y, ob) = do
+  let c' = addToEvalContext c (Arity 0) (Value (Map.singleton [] x))
+  checkPointIsInBounds c' ibs (y, ob)
+checkPointIsInBounds c ((x, InputBound (TermBound ib)) : ibs) (y, ob) = do
+  ib' <- evalTerm c ib
+  when (x >= ib') (Left (ErrorMessage () "input is out of bounds"))
+  let c' = addToEvalContext c (Arity 0) (Value (Map.singleton [] x))
+  checkPointIsInBounds c' ibs (y, ob)
 
 addToEvalContext :: EvaluationContext -> Arity -> Value -> EvaluationContext
 addToEvalContext (EvaluationContext c) n x =
