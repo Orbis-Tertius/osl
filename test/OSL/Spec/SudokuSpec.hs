@@ -9,19 +9,25 @@ module OSL.Spec.SudokuSpec (spec) where
 
 import Control.Lens ((^.))
 import Control.Monad (forM_)
+import Control.Monad.Trans.State.Strict (runStateT)
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Die (die)
 import GHC.Generics (Generic)
+import OSL.Argument (toSigma11Argument)
 import OSL.ArgumentForm (getArgumentForm)
+import OSL.BuildTranslationContext (buildTranslationContext)
 import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
+import OSL.Sigma11 (evalFormula, auxTablesToEvalContext)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
+import OSL.Translate (translateToFormula)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
 import OSL.Types.FileName (FileName (FileName))
-import OSL.Types.OSL (ContextType (Global), Declaration (Defined), Name (Sym), Type (F, Fin, NamedType, Product), ValidContext)
+import OSL.Types.OSL (ContextType (Global), Declaration (Defined), Name (Sym), Type (F, Fin, NamedType, Product), ValidContext (ValidContext))
+import OSL.Types.TranslationContext (TranslationContext (TranslationContext))
 import OSL.Types.Value (Value (Fin', Fun, Maybe'', Pair', To'))
 import OSL.ValidContext (getNamedTermUnsafe)
 import Stark.Types.Scalar (integerToScalar)
@@ -86,6 +92,26 @@ exampleSpec c = do
       (getNamedTermUnsafe c "problemIsSolvable")
       (exampleUnsoundArgument c)
       `shouldBe` Right False
+
+  it "Sudoku spec's semantics are preserved in Sigma11 translation" $
+    case buildTranslationContext c of
+      Right tc ->
+        let ltc = TranslationContext (ValidContext (tc ^. #context . #unValidContext)) (tc ^. #mappings) in
+        case runStateT (translateToFormula tc ltc (getNamedTermUnsafe c "problemIsSolvable")) mempty of
+          Right (translated, aux) ->
+            case auxTablesToEvalContext aux of
+              Right ec -> do
+                case toSigma11Argument c argumentForm (exampleArgument c) of
+                  Right arg ->
+                    evalFormula ec arg translated `shouldBe` Right True
+                  Left err -> expectationFailure ("toSigma11Argument exampleArgument: " <> show err)
+                case toSigma11Argument c argumentForm (exampleUnsoundArgument c) of
+                  Right arg ->
+                    evalFormula ec arg translated `shouldBe` Right False
+                  Left err -> expectationFailure ("toSigma11Argument exampleUnsoundArgument: " <> show err)
+              Left err -> expectationFailure ("auxTablesToEvalContext: " <> show err)
+          Left err -> expectationFailure ("translateToFormula: " <> show err)
+      Left err -> expectationFailure ("buildTranslationContext: " <> show err)
 
 exampleArgument :: ValidContext 'Global ann -> Argument
 exampleArgument c =
@@ -484,6 +510,12 @@ simpleWitnessType =
             )
         )
     )
+
+argumentForm :: ArgumentForm
+argumentForm =
+  ArgumentForm
+  (StatementType complexStatementType)
+  (WitnessType complexWitnessType)
 
 solutionToValue :: Solution -> Value
 solutionToValue (Solution s) =
