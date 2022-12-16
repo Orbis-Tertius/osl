@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module OSL.Types.Sigma11.Value
   ( Value (Value)
@@ -17,4 +18,4 @@ import Stark.Types.Scalar (Scalar)
 --    satisfying inputs
 newtype Value =
   Value { unValue :: Map [Scalar] Scalar }
-  deriving Generic
+  deriving (Generic, Semigroup, Monoid)

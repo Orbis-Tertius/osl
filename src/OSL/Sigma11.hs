@@ -16,6 +16,7 @@ module OSL.Sigma11
     prependInstanceQuantifiers,
     evalTerm,
     evalFormula,
+    boolToScalar,
   )
 where
 
