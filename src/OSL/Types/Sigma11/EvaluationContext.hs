@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module OSL.Types.Sigma11.EvaluationContext (EvaluationContext (EvaluationContext)) where
 
@@ -10,4 +11,4 @@ import OSL.Types.Sigma11.Value (Value)
 newtype EvaluationContext =
   EvaluationContext
     { unEvaluationContext :: Map (Either Name PredicateName) Value }
-  deriving Generic
+  deriving (Semigroup, Monoid, Generic)

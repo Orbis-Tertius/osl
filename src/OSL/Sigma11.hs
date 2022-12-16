@@ -36,7 +36,7 @@ import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Max, Mul), AuxTables)
+import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Max, Mul), AuxTables, PredicateName)
 import OSL.Types.Sigma11.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.Sigma11.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.Sigma11.Value (Value (Value))
@@ -321,7 +321,17 @@ addToEvalContext (EvaluationContext c) n x =
     incIfN (Right p) = Right p
 
 auxTablesToEvalContext :: AuxTables -> Either (ErrorMessage ()) EvaluationContext
-auxTablesToEvalContext = todo
+auxTablesToEvalContext aux =
+  mconcat <$> sequence
+    [ functionTablesToEvalContext (aux ^. #functionTables),
+      predicateTablesToEvalContext (aux ^. #predicateTables)
+    ]
+
+functionTablesToEvalContext :: Map Name (Map [Integer] Integer) -> Either (ErrorMessage ()) EvaluationContext
+functionTablesToEvalContext = todo
+
+predicateTablesToEvalContext :: Map PredicateName (Set [Integer]) -> Either (ErrorMessage ()) EvaluationContext
+predicateTablesToEvalContext = todo
 
 todo :: a
 todo = todo

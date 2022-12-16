@@ -29,7 +29,7 @@ import OSL.Types.FileName (FileName (FileName))
 import OSL.Types.OSL (ContextType (Global), Declaration (Defined), Name (Sym), Type (F, Fin, NamedType, Product), ValidContext (ValidContext))
 import OSL.Types.TranslationContext (TranslationContext (TranslationContext))
 import OSL.Types.Value (Value (Fin', Fun, Maybe'', Pair', To'))
-import OSL.ValidContext (getNamedTermUnsafe)
+import OSL.ValidContext (getDeclaration, getNamedTermUnsafe)
 import Stark.Types.Scalar (integerToScalar)
 import Test.Syd (Spec, describe, expectationFailure, it, liftIO, shouldBe)
 import Text.Parsec (SourcePos)
@@ -97,20 +97,23 @@ exampleSpec c = do
     case buildTranslationContext c of
       Right tc ->
         let ltc = TranslationContext (ValidContext (tc ^. #context . #unValidContext)) (tc ^. #mappings) in
-        case runStateT (translateToFormula tc ltc (getNamedTermUnsafe c "problemIsSolvable")) mempty of
-          Right (translated, aux) ->
-            case auxTablesToEvalContext aux of
-              Right ec -> do
-                case toSigma11Argument c argumentForm (exampleArgument c) of
-                  Right arg ->
-                    evalFormula ec arg translated `shouldBe` Right True
-                  Left err -> expectationFailure ("toSigma11Argument exampleArgument: " <> show err)
-                case toSigma11Argument c argumentForm (exampleUnsoundArgument c) of
-                  Right arg ->
-                    evalFormula ec arg translated `shouldBe` Right False
-                  Left err -> expectationFailure ("toSigma11Argument exampleUnsoundArgument: " <> show err)
-              Left err -> expectationFailure ("auxTablesToEvalContext: " <> show err)
-          Left err -> expectationFailure ("translateToFormula: " <> show err)
+        case getDeclaration c "problemIsSolvable" of
+          Just (Defined _ def) ->
+            case runStateT (translateToFormula tc ltc def) mempty of
+              Right (translated, aux) ->
+                case auxTablesToEvalContext aux of
+                  Right ec -> do
+                    case toSigma11Argument c argumentForm (exampleArgument c) of
+                      Right arg ->
+                        evalFormula ec arg translated `shouldBe` Right True
+                      Left err -> expectationFailure ("toSigma11Argument exampleArgument: " <> show err)
+                    case toSigma11Argument c argumentForm (exampleUnsoundArgument c) of
+                      Right arg ->
+                        evalFormula ec arg translated `shouldBe` Right False
+                      Left err -> expectationFailure ("toSigma11Argument exampleUnsoundArgument: " <> show err)
+                  Left err -> expectationFailure ("auxTablesToEvalContext: " <> show err)
+              Left err -> expectationFailure ("translateToFormula: " <> show err)
+          _ -> expectationFailure "problemIsSolvable not defined"
       Left err -> expectationFailure ("buildTranslationContext: " <> show err)
 
 exampleArgument :: ValidContext 'Global ann -> Argument
