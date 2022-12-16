@@ -985,14 +985,14 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
         Just (OSL.Data a) -> rec lc a
         _ -> lift . Left $ ErrorMessage ann "expected the name of a type"
     OSL.Maybe ann a -> do
-      (aQs, aM) <- rec lc a
       (cQs, cM) <- rec lc (OSL.Fin ann 2)
+      (aQs, aM) <- rec lc a
       pure
         ( cQs <> aQs,
           mergeMapping
-            (\cM' aM' -> MaybeMapping (ChoiceMapping cM') (ValuesMapping aM'))
-            cM
+            (\aM' cM' -> MaybeMapping (ChoiceMapping cM') (ValuesMapping aM'))
             aM
+            cM
         )
     OSL.List ann (OSL.Cardinality n) a -> do
       (lQs, lM) <- rec lc (OSL.N ann)
@@ -1379,7 +1379,7 @@ translateToFormula gc lc@(TranslationContext decls mappings) t = do
         OSL.Lambda _ varName varType body -> do
           (qs, mapping) <- getInstanceQuantifierStringAndMapping gc lc varType
           let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
-              lc' = TranslationContext decls' (Map.insert varName mapping mappings)
+              lc' = TranslationContext decls' (mergeMappings (Map.singleton varName mapping) mappings)
           prependInstanceQuantifiers qs <$> translateToFormula gc lc' body
         _ ->
           lift . Left $
