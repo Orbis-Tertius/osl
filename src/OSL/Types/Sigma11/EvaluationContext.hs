@@ -11,4 +11,4 @@ import OSL.Types.Sigma11.Value (Value)
 newtype EvaluationContext =
   EvaluationContext
     { unEvaluationContext :: Map (Either Name PredicateName) Value }
-  deriving (Semigroup, Monoid, Generic)
+  deriving (Semigroup, Monoid, Generic, Show)

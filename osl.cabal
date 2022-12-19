@@ -94,6 +94,7 @@ library
     OSL.Types.Sigma11.Argument
     OSL.Types.Sigma11.EvaluationContext
     OSL.Types.Sigma11.Value
+    OSL.Types.Sigma11.ValueTree
     OSL.Types.Token
     OSL.Types.Translation
     OSL.Types.TranslationContext

@@ -18,4 +18,4 @@ import Stark.Types.Scalar (Scalar)
 --    satisfying inputs
 newtype Value =
   Value { unValue :: Map [Scalar] Scalar }
-  deriving (Generic, Semigroup, Monoid)
+  deriving (Generic, Semigroup, Monoid, Show)

@@ -229,8 +229,10 @@ evalFormula c arg =
          Nothing ->
            Left . ErrorMessage () $
              "predicate not defined in given evaluation context"
-    Not p -> not <$> rec p
-    And p q -> (&&) <$> rec p <*> rec q
+    Not p -> not <$> rec arg p
+    And p q -> do
+      (arg0, arg1) <- splitArg
+      (&&) <$> rec arg0 p <*> rec arg1 q
     Or p q -> (||) <$> rec p <*> rec q
     Implies p q -> (||) <$> (not <$> rec p) <*> rec q
     Iff p q -> (==) <$> rec p <*> rec q
@@ -262,10 +264,16 @@ evalFormula c arg =
               then pure True
               else if r
                    then go x'
-                   else pure False
+                   else pure False -- Left (ErrorMessage () $ "ForAll: false " <> pack (show (x, p, arg, c)))
       go zero
   where
-    rec = evalFormula c arg
+    rec = evalFormula c
+
+    splitArg =
+      case arg ^. #witness of
+        Pair' w0 w1 ->
+          pure (Argument (arg ^. #statement, w0), Argument (arg ^. #statement, w1))
+        _ -> Left (ErrorMessage () "expected witness to be a pair")
 
     existentialQuantifier n ibs ob p =
       let arity = Arity (length ibs) in
