@@ -42,6 +42,7 @@ import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifie
 import OSL.Types.Sigma11.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.Sigma11.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.Sigma11.Value (Value (Value))
+import OSL.Types.Sigma11.ValueTree (ValueTree (ValueTree))
 import OSL.Types.TranslationContext (Mapping (..))
 import Prelude hiding (fromInteger)
 import Stark.Types.Scalar (Scalar, zero, one, integerToScalar)
@@ -233,9 +234,15 @@ evalFormula c arg =
     And p q -> do
       (arg0, arg1) <- splitArg
       (&&) <$> rec arg0 p <*> rec arg1 q
-    Or p q -> (||) <$> rec p <*> rec q
-    Implies p q -> (||) <$> (not <$> rec p) <*> rec q
-    Iff p q -> (==) <$> rec p <*> rec q
+    Or p q -> do
+      (arg0, arg1) <- splitArg
+      (||) <$> rec arg0 p <*> rec arg1 q
+    Implies p q -> do
+      (arg0, arg1) <- splitArg
+      (||) <$> (not <$> rec arg0 p) <*> rec arg1 q
+    Iff p q -> do
+      (arg0, arg1) <- splitArg
+      (==) <$> rec arg0 p <*> rec arg1 q
     Top -> pure True
     Bottom -> pure False
     Given n ibs ob p ->
@@ -271,20 +278,21 @@ evalFormula c arg =
 
     splitArg =
       case arg ^. #witness of
-        Pair' w0 w1 ->
-          pure (Argument (arg ^. #statement, w0), Argument (arg ^. #statement, w1))
+        Witness (ValueTree Nothing [w0, w1]) ->
+          pure (Argument (arg ^. #statement) (Witness w0),
+                Argument (arg ^. #statement) (Witness w1))
         _ -> Left (ErrorMessage () "expected witness to be a pair")
 
     existentialQuantifier n ibs ob p =
       let arity = Arity (length ibs) in
       case arg ^. #witness . #unWitness of
-        (w:ws') -> do
+        ValueTree (Just w) [ws'] -> do
           let c' = addToEvalContext c arity w
           let arg' = Argument (arg ^. #statement) (Witness ws')
           checkValueIsInBounds c n ibs ob w
           evalFormula c' arg' p
-        [] -> Left . ErrorMessage () $
-          "witness is too short"
+        _ -> Left . ErrorMessage () $
+          "witness is not existential-shaped"
 
 checkValueIsInBounds ::
   EvaluationContext ->

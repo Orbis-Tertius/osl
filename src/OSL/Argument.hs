@@ -19,6 +19,7 @@ import qualified OSL.Types.OSL as OSL
 import qualified OSL.Types.Value as OSL
 import qualified OSL.Types.Sigma11.Argument as S11
 import qualified OSL.Types.Sigma11.Value as S11
+import qualified OSL.Types.Sigma11.ValueTree as S11
 import qualified OSL.Value as OSL
 import Safe (atMay)
 import Stark.Types.Scalar (Scalar, zero, one, integerToScalar)
@@ -50,7 +51,21 @@ toSigma11Witness ::
   OSL.Witness ->
   Either (ErrorMessage ()) S11.Witness
 toSigma11Witness c (OSL.WitnessType t) (OSL.Witness w) =
-  S11.Witness <$> toSigma11Values c t w
+  S11.Witness <$> toSigma11ValueTree c t w
+
+toSigma11ValueTree ::
+  OSL.ValidContext t ann ->
+  OSL.Type () ->
+  OSL.Value ->
+  Either (ErrorMessage ()) S11.ValueTree
+toSigma11ValueTree c t x =
+  case (t,x) of
+    (OSL.N _, OSL.Nat y) -> scalarVT y
+  where
+    scalarVT y = S11.ValueTree (Just (scalarValue y)) []
+
+todo :: a
+todo = todo
 
 toSigma11Values ::
   OSL.ValidContext t ann ->
