@@ -8,10 +8,12 @@ module OSL.Argument (toSigma11Argument) where
 
 import Cast (intToInteger)
 import Control.Lens ((^.))
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes, fromMaybe)
 import qualified OSL.Sigma11 as S11
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+import OSL.Evaluation (decodeScalar)
 import qualified OSL.Type as OSL
 import qualified OSL.Types.ArgumentForm as OSL
 import qualified OSL.Types.Argument as OSL
@@ -28,7 +30,7 @@ toSigma11Argument ::
   OSL.ValidContext t ann ->
   OSL.ArgumentForm ->
   OSL.Argument ->
-  OSL.Term ann ->
+  OSL.Term () ->
   Either (ErrorMessage ()) S11.Argument
 toSigma11Argument c af a x =
   S11.Argument
@@ -49,107 +51,111 @@ toSigma11Witness ::
   OSL.ValidContext t ann ->
   OSL.WitnessType ->
   OSL.Witness ->
-  OSL.Term ann ->
+  OSL.Term () ->
   Either (ErrorMessage ()) S11.Witness
 toSigma11Witness c (OSL.WitnessType t) (OSL.Witness w) x =
-  S11.Witness <$> toSigma11ValueTree c t w (Just x)
+  S11.Witness <$> toSigma11ValueTree c t w x
 
 toSigma11ValueTree ::
   OSL.ValidContext t ann ->
   OSL.Type () ->
   OSL.Value ->
-  Maybe (OSL.Term ann) ->
+  OSL.Term () ->
   Either (ErrorMessage ()) S11.ValueTree
 toSigma11ValueTree c t val term =
   case (t,val,term) of
-    (OSL.N _, OSL.Nat x, _) -> scalarVT x
-    (OSL.N _, _, _) -> typeMismatch
-    (OSL.Z _, OSL.Int x, _) -> scalarVT x
-    (OSL.Z _, _, _) -> typeMismatch
-    (OSL.Fp _, OSL.Fp' x, _) -> scalarVT x
-    (OSL.Fp _, _, _) -> typeMismatch
-    (OSL.Fin {}, OSL.Fin' x, _) -> scalarVT x
-    (OSL.Fin {}, _, _) -> typeMismatch
-    (OSL.Prop _, OSL.Bool y, _) -> scalarVT (S11.boolToScalar y)
+    (OSL.Product _ a b, OSL.Pair' x y, OSL.And _ p q) ->
+      pairTree <$> rec a x p <*> rec b y q
+    (_, _, OSL.And {}) -> typeMismatch
+    (OSL.Product _ a b, OSL.Pair' x y, OSL.Or _ p q) ->
+      pairTree <$> rec a x p <*> rec b y q
+    (_, _, OSL.Or {}) -> typeMismatch
+    (OSL.Product _ a b, OSL.Pair' x y, OSL.Implies _ p q) ->
+      pairTree <$> rec a x p <*> rec b y q
+    (_, _, OSL.Implies {}) -> typeMismatch
+    (OSL.Product _ a b, OSL.Pair' x y, OSL.Iff _ p q) ->
+      pairTree <$> rec a x p <*> rec b y q
+    (_, _, OSL.Iff {}) -> typeMismatch
+    (_, _, OSL.Equal {}) -> pure emptyTree
+    (_, _, OSL.LessOrEqual {}) -> pure emptyTree
+    (_, _, OSL.Top _) -> pure emptyTree
+    (_, _, OSL.Bottom _) -> pure emptyTree
     (OSL.Prop _, _, _) -> typeMismatch
-    (OSL.NamedType _ name, OSL.To' name' x, _) ->
-      if name == name'
-      then case Map.lookup name (c ^. #unValidContext) of
-             Just (OSL.Data a) -> rec (OSL.dropTypeAnnotations a) x Nothing
-             _ -> Left (ErrorMessage () "expected the name of a type")
-      else Left (ErrorMessage () "named type mismatch")
-    (OSL.NamedType {}, _, _) -> typeMismatch
-    (OSL.Product _ a b, OSL.Pair' x y, Just (OSL.And _ p q)) ->
-      S11.ValueTree Nothing <$> sequence
-        [ rec a x (Just p),
-          rec b y (Just q)
-        ]
-    (OSL.Product _ a b, OSL.Pair' x y, Just (OSL.Or _ p q)) ->
-      S11.ValueTree Nothing <$> sequence
-        [ rec a x (Just p),
-          rec b y (Just q)
-        ]
-    (OSL.Coproduct _ a b, OSL.Iota1' x, Nothing) ->
-      S11.ValueTree Nothing <$> sequence
-        [ scalarVT zero,
-          rec a x Nothing,
-          flip (rec b) Nothing =<< OSL.defaultValue c b
-        ]
-    (OSL.Maybe _ a, OSL.Maybe'' Nothing, Nothing) ->
-      S11.ValueTree Nothing <$> sequence
-        [ scalarVT zero,
-          flip (rec a) Nothing =<< OSL.defaultValue c a
-        ]
-    (OSL.Maybe _ a, OSL.Maybe'' (Just x), Nothing) ->
-      S11.ValueTree Nothing <$> sequence
-        [ scalarVT one,
-          rec a x Nothing
-        ]
-    (OSL.List ann n a, OSL.List'' xs, _) ->
-      S11.ValueTree
-        <$> (Just . S11.Value . Map.singleton [] <$> fromInt (length xs))
-        <*> ((:[]) <$>
-              (rec (OSL.F ann (Just n) (OSL.N ann) a) . OSL.Fun . Map.fromList
-                =<< sequence [ (,x) . OSL.Nat <$> fromInt i
-                             | (i,x) <- zip [0..] xs
-                             ]))
-    (OSL.List {}, _, _) -> typeMismatch
-    (OSL.Map ann n a b, OSL.Map'' m, _) ->
-      S11.ValueTree
-        <$> (Just . S11.Value . Map.singleton [] <$> fromInt (Map.size m))
-        <*> sequence
-            [ rec (OSL.F ann (Just n) (OSL.N ann) a) . OSL.Fun . Map.fromList
-                =<< sequence
-                    [ (,x) . OSL.Nat <$> fromInt i
-                    | (i,x) <- zip [0..] (Map.keys m)
-                    ],
-              rec (OSL.F ann (Just n) a b) (OSL.Fun m)
-            ]
-    (OSL.Map {}, _, _) -> typeMismatch
-    (OSL.P _ _ a b@(OSL.N _), OSL.Fun f, _) -> scalarFun a b f
-    (OSL.P _ _ a b@(OSL.Z _), OSL.Fun f, _) -> scalarFun a b f
-    (OSL.P _ _ a b@(OSL.Fp _), OSL.Fun f, _) -> scalarFun a b f
-    (OSL.P _ _ a b@(OSL.Fin {}), OSL.Fun f, _) -> scalarFun a b f
-    (OSL.P _ _ a b@(OSL.NamedType {}), OSL.Fun f, _) -> scalarFun a b f
-    (OSL.P {}, _, _) -> typeMismatch
-    (OSL.F _ _ a b@(OSL.N _), OSL.Fun f) -> scalarFun a b f
-    (OSL.F _ _ a b@(OSL.Z _), OSL.Fun f) -> scalarFun a b f
-    (OSL.F _ _ a b@(OSL.Fp _), OSL.Fun f) -> scalarFun a b f
-    (OSL.F _ _ a b@(OSL.Fin {}), OSL.Fun f) -> scalarFun a b f
-    (OSL.F _ _ _ (OSL.Prop _), _) ->
-      Left (ErrorMessage () "unsupported: Prop-valued functions")
-    (OSL.F _ _ _ (OSL.P {}), _) ->
-      Left (ErrorMessage () "unsupported: families of permutations")
+    (OSL.F _ _ (OSL.N _) b, OSL.Fun f, OSL.ForAll _ _ (OSL.N _) _ p) ->
+      scalarForAll b f p
+    (OSL.F _ _ (OSL.Z _) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Z _) _ p) ->
+      scalarForAll b f p
+    (OSL.F _ _ (OSL.Fp _) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Fp _) _ p) ->
+       scalarForAll b f p
+    (OSL.F _ _ (OSL.Fin {}) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Fin {}) _ p) ->
+      scalarForAll b f p
+    (OSL.F _ _ (OSL.Product _ a b) d, OSL.Fun f, OSL.ForAll _ x (OSL.Product {}) _ p) -> do
+      f' <- curryFun f
+      rec (OSL.F () Nothing a (OSL.F () Nothing b d))
+        (OSL.Fun f')
+        -- Note that this step, and similar steps below, corrupt the input term by changing the usage of x,
+        -- and also by removing any bounds on x, but none of that matters for this algorithm,
+        -- where the atomic formulas and also the quantifier bounds are irrelevant.
+        (OSL.ForAll () x a Nothing (OSL.ForAll () x b Nothing p))
+    (OSL.F _ _ (OSL.Coproduct _ a b) d, OSL.Fun f, OSL.ForAll _ x (OSL.Coproduct {}) _ p) -> do
+      defaultA <- OSL.defaultValue c a
+      defaultB <- OSL.defaultValue c b
+      f' <- curryCoproductFun (defaultA, defaultB) f
+      rec (OSL.F () Nothing (OSL.N ()) (OSL.F () Nothing a (OSL.F () Nothing b d)))
+        (OSL.Fun f')
+        (OSL.ForAll () x (OSL.N ()) Nothing
+          (OSL.ForAll () x a Nothing
+            (OSL.ForAll () x b Nothing p)))
+    (OSL.F _ _ (OSL.Maybe _ a) b, OSL.Fun f, OSL.ForAll _ x (OSL.Maybe {}) _ p) -> do
+      defaultA <- OSL.defaultValue c a
+      f' <- curryMaybeFun defaultA f
+      rec (OSL.F () Nothing (OSL.N ()) (OSL.F () Nothing a b))
+        (OSL.Fun f')
+        (OSL.ForAll () x (OSL.N ()) Nothing (OSL.ForAll () x a Nothing p))
+    (OSL.Product () (OSL.N _) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.N _) _ p) -> do
+      S11.ValueTree <$> (Just . S11.Value . Map.singleton [] <$> decodeScalar () x)
+                    <*> ((:[]) <$> rec b y p)
   where
     rec = toSigma11ValueTree c
 
-    scalarVT y = pure $ S11.ValueTree (Just (scalarValue y)) []
+    pairTree x y = S11.ValueTree Nothing [x, y]
 
-    scalarFun a b f =
-      flip S11.ValueTree [] . Just . S11.Value . Map.fromList <$> sequence
-        [ (,) <$> (toScalars =<< toSigma11Values c a x) <*> (toScalar =<< toSigma11Values c b y)
-        | (x,y) <- Map.toList f
-        ]
+    emptyTree = S11.ValueTree Nothing []
+
+    scalarForAll b f p =
+      -- we are relying on Map.elems outputting the elements in ascending
+      -- order of their keys
+      S11.ValueTree Nothing <$> sequence
+        [ rec b y p | y <- Map.elems f ]
+
+curryFun :: Map OSL.Value OSL.Value -> Either (ErrorMessage ()) (Map OSL.Value OSL.Value)
+curryFun f =
+  fmap OSL.Fun . Map.unionsWith (<>) <$> sequence
+    [ case x of
+        OSL.Pair' x0 x1 -> pure (Map.singleton x0 (Map.singleton x1 y))
+        _ -> typeMismatch
+    | (x,y) <- Map.toList f
+    ]
+
+curryCoproductFun :: (OSL.Value, OSL.Value) -> Map OSL.Value OSL.Value -> Either (ErrorMessage ()) (Map OSL.Value OSL.Value)
+curryCoproductFun (defaultLeft, defaultRight) f =
+  fmap OSL.Fun . fmap (fmap OSL.Fun) . Map.unionsWith (Map.unionWith (<>)) <$> sequence
+    [ case x of
+        OSL.Iota1' x' -> pure (Map.singleton (OSL.Nat zero) (Map.singleton x' (Map.singleton defaultRight y)))
+        OSL.Iota2' x' -> pure (Map.singleton (OSL.Nat one) (Map.singleton defaultLeft (Map.singleton x' y)))
+        _ -> typeMismatch
+    | (x,y) <- Map.toList f
+    ]
+
+curryMaybeFun :: OSL.Value -> Map OSL.Value OSL.Value -> Either (ErrorMessage ()) (Map OSL.Value OSL.Value)
+curryMaybeFun defaultValue f =
+  fmap OSL.Fun . Map.unionsWith (<>) <$> sequence
+    [ case x of
+        OSL.Maybe'' Nothing -> pure (Map.singleton (OSL.Nat zero) (Map.singleton defaultValue y))
+        OSL.Maybe'' (Just x') -> pure (Map.singleton (OSL.Nat one) (Map.singleton x' y))
+        _ -> typeMismatch
+    | (x,y) <- Map.toList f
+    ]
 
 toSigma11Values ::
   OSL.ValidContext t ann ->

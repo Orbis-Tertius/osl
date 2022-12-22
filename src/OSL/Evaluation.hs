@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
-module OSL.Evaluation (evaluate, checkValueIsInType) where
+module OSL.Evaluation (decodeScalar, evaluate, checkValueIsInType) where
 
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring

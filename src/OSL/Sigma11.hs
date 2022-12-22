@@ -262,17 +262,18 @@ evalFormula c arg =
         "field max bound unsupported in universal quantifier"
     ForAll (TermBound b) p -> do
       b' <- evalTerm c b
-      let go x = do
+      let go x arg' = do
+            (arg'', arg''') <- popArg arg'
             let c' = addToEvalContext c (Arity 0)
                        (Value (Map.singleton [] x))
                 x' = x Group.+ one
-            r <- evalFormula c' arg p
+            r <- evalFormula c' arg'' p
             if r && x' == b'
               then pure True
               else if r
-                   then go x'
+                   then go x' arg'''
                    else pure False -- Left (ErrorMessage () $ "ForAll: false " <> pack (show (x, p, arg, c)))
-      go zero
+      go zero arg
   where
     rec = evalFormula c
 
@@ -282,6 +283,15 @@ evalFormula c arg =
           pure (Argument (arg ^. #statement) (Witness w0),
                 Argument (arg ^. #statement) (Witness w1))
         _ -> Left (ErrorMessage () "expected witness to be a pair")
+
+    popArg :: Argument -> Either (ErrorMessage ()) (Argument, Argument)
+    popArg arg' =
+      case arg' ^. #witness . #unWitness . #branches of
+        (b:bs) -> pure $
+          ( Argument (arg ^. #statement) (Witness b),
+            Argument (arg ^. #statement) (Witness (ValueTree Nothing bs))
+          )
+        [] -> Left (ErrorMessage () "ran out of branches while transforming universal witness")
 
     existentialQuantifier n ibs ob p =
       let arity = Arity (length ibs) in
