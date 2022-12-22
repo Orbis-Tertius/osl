@@ -28,12 +28,12 @@ toSigma11Argument ::
   OSL.ValidContext t ann ->
   OSL.ArgumentForm ->
   OSL.Argument ->
+  OSL.Term ann ->
   Either (ErrorMessage ()) S11.Argument
-toSigma11Argument c af a =
+toSigma11Argument c af a x =
   S11.Argument
     <$> toSigma11Statement c (af ^. #statementType) (a ^. #statement)
-    <*> toSigma11Witness c (af ^. #witnessType) (a ^. #witness)
-
+    <*> toSigma11Witness c (af ^. #witnessType) (a ^. #witness) x
 toSigma11Statement ::
   OSL.ValidContext t ann ->
   OSL.StatementType ->
@@ -49,23 +49,107 @@ toSigma11Witness ::
   OSL.ValidContext t ann ->
   OSL.WitnessType ->
   OSL.Witness ->
+  OSL.Term ann ->
   Either (ErrorMessage ()) S11.Witness
-toSigma11Witness c (OSL.WitnessType t) (OSL.Witness w) =
-  S11.Witness <$> toSigma11ValueTree c t w
+toSigma11Witness c (OSL.WitnessType t) (OSL.Witness w) x =
+  S11.Witness <$> toSigma11ValueTree c t w (Just x)
 
 toSigma11ValueTree ::
   OSL.ValidContext t ann ->
   OSL.Type () ->
   OSL.Value ->
+  Maybe (OSL.Term ann) ->
   Either (ErrorMessage ()) S11.ValueTree
-toSigma11ValueTree c t x =
-  case (t,x) of
-    (OSL.N _, OSL.Nat y) -> scalarVT y
+toSigma11ValueTree c t val term =
+  case (t,val,term) of
+    (OSL.N _, OSL.Nat x, _) -> scalarVT x
+    (OSL.N _, _, _) -> typeMismatch
+    (OSL.Z _, OSL.Int x, _) -> scalarVT x
+    (OSL.Z _, _, _) -> typeMismatch
+    (OSL.Fp _, OSL.Fp' x, _) -> scalarVT x
+    (OSL.Fp _, _, _) -> typeMismatch
+    (OSL.Fin {}, OSL.Fin' x, _) -> scalarVT x
+    (OSL.Fin {}, _, _) -> typeMismatch
+    (OSL.Prop _, OSL.Bool y, _) -> scalarVT (S11.boolToScalar y)
+    (OSL.Prop _, _, _) -> typeMismatch
+    (OSL.NamedType _ name, OSL.To' name' x, _) ->
+      if name == name'
+      then case Map.lookup name (c ^. #unValidContext) of
+             Just (OSL.Data a) -> rec (OSL.dropTypeAnnotations a) x Nothing
+             _ -> Left (ErrorMessage () "expected the name of a type")
+      else Left (ErrorMessage () "named type mismatch")
+    (OSL.NamedType {}, _, _) -> typeMismatch
+    (OSL.Product _ a b, OSL.Pair' x y, Just (OSL.And _ p q)) ->
+      S11.ValueTree Nothing <$> sequence
+        [ rec a x (Just p),
+          rec b y (Just q)
+        ]
+    (OSL.Product _ a b, OSL.Pair' x y, Just (OSL.Or _ p q)) ->
+      S11.ValueTree Nothing <$> sequence
+        [ rec a x (Just p),
+          rec b y (Just q)
+        ]
+    (OSL.Coproduct _ a b, OSL.Iota1' x, Nothing) ->
+      S11.ValueTree Nothing <$> sequence
+        [ scalarVT zero,
+          rec a x Nothing,
+          flip (rec b) Nothing =<< OSL.defaultValue c b
+        ]
+    (OSL.Maybe _ a, OSL.Maybe'' Nothing, Nothing) ->
+      S11.ValueTree Nothing <$> sequence
+        [ scalarVT zero,
+          flip (rec a) Nothing =<< OSL.defaultValue c a
+        ]
+    (OSL.Maybe _ a, OSL.Maybe'' (Just x), Nothing) ->
+      S11.ValueTree Nothing <$> sequence
+        [ scalarVT one,
+          rec a x Nothing
+        ]
+    (OSL.List ann n a, OSL.List'' xs, _) ->
+      S11.ValueTree
+        <$> (Just . S11.Value . Map.singleton [] <$> fromInt (length xs))
+        <*> ((:[]) <$>
+              (rec (OSL.F ann (Just n) (OSL.N ann) a) . OSL.Fun . Map.fromList
+                =<< sequence [ (,x) . OSL.Nat <$> fromInt i
+                             | (i,x) <- zip [0..] xs
+                             ]))
+    (OSL.List {}, _, _) -> typeMismatch
+    (OSL.Map ann n a b, OSL.Map'' m, _) ->
+      S11.ValueTree
+        <$> (Just . S11.Value . Map.singleton [] <$> fromInt (Map.size m))
+        <*> sequence
+            [ rec (OSL.F ann (Just n) (OSL.N ann) a) . OSL.Fun . Map.fromList
+                =<< sequence
+                    [ (,x) . OSL.Nat <$> fromInt i
+                    | (i,x) <- zip [0..] (Map.keys m)
+                    ],
+              rec (OSL.F ann (Just n) a b) (OSL.Fun m)
+            ]
+    (OSL.Map {}, _, _) -> typeMismatch
+    (OSL.P _ _ a b@(OSL.N _), OSL.Fun f, _) -> scalarFun a b f
+    (OSL.P _ _ a b@(OSL.Z _), OSL.Fun f, _) -> scalarFun a b f
+    (OSL.P _ _ a b@(OSL.Fp _), OSL.Fun f, _) -> scalarFun a b f
+    (OSL.P _ _ a b@(OSL.Fin {}), OSL.Fun f, _) -> scalarFun a b f
+    (OSL.P _ _ a b@(OSL.NamedType {}), OSL.Fun f, _) -> scalarFun a b f
+    (OSL.P {}, _, _) -> typeMismatch
+    (OSL.F _ _ a b@(OSL.N _), OSL.Fun f) -> scalarFun a b f
+    (OSL.F _ _ a b@(OSL.Z _), OSL.Fun f) -> scalarFun a b f
+    (OSL.F _ _ a b@(OSL.Fp _), OSL.Fun f) -> scalarFun a b f
+    (OSL.F _ _ a b@(OSL.Fin {}), OSL.Fun f) -> scalarFun a b f
+    (OSL.F _ _ _ (OSL.Prop _), _) ->
+      Left (ErrorMessage () "unsupported: Prop-valued functions")
+    (OSL.F _ _ _ (OSL.P {}), _) ->
+      Left (ErrorMessage () "unsupported: families of permutations")
   where
-    scalarVT y = S11.ValueTree (Just (scalarValue y)) []
+    rec = toSigma11ValueTree c
 
-todo :: a
-todo = todo
+    scalarVT y = pure $ S11.ValueTree (Just (scalarValue y)) []
+
+    scalarFun a b f =
+      flip S11.ValueTree [] . Just . S11.Value . Map.fromList <$> sequence
+        [ (,) <$> (toScalars =<< toSigma11Values c a x) <*> (toScalar =<< toSigma11Values c b y)
+        | (x,y) <- Map.toList f
+        ]
 
 toSigma11Values ::
   OSL.ValidContext t ann ->
@@ -313,22 +397,24 @@ toSigma11Values c t v =
         OSL.To' _ x -> pure x
         _ -> Left (ErrorMessage () "expected a To value")
 
-    fromInt :: Int -> Either (ErrorMessage ()) Scalar
-    fromInt x =
-      maybe (Left (ErrorMessage () "int out of range of scalar field"))
-        pure (integerToScalar (intToInteger x))
 
-    toScalars :: [S11.Value] -> Either (ErrorMessage ()) [Scalar]
-    toScalars = mapM (toScalar . (:[]))
+typeMismatch :: Either (ErrorMessage ()) a
+typeMismatch = Left . ErrorMessage () $ "type mismatch"
 
-    toScalar :: [S11.Value] -> Either (ErrorMessage ()) Scalar
-    toScalar [S11.Value u] =
-      case Map.lookup [] u of
-        Just u' -> pure u'
-        Nothing -> Left . ErrorMessage () $ "expected a scalar"
-    toScalar _ = Left . ErrorMessage () $ "expected a scalar"
+fromInt :: Int -> Either (ErrorMessage ()) Scalar
+fromInt x =
+  maybe (Left (ErrorMessage () "int out of range of scalar field"))
+    pure (integerToScalar (intToInteger x))
 
-    typeMismatch = Left . ErrorMessage () $ "type mismatch"
+toScalars :: [S11.Value] -> Either (ErrorMessage ()) [Scalar]
+toScalars = mapM (toScalar . (:[]))
+
+toScalar :: [S11.Value] -> Either (ErrorMessage ()) Scalar
+toScalar [S11.Value u] =
+  case Map.lookup [] u of
+    Just u' -> pure u'
+    Nothing -> Left . ErrorMessage () $ "expected a scalar"
+toScalar _ = Left . ErrorMessage () $ "expected a scalar"
 
 defaultSigma11Values ::
   OSL.ValidContext t ann ->
