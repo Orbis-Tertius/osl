@@ -11,6 +11,7 @@ import Control.Lens ((^.))
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes, fromMaybe)
+import Data.Text (pack)
 import qualified OSL.Sigma11 as S11
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Evaluation (decodeScalar)
@@ -71,6 +72,10 @@ toSigma11ValueTree ::
   Either (ErrorMessage ()) S11.ValueTree
 toSigma11ValueTree gc lc lcs t val term =
   case (t,val,term) of
+    (_, OSL.Fin' 0, _) ->
+      -- the logic for this case is that there is no witness and so
+      -- we can just provide an empty tree.
+      pure emptyTree
     (_, _, OSL.Apply {}) ->
       -- the logic for this case works based on the assumption
       -- that the application head is a defined term which is
@@ -84,16 +89,18 @@ toSigma11ValueTree gc lc lcs t val term =
             Just (OSL.Defined _ def) ->
               let lc' = case Map.lookup name lcs of
                           Just lc'' -> lc''
-                          Nothing -> OSL.ValidContext (OSL.dropDeclarationAnnotations <$> (gc ^. #unValidContext)) in
-              toSigma11ValueTree gc lc' lcs t val (OSL.lambdaBody (OSL.dropTermAnnotations def))
-            _ -> Left (ErrorMessage () "expected application head to be the name of a defined predicate")
-        _ -> Left (ErrorMessage () "expected application head to be the name of a defined predicate")
-    (_, _, OSL.Let _ name a d y) ->
-      let lc' = lc <> OSL.ValidContext (Map.singleton name (OSL.Defined a d))
-          lcs' = Map.insert name lc lcs in
-      toSigma11ValueTree gc lc' lcs' t val y
-    (OSL.F _ _ _ b, _, OSL.Lambda _ _ _ body) ->
-      rec b val body
+                          Nothing -> OSL.ValidContext (OSL.dropDeclarationAnnotations <$> (gc ^. #unValidContext))
+              in toSigma11ValueTree gc lc' lcs t val (OSL.lambdaBody (OSL.dropTermAnnotations def))
+            _ -> Left . ErrorMessage () $
+              "expected application head to be the name of a defined predicate: " <> pack (show (t, val, term))
+        _ -> Left . ErrorMessage () $
+          "expected application head to be the name of a defined predicate: " <> pack (show (t, val, term))
+    (OSL.Product _ a b, OSL.Pair' w0 w1, OSL.Let _ name e d y) ->
+      let lc' = lc <> OSL.ValidContext (Map.singleton name (OSL.Defined e d))
+          lcs' = Map.insert name lc lcs
+      in pairTree <$> rec a w0 d <*> toSigma11ValueTree gc lc' lcs' b w1 y
+    (_, _, OSL.Lambda _ _ _ body) ->
+      rec t val body
     (OSL.Product _ a b, OSL.Pair' x y, OSL.And _ p q) ->
       pairTree <$> rec a x p <*> rec b y q
     (_, _, OSL.And {}) -> Left (ErrorMessage () "unexpected conjunction")
@@ -192,7 +199,9 @@ toSigma11ValueTree gc lc lcs t val term =
       Left (ErrorMessage () "unexpected Fp * a") -- NOTE: this is a fallthrough case
     (OSL.Product () (OSL.Fin {}) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.Fin {}) _ p) ->
       forSomeScalar b x y p
-    (OSL.Product () (OSL.Fin {}) _, _, _) -> Left (ErrorMessage () "unexpected Fin * a") -- NOTE: this is a fallthrough case
+    (OSL.Product () (OSL.Fin {}) _, _, _) ->
+      -- NOTE: this is a fallthrough case
+      Left . ErrorMessage () $ "unexpected Fin * a: " <> pack (show (t, val, term))
     (OSL.Product () (OSL.Product _ a b) d, OSL.Pair' (OSL.Pair' x y) z, OSL.ForSome ann v (OSL.Product {}) _ p) ->
       rec (OSL.Product () a (OSL.Product () b d))
         (OSL.Pair' x (OSL.Pair' y z))
@@ -263,7 +272,8 @@ toSigma11ValueTree gc lc lcs t val term =
           rec (OSL.Product () a' b) (OSL.Pair' x y) (OSL.ForSome ann v a' Nothing p)
         _ -> Left (ErrorMessage () "expected the name of a type")
     (OSL.Product _ (OSL.NamedType {}) _, _, _) ->
-      Left (ErrorMessage () "unexpected Foo * a") -- NOTE: this is a fallthrough case; careful moving it
+     -- NOTE: this is a fallthrough case; careful moving it
+     Left . ErrorMessage () $ "unexpected Foo * a: " <> pack (show (t, val, term))
     (OSL.Product _ (OSL.F _ _ a (OSL.N _)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
       forSomeScalarFun a (OSL.N ()) b f y p
     (OSL.Product _ (OSL.F _ _ a (OSL.Z _)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
@@ -302,13 +312,21 @@ toSigma11ValueTree gc lc lcs t val term =
         (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.N ann)) Nothing
           (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.F ann Nothing (OSL.N ann) a)) Nothing
             (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.F ann Nothing b d)) Nothing p)))
+    (OSL.Product _ (OSL.F _ _ a (OSL.NamedType _ name)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ v (OSL.F {}) _ p) ->
+      case Map.lookup name (lc ^. #unValidContext) of
+        Just (OSL.Data d) ->
+          rec (OSL.Product () (OSL.F () Nothing a d) b)
+            (OSL.Pair' (OSL.Fun (Map.mapMaybe OSL.toInverse f)) y)
+            (OSL.ForSome () v (OSL.F () Nothing a d) Nothing p)
+        _ -> Left (ErrorMessage () "expected the name of a type")
     (OSL.Product _ (OSL.F _ _ a (OSL.F _ _ b d)) e, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ v (OSL.F {}) _ p) ->
       rec
         (OSL.Product () (OSL.F () Nothing (OSL.Product () a b) d) e)
         (OSL.Pair' (OSL.Fun (OSL.uncurryFun f)) y)
         (OSL.ForSome () v (OSL.F () Nothing (OSL.Product () a b) d) Nothing p)
     (OSL.Product _ (OSL.F {}) _, _, _) ->
-      Left (ErrorMessage () "unexpected (a -> b) * c") -- NOTE: this is a fallthrough case; careful moving it
+      -- NOTE: this is a fallthrough case; careful moving it
+      Left . ErrorMessage () $ "unexpected (a -> b) * c: " <> pack (show (t, val, term))
     (OSL.Product _ (OSL.P _ _ a b) d, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.P {}) _ p) ->
       forSomeScalarFun a b d f y p
     (OSL.Product _ (OSL.P {}) _, _, _) ->
