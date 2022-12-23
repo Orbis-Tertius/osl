@@ -23,6 +23,7 @@ import qualified OSL.Types.Value as OSL
 import qualified OSL.Types.Sigma11.Argument as S11
 import qualified OSL.Types.Sigma11.Value as S11
 import qualified OSL.Types.Sigma11.ValueTree as S11
+import qualified OSL.ValidContext as OSL
 import qualified OSL.Value as OSL
 import Safe (atMay)
 import Stark.Types.Scalar (Scalar, zero, one, integerToScalar)
@@ -58,12 +59,12 @@ toSigma11Witness c (OSL.WitnessType t) (OSL.Witness w) x =
   S11.Witness <$> toSigma11ValueTree gc lc mempty t w x
   where
     gc = OSL.ValidContext (c ^. #unValidContext)
-    lc = OSL.ValidContext (c ^. #unValidContext)
+    lc = OSL.ValidContext (OSL.dropDeclarationAnnotations <$> (c ^. #unValidContext))
 
 toSigma11ValueTree ::
   OSL.ValidContext 'OSL.Global ann ->
-  OSL.ValidContext 'OSL.Local ann ->
-  Map OSL.Name (OSL.ValidContext 'OSL.Local ann) ->
+  OSL.ValidContext 'OSL.Local () ->
+  Map OSL.Name (OSL.ValidContext 'OSL.Local ()) ->
   OSL.Type () ->
   OSL.Value ->
   OSL.Term () ->
@@ -83,10 +84,14 @@ toSigma11ValueTree gc lc lcs t val term =
             Just (OSL.Defined _ def) ->
               let lc' = case Map.lookup name lcs of
                           Just lc'' -> lc''
-                          Nothing -> OSL.ValidContext (gc ^. #unValidContext) in
+                          Nothing -> OSL.ValidContext (OSL.dropDeclarationAnnotations <$> (gc ^. #unValidContext)) in
               toSigma11ValueTree gc lc' lcs t val (OSL.lambdaBody (OSL.dropTermAnnotations def))
             _ -> Left (ErrorMessage () "expected application head to be the name of a defined predicate")
         _ -> Left (ErrorMessage () "expected application head to be the name of a defined predicate")
+    (_, _, OSL.Let _ name a d y) ->
+      let lc' = lc <> OSL.ValidContext (Map.singleton name (OSL.Defined a d))
+          lcs' = Map.insert name lc lcs in
+      toSigma11ValueTree gc lc' lcs' t val y
     (OSL.Product _ a b, OSL.Pair' x y, OSL.And _ p q) ->
       pairTree <$> rec a x p <*> rec b y q
     (_, _, OSL.And {}) -> typeMismatch
@@ -305,7 +310,6 @@ toSigma11ValueTree gc lc lcs t val term =
     (OSL.Maybe {}, _, _) -> typeMismatch
     (OSL.List {}, _, _) -> typeMismatch
     (OSL.Map {}, _, _) -> typeMismatch
-    -- TODO: cases for let expressions
   where
     rec = toSigma11ValueTree gc lc lcs
 

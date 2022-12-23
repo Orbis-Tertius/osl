@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module OSL.ValidContext
   ( getDeclaration,
@@ -6,6 +7,7 @@ module OSL.ValidContext
     getNamedTermUnsafe,
     addDeclaration,
     getFreeOSLName,
+    dropDeclarationAnnotations,
   )
 where
 
@@ -13,8 +15,9 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Die (die)
-import OSL.Term (termAnnotation)
-import OSL.Types.OSL (Declaration (Defined), Name (GenSym, Sym), Term (NamedTerm), ValidContext (..))
+import OSL.Term (termAnnotation, dropTermAnnotations)
+import OSL.Type (dropTypeAnnotations)
+import OSL.Types.OSL (Declaration (Defined, Data, FreeVariable), Name (GenSym, Sym), Term (NamedTerm), ValidContext (..))
 
 getNamedTermUnsafe :: ValidContext t ann -> Name -> Term ann
 getNamedTermUnsafe c name =
@@ -51,3 +54,10 @@ getFreeOSLName (ValidContext c) =
     Nothing -> GenSym 0
     Just (Sym _) -> GenSym 0
     Just (GenSym i) -> GenSym (i + 1)
+
+dropDeclarationAnnotations :: Declaration ann -> Declaration ()
+dropDeclarationAnnotations =
+  \case
+    Data a -> Data (dropTypeAnnotations a)
+    Defined a d -> Defined (dropTypeAnnotations a) (dropTermAnnotations d)
+    FreeVariable a -> FreeVariable (dropTypeAnnotations a)
