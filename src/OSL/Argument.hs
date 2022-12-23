@@ -82,13 +82,13 @@ toSigma11ValueTree c t val term =
     (_, _, OSL.Bottom _) -> pure emptyTree
     (OSL.Prop _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.N _) b, OSL.Fun f, OSL.ForAll _ _ (OSL.N _) _ p) ->
-      scalarForAll b f p
+      forAllScalar b f p
     (OSL.F _ _ (OSL.Z _) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Z _) _ p) ->
-      scalarForAll b f p
+      forAllScalar b f p
     (OSL.F _ _ (OSL.Fp _) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Fp _) _ p) ->
-       scalarForAll b f p
+       forAllScalar b f p
     (OSL.F _ _ (OSL.Fin {}) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Fin {}) _ p) ->
-      scalarForAll b f p
+      forAllScalar b f p
     (OSL.F _ _ (OSL.Product _ a b) d, OSL.Fun f, OSL.ForAll _ x (OSL.Product {}) _ p) -> do
       f' <- curryFun f
       rec (OSL.F () Nothing a (OSL.F () Nothing b d))
@@ -112,9 +112,96 @@ toSigma11ValueTree c t val term =
       rec (OSL.F () Nothing (OSL.N ()) (OSL.F () Nothing a b))
         (OSL.Fun f')
         (OSL.ForAll () x (OSL.N ()) Nothing (OSL.ForAll () x a Nothing p))
-    (OSL.Product () (OSL.N _) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.N _) _ p) -> do
-      S11.ValueTree <$> (Just . S11.Value . Map.singleton [] <$> decodeScalar () x)
-                    <*> ((:[]) <$> rec b y p)
+    (OSL.Product () (OSL.N _) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.N _) _ p) ->
+      forSomeScalar b x y p
+    (OSL.Product () (OSL.Z _) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.Z _) _ p) ->
+      forSomeScalar b x y p
+    (OSL.Product () (OSL.Fp _) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.Fp _) _ p) ->
+      forSomeScalar b x y p
+    (OSL.Product () (OSL.Fin {}) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.Fin {}) _ p) ->
+      forSomeScalar b x y p
+    (OSL.Product () (OSL.Product _ a b) d, OSL.Pair' (OSL.Pair' x y) z, OSL.ForSome ann v (OSL.Product {}) _ p) ->
+      rec (OSL.Product () a (OSL.Product () b d))
+        (OSL.Pair' x (OSL.Pair' y z))
+        (OSL.ForSome ann v a Nothing (OSL.ForSome ann v b Nothing p))
+    (OSL.Product _ (OSL.Coproduct _ a b) d, OSL.Pair' (OSL.Iota1' x) y, OSL.ForSome ann v (OSL.Coproduct {}) _ p) -> do
+      defaultB <- OSL.defaultValue c b
+      rec (OSL.Product () (OSL.N ()) (OSL.Product () a (OSL.Product () b d)))
+        (OSL.Pair' (OSL.Nat zero) (OSL.Pair' x (OSL.Pair' defaultB y)))
+        (OSL.ForSome ann v (OSL.N ()) Nothing
+          (OSL.ForSome ann v a Nothing
+            (OSL.ForSome ann v b Nothing p)))
+    (OSL.Product _ (OSL.Coproduct _ a b) d, OSL.Pair' (OSL.Iota2' x) y, OSL.ForSome ann v (OSL.Coproduct {}) _ p) -> do
+      defaultA <- OSL.defaultValue c a
+      rec (OSL.Product () (OSL.N ()) (OSL.Product () a (OSL.Product () b d)))
+        (OSL.Pair' (OSL.Nat one) (OSL.Pair' defaultA (OSL.Pair' x y)))
+        (OSL.ForSome ann v (OSL.N ()) Nothing
+          (OSL.ForSome ann v a Nothing
+            (OSL.ForSome ann v b Nothing p)))
+    (OSL.Product _ (OSL.Maybe _ a) b, OSL.Pair' (OSL.Maybe'' Nothing) y, OSL.ForSome ann v (OSL.Maybe {}) _ p) -> do
+      defaultA <- OSL.defaultValue c a
+      rec (OSL.Product () (OSL.N ()) (OSL.Product () a b))
+        (OSL.Pair' (OSL.Nat zero) (OSL.Pair' defaultA y))
+        (OSL.ForSome ann v (OSL.N ()) Nothing
+          (OSL.ForSome ann v a Nothing p))
+    (OSL.Product _ (OSL.Maybe _ a) b, OSL.Pair' (OSL.Maybe'' (Just x)) y, OSL.ForSome ann v (OSL.Maybe {}) _ p) -> do
+      rec (OSL.Product () (OSL.N ()) (OSL.Product () a b))
+        (OSL.Pair' (OSL.Nat one) (OSL.Pair' x y))
+        (OSL.ForSome ann v (OSL.N ()) Nothing
+          (OSL.ForSome ann v a Nothing p))
+    (OSL.Product _ (OSL.List _ _ a) b, OSL.Pair' (OSL.List'' xs) y, OSL.ForSome ann v (OSL.List {}) _ p) -> do
+      n <- fromInt (length xs)
+      f <- OSL.Fun . Map.fromList <$> sequence
+           [ (,x) . OSL.Nat <$> fromInt i
+           | (i,x) <- zip [0..] xs
+           ]
+      rec (OSL.Product () (OSL.N ()) (OSL.Product () (OSL.F () Nothing (OSL.N ()) a) b))
+        (OSL.Pair' (OSL.Nat n) (OSL.Pair' f y))
+        (OSL.ForSome ann v (OSL.N ann) Nothing
+          (OSL.ForSome ann v (OSL.F ann Nothing (OSL.N ()) a) Nothing p))
+    (OSL.Product _ (OSL.Map _ _ a b) d, OSL.Pair' (OSL.Map'' m) y, OSL.ForSome ann v (OSL.Map {}) _ p) -> do
+      n <- OSL.Nat <$> fromInt (Map.size m)
+      ks <- OSL.Fun . Map.fromList <$> sequence
+            [ (,x) . OSL.Nat <$> fromInt i
+            | (i,x) <- zip [0..] (Map.keys m)
+            ]
+      rec
+        (OSL.Product () (OSL.N ())
+          (OSL.Product () (OSL.F () Nothing (OSL.N ()) a)
+            (OSL.Product () (OSL.F () Nothing a b) d)))
+        (OSL.Pair' n (OSL.Pair' ks (OSL.Pair' (OSL.Fun m) y)))
+        (OSL.ForSome ann v (OSL.N ann) Nothing
+          (OSL.ForSome ann v (OSL.F ann Nothing (OSL.N ann) a) Nothing
+            (OSL.ForSome ann v (OSL.F ann Nothing a b) Nothing p)))
+    (OSL.Product _ (OSL.F _ _ a (OSL.N _)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
+      forSomeScalarFun a b f y p
+    (OSL.Product _ (OSL.F _ _ a (OSL.Z _)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
+      forSomeScalarFun a b f y p
+    (OSL.Product _ (OSL.F _ _ a (OSL.Fp _)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
+      forSomeScalarFun a b f y p
+    (OSL.Product _ (OSL.F _ _ a (OSL.Fin {})) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
+      forSomeScalarFun a b f y p
+    (OSL.Product _ (OSL.F _ _ a (OSL.Product _ b d)) e, OSL.Pair' (OSL.Fun f) y, OSL.ForSome ann v (OSL.F {}) _ p) ->
+      let f0 = OSL.Fun $ Map.mapMaybe OSL.fstOfPairMay f
+          f1 = OSL.Fun $ Map.mapMaybe OSL.sndOfPairMay f in
+      rec
+        (OSL.Product () (OSL.F () Nothing a b)
+          (OSL.Product () (OSL.F () Nothing a d) e))
+        (OSL.Pair' f0 (OSL.Pair' f1 y))
+        (OSL.ForSome ann v (OSL.F ann Nothing a b) Nothing
+          (OSL.ForSome ann v (OSL.F ann Nothing a d) Nothing p))
+    (OSL.Product _ (OSL.F _ _ a (OSL.Coproduct _ b d)) e, OSL.Pair' (OSL.Fun f) y, OSL.ForSome ann v (OSL.F {}) _ p) ->
+      let fInd = OSL.Fun $ Map.mapMaybe OSL.coproductIndicator f
+          f0 = OSL.Fun $ Map.mapMaybe OSL.iota1Inverse f
+          f1 = OSL.Fun $ Map.mapMaybe OSL.iota2Inverse f in
+      rec
+        (OSL.Product () (OSL.F () Nothing a (OSL.N ()))
+          (OSL.Product () (OSL.F () Nothing a b)
+            (OSL.Product () (OSL.F () Nothing a d) e)))
+        (OSL.Pair' fInd (OSL.Pair' f0 (OSL.Pair' f1 y)))
+        (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.N ann)) Nothing
+          (OSL.ForSome ann v (OSL.F ann Nothing a b) Nothing
+            (OSL.ForSome ann v (OSL.F ann Nothing a d) Nothing p)))
   where
     rec = toSigma11ValueTree c
 
@@ -122,11 +209,24 @@ toSigma11ValueTree c t val term =
 
     emptyTree = S11.ValueTree Nothing []
 
-    scalarForAll b f p =
+    forAllScalar b f p =
       -- we are relying on Map.elems outputting the elements in ascending
       -- order of their keys
       S11.ValueTree Nothing <$> sequence
         [ rec b y p | y <- Map.elems f ]
+
+    forSomeScalar b x y p =
+      S11.ValueTree <$> (Just . S11.Value . Map.singleton [] <$> decodeScalar () x)
+                    <*> ((:[]) <$> rec b y p)
+
+    forSomeScalarFun a b f y p = do
+      f' <- toSigma11Values c (OSL.F () Nothing a b) (OSL.Fun f)
+      case f' of
+        [f''] -> S11.ValueTree (Just f'') . (:[]) <$> rec b y p
+        _ -> Left (ErrorMessage () "forSomeScalarFun: pattern match failure (this is a compiler bug)")
+
+todo :: a
+todo = todo
 
 curryFun :: Map OSL.Value OSL.Value -> Either (ErrorMessage ()) (Map OSL.Value OSL.Value)
 curryFun f =
