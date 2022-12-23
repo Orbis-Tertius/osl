@@ -55,25 +55,36 @@ toSigma11Witness ::
   OSL.Term () ->
   Either (ErrorMessage ()) S11.Witness
 toSigma11Witness c (OSL.WitnessType t) (OSL.Witness w) x =
-  S11.Witness <$> toSigma11ValueTree c t w x
+  S11.Witness <$> toSigma11ValueTree gc lc mempty t w x
+  where
+    gc = OSL.ValidContext (c ^. #unValidContext)
+    lc = OSL.ValidContext (c ^. #unValidContext)
 
 toSigma11ValueTree ::
-  OSL.ValidContext t ann ->
+  OSL.ValidContext 'OSL.Global ann ->
+  OSL.ValidContext 'OSL.Local ann ->
+  Map OSL.Name (OSL.ValidContext 'OSL.Local ann) ->
   OSL.Type () ->
   OSL.Value ->
   OSL.Term () ->
   Either (ErrorMessage ()) S11.ValueTree
-toSigma11ValueTree c t val term =
+toSigma11ValueTree gc lc lcs t val term =
   case (t,val,term) of
     (_, _, OSL.Apply {}) ->
       -- the logic for this case works based on the assumption
       -- that the application head is a defined term which is
       -- a Prop-valued lambda abstraction with the same number
       -- of arguments as it is applied to in the term.
+      -- TODO: also support applications of set literals and names
+      -- denoting set literals.
       case OSL.applicationHead term of
         OSL.NamedTerm _ name ->
-          case Map.lookup name (c ^. #unValidContext) of
-            Just (OSL.Defined _ def) -> rec t val (OSL.lambdaBody (OSL.dropTermAnnotations def))
+          case Map.lookup name (lc ^. #unValidContext) of
+            Just (OSL.Defined _ def) ->
+              let lc' = case Map.lookup name lcs of
+                          Just lc'' -> lc''
+                          Nothing -> OSL.ValidContext (gc ^. #unValidContext) in
+              toSigma11ValueTree gc lc' lcs t val (OSL.lambdaBody (OSL.dropTermAnnotations def))
             _ -> Left (ErrorMessage () "expected application head to be the name of a defined predicate")
         _ -> Left (ErrorMessage () "expected application head to be the name of a defined predicate")
     (OSL.Product _ a b, OSL.Pair' x y, OSL.And _ p q) ->
@@ -115,8 +126,8 @@ toSigma11ValueTree c t val term =
         (OSL.ForAll () x a Nothing (OSL.ForAll () x b Nothing p))
     (OSL.F _ _ (OSL.Product {}) _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.Coproduct _ a b) d, OSL.Fun f, OSL.ForAll _ x (OSL.Coproduct {}) _ p) -> do
-      defaultA <- OSL.defaultValue c a
-      defaultB <- OSL.defaultValue c b
+      defaultA <- OSL.defaultValue gc a
+      defaultB <- OSL.defaultValue gc b
       f' <- curryCoproductFun (defaultA, defaultB) f
       rec (OSL.F () Nothing (OSL.N ()) (OSL.F () Nothing a (OSL.F () Nothing b d)))
         (OSL.Fun f')
@@ -125,14 +136,14 @@ toSigma11ValueTree c t val term =
             (OSL.ForAll () x b Nothing p)))
     (OSL.F _ _ (OSL.Coproduct {}) _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.Maybe _ a) b, OSL.Fun f, OSL.ForAll _ x (OSL.Maybe {}) _ p) -> do
-      defaultA <- OSL.defaultValue c a
+      defaultA <- OSL.defaultValue gc a
       f' <- curryMaybeFun defaultA f
       rec (OSL.F () Nothing (OSL.N ()) (OSL.F () Nothing a b))
         (OSL.Fun f')
         (OSL.ForAll () x (OSL.N ()) Nothing (OSL.ForAll () x a Nothing p))
     (OSL.F _ _ (OSL.Maybe {}) _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.NamedType _ name) b, OSL.Fun f, OSL.ForAll _ x (OSL.NamedType {}) _ p) ->
-      case Map.lookup name (c ^. #unValidContext) of
+      case Map.lookup name (gc ^. #unValidContext) of
         Just (OSL.Data a) ->
           let f' = OSL.Fun $ Map.mapMaybe OSL.toInverse f
               a' = OSL.dropTypeAnnotations a in
@@ -178,14 +189,14 @@ toSigma11ValueTree c t val term =
         (OSL.ForSome ann v a Nothing (OSL.ForSome ann v b Nothing p))
     (OSL.Product () (OSL.Product {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.Coproduct _ a b) d, OSL.Pair' (OSL.Iota1' x) y, OSL.ForSome ann v (OSL.Coproduct {}) _ p) -> do
-      defaultB <- OSL.defaultValue c b
+      defaultB <- OSL.defaultValue gc b
       rec (OSL.Product () (OSL.N ()) (OSL.Product () a (OSL.Product () b d)))
         (OSL.Pair' (OSL.Nat zero) (OSL.Pair' x (OSL.Pair' defaultB y)))
         (OSL.ForSome ann v (OSL.N ()) Nothing
           (OSL.ForSome ann v a Nothing
             (OSL.ForSome ann v b Nothing p)))
     (OSL.Product _ (OSL.Coproduct _ a b) d, OSL.Pair' (OSL.Iota2' x) y, OSL.ForSome ann v (OSL.Coproduct {}) _ p) -> do
-      defaultA <- OSL.defaultValue c a
+      defaultA <- OSL.defaultValue gc a
       rec (OSL.Product () (OSL.N ()) (OSL.Product () a (OSL.Product () b d)))
         (OSL.Pair' (OSL.Nat one) (OSL.Pair' defaultA (OSL.Pair' x y)))
         (OSL.ForSome ann v (OSL.N ()) Nothing
@@ -193,7 +204,7 @@ toSigma11ValueTree c t val term =
             (OSL.ForSome ann v b Nothing p)))
     (OSL.Product () (OSL.Coproduct {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.Maybe _ a) b, OSL.Pair' (OSL.Maybe'' Nothing) y, OSL.ForSome ann v (OSL.Maybe {}) _ p) -> do
-      defaultA <- OSL.defaultValue c a
+      defaultA <- OSL.defaultValue gc a
       rec (OSL.Product () (OSL.N ()) (OSL.Product () a b))
         (OSL.Pair' (OSL.Nat zero) (OSL.Pair' defaultA y))
         (OSL.ForSome ann v (OSL.N ()) Nothing
@@ -231,7 +242,7 @@ toSigma11ValueTree c t val term =
             (OSL.ForSome ann v (OSL.F ann Nothing a b) Nothing p)))
     (OSL.Product _ (OSL.Map {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.NamedType _ name) b, OSL.Pair' (OSL.To' _ x) y, OSL.ForSome ann v (OSL.NamedType {}) _ p) ->
-      case Map.lookup name (c ^. #unValidContext) of
+      case Map.lookup name (gc ^. #unValidContext) of
         Just (OSL.Data a) ->
           let a' = OSL.dropTypeAnnotations a in
           rec (OSL.Product () a' b) (OSL.Pair' x y) (OSL.ForSome ann v a' Nothing p)
@@ -296,7 +307,7 @@ toSigma11ValueTree c t val term =
     (OSL.Map {}, _, _) -> typeMismatch
     -- TODO: cases for let expressions
   where
-    rec = toSigma11ValueTree c
+    rec = toSigma11ValueTree gc lc lcs
 
     pairTree x y = S11.ValueTree Nothing [x, y]
 
@@ -313,7 +324,7 @@ toSigma11ValueTree c t val term =
                     <*> ((:[]) <$> rec b y p)
 
     forSomeScalarFun a b d f y p = do
-      f' <- toSigma11Values c (OSL.F () Nothing a b) (OSL.Fun f)
+      f' <- toSigma11Values lc (OSL.F () Nothing a b) (OSL.Fun f)
       case f' of
         [f''] -> S11.ValueTree (Just f'') . (:[]) <$> rec d y p
         _ -> Left (ErrorMessage () "forSomeScalarFun: pattern match failure (this is a compiler bug)")
