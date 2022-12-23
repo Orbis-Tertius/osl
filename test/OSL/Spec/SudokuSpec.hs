@@ -22,6 +22,7 @@ import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.Sigma11 (evalFormula, auxTablesToEvalContext)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
+import OSL.Term (dropTermAnnotations)
 import OSL.Translate (translateToFormula)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
@@ -103,11 +104,11 @@ exampleSpec c = do
               Right (translated, aux) ->
                 case auxTablesToEvalContext aux of
                   Right ec -> do
-                    case toSigma11Argument c argumentForm (exampleArgument c) of
+                    case toSigma11Argument c argumentForm (exampleArgument c) (dropTermAnnotations def) of
                       Right arg ->
                         evalFormula ec arg translated `shouldBe` Right True
                       Left err -> expectationFailure ("toSigma11Argument exampleArgument: " <> show err)
-                    case toSigma11Argument c argumentForm (exampleUnsoundArgument c) of
+                    case toSigma11Argument c argumentForm (exampleUnsoundArgument c) (dropTermAnnotations def) of
                       Right arg ->
                         evalFormula ec arg translated `shouldBe` Right False
                       Left err -> expectationFailure ("toSigma11Argument exampleUnsoundArgument: " <> show err)
