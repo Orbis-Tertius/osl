@@ -92,6 +92,8 @@ toSigma11ValueTree gc lc lcs t val term =
       let lc' = lc <> OSL.ValidContext (Map.singleton name (OSL.Defined a d))
           lcs' = Map.insert name lc lcs in
       toSigma11ValueTree gc lc' lcs' t val y
+    (OSL.F _ _ _ b, _, OSL.Lambda _ _ _ body) ->
+      rec b val body
     (OSL.Product _ a b, OSL.Pair' x y, OSL.And _ p q) ->
       pairTree <$> rec a x p <*> rec b y q
     (_, _, OSL.And {}) -> typeMismatch
