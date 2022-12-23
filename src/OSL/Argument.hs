@@ -14,6 +14,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified OSL.Sigma11 as S11
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Evaluation (decodeScalar)
+import qualified OSL.Term as OSL
 import qualified OSL.Type as OSL
 import qualified OSL.Types.ArgumentForm as OSL
 import qualified OSL.Types.Argument as OSL
@@ -64,6 +65,17 @@ toSigma11ValueTree ::
   Either (ErrorMessage ()) S11.ValueTree
 toSigma11ValueTree c t val term =
   case (t,val,term) of
+    (_, _, OSL.Apply {}) ->
+      -- the logic for this case works based on the assumption
+      -- that the application head is a defined term which is
+      -- a Prop-valued lambda abstraction with the same number
+      -- of arguments as it is applied to in the term.
+      case OSL.applicationHead term of
+        OSL.NamedTerm _ name ->
+          case Map.lookup name (c ^. #unValidContext) of
+            Just (OSL.Defined _ def) -> rec t val (OSL.lambdaBody (OSL.dropTermAnnotations def))
+            _ -> Left (ErrorMessage () "expected application head to be the name of a defined predicate")
+        _ -> Left (ErrorMessage () "expected application head to be the name of a defined predicate")
     (OSL.Product _ a b, OSL.Pair' x y, OSL.And _ p q) ->
       pairTree <$> rec a x p <*> rec b y q
     (_, _, OSL.And {}) -> typeMismatch
@@ -83,12 +95,16 @@ toSigma11ValueTree c t val term =
     (OSL.Prop _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.N _) b, OSL.Fun f, OSL.ForAll _ _ (OSL.N _) _ p) ->
       forAllScalar b f p
+    (OSL.F _ _ (OSL.N _) _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.Z _) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Z _) _ p) ->
       forAllScalar b f p
+    (OSL.F _ _ (OSL.Z _) _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.Fp _) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Fp _) _ p) ->
        forAllScalar b f p
+    (OSL.F _ _ (OSL.Fp _) _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.Fin {}) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Fin {}) _ p) ->
       forAllScalar b f p
+    (OSL.F _ _ (OSL.Fin {}) _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.Product _ a b) d, OSL.Fun f, OSL.ForAll _ x (OSL.Product {}) _ p) -> do
       f' <- curryFun f
       rec (OSL.F () Nothing a (OSL.F () Nothing b d))
@@ -97,6 +113,7 @@ toSigma11ValueTree c t val term =
         -- and also by removing any bounds on x, but none of that matters for this algorithm,
         -- where the atomic formulas and also the quantifier bounds are irrelevant.
         (OSL.ForAll () x a Nothing (OSL.ForAll () x b Nothing p))
+    (OSL.F _ _ (OSL.Product {}) _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.Coproduct _ a b) d, OSL.Fun f, OSL.ForAll _ x (OSL.Coproduct {}) _ p) -> do
       defaultA <- OSL.defaultValue c a
       defaultB <- OSL.defaultValue c b
@@ -106,24 +123,60 @@ toSigma11ValueTree c t val term =
         (OSL.ForAll () x (OSL.N ()) Nothing
           (OSL.ForAll () x a Nothing
             (OSL.ForAll () x b Nothing p)))
+    (OSL.F _ _ (OSL.Coproduct {}) _, _, _) -> typeMismatch
     (OSL.F _ _ (OSL.Maybe _ a) b, OSL.Fun f, OSL.ForAll _ x (OSL.Maybe {}) _ p) -> do
       defaultA <- OSL.defaultValue c a
       f' <- curryMaybeFun defaultA f
       rec (OSL.F () Nothing (OSL.N ()) (OSL.F () Nothing a b))
         (OSL.Fun f')
         (OSL.ForAll () x (OSL.N ()) Nothing (OSL.ForAll () x a Nothing p))
+    (OSL.F _ _ (OSL.Maybe {}) _, _, _) -> typeMismatch
+    (OSL.F _ _ (OSL.NamedType _ name) b, OSL.Fun f, OSL.ForAll _ x (OSL.NamedType {}) _ p) ->
+      case Map.lookup name (c ^. #unValidContext) of
+        Just (OSL.Data a) ->
+          let f' = OSL.Fun $ Map.mapMaybe OSL.toInverse f
+              a' = OSL.dropTypeAnnotations a in
+          rec (OSL.F () Nothing a' b) f' (OSL.ForAll () x a' Nothing p)
+        _ -> Left (ErrorMessage () "expected the name of a type")
+    (OSL.F _ _ (OSL.NamedType {}) _, _, _) -> typeMismatch
+    (OSL.F _ _ (OSL.Prop _) _, _, _) -> typeMismatch
+    (OSL.F _ _ (OSL.F {}) _, _, _) -> typeMismatch
+    (OSL.F _ _ (OSL.P {}) _, _, _) -> typeMismatch
+    (OSL.F _ _ (OSL.List {}) _, _, _) -> typeMismatch
+    (OSL.F _ _ (OSL.Map {}) _, _, _) -> typeMismatch
+    -- The following patterns ((_, OSL.Nat _, _), etc.) are correct because every
+    -- OSL witness is either a pair, a function, or fin(0) (in which case it should
+    -- be caught by an earlier pattern matching the formula, which would be an atomic formula).
+    (_, OSL.Nat _, _) -> typeMismatch
+    (_, OSL.Int _, _) -> typeMismatch
+    (_, OSL.Fp' _, _) -> typeMismatch
+    (_, OSL.Fin' {}, _) -> typeMismatch
+    (_, OSL.Iota1' {}, _) -> typeMismatch
+    (_, OSL.Iota2' {}, _) -> typeMismatch
+    (_, OSL.To' {}, _) -> typeMismatch
+    (_, OSL.Maybe'' {}, _) -> typeMismatch
+    (_, OSL.List'' {}, _) -> typeMismatch
+    (_, OSL.Map'' {}, _) -> typeMismatch
+    (_, OSL.Bool {}, _) -> typeMismatch
+    (_, OSL.Predicate {}, _) -> typeMismatch
+    (OSL.Product () (OSL.Prop _) _, _, _) -> typeMismatch
     (OSL.Product () (OSL.N _) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.N _) _ p) ->
       forSomeScalar b x y p
+    (OSL.Product () (OSL.N _) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product () (OSL.Z _) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.Z _) _ p) ->
       forSomeScalar b x y p
+    (OSL.Product () (OSL.Z _) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product () (OSL.Fp _) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.Fp _) _ p) ->
       forSomeScalar b x y p
+    (OSL.Product () (OSL.Fp _) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product () (OSL.Fin {}) b, OSL.Pair' x y, OSL.ForSome _ _ (OSL.Fin {}) _ p) ->
       forSomeScalar b x y p
+    (OSL.Product () (OSL.Fin {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product () (OSL.Product _ a b) d, OSL.Pair' (OSL.Pair' x y) z, OSL.ForSome ann v (OSL.Product {}) _ p) ->
       rec (OSL.Product () a (OSL.Product () b d))
         (OSL.Pair' x (OSL.Pair' y z))
         (OSL.ForSome ann v a Nothing (OSL.ForSome ann v b Nothing p))
+    (OSL.Product () (OSL.Product {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.Coproduct _ a b) d, OSL.Pair' (OSL.Iota1' x) y, OSL.ForSome ann v (OSL.Coproduct {}) _ p) -> do
       defaultB <- OSL.defaultValue c b
       rec (OSL.Product () (OSL.N ()) (OSL.Product () a (OSL.Product () b d)))
@@ -138,6 +191,7 @@ toSigma11ValueTree c t val term =
         (OSL.ForSome ann v (OSL.N ()) Nothing
           (OSL.ForSome ann v a Nothing
             (OSL.ForSome ann v b Nothing p)))
+    (OSL.Product () (OSL.Coproduct {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.Maybe _ a) b, OSL.Pair' (OSL.Maybe'' Nothing) y, OSL.ForSome ann v (OSL.Maybe {}) _ p) -> do
       defaultA <- OSL.defaultValue c a
       rec (OSL.Product () (OSL.N ()) (OSL.Product () a b))
@@ -149,6 +203,7 @@ toSigma11ValueTree c t val term =
         (OSL.Pair' (OSL.Nat one) (OSL.Pair' x y))
         (OSL.ForSome ann v (OSL.N ()) Nothing
           (OSL.ForSome ann v a Nothing p))
+    (OSL.Product _ (OSL.Maybe {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.List _ _ a) b, OSL.Pair' (OSL.List'' xs) y, OSL.ForSome ann v (OSL.List {}) _ p) -> do
       n <- fromInt (length xs)
       f <- OSL.Fun . Map.fromList <$> sequence
@@ -159,6 +214,7 @@ toSigma11ValueTree c t val term =
         (OSL.Pair' (OSL.Nat n) (OSL.Pair' f y))
         (OSL.ForSome ann v (OSL.N ann) Nothing
           (OSL.ForSome ann v (OSL.F ann Nothing (OSL.N ()) a) Nothing p))
+    (OSL.Product _ (OSL.List {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.Map _ _ a b) d, OSL.Pair' (OSL.Map'' m) y, OSL.ForSome ann v (OSL.Map {}) _ p) -> do
       n <- OSL.Nat <$> fromInt (Map.size m)
       ks <- OSL.Fun . Map.fromList <$> sequence
@@ -173,35 +229,72 @@ toSigma11ValueTree c t val term =
         (OSL.ForSome ann v (OSL.N ann) Nothing
           (OSL.ForSome ann v (OSL.F ann Nothing (OSL.N ann) a) Nothing
             (OSL.ForSome ann v (OSL.F ann Nothing a b) Nothing p)))
+    (OSL.Product _ (OSL.Map {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case
+    (OSL.Product _ (OSL.NamedType _ name) b, OSL.Pair' (OSL.To' _ x) y, OSL.ForSome ann v (OSL.NamedType {}) _ p) ->
+      case Map.lookup name (c ^. #unValidContext) of
+        Just (OSL.Data a) ->
+          let a' = OSL.dropTypeAnnotations a in
+          rec (OSL.Product () a' b) (OSL.Pair' x y) (OSL.ForSome ann v a' Nothing p)
+        _ -> Left (ErrorMessage () "expected the name of a type")
+    (OSL.Product _ (OSL.NamedType {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case; careful moving it
     (OSL.Product _ (OSL.F _ _ a (OSL.N _)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
-      forSomeScalarFun a b f y p
+      forSomeScalarFun a (OSL.N ()) b f y p
     (OSL.Product _ (OSL.F _ _ a (OSL.Z _)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
-      forSomeScalarFun a b f y p
+      forSomeScalarFun a (OSL.Z ()) b f y p
     (OSL.Product _ (OSL.F _ _ a (OSL.Fp _)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
-      forSomeScalarFun a b f y p
-    (OSL.Product _ (OSL.F _ _ a (OSL.Fin {})) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
-      forSomeScalarFun a b f y p
-    (OSL.Product _ (OSL.F _ _ a (OSL.Product _ b d)) e, OSL.Pair' (OSL.Fun f) y, OSL.ForSome ann v (OSL.F {}) _ p) ->
+      forSomeScalarFun a (OSL.Fp ()) b f y p
+    (OSL.Product _ (OSL.F _ _ a (OSL.Fin _ n)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
+      forSomeScalarFun a (OSL.Fin () n) b f y p
+    (OSL.Product _ (OSL.F _ _ a (OSL.Product _ b d)) e, OSL.Pair' (OSL.Fun f) y, OSL.ForSome ann v (OSL.F {}) _ p) -> do
       let f0 = OSL.Fun $ Map.mapMaybe OSL.fstOfPairMay f
-          f1 = OSL.Fun $ Map.mapMaybe OSL.sndOfPairMay f in
+          f1 = OSL.Fun $ Map.mapMaybe OSL.sndOfPairMay f
       rec
         (OSL.Product () (OSL.F () Nothing a b)
           (OSL.Product () (OSL.F () Nothing a d) e))
         (OSL.Pair' f0 (OSL.Pair' f1 y))
         (OSL.ForSome ann v (OSL.F ann Nothing a b) Nothing
           (OSL.ForSome ann v (OSL.F ann Nothing a d) Nothing p))
-    (OSL.Product _ (OSL.F _ _ a (OSL.Coproduct _ b d)) e, OSL.Pair' (OSL.Fun f) y, OSL.ForSome ann v (OSL.F {}) _ p) ->
-      let fInd = OSL.Fun $ Map.mapMaybe OSL.coproductIndicator f
-          f0 = OSL.Fun $ Map.mapMaybe OSL.iota1Inverse f
-          f1 = OSL.Fun $ Map.mapMaybe OSL.iota2Inverse f in
+    (OSL.Product _ (OSL.F _ _ a (OSL.List _ _ b)) d, OSL.Pair' (OSL.Fun f) y, OSL.ForSome ann v (OSL.F {}) _ p) ->
+      let fLengths = OSL.Fun $ Map.mapMaybe OSL.listLength f
+          fValues = OSL.Fun $ Map.mapMaybe OSL.listFun f in
       rec
         (OSL.Product () (OSL.F () Nothing a (OSL.N ()))
-          (OSL.Product () (OSL.F () Nothing a b)
-            (OSL.Product () (OSL.F () Nothing a d) e)))
-        (OSL.Pair' fInd (OSL.Pair' f0 (OSL.Pair' f1 y)))
+          (OSL.Product () (OSL.F () Nothing a (OSL.F () Nothing (OSL.N ()) b)) d))
+        (OSL.Pair' fLengths (OSL.Pair' fValues y))
         (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.N ann)) Nothing
-          (OSL.ForSome ann v (OSL.F ann Nothing a b) Nothing
-            (OSL.ForSome ann v (OSL.F ann Nothing a d) Nothing p)))
+          (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.F ann Nothing (OSL.N ann) b)) Nothing p))
+    (OSL.Product _ (OSL.F _ _ a (OSL.Map _ _ b d)) e, OSL.Pair' (OSL.Fun f) y, OSL.ForSome ann v (OSL.F {}) _ p) ->
+      let fSizes = OSL.Fun $ Map.mapMaybe OSL.mapSize f
+          fKeys = OSL.Fun $ Map.mapMaybe OSL.mapKeys f
+          fValues = OSL.Fun $ Map.mapMaybe OSL.mapFun f in
+      rec
+        (OSL.Product () (OSL.F () Nothing a (OSL.N ()))
+          (OSL.Product () (OSL.F () Nothing a (OSL.F () Nothing (OSL.N ()) b))
+            (OSL.Product () (OSL.F () Nothing a (OSL.F () Nothing a b)) e)))
+        (OSL.Pair' fSizes (OSL.Pair' fKeys (OSL.Pair' fValues y)))
+        (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.N ann)) Nothing
+          (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.F ann Nothing (OSL.N ann) a)) Nothing
+            (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.F ann Nothing b d)) Nothing p)))
+    (OSL.Product _ (OSL.F _ _ a (OSL.F _ _ b d)) e, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ v (OSL.F {}) _ p) ->
+      rec
+        (OSL.Product () (OSL.F () Nothing (OSL.Product () a b) d) e)
+        (OSL.Pair' (OSL.Fun (OSL.uncurryFun f)) y)
+        (OSL.ForSome () v (OSL.F () Nothing (OSL.Product () a b) d) Nothing p)
+    (OSL.Product _ (OSL.F {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case; careful moving it
+    (OSL.Product _ (OSL.P _ _ a b) d, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.P {}) _ p) ->
+      forSomeScalarFun a b d f y p
+    (OSL.Product _ (OSL.P {}) _, _, _) -> typeMismatch -- NOTE: this is a fallthrough case; careful moving it
+    (OSL.P {}, _, _) -> typeMismatch
+    (OSL.N {}, _, _) -> typeMismatch
+    (OSL.Z {}, _, _) -> typeMismatch
+    (OSL.Fp {}, _, _) -> typeMismatch
+    (OSL.Fin {}, _, _) -> typeMismatch
+    (OSL.Coproduct {}, _, _) -> typeMismatch
+    (OSL.NamedType {}, _, _) -> typeMismatch
+    (OSL.Maybe {}, _, _) -> typeMismatch
+    (OSL.List {}, _, _) -> typeMismatch
+    (OSL.Map {}, _, _) -> typeMismatch
+    -- TODO: cases for let expressions
   where
     rec = toSigma11ValueTree c
 
@@ -219,14 +312,11 @@ toSigma11ValueTree c t val term =
       S11.ValueTree <$> (Just . S11.Value . Map.singleton [] <$> decodeScalar () x)
                     <*> ((:[]) <$> rec b y p)
 
-    forSomeScalarFun a b f y p = do
+    forSomeScalarFun a b d f y p = do
       f' <- toSigma11Values c (OSL.F () Nothing a b) (OSL.Fun f)
       case f' of
-        [f''] -> S11.ValueTree (Just f'') . (:[]) <$> rec b y p
+        [f''] -> S11.ValueTree (Just f'') . (:[]) <$> rec d y p
         _ -> Left (ErrorMessage () "forSomeScalarFun: pattern match failure (this is a compiler bug)")
-
-todo :: a
-todo = todo
 
 curryFun :: Map OSL.Value OSL.Value -> Either (ErrorMessage ()) (Map OSL.Value OSL.Value)
 curryFun f =

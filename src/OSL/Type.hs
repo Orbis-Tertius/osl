@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 module OSL.Type
   ( typeAnnotation,
@@ -7,8 +8,9 @@ module OSL.Type
   )
 where
 
+import qualified Data.Map as Map
+import Control.Lens ((^.))
 import OSL.Types.OSL (Cardinality (..), Declaration (Data), Type (..), ValidContext)
-import OSL.ValidContext (getDeclaration)
 
 typeAnnotation :: Type ann -> ann
 typeAnnotation t =
@@ -40,7 +42,7 @@ typeCardinality ctx t =
     Product {} -> Just 1
     Coproduct {} -> Just 1
     NamedType _ name ->
-      case getDeclaration ctx name of
+      case Map.lookup name (ctx ^. #unValidContext) of
         Just (Data t') -> typeCardinality ctx t'
         _ -> Nothing
     Maybe _ _ -> Just 1
