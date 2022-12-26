@@ -33,7 +33,9 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (pack)
+import Debug.Trace (trace)
 import Die (die)
+import OSL.Debug (showTrace)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
@@ -263,7 +265,7 @@ evalFormula c arg =
     ForAll (TermBound b) p -> do
       b' <- evalTerm c b
       let go x arg' = do
-            let (arg'', arg''') = popArg arg'
+            let (arg'', arg''') = popArg p arg'
                 c' = addToEvalContext c (Arity 0)
                        (Value (Map.singleton [] x))
                 x' = x Group.+ one
@@ -275,7 +277,14 @@ evalFormula c arg =
               else pure False -- Left (ErrorMessage () $ "ForAll: false " <> pack (show (x, p, arg, c)))
       if b' == zero then pure True else go zero arg
   where
-    rec = evalFormula c
+    rec = traceEvalFormula c
+
+    traceEvalFormula c' arg' p@(ForSome {}) = do
+      r <- evalFormula c' arg' p
+      if r == False
+        then pure (fst (showTrace "evaluate: " (r, (p, c', arg' ^. #witness))))
+        else pure r
+    traceEvalFormula c' arg' p = evalFormula c' arg' p
 
     splitArg =
       case arg ^. #witness of
@@ -286,14 +295,14 @@ evalFormula c arg =
           (Argument (arg ^. #statement) (Witness (ValueTree Nothing [])),
            Argument (arg ^. #statement) (Witness (ValueTree Nothing [])))
 
-    popArg :: Argument -> (Argument, Argument)
-    popArg arg' =
+    popArg :: Formula -> Argument -> (Argument, Argument)
+    popArg p arg' =
       case arg' ^. #witness . #unWitness . #branches of
         (b:bs) ->
           ( Argument (arg ^. #statement) (Witness b),
             Argument (arg ^. #statement) (Witness (ValueTree Nothing bs))
           )
-        [] ->
+        [] -> trace ("popArg: ran out of witness branches: " <> show p) $
           ( Argument (arg ^. #statement) (Witness (ValueTree Nothing [])),
             Argument (arg ^. #statement) (Witness (ValueTree Nothing []))
           )
@@ -305,7 +314,7 @@ evalFormula c arg =
           let c' = addToEvalContext c arity w
               arg' = Argument (arg ^. #statement) (Witness ws')
           checkValueIsInBounds c n ibs ob w
-          evalFormula c' arg' p
+          traceEvalFormula c' arg' p
         _ -> do
           let c' = addToEvalContext c arity (if arity == 0 then Value (Map.singleton [] 0) else Value mempty)
               arg' = Argument (arg ^. #statement) (Witness (ValueTree Nothing []))

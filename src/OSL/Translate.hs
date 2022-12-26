@@ -990,9 +990,9 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
       pure
         ( cQs <> aQs,
           mergeMapping
-            (\aM' cM' -> MaybeMapping (ChoiceMapping cM') (ValuesMapping aM'))
-            aM
+            (\cM' aM' -> MaybeMapping (ChoiceMapping cM') (ValuesMapping aM'))
             cM
+            aM
         )
     OSL.List ann (OSL.Cardinality n) a -> do
       (lQs, lM) <- rec lc (OSL.N ann)
@@ -1131,9 +1131,9 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
           pure
             ( [cQ] <> aQs <> bQs,
               mergeMapping
-                (\bM' aM' -> CoproductMapping cM (LeftMapping aM') (RightMapping bM'))
-                bM
+                (\aM' bM' -> CoproductMapping cM (LeftMapping aM') (RightMapping bM'))
                 aM
+                bM
             )
         _ -> lift . Left $ ErrorMessage (boundAnnotation varBound) "expected a coproduct bound"
     OSL.NamedType ann name ->
