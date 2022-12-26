@@ -232,16 +232,16 @@ evalFormula c arg =
              "predicate not defined in given evaluation context"
     Not p -> not <$> rec arg p
     And p q -> do
-      (arg0, arg1) <- splitArg
+      let (arg0, arg1) = splitArg
       (&&) <$> rec arg0 p <*> rec arg1 q
     Or p q -> do
-      (arg0, arg1) <- splitArg
+      let (arg0, arg1) = splitArg
       (||) <$> rec arg0 p <*> rec arg1 q
     Implies p q -> do
-      (arg0, arg1) <- splitArg
+      let (arg0, arg1) = splitArg
       (||) <$> (not <$> rec arg0 p) <*> rec arg1 q
     Iff p q -> do
-      (arg0, arg1) <- splitArg
+      let (arg0, arg1) = splitArg
       (==) <$> rec arg0 p <*> rec arg1 q
     Top -> pure True
     Bottom -> pure False
@@ -263,46 +263,53 @@ evalFormula c arg =
     ForAll (TermBound b) p -> do
       b' <- evalTerm c b
       let go x arg' = do
-            (arg'', arg''') <- popArg arg'
-            let c' = addToEvalContext c (Arity 0)
+            let (arg'', arg''') = popArg arg'
+                c' = addToEvalContext c (Arity 0)
                        (Value (Map.singleton [] x))
                 x' = x Group.+ one
             r <- evalFormula c' arg'' p
-            if r && x' == b'
-              then pure True
-              else if r
-                   then go x' arg'''
-                   else pure False -- Left (ErrorMessage () $ "ForAll: false " <> pack (show (x, p, arg, c)))
-      go zero arg
+            if r
+              then if x' == b'
+                   then pure True
+                   else go x' arg'''
+              else pure False -- Left (ErrorMessage () $ "ForAll: false " <> pack (show (x, p, arg, c)))
+      if b' == zero then pure True else go zero arg
   where
     rec = evalFormula c
 
     splitArg =
       case arg ^. #witness of
         Witness (ValueTree Nothing [w0, w1]) ->
-          pure (Argument (arg ^. #statement) (Witness w0),
-                Argument (arg ^. #statement) (Witness w1))
-        _ -> Left (ErrorMessage () "expected witness to be a pair")
+          (Argument (arg ^. #statement) (Witness w0),
+           Argument (arg ^. #statement) (Witness w1))
+        _ ->
+          (Argument (arg ^. #statement) (Witness (ValueTree Nothing [])),
+           Argument (arg ^. #statement) (Witness (ValueTree Nothing [])))
 
-    popArg :: Argument -> Either (ErrorMessage ()) (Argument, Argument)
+    popArg :: Argument -> (Argument, Argument)
     popArg arg' =
       case arg' ^. #witness . #unWitness . #branches of
-        (b:bs) -> pure $
+        (b:bs) ->
           ( Argument (arg ^. #statement) (Witness b),
             Argument (arg ^. #statement) (Witness (ValueTree Nothing bs))
           )
-        [] -> Left (ErrorMessage () "ran out of branches while transforming universal witness")
+        [] ->
+          ( Argument (arg ^. #statement) (Witness (ValueTree Nothing [])),
+            Argument (arg ^. #statement) (Witness (ValueTree Nothing []))
+          )
 
     existentialQuantifier n ibs ob p =
       let arity = Arity (length ibs) in
       case arg ^. #witness . #unWitness of
         ValueTree (Just w) [ws'] -> do
           let c' = addToEvalContext c arity w
-          let arg' = Argument (arg ^. #statement) (Witness ws')
+              arg' = Argument (arg ^. #statement) (Witness ws')
           checkValueIsInBounds c n ibs ob w
           evalFormula c' arg' p
-        _ -> Left . ErrorMessage () $
-          "witness is not existential-shaped"
+        _ -> do
+          let c' = addToEvalContext c arity (if arity == 0 then Value (Map.singleton [] 0) else Value mempty)
+              arg' = Argument (arg ^. #statement) (Witness (ValueTree Nothing []))
+          evalFormula c' arg' p
 
 checkValueIsInBounds ::
   EvaluationContext ->

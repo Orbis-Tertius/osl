@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module OSL.Argument (toSigma11Argument) where
 
@@ -12,6 +13,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (pack)
+import OSL.Debug (showTrace)
 import qualified OSL.Sigma11 as S11
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Evaluation (decodeScalar)
@@ -70,12 +72,13 @@ toSigma11ValueTree ::
   OSL.Value ->
   OSL.Term () ->
   Either (ErrorMessage ()) S11.ValueTree
-toSigma11ValueTree gc lc lcs t val term =
+toSigma11ValueTree gc lc lcs t = curry $ \(showTrace "val/term: " -> (val, term)) ->
   case (t,val,term) of
-    (_, OSL.Fin' 0, _) ->
-      -- the logic for this case is that there is no witness and so
-      -- we can just provide an empty tree.
-      pure emptyTree
+    -- TODO: is the following commented out clause needed?
+    -- (_, OSL.Fin' 0, _) ->
+    --   -- the logic for this case is that there is no witness and so
+    --   -- we can just provide an empty tree.
+    --   pure emptyTree
     (_, _, OSL.Apply {}) ->
       -- the logic for this case works based on the assumption
       -- that the application head is a defined term which is
@@ -95,10 +98,10 @@ toSigma11ValueTree gc lc lcs t val term =
               "expected application head to be the name of a defined predicate: " <> pack (show (t, val, term))
         _ -> Left . ErrorMessage () $
           "expected application head to be the name of a defined predicate: " <> pack (show (t, val, term))
-    (OSL.Product _ a b, OSL.Pair' w0 w1, OSL.Let _ name e d y) ->
+    (a, w, OSL.Let _ name e d y) ->
       let lc' = lc <> OSL.ValidContext (Map.singleton name (OSL.Defined e d))
           lcs' = Map.insert name lc lcs
-      in pairTree <$> rec a w0 d <*> toSigma11ValueTree gc lc' lcs' b w1 y
+      in toSigma11ValueTree gc lc' lcs' a w y
     (_, _, OSL.Lambda _ _ _ body) ->
       rec t val body
     (OSL.Product _ a b, OSL.Pair' x y, OSL.And _ p q) ->
@@ -159,7 +162,7 @@ toSigma11ValueTree gc lc lcs t val term =
     (OSL.F _ _ (OSL.NamedType _ name) b, OSL.Fun f, OSL.ForAll _ x (OSL.NamedType {}) _ p) ->
       case Map.lookup name (gc ^. #unValidContext) of
         Just (OSL.Data a) ->
-          let f' = OSL.Fun $ Map.mapMaybe OSL.toInverse f
+          let f' = OSL.Fun $ mapKeysMaybe OSL.toInverse f
               a' = OSL.dropTypeAnnotations a in
           rec (OSL.F () Nothing a' b) f' (OSL.ForAll () x a' Nothing p)
         _ -> Left (ErrorMessage () "expected the name of a type")
@@ -706,3 +709,8 @@ defaultSigma11Values c =
     rec = defaultSigma11Values c
 
     scalarDefault = [S11.Value (Map.singleton [] zero)]
+
+mapKeysMaybe :: Ord k' => (k -> Maybe k') -> Map k a -> Map k' a
+mapKeysMaybe f m =
+  Map.fromList . catMaybes $
+    [ (,v) <$> f k | (k,v) <- Map.toList m ]

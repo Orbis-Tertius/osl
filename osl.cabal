@@ -67,6 +67,7 @@ library
     OSL.ArgumentForm
     OSL.Bound
     OSL.BuildTranslationContext
+    OSL.Debug
     OSL.EntryPoint
     OSL.Evaluation
     OSL.LoadContext

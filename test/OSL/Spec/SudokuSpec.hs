@@ -105,7 +105,9 @@ exampleSpec c = do
                 case auxTablesToEvalContext aux of
                   Right ec -> do
                     case toSigma11Argument c argumentForm (exampleArgument c) (dropTermAnnotations def) of
-                      Right arg ->
+                      Right arg -> do
+                        liftIO . putStrLn . ("OSL witness: " <>) $ show (exampleArgument c ^. #witness)
+                        liftIO . putStrLn . ("sigma11 argument: " <>) $ show arg
                         evalFormula ec arg translated `shouldBe` Right True
                       Left err -> expectationFailure ("toSigma11Argument exampleArgument: " <> show err)
                     case toSigma11Argument c argumentForm (exampleUnsoundArgument c) (dropTermAnnotations def) of
@@ -399,71 +401,59 @@ complexWitnessType =
     (NamedType () "Solution")
     ( Product
         ()
-        ( Product
+        ( F
             ()
-            (Fin () 1)
-            ( Product
-                ()
-                (Fin () 1)
-                ( F
-                    ()
-                    Nothing
-                    (NamedType () "Cell")
-                    (Product () (Fin () 1) (Fin () 1))
-                )
-            )
+            Nothing
+            (NamedType () "Cell")
+            (Product () (Fin () 1) (Fin () 1))
         )
         ( Product
             ()
-            (Fin () 1)
             ( Product
                 ()
-                ( Product
-                    ()
-                    ( F
-                        ()
-                        Nothing
-                        (NamedType () "Row")
-                        ( F
-                            ()
-                            Nothing
-                            (NamedType () "Digit")
-                            ( Product
-                                ()
-                                (NamedType () "Col")
-                                (Fin () 1)
-                            )
-                        )
-                    )
-                    ( F
-                        ()
-                        Nothing
-                        (NamedType () "Col")
-                        ( F
-                            ()
-                            Nothing
-                            (NamedType () "Digit")
-                            ( Product
-                                ()
-                                (NamedType () "Row")
-                                (Fin () 1)
-                            )
-                        )
-                    )
-                )
                 ( F
                     ()
                     Nothing
-                    (NamedType () "Square")
+                    (NamedType () "Row")
                     ( F
                         ()
                         Nothing
                         (NamedType () "Digit")
                         ( Product
                             ()
-                            (NamedType () "SquareCell")
+                            (NamedType () "Col")
                             (Fin () 1)
                         )
+                    )
+                )
+                ( F
+                    ()
+                    Nothing
+                    (NamedType () "Col")
+                    ( F
+                        ()
+                        Nothing
+                        (NamedType () "Digit")
+                        ( Product
+                            ()
+                            (NamedType () "Row")
+                            (Fin () 1)
+                        )
+                    )
+                )
+            )
+            ( F
+                ()
+                Nothing
+                (NamedType () "Square")
+                ( F
+                    ()
+                    Nothing
+                    (NamedType () "Digit")
+                    ( Product
+                        ()
+                        (NamedType () "SquareCell")
+                        (Fin () 1)
                     )
                 )
             )

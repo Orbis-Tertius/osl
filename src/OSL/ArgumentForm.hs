@@ -92,7 +92,7 @@ getWitnessType gc lc lcs =
     Let _ v a def body -> do
       let lc' = lc <> ValidContext (Map.singleton v (Defined a def))
           lcs' = ContextBacklinks (Map.insert v (lc, lcs) (unContextBacklinks lcs))
-      prod <$> rec lc lcs def <*> rec lc' lcs' body
+      rec lc' lcs' body
     Lambda _ v a body -> do
       let lc' = lc <> ValidContext (Map.singleton v (FreeVariable a))
           lcs' = ContextBacklinks (Map.insert v (lc, lcs) (unContextBacklinks lcs))
