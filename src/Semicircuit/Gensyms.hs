@@ -10,7 +10,7 @@ module Semicircuit.Gensyms
 where
 
 import Control.Arrow (second)
-import Control.Lens ((^.))
+import Control.Lens (Identity (Identity, runIdentity), (^.))
 import Control.Monad.State (State, get, put, runState)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -56,14 +56,14 @@ deBruijnToGensyms' =
     DB.Iff p q -> GS.Iff <$> rec p <*> rec q
     DB.Top -> pure GS.Top
     DB.Bottom -> pure GS.Bottom
-    DB.ForAll b p -> do
+    DB.ForAll _ b p -> do
       b' <- bound b
       pushIndices (Arity 0)
       x <- mapName (DB.Name (Arity 0) (DeBruijnIndex 0))
       r <- GS.ForAll x b' <$> rec p
       popIndices (Arity 0)
       pure r
-    DB.ForSome (DB.Some n bs b) p -> do
+    DB.ForSome (DB.Some _ n bs b) p -> do
       bs' <-
         mapM
           ( \case
@@ -84,7 +84,7 @@ deBruijnToGensyms' =
       r <- GS.ForSome (GS.Some x n bs' b') <$> rec p
       popIndices arity
       pure r
-    DB.ForSome (DB.SomeP n b0 b1) p -> do
+    DB.ForSome (DB.SomeP _ n b0 b1) p -> do
       b0' <-
         case b0 of
           DB.NamedInputBound _ b0' ->
@@ -104,7 +104,7 @@ deBruijnToGensyms' =
           <$> rec p
       popIndices (Arity 1)
       pure r
-    DB.Given n ibs ob p -> do
+    DB.Given _ n ibs ob p -> do
       ibs' <-
         mapM
           ( \case
@@ -168,7 +168,7 @@ nextSym = do
 pushIndices :: Arity -> State S ()
 pushIndices arity = do
   S n m <- get
-  put (S n (Map.mapKeys (incrementDeBruijnIndices arity 1) m))
+  put (S n (Map.mapKeys (runIdentity . incrementDeBruijnIndices arity 1 . Identity) m))
 
 popIndices :: Arity -> State S ()
 popIndices arity = do
@@ -177,7 +177,7 @@ popIndices arity = do
     ( S
         n
         ( Map.mapKeys
-            (incrementDeBruijnIndices arity (-1))
+            (runIdentity . incrementDeBruijnIndices arity (-1) . Identity)
             (Map.delete (DB.Name arity 0) m)
         )
     )

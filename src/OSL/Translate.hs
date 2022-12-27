@@ -863,9 +863,9 @@ translate
             let lc' =
                   TranslationContext
                     decls'
-                    (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
+                    (qCtx `Map.union` (fmap (incrementDeBruijnIndices (Arity 0) n) <$> mappings))
             bounds <- translateBound gc lc varType varBound
-            Formula . foldl' (.) id (S11.ForAll <$> bounds)
+            Formula . foldl' (.) id (S11.ForAll (S11.Name 0 0) <$> bounds)
               <$> translateToFormula gc lc' p
           InfiniteDimensions ->
             lift . Left $ ErrorMessage ann "universal quantification over an infinite-dimensional type"
@@ -919,7 +919,7 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
             Nothing -> lift . Left $ ErrorMessage ann "missing function type cardinality (required for instance data)"
           (bQs, bM) <- rec lc b
           aBounds <- fmap S11.inputBound <$> translateBound gc lc a Nothing
-          let fM = incrementArities n bM
+          let fM = incrementArities n <$> bM
           let fQs = prependBounds cardinality aBounds <$> bQs
           pure (fQs, fM)
         InfiniteDimensions ->
@@ -935,12 +935,12 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
             Just m -> pure m
             Nothing -> lift . Left $ ErrorMessage ann "missing permutation type cardinality (required for instance data)"
           (_, aM) <- rec lc a
-          let fM = incrementArities 1 aM
+          let fM = incrementArities 1 <$> aM
           aBoundTs <- fmap S11.inputBound <$> translateBound gc lc a Nothing
           bBoundTs <- fmap S11.OutputBound <$> translateBound gc lc b Nothing
           case (aBoundTs, bBoundTs) of
             ([aBoundT], [bBoundT]) ->
-              pure ([S11.Instance cardinality [aBoundT] bBoundT], fM)
+              pure ([S11.Instance (S11.Name (1 :: Arity) (0 :: DeBruijnIndex)) cardinality [aBoundT] bBoundT], fM)
             _ -> lift . Left $ ErrorMessage ann "non-scalar bounds for a permutation; this a compiler bug"
         InfiniteDimensions -> lift . Left $ ErrorMessage ann "expected a finite-dimensional type"
     OSL.Product _ a b -> do
@@ -1017,7 +1017,7 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
       case bTs of
         [bT] ->
           pure
-            ( [S11.Instance 1 [] (S11.OutputBound bT)],
+            ( [S11.Instance (S11.Name 0 0) 1 [] (S11.OutputBound bT)],
               ScalarMapping (S11.var (S11.Name 0 0))
             )
         _ ->
@@ -1051,7 +1051,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
             Just m -> pure m
             Nothing -> lift . Left $ ErrorMessage ann "missing function type cardinality (required for quantification)"
           (bQs, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
-          let fM = incrementArities n bM
+          let fM = incrementArities n <$> bM
           aBounds <-
             fmap S11.inputBound
               <$> translateBound gc lc a (Just aBound)
@@ -1077,13 +1077,13 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
             fmap S11.OutputBound
               <$> translateBound gc lc a (Just bBound)
           (_, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
-          let fM = incrementArities 1 bM
+          let fM = incrementArities 1 <$> bM
           aBoundTs <-
             fmap S11.inputBound
               <$> translateBound gc lc a (Just aBound)
           case (aBoundTs, bBoundTs) of
             ([aBoundT], [bBoundT]) ->
-              pure ([S11.SomeP cardinality aBoundT bBoundT], fM)
+              pure ([S11.SomeP (S11.Name (1 :: Arity) (0 :: DeBruijnIndex)) cardinality aBoundT bBoundT], fM)
             _ -> lift . Left $ ErrorMessage ann "non-scalar bounds for a permutation; this is a compiler bug"
         _ ->
           lift . Left $
@@ -1315,7 +1315,7 @@ getArbitraryMapping ctx =
       case getMappingDimensions ctx a of
         Left err -> Left err
         Right (FiniteDimensions m) ->
-          incrementArities m <$> getArbitraryMapping ctx b
+          fmap (incrementArities m) <$> getArbitraryMapping ctx b
         Right InfiniteDimensions ->
           Left (ErrorMessage ann "expected a finite-dimensional domain type")
     OSL.P {} -> pure $ ScalarMapping (S11.var (S11.Name 1 0))

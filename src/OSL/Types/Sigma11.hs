@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -11,10 +12,13 @@ module OSL.Types.Sigma11
     TermF (..),
     Term,
     var,
-    Formula (..),
-    ExistentialQuantifier (..),
+    FormulaF (..),
+    Formula,
+    ExistentialQuantifierF (..),
+    ExistentialQuantifier,
     someFirstOrder,
-    InstanceQuantifier (..),
+    InstanceQuantifierF (..),
+    InstanceQuantifier,
     InputBound,
     inputBound,
     InputBoundF (..),
@@ -22,8 +26,10 @@ module OSL.Types.Sigma11
     OutputBoundF (..),
     Bound,
     BoundF (..),
-    Quantifier (ForAll', ForSome', Given'),
-    AuxTables (..),
+    Quantifier,
+    QuantifierF (ForAll', ForSome', Given'),
+    AuxTablesF (..),
+    AuxTables,
   )
 where
 
@@ -56,7 +62,7 @@ data TermF name
   | IndLess (TermF name) (TermF name)
   | Max (TermF name) (TermF name)
   | Const Integer
-  deriving (Eq)
+  deriving (Eq, Functor)
 
 type Term = TermF Name
 
@@ -79,22 +85,23 @@ instance Show a => Show (TermF a) where
     "max(" <> show x <> ", " <> show y <> ")"
   show (Const x) = show x
 
-data Formula
-  = Equal Term Term
-  | LessOrEqual Term Term
-  | Predicate PredicateName [Term]
-  | Not Formula
-  | And Formula Formula
-  | Or Formula Formula
-  | Implies Formula Formula
-  | Iff Formula Formula
-  | ForAll Bound Formula
-  | ForSome ExistentialQuantifier Formula
-  | Given Cardinality [InputBound] OutputBound Formula
+data FormulaF name
+  = Equal (TermF name) (TermF name)
+  | LessOrEqual (TermF name) (TermF name)
+  | Predicate PredicateName [TermF name]
+  | Not (FormulaF name)
+  | And (FormulaF name) (FormulaF name)
+  | Or (FormulaF name) (FormulaF name)
+  | Implies (FormulaF name) (FormulaF name)
+  | Iff (FormulaF name) (FormulaF name)
+  | ForAll name (BoundF name) (FormulaF name)
+  | ForSome (ExistentialQuantifierF name) (FormulaF name)
+  | Given name Cardinality [InputBoundF name] (OutputBoundF name) (FormulaF name)
   | Top
   | Bottom
+  deriving (Functor)
 
-instance Show Formula where
+instance Show name => Show (FormulaF name) where
   show (Equal x y) =
     "(" <> show x <> " = " <> show y <> ")"
   show (LessOrEqual x y) =
@@ -108,23 +115,25 @@ instance Show Formula where
     "(" <> show p <> " -> " <> show q <> ")"
   show (Iff p q) =
     "(" <> show p <> " <-> " <> show q <> ")"
-  show (ForAll b p) =
+  show (ForAll _ b p) =
     "(∀<" <> show b <> ", " <> show p <> ")"
   show (ForSome q p) =
     "(∃" <> show q <> ", " <> show p <> ")"
-  show (Given _ [] ob p) =
+  show (Given _ _ [] ob p) =
     "(λ<" <> show ob <> ", " <> show p <> ")"
-  show (Given n ibs ob p) =
+  show (Given _ n ibs ob p) =
     "(λ^" <> show n <> "<" <> show ob <> "(" <> intercalate ", " (show <$> ibs) <> "), " <> show p <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
   show Top = "⊤"
   show Bottom = "⊥"
 
+type Formula = FormulaF Name
+
 data InputBoundF name
   = UnnamedInputBound {bound :: BoundF name}
   | NamedInputBound {_name :: name, bound :: BoundF name}
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, Functor)
 
 instance Show a => Show (InputBoundF a) where
   show (UnnamedInputBound b) = "<" <> show b
@@ -144,28 +153,31 @@ inputBound = UnnamedInputBound
 type OutputBound = OutputBoundF Name
 
 newtype OutputBoundF name = OutputBound {unOutputBound :: BoundF name}
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, Functor)
 
 deriving newtype instance Show a => Show (OutputBoundF a)
 
-data ExistentialQuantifier
-  = Some Cardinality [InputBound] OutputBound
-  | SomeP Cardinality InputBound OutputBound
+data ExistentialQuantifierF name
+  = Some name Cardinality [InputBoundF name] (OutputBoundF name)
+  | SomeP name Cardinality (InputBoundF name) (OutputBoundF name)
+  deriving (Functor)
+
+type ExistentialQuantifier = ExistentialQuantifierF Name
 
 someFirstOrder :: Bound -> ExistentialQuantifier
 someFirstOrder b =
-  Some (Cardinality 1) [] (OutputBound b)
+  Some (Name (0 :: Arity) (0 :: DeBruijnIndex)) (Cardinality 1) [] (OutputBound b)
 
-instance Show ExistentialQuantifier where
-  show (Some _ [] b) = "<" <> show b
-  show (Some (Cardinality n) bs b) =
+instance Show name => Show (ExistentialQuantifierF name) where
+  show (Some _ _ [] b) = "<" <> show b
+  show (Some _ (Cardinality n) bs b) =
     "^"
       <> show n
       <> "("
       <> intercalate ", " (show <$> bs)
       <> ")<"
       <> show b
-  show (SomeP (Cardinality n) b0 b1) =
+  show (SomeP _ (Cardinality n) b0 b1) =
     "^"
       <> show n
       <> "<"
@@ -174,11 +186,13 @@ instance Show ExistentialQuantifier where
       <> show b1
       <> ")"
 
-data InstanceQuantifier
-  = Instance Cardinality [InputBound] OutputBound
+data InstanceQuantifierF name
+  = Instance name Cardinality [InputBoundF name] (OutputBoundF name)
+
+type InstanceQuantifier = InstanceQuantifierF Name
 
 data BoundF name = TermBound (TermF name) | FieldMaxBound
-  deriving (Eq)
+  deriving (Eq, Functor)
 
 type Bound = BoundF Name
 
@@ -186,19 +200,23 @@ instance Show a => Show (BoundF a) where
   show (TermBound t) = show t
   show FieldMaxBound = "|F|"
 
-data Quantifier
-  = ForAll' Bound
-  | ForSome' ExistentialQuantifier
-  | Given' InstanceQuantifier
+data QuantifierF name
+  = ForAll' name (BoundF name)
+  | ForSome' (ExistentialQuantifierF name)
+  | Given' (InstanceQuantifierF name)
 
-data AuxTables = AuxTables
-  { functionTables :: Map Name (Map [Integer] Integer),
+type Quantifier = QuantifierF Name
+
+data AuxTablesF name = AuxTables
+  { functionTables :: Map name (Map [Integer] Integer),
     predicateTables :: Map PredicateName (Set [Integer])
   }
   deriving (Eq, Show, Generic)
 
-instance Semigroup AuxTables where
+instance Ord name => Semigroup (AuxTablesF name) where
   (AuxTables ft0 pt0) <> (AuxTables ft1 pt1) = AuxTables (ft0 <> ft1) (pt0 <> pt1)
 
-instance Monoid AuxTables where
+instance Ord name => Monoid (AuxTablesF name) where
   mempty = AuxTables mempty mempty
+
+type AuxTables = AuxTablesF Name
