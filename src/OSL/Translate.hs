@@ -870,28 +870,15 @@ translate
         let decls' =
               OSL.ValidContext $
                 Map.insert varName (OSL.FreeVariable varType) declsMap
-        varDim <- lift $ getMappingDimensions decls varType
-        case varDim of
-          FiniteDimensions n -> do
-            TranslationContext _ qCtx <-
-              lift $ buildTranslationContext' decls' [varName]
-            let lc' =
-                  TranslationContext
-                    decls'
-                    (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
-            bounds <- translateBound gc lc varType varBound
-            Formula . foldl' (.) id (S11.ForSome . S11.someFirstOrder <$> bounds)
-              <$> translateToFormula gc lc' p
-          InfiniteDimensions -> do
-            (qs, newMapping) <-
-              getExistentialQuantifierStringAndMapping gc lc varType
-                =<< lift (getExplicitOrInferredBound decls varType varBound)
-            let lc' =
-                  TranslationContext
-                    decls'
-                    (mergeMappings (Map.singleton varName newMapping) mappings)
-            Formula . (\f -> foldl' (flip S11.ForSome) f qs)
-              <$> translateToFormula gc lc' p
+        (qs, newMapping) <-
+          getExistentialQuantifierStringAndMapping gc lc varType
+            =<< lift (getExplicitOrInferredBound decls varType varBound)
+        let lc' =
+              TranslationContext
+                decls'
+                (mergeMappings (Map.singleton varName newMapping) mappings)
+        Formula . (\f -> foldl' (flip S11.ForSome) f qs)
+          <$> translateToFormula gc lc' p
       term ->
         lift . Left . ErrorMessage (termAnnotation term) $
           "could not translate term: " <> pack (show term)

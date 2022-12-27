@@ -37,7 +37,7 @@ import Text.Parsec (SourcePos)
 
 spec :: Spec
 spec =
-  describe "Sudoku" $ do
+  describe "sudoku" $ do
     mctx <- loadContext (FileName "examples/sudoku.osl")
     case mctx of
       Left err -> liftIO . expectationFailure $ show err

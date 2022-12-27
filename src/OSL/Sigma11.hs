@@ -257,7 +257,7 @@ evalFormula c arg =
         [] -> Left . ErrorMessage () $ "statement is too short"
     ForSome (Some n ibs ob) p ->
       existentialQuantifier n ibs ob p
-    ForSome (SomeP n ib ob) p ->
+    ForSome (SomeP n ib ob) p -> -- TODO: also check witness value is a permutation
       existentialQuantifier n [ib] ob p
     ForAll FieldMaxBound _ ->
       Left . ErrorMessage () $
@@ -315,10 +315,8 @@ evalFormula c arg =
               arg' = Argument (arg ^. #statement) (Witness ws')
           checkValueIsInBounds c n ibs ob w
           traceEvalFormula c' arg' p
-        _ -> do
-          let c' = addToEvalContext c arity (if arity == 0 then Value (Map.singleton [] 0) else Value mempty)
-              arg' = Argument (arg ^. #statement) (Witness (ValueTree Nothing []))
-          evalFormula c' arg' p
+        _ -> Left . ErrorMessage () $
+          "witness has wrong shape for an existential quantifier: " <> pack (show (arg ^. #witness . #unWitness, p))
 
 checkValueIsInBounds ::
   EvaluationContext ->
