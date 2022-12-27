@@ -24,7 +24,7 @@ import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Gensyms (NextSym (NextSym))
 import Semicircuit.Sigma11 (FromName (FromName), HasArity (getArity), HasNames (getNames), ToName (ToName), foldConstants, getInputName, hasFieldMaxBound, prependArguments, prependBounds, substitute)
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name (Name), OutputBound (..), Quantifier (..), Term (Add, Const, IndLess, Max, Mul), someFirstOrder, var)
+import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name (Name), OutputBound, OutputBoundF (..), Quantifier (..), Term, TermF (Add, Const, IndLess, Max, Mul), someFirstOrder, var)
 
 -- Assumes input is in strong prenex normal form.
 -- Merges all consecutive same-type quantifiers that can be

@@ -918,7 +918,7 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
             Just m -> pure m
             Nothing -> lift . Left $ ErrorMessage ann "missing function type cardinality (required for instance data)"
           (bQs, bM) <- rec lc b
-          aBounds <- fmap S11.InputBound <$> translateBound gc lc a Nothing
+          aBounds <- fmap S11.inputBound <$> translateBound gc lc a Nothing
           let fM = incrementArities n bM
           let fQs = prependBounds cardinality aBounds <$> bQs
           pure (fQs, fM)
@@ -936,7 +936,7 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
             Nothing -> lift . Left $ ErrorMessage ann "missing permutation type cardinality (required for instance data)"
           (_, aM) <- rec lc a
           let fM = incrementArities 1 aM
-          aBoundTs <- fmap S11.InputBound <$> translateBound gc lc a Nothing
+          aBoundTs <- fmap S11.inputBound <$> translateBound gc lc a Nothing
           bBoundTs <- fmap S11.OutputBound <$> translateBound gc lc b Nothing
           case (aBoundTs, bBoundTs) of
             ([aBoundT], [bBoundT]) ->
@@ -1053,7 +1053,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
           (bQs, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
           let fM = incrementArities n bM
           aBounds <-
-            fmap S11.InputBound
+            fmap S11.inputBound
               <$> translateBound gc lc a (Just aBound)
           let fQs = prependBounds cardinality aBounds <$> bQs
           pure (fQs, fM)
@@ -1079,7 +1079,7 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
           (_, bM) <- getExistentialQuantifierStringAndMapping gc lc b bBound
           let fM = incrementArities 1 bM
           aBoundTs <-
-            fmap S11.InputBound
+            fmap S11.inputBound
               <$> translateBound gc lc a (Just aBound)
           case (aBoundTs, bBoundTs) of
             ([aBoundT], [bBoundT]) ->

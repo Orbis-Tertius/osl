@@ -41,9 +41,9 @@ import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.Sigma11 (AuxTables, Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), PredicateName, Quantifier (ForAll', ForSome', Given'), Term (Add, App, AppInverse, Const, IndLess, Max, Mul), someFirstOrder)
+import OSL.Types.Sigma11 (AuxTables, Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound, InputBoundF (..), InstanceQuantifier (Instance), Name (..), OutputBound, OutputBoundF (..), PredicateName, Quantifier (ForAll', ForSome', Given'), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul), someFirstOrder)
 import OSL.Types.Sigma11.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
-import OSL.Types.Sigma11.EvaluationContext (EvaluationContext (EvaluationContext))
+import OSL.Types.Sigma11.EvaluationContext (EvaluationContext, EvaluationContextF (EvaluationContext))
 import OSL.Types.Sigma11.Value (Value (Value))
 import OSL.Types.Sigma11.ValueTree (ValueTree (ValueTree))
 import OSL.Types.TranslationContext (Mapping (..))
@@ -78,7 +78,7 @@ instance MapNames Formula where
       Not p -> Not (mapNames f p)
       Implies p q -> Implies (mapNames f p) (mapNames f q)
       Iff p q -> Iff (mapNames f p) (mapNames f q)
-      ForAll bound p -> ForAll (mapNames f bound) (mapNames f p)
+      ForAll b p -> ForAll (mapNames f b) (mapNames f p)
       ForSome (Some n inBounds outBound) p ->
         ForSome (Some n (mapNames f inBounds) (mapNames f outBound)) (mapNames f p)
       ForSome (SomeP n inBound outBound) p ->
@@ -94,7 +94,9 @@ instance MapNames Bound where
       TermBound t -> TermBound (mapNames f t)
       FieldMaxBound -> FieldMaxBound
 
-deriving newtype instance MapNames InputBound
+instance MapNames InputBound where
+  mapNames f (NamedInputBound name x) = NamedInputBound (f name) (mapNames f x)
+  mapNames f (UnnamedInputBound x) = UnnamedInputBound (mapNames f x)
 
 deriving newtype instance MapNames OutputBound
 
@@ -168,7 +170,7 @@ prependInstanceQuantifiers = foldl' (.) id . fmap prependInstanceQuantifier
 prependInstanceQuantifier :: InstanceQuantifier -> Formula -> Formula
 prependInstanceQuantifier (Instance n bs b) = Given n bs b
 
-evalTerm :: EvaluationContext -> Term -> Either (ErrorMessage ()) Scalar
+evalTerm :: Ord name => EvaluationContextF name -> TermF name -> Either (ErrorMessage ()) Scalar
 evalTerm (EvaluationContext c) =
   \case
     App f xs ->
@@ -255,7 +257,7 @@ evalFormula c arg =
     Given n ibs ob p ->
       case arg ^. #statement . #unStatement of
         (i : is') -> do
-          let c' = addToEvalContext c (Arity (length ibs)) i
+          let c' = addToEvalContext c (Left (Name (Arity (length ibs)) (0 :: DeBruijnIndex))) i
           let arg' = Argument (Statement is') (arg ^. #witness)
           checkValueIsInBounds c n ibs ob i
           evalFormula c' arg' p
@@ -275,7 +277,7 @@ evalFormula c arg =
                 c' =
                   addToEvalContext
                     c
-                    (Arity 0)
+                    (Left (Name (0 :: Arity) (0 :: DeBruijnIndex)))
                     (scalarValue x)
                 x' = x Group.+ one
             r <- evalFormula c' arg'' p
@@ -316,7 +318,7 @@ evalFormula c arg =
       let arity = Arity (length ibs)
        in case arg ^. #witness . #unWitness of
             ValueTree (Just w) [ws'] -> do
-              let c' = addToEvalContext c arity w
+              let c' = addToEvalContext c (Left (Name arity (0 :: DeBruijnIndex))) w
                   arg' = Argument (arg ^. #statement) (Witness ws')
               checkValueIsInBounds c n ibs ob w
               evalFormula c' arg' p
@@ -341,33 +343,45 @@ checkValueIsInBounds c (Cardinality n) ibs ob (Value v) =
     else Left (ErrorMessage () ("value is too big: " <> pack (show (Map.size v)) <> " > " <> pack (show n)))
 
 checkPointIsInBounds ::
-  EvaluationContext ->
-  [(Scalar, InputBound)] ->
-  (Scalar, OutputBound) ->
+  (Ord name, HasAddToEvalContext name) =>
+  EvaluationContextF name ->
+  [(Scalar, InputBoundF name)] ->
+  (Scalar, OutputBoundF name) ->
   Either (ErrorMessage ()) ()
 checkPointIsInBounds _ [] (_, OutputBound FieldMaxBound) = pure ()
 checkPointIsInBounds c [] (y, OutputBound (TermBound ob)) = do
   ob' <- evalTerm c ob
   when (y >= ob') (Left (ErrorMessage () "output is out of bounds"))
-checkPointIsInBounds c ((x, InputBound FieldMaxBound) : ibs) (y, ob) = do
-  let c' = addToEvalContext c (Arity 0) (scalarValue x)
+checkPointIsInBounds c ((x, NamedInputBound nm FieldMaxBound) : ibs) (y, ob) = do
+  let c' = addToEvalContext c (Left nm) (scalarValue x)
   checkPointIsInBounds c' ibs (y, ob)
-checkPointIsInBounds c ((x, InputBound (TermBound ib)) : ibs) (y, ob) = do
+checkPointIsInBounds c ((_, UnnamedInputBound FieldMaxBound) : ibs) (y, ob) =
+  checkPointIsInBounds c ibs (y, ob)
+checkPointIsInBounds c ((x, NamedInputBound nm (TermBound ib)) : ibs) (y, ob) = do
   ib' <- evalTerm c ib
   when (x >= ib') (Left (ErrorMessage () "input is out of bounds"))
-  let c' = addToEvalContext c (Arity 0) (scalarValue x)
+  let c' = addToEvalContext c (Left nm) (scalarValue x)
   checkPointIsInBounds c' ibs (y, ob)
+checkPointIsInBounds c ((x, UnnamedInputBound (TermBound ib)) : ibs) (y, ob) = do
+  ib' <- evalTerm c ib
+  when (x >= ib') (Left (ErrorMessage () "input is out of bounds"))
+  checkPointIsInBounds c ibs (y, ob)
 
-addToEvalContext :: EvaluationContext -> Arity -> Value -> EvaluationContext
-addToEvalContext (EvaluationContext c) n x =
-  EvaluationContext . Map.insert (Left (Name n 0)) x $
-    Map.mapKeys incIfN c
-  where
-    incIfN (Left (Name n' i)) =
-      if n == n'
-        then Left (Name n (i + 1))
-        else Left (Name n' i)
-    incIfN (Right p) = Right p
+class HasAddToEvalContext name where
+  addToEvalContext :: EvaluationContextF name -> Either name PredicateName -> Value -> EvaluationContextF name
+
+instance HasAddToEvalContext Name where
+  addToEvalContext (EvaluationContext c) (Left (Name n _)) x =
+    EvaluationContext . Map.insert (Left (Name n 0)) x $
+      Map.mapKeys incIfN c
+    where
+      incIfN (Left (Name n' i)) =
+        if n == n'
+          then Left (Name n (i + 1))
+          else Left (Name n' i)
+      incIfN (Right p) = Right p
+  addToEvalContext (EvaluationContext c) (Right p) x =
+    EvaluationContext (Map.insert (Right p) x c)
 
 auxTablesToEvalContext :: AuxTables -> Either (ErrorMessage ()) EvaluationContext
 auxTablesToEvalContext aux =

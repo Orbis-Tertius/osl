@@ -12,7 +12,6 @@ where
 import Control.Arrow (second)
 import Control.Lens ((^.))
 import Control.Monad.State (State, get, put, runState)
-import Data.Functor ((<&>))
 import Data.Map (Map)
 import qualified Data.Map as Map
 import OSL.Map (mapKeysMaybe)
@@ -67,12 +66,15 @@ deBruijnToGensyms' =
     DB.ForSome (DB.Some n bs b) p -> do
       bs' <-
         mapM
-          ( \b'' ->
-              GS.NamedInputBound
-                <$> (GS.Name (Arity 0) <$> nextSym)
-                <*> bound b''
+          ( \case
+              DB.NamedInputBound _ b'' ->
+                GS.NamedInputBound
+                  <$> (GS.Name (Arity 0) <$> nextSym)
+                  <*> bound b''
+              DB.UnnamedInputBound b'' ->
+                GS.UnnamedInputBound <$> bound b''
           )
-          (bs <&> (^. #unInputBound))
+          bs
       b' <-
         GS.OutputBound
           <$> bound (b ^. #unOutputBound)
@@ -84,9 +86,13 @@ deBruijnToGensyms' =
       pure r
     DB.ForSome (DB.SomeP n b0 b1) p -> do
       b0' <-
-        GS.NamedInputBound
-          <$> (GS.Name 0 <$> nextSym)
-          <*> bound (b0 ^. #unInputBound)
+        case b0 of
+          DB.NamedInputBound _ b0' ->
+            GS.NamedInputBound
+              <$> (GS.Name 0 <$> nextSym)
+              <*> bound b0'
+          DB.UnnamedInputBound b0' ->
+            GS.UnnamedInputBound <$> bound b0'
       b1' <-
         GS.OutputBound
           <$> bound (b1 ^. #unOutputBound)
@@ -101,12 +107,15 @@ deBruijnToGensyms' =
     DB.Given n ibs ob p -> do
       ibs' <-
         mapM
-          ( \b'' ->
-              GS.NamedInputBound
-                <$> (GS.Name (Arity 0) <$> nextSym)
-                <*> bound b''
+          ( \case
+              DB.NamedInputBound _ b'' ->
+                GS.NamedInputBound
+                  <$> (GS.Name (Arity 0) <$> nextSym)
+                  <*> bound b''
+              DB.UnnamedInputBound b'' ->
+                GS.UnnamedInputBound <$> bound b''
           )
-          (ibs <&> (^. #unInputBound))
+          ibs
       ob' <-
         GS.OutputBound
           <$> bound (ob ^. #unOutputBound)

@@ -1,20 +1,27 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module OSL.Types.Sigma11
   ( Name (Name),
     PredicateName (PredicateName),
-    Term (..),
+    TermF (..),
+    Term,
     var,
     Formula (..),
     ExistentialQuantifier (..),
     someFirstOrder,
     InstanceQuantifier (..),
-    InputBound (..),
-    OutputBound (..),
-    Bound (..),
+    InputBound,
+    inputBound,
+    InputBoundF (..),
+    OutputBound,
+    OutputBoundF (..),
+    Bound,
+    BoundF (..),
     Quantifier (ForAll', ForSome', Given'),
     AuxTables (..),
   )
@@ -41,20 +48,22 @@ data PredicateName = PredicateName {arity :: Arity, deBruijnIndex :: DeBruijnInd
 instance Show PredicateName where
   show (PredicateName a i) = "P" <> show i <> "^" <> show a
 
-data Term
-  = App Name [Term]
-  | AppInverse Name Term
-  | Add Term Term
-  | Mul Term Term
-  | IndLess Term Term
-  | Max Term Term
+data TermF name
+  = App name [TermF name]
+  | AppInverse name (TermF name)
+  | Add (TermF name) (TermF name)
+  | Mul (TermF name) (TermF name)
+  | IndLess (TermF name) (TermF name)
+  | Max (TermF name) (TermF name)
   | Const Integer
   deriving (Eq)
 
-var :: Name -> Term
+type Term = TermF Name
+
+var :: name -> TermF name
 var x = App x []
 
-instance Show Term where
+instance Show a => Show (TermF a) where
   show (App name []) = show name
   show (App f xs) =
     show f <> "(" <> intercalate ", " (show <$> xs) <> ")"
@@ -106,25 +115,38 @@ instance Show Formula where
   show (Given _ [] ob p) =
     "(λ<" <> show ob <> ", " <> show p <> ")"
   show (Given n ibs ob p) =
-    "(λ^" <> show n <> "<" <> show ob <> "(<" <> intercalate ", <" (show <$> ibs) <> "), " <> show p <> ")"
+    "(λ^" <> show n <> "<" <> show ob <> "(" <> intercalate ", " (show <$> ibs) <> "), " <> show p <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
   show Top = "⊤"
   show Bottom = "⊥"
 
+data InputBoundF name
+  = UnnamedInputBound {bound :: BoundF name}
+  | NamedInputBound {_name :: name, bound :: BoundF name}
+  deriving (Eq, Generic)
+
+instance Show a => Show (InputBoundF a) where
+  show (UnnamedInputBound b) = "<" <> show b
+  show (NamedInputBound x b) = "(" <> show x <> "<" <> show b <> ")"
+
 -- In an input bound, de Bruijn indices refer first to the preceding
 -- input argument values, with the last argument having the lowest index,
 -- and then to the variables in the scope surrounding the quantifier.
-newtype InputBound = InputBound {unInputBound :: Bound}
-  deriving (Eq, Generic)
-  deriving newtype (Show)
+type InputBound = InputBoundF Name
+
+inputBound :: Bound -> InputBound
+inputBound = UnnamedInputBound
 
 -- In an output bound, de Bruijn indices refer first to the input
 -- argument values, with the last argument having the lowest index,
 -- and then to the variables in the scope surrounding the quantifier.
-newtype OutputBound = OutputBound {unOutputBound :: Bound}
+type OutputBound = OutputBoundF Name
+
+newtype OutputBoundF name = OutputBound {unOutputBound :: BoundF name}
   deriving (Eq, Generic)
-  deriving newtype (Show)
+
+deriving newtype instance Show a => Show (OutputBoundF a)
 
 data ExistentialQuantifier
   = Some Cardinality [InputBound] OutputBound
@@ -140,26 +162,27 @@ instance Show ExistentialQuantifier where
     "^"
       <> show n
       <> "("
-      <> intercalate ", " (("<" <>) . show <$> bs)
-      <> ")"
-      <> "<"
+      <> intercalate ", " (show <$> bs)
+      <> ")<"
       <> show b
   show (SomeP (Cardinality n) b0 b1) =
     "^"
       <> show n
       <> "<"
       <> show b0
-      <> "(<"
+      <> "("
       <> show b1
       <> ")"
 
 data InstanceQuantifier
   = Instance Cardinality [InputBound] OutputBound
 
-data Bound = TermBound Term | FieldMaxBound
+data BoundF name = TermBound (TermF name) | FieldMaxBound
   deriving (Eq)
 
-instance Show Bound where
+type Bound = BoundF Name
+
+instance Show a => Show (BoundF a) where
   show (TermBound t) = show t
   show FieldMaxBound = "|F|"
 

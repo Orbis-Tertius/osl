@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedLabels #-}
 
 -- This is different from OSL.Types.Sigma11
@@ -18,28 +18,31 @@
 
 module Semicircuit.Types.Sigma11
   ( Name (Name),
-    Term (..),
+    TermF (..),
+    Term,
     var,
     Formula (..),
     ExistentialQuantifier (..),
     someFirstOrder,
-    Bound (..),
+    Bound,
+    BoundF (..),
     InputBound (..),
-    OutputBound (..),
+    OutputBound,
+    OutputBoundF (..),
     Quantifier (..),
     MapNames (..),
-    EvaluationContext (..),
+    EvaluationContextF (..),
+    EvaluationContext,
   )
 where
 
 import Control.Lens ((^.))
 import Data.List (intercalate)
-import Data.Map (Map)
 import GHC.Generics (Generic)
 import OSL.Types.Arity (Arity)
 import OSL.Types.Cardinality (Cardinality (..))
-import OSL.Types.Sigma11 (PredicateName)
-import OSL.Types.Sigma11.Value (Value)
+import OSL.Types.Sigma11 (BoundF (FieldMaxBound, TermBound), OutputBoundF (OutputBound), PredicateName, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul), var)
+import OSL.Types.Sigma11.EvaluationContext (EvaluationContextF (EvaluationContext))
 
 data Name = Name {arity :: Arity, sym :: Int}
   deriving (Eq, Ord, Generic)
@@ -53,34 +56,7 @@ class MapNames a where
 instance MapNames a => MapNames [a] where
   mapNames f = fmap (mapNames f)
 
-data Term
-  = App Name [Term]
-  | AppInverse Name Term
-  | Add Term Term
-  | Mul Term Term
-  | IndLess Term Term
-  | Max Term Term
-  | Const Integer
-  deriving (Eq, Ord)
-
-instance Show Term where
-  show (App x []) = show x
-  show (App f xs) =
-    show f <> "(" <> intercalate ", " (show <$> xs) <> ")"
-  show (AppInverse f x) =
-    show f <> "^-1(" <> show x <> ")"
-  show (Add x y) =
-    "(" <> show x <> " + " <> show y <> ")"
-  show (Mul x y) =
-    "(" <> show x <> " * " <> show y <> ")"
-  show (IndLess x y) =
-    "ind_<(" <> show x <> ", " <> show y <> ")"
-  show (Max x y) =
-    "max(" <> show x <> ", " <> show y <> ")"
-  show (Const x) = show x
-
-var :: Name -> Term
-var x = App x []
+type Term = TermF Name
 
 instance MapNames Term where
   mapNames f (App g xs) =
@@ -172,27 +148,14 @@ someFirstOrder :: Name -> Bound -> ExistentialQuantifier
 someFirstOrder x b =
   Some x (Cardinality 0) [] (OutputBound b)
 
-data Bound = TermBound Term | FieldMaxBound
-  deriving (Eq)
-
-instance Show Bound where
-  show (TermBound x) = show x
-  show FieldMaxBound = "|F|"
+type Bound = BoundF Name
 
 data InputBound
   = NamedInputBound {_name :: Name, bound :: Bound}
   | UnnamedInputBound {bound :: Bound}
-  deriving (Eq, Generic)
+  deriving (Eq, Show, Generic)
 
-instance Show InputBound where
-  show (NamedInputBound name b) =
-    show name <> "<" <> show b
-  show (UnnamedInputBound b) =
-    "<" <> show b
-
-newtype OutputBound = OutputBound {unOutputBound :: Bound}
-  deriving stock (Eq, Generic)
-  deriving newtype (Show)
+type OutputBound = OutputBoundF Name
 
 data Quantifier
   = Universal Name Bound
@@ -211,7 +174,4 @@ instance Show Quantifier where
       <> "<"
       <> show ob
 
-newtype EvaluationContext = EvaluationContext
-  { unEvaluationContext ::
-      Map (Either Name PredicateName) Value
-  }
+type EvaluationContext = EvaluationContextF Name

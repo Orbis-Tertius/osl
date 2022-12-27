@@ -59,7 +59,7 @@ import Semicircuit.Types.PNFFormula (ExistentialQuantifier (Some, SomeP), Instan
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), ZeroVectorIndex (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), InputBound, Name, OutputBound (OutputBound), Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), InputBound, Name, OutputBound, OutputBoundF (OutputBound), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
 import Stark.Types.Scalar (one, order, scalarToInt, zero)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout

@@ -1,4 +1,5 @@
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
@@ -30,7 +31,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Die (die)
 import OSL.Types.Arity (Arity (..))
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound (..), Quantifier (Existential, Instance, Universal), Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), Name (Name), OutputBound, OutputBoundF (..), Quantifier (Existential, Instance, Universal), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
 
 class MapNames a where
   mapNames :: (Name -> Name) -> a -> a
