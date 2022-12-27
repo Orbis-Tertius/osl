@@ -20,6 +20,8 @@ module OSL.Sigma11
     boolToScalar,
     scalarValue,
     auxTablesToEvalContext,
+    flipQuantifiers,
+    flipQuantifier,
   )
 where
 
@@ -39,7 +41,7 @@ import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.Sigma11 (AuxTables, Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), PredicateName, Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import OSL.Types.Sigma11 (AuxTables, Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), PredicateName, Quantifier (ForAll', ForSome', Given'), Term (Add, App, AppInverse, Const, IndLess, Max, Mul), someFirstOrder)
 import OSL.Types.Sigma11.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.Sigma11.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.Sigma11.Value (Value (Value))
@@ -408,3 +410,55 @@ fromInteger = maybe (Left (ErrorMessage () "integer out of range of scalar field
 
 scalarValue :: Scalar -> Value
 scalarValue = Value . Map.singleton []
+
+flipQuantifiers ::
+  ann ->
+  Formula ->
+  Either (ErrorMessage ann) Formula
+flipQuantifiers ann = mapQuantifiers (flipQuantifier ann)
+
+mapQuantifiers ::
+  Monad m =>
+  (Quantifier -> m Quantifier) ->
+  Formula ->
+  m Formula
+mapQuantifiers f =
+  \case
+    Equal x y -> pure (Equal x y)
+    LessOrEqual x y -> pure (LessOrEqual x y)
+    Predicate p xs -> pure (Predicate p xs)
+    Not p -> Not <$> rec p
+    And p q -> And <$> rec p <*> rec q
+    Or p q -> Or <$> rec p <*> rec q
+    Implies p q -> Implies <$> rec p <*> rec q
+    Iff p q -> Iff <$> rec p <*> rec q
+    ForAll b p -> prependQuantifier <$> f (ForAll' b) <*> rec p
+    ForSome q p -> prependQuantifier <$> f (ForSome' q) <*> rec p
+    Given n ibs ob p -> prependQuantifier <$> f (Given' (Instance n ibs ob)) <*> rec p
+    Top -> pure Top
+    Bottom -> pure Bottom
+  where
+    rec = mapQuantifiers f
+
+prependQuantifier :: Quantifier -> Formula -> Formula
+prependQuantifier =
+  \case
+    ForAll' b -> ForAll b
+    ForSome' q -> ForSome q
+    Given' (Instance n ibs ob) -> Given n ibs ob
+
+flipQuantifier ::
+  ann ->
+  Quantifier ->
+  Either (ErrorMessage ann) Quantifier
+flipQuantifier ann =
+  \case
+    ForAll' b ->
+      pure (ForSome' (someFirstOrder b))
+    ForSome' (Some _ [] (OutputBound b)) ->
+      pure (ForAll' b)
+    ForSome' _ ->
+      Left . ErrorMessage ann $
+        "not supported: second-order quantification in negative position"
+    Given' (Instance n ibs ob) ->
+      pure (Given' (Instance n ibs ob))

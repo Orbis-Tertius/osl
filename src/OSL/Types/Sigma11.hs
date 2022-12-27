@@ -15,6 +15,7 @@ module OSL.Types.Sigma11
     InputBound (..),
     OutputBound (..),
     Bound (..),
+    Quantifier (ForAll', ForSome', Given'),
     AuxTables (..),
   )
 where
@@ -161,6 +162,11 @@ data Bound = TermBound Term | FieldMaxBound
 instance Show Bound where
   show (TermBound t) = show t
   show FieldMaxBound = "|F|"
+
+data Quantifier
+  = ForAll' Bound
+  | ForSome' ExistentialQuantifier
+  | Given' InstanceQuantifier
 
 data AuxTables = AuxTables
   { functionTables :: Map Name (Map [Integer] Integer),

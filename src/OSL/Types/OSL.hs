@@ -20,6 +20,7 @@ module OSL.Types.OSL
     Context (..),
     ContextType (..),
     ValidContext (..),
+    Quantifier (ForAll', ForSome'),
   )
 where
 
@@ -151,6 +152,11 @@ data Term ann
   | ForSome ann Name (Type ann) (Maybe (Bound ann)) (Term ann)
   | Top ann
   | Bottom ann
+  deriving (Eq, Ord, Show)
+
+data Quantifier ann
+  = ForAll' ann Name (Type ann) (Maybe (Bound ann))
+  | ForSome' ann Name (Type ann) (Maybe (Bound ann))
   deriving (Eq, Ord, Show)
 
 data Bound ann
