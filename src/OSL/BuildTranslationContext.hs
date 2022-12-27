@@ -86,8 +86,8 @@ addFreeVariableMapping freeVariable = do
         Product _ a b -> do
           aSym <- addGensym a
           bSym <- addGensym b
-          aMap <- addFreeVariableMapping aSym
           bMap <- addFreeVariableMapping bSym
+          aMap <- addFreeVariableMapping aSym
           let mapping =
                 ProductMapping
                   (LeftMapping aMap)
