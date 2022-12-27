@@ -490,7 +490,7 @@ curryFun f =
 
 curryCoproductFun :: (OSL.Value, OSL.Value) -> Map OSL.Value OSL.Value -> Either (ErrorMessage ()) (Map OSL.Value OSL.Value)
 curryCoproductFun (defaultLeft, defaultRight) f =
-  fmap OSL.Fun . fmap (fmap OSL.Fun) . Map.unionsWith (Map.unionWith (<>))
+  fmap (OSL.Fun . fmap OSL.Fun) . Map.unionsWith (Map.unionWith (<>))
     <$> sequence
       [ case x of
           OSL.Iota1' x' -> pure (Map.singleton (OSL.Nat zero) (Map.singleton x' (Map.singleton defaultRight y)))
@@ -618,7 +618,7 @@ toSigma11Values c t v =
         <$> sequence
           [ rec (OSL.F ann n a (OSL.N ann)) . OSL.Fun . Map.fromList
               =<< sequence
-                [ (x,) <$> OSL.Nat <$> listLength y
+                [ (x,) . OSL.Nat <$> listLength y
                   | (x, y) <- Map.toList f
                 ],
             rec (OSL.F ann n a (OSL.F ann (Just m) (OSL.N ann) b)) . OSL.Fun . Map.fromList
@@ -634,7 +634,7 @@ toSigma11Values c t v =
         <$> sequence
           [ rec (OSL.F ann n a (OSL.N ann)) . OSL.Fun . Map.fromList
               =<< sequence
-                [ (x,) <$> OSL.Nat <$> mapSize y
+                [ (x,) . OSL.Nat <$> mapSize y
                   | (x, y) <- Map.toList f
                 ],
             rec (OSL.F ann n a (OSL.F ann (Just m) (OSL.N ann) b)) . OSL.Fun . Map.fromList
