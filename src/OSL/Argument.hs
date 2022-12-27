@@ -49,7 +49,7 @@ toSigma11Statement c (OSL.StatementType t) (OSL.Statement s) =
   S11.Statement <$> toSigma11Values c t s
 
 scalarValue :: Scalar -> S11.Value
-scalarValue = S11.Value . Map.singleton []
+scalarValue = S11.scalarValue
 
 toSigma11Witness ::
   OSL.ValidContext t ann ->
@@ -841,7 +841,7 @@ defaultSigma11Values c =
   where
     rec = defaultSigma11Values c
 
-    scalarDefault = [S11.Value (Map.singleton [] zero)]
+    scalarDefault = [scalarValue zero]
 
 mapKeysMaybe :: Ord k' => (k -> Maybe k') -> Map k a -> Map k' a
 mapKeysMaybe f m =

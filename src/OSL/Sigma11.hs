@@ -18,6 +18,7 @@ module OSL.Sigma11
     evalTerm,
     evalFormula,
     boolToScalar,
+    scalarValue,
     auxTablesToEvalContext,
   )
 where
@@ -273,7 +274,7 @@ evalFormula c arg =
                   addToEvalContext
                     c
                     (Arity 0)
-                    (Value (Map.singleton [] x))
+                    (scalarValue x)
                 x' = x Group.+ one
             r <- evalFormula c' arg'' p
             if r
@@ -347,12 +348,12 @@ checkPointIsInBounds c [] (y, OutputBound (TermBound ob)) = do
   ob' <- evalTerm c ob
   when (y >= ob') (Left (ErrorMessage () "output is out of bounds"))
 checkPointIsInBounds c ((x, InputBound FieldMaxBound) : ibs) (y, ob) = do
-  let c' = addToEvalContext c (Arity 0) (Value (Map.singleton [] x))
+  let c' = addToEvalContext c (Arity 0) (scalarValue x)
   checkPointIsInBounds c' ibs (y, ob)
 checkPointIsInBounds c ((x, InputBound (TermBound ib)) : ibs) (y, ob) = do
   ib' <- evalTerm c ib
   when (x >= ib') (Left (ErrorMessage () "input is out of bounds"))
-  let c' = addToEvalContext c (Arity 0) (Value (Map.singleton [] x))
+  let c' = addToEvalContext c (Arity 0) (scalarValue x)
   checkPointIsInBounds c' ibs (y, ob)
 
 addToEvalContext :: EvaluationContext -> Arity -> Value -> EvaluationContext
@@ -404,3 +405,6 @@ predicateTablesToEvalContext m =
 
 fromInteger :: Integer -> Either (ErrorMessage ()) Scalar
 fromInteger = maybe (Left (ErrorMessage () "integer out of range of scalar field")) pure . integerToScalar
+
+scalarValue :: Scalar -> Value
+scalarValue = Value . Map.singleton []
