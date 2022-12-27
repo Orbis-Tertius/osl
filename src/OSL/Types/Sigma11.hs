@@ -131,7 +131,7 @@ data ExistentialQuantifier
 
 someFirstOrder :: Bound -> ExistentialQuantifier
 someFirstOrder b =
-  Some (Cardinality 0) [] (OutputBound b)
+  Some (Cardinality 1) [] (OutputBound b)
 
 instance Show ExistentialQuantifier where
   show (Some _ [] b) = "<" <> show b

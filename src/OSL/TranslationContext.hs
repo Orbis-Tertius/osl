@@ -61,7 +61,7 @@ mergeMapping f a b =
           [ incrementDeBruijnIndices arity (m + 1)
             | (arity, DeBruijnIndex m) <- Map.toList aMaxes
           ]
-   in f a (g b)
+   in f (g a) b
 
 mergeMapping3 ::
   (Mapping ann Term -> Mapping ann Term -> Mapping ann Term -> Mapping ann Term) ->
@@ -87,7 +87,7 @@ mergeMapping3 f a b c =
           [ incrementDeBruijnIndices arity (m + 1)
             | (arity, DeBruijnIndex m) <- Map.toList bMaxes
           ]
-   in f a b' (h c)
+   in f (h a) b' c
 
 mappingIndices ::
   Mapping ann Term ->

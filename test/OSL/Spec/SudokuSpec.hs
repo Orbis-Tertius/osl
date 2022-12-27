@@ -18,6 +18,7 @@ import OSL.ArgumentForm (getArgumentForm)
 import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
+import OSL.TranslatedEvaluation (evalTranslatedFormula)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
 import OSL.Types.FileName (FileName (FileName))
@@ -30,7 +31,7 @@ import Text.Parsec (SourcePos)
 
 spec :: Spec
 spec =
-  describe "Sudoku" $ do
+  describe "sudoku" $ do
     mctx <- loadContext (FileName "examples/sudoku.osl")
     case mctx of
       Left err -> liftIO . expectationFailure $ show err
@@ -85,6 +86,13 @@ exampleSpec c = do
       c
       (getNamedTermUnsafe c "problemIsSolvable")
       (exampleUnsoundArgument c)
+      `shouldBe` Right False
+
+  it "Sudoku spec's semantics are preserved in Sigma11 translation" $ do
+    evalTranslatedFormula c "problemIsSolvable" argumentForm (exampleArgument c)
+      `shouldBe` Right True
+
+    evalTranslatedFormula c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
       `shouldBe` Right False
 
 exampleArgument :: ValidContext 'Global ann -> Argument
@@ -369,71 +377,59 @@ complexWitnessType =
     (NamedType () "Solution")
     ( Product
         ()
-        ( Product
+        ( F
             ()
-            (Fin () 1)
-            ( Product
-                ()
-                (Fin () 1)
-                ( F
-                    ()
-                    Nothing
-                    (NamedType () "Cell")
-                    (Product () (Fin () 1) (Fin () 1))
-                )
-            )
+            Nothing
+            (NamedType () "Cell")
+            (Product () (Fin () 1) (Fin () 1))
         )
         ( Product
             ()
-            (Fin () 1)
             ( Product
                 ()
-                ( Product
-                    ()
-                    ( F
-                        ()
-                        Nothing
-                        (NamedType () "Row")
-                        ( F
-                            ()
-                            Nothing
-                            (NamedType () "Digit")
-                            ( Product
-                                ()
-                                (NamedType () "Col")
-                                (Fin () 1)
-                            )
-                        )
-                    )
-                    ( F
-                        ()
-                        Nothing
-                        (NamedType () "Col")
-                        ( F
-                            ()
-                            Nothing
-                            (NamedType () "Digit")
-                            ( Product
-                                ()
-                                (NamedType () "Row")
-                                (Fin () 1)
-                            )
-                        )
-                    )
-                )
                 ( F
                     ()
                     Nothing
-                    (NamedType () "Square")
+                    (NamedType () "Row")
                     ( F
                         ()
                         Nothing
                         (NamedType () "Digit")
                         ( Product
                             ()
-                            (NamedType () "SquareCell")
+                            (NamedType () "Col")
                             (Fin () 1)
                         )
+                    )
+                )
+                ( F
+                    ()
+                    Nothing
+                    (NamedType () "Col")
+                    ( F
+                        ()
+                        Nothing
+                        (NamedType () "Digit")
+                        ( Product
+                            ()
+                            (NamedType () "Row")
+                            (Fin () 1)
+                        )
+                    )
+                )
+            )
+            ( F
+                ()
+                Nothing
+                (NamedType () "Square")
+                ( F
+                    ()
+                    Nothing
+                    (NamedType () "Digit")
+                    ( Product
+                        ()
+                        (NamedType () "SquareCell")
+                        (Fin () 1)
                     )
                 )
             )
@@ -484,6 +480,12 @@ simpleWitnessType =
             )
         )
     )
+
+argumentForm :: ArgumentForm
+argumentForm =
+  ArgumentForm
+    (StatementType complexStatementType)
+    (WitnessType complexWitnessType)
 
 solutionToValue :: Solution -> Value
 solutionToValue (Solution s) =

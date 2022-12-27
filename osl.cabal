@@ -63,9 +63,11 @@ library
     Halo2.Types.Witness
     Halo2.Types.WitnessColumns
     Halo2.Types.WitnessGenerationContext
+    OSL.Argument
     OSL.ArgumentForm
     OSL.Bound
     OSL.BuildTranslationContext
+    OSL.Debug
     OSL.EntryPoint
     OSL.Evaluation
     OSL.LoadContext
@@ -76,6 +78,7 @@ library
     OSL.Term
     OSL.Tokenize
     OSL.Translate
+    OSL.TranslatedEvaluation
     OSL.TranslationContext
     OSL.Type
     OSL.Types.ArgumentForm
@@ -90,12 +93,17 @@ library
     OSL.Types.OSL
     OSL.Types.PreValue
     OSL.Types.Sigma11
+    OSL.Types.Sigma11.Argument
+    OSL.Types.Sigma11.EvaluationContext
+    OSL.Types.Sigma11.Value
+    OSL.Types.Sigma11.ValueTree
     OSL.Types.Token
     OSL.Types.Translation
     OSL.Types.TranslationContext
     OSL.Types.Value
     OSL.ValidContext
     OSL.ValidateContext
+    OSL.Value
     OSL.Witness
     Semicircuit.DNFFormula
     Semicircuit.Gensyms

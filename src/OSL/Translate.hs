@@ -9,6 +9,7 @@ module OSL.Translate
   ( translate,
     translateToTerm,
     translateToFormula,
+    translateToFormulaSimple,
   )
 where
 
@@ -17,7 +18,8 @@ import Control.Lens ((^.))
 import Control.Monad (forM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExceptT)
-import Control.Monad.Trans.State.Strict (StateT, execStateT, get, put)
+import Control.Monad.Trans.State.Strict (StateT, execStateT, get, put, runStateT)
+import Data.Either.Extra (mapLeft)
 import Data.Functor.Identity (runIdentity)
 import Data.List (foldl')
 import qualified Data.Map as Map
@@ -25,7 +27,7 @@ import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
 import OSL.Bound (boundAnnotation)
-import OSL.BuildTranslationContext (addFreeVariableMapping, addTermMapping, buildTranslationContext', getBoundS11NamesInContext, getFreeOSLName, getFreeS11Name)
+import OSL.BuildTranslationContext (addFreeVariableMapping, addTermMapping, buildTranslationContext, buildTranslationContext', getBoundS11NamesInContext, getFreeOSLName, getFreeS11Name)
 import OSL.Sigma11 (incrementArities, incrementDeBruijnIndices, prependBounds, prependInstanceQuantifiers)
 import OSL.Term (termAnnotation)
 import OSL.TranslationContext (linearizeMapping, mergeMapping, mergeMapping3, mergeMappings)
@@ -38,6 +40,7 @@ import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.Translation (Translation (Formula, Mapping, Term))
 import OSL.Types.TranslationContext (ChoiceMapping (..), KeysMapping (..), LeftMapping (..), LengthMapping (..), Mapping (..), MappingDimensions (..), RightMapping (..), TranslationContext (..), ValuesMapping (..))
 import OSL.ValidContext (addDeclaration, getDeclaration)
+import qualified OSL.ValidContext as OSL
 import OSL.ValidateContext (inferType)
 
 -- Provides a translation for the given term in
@@ -870,28 +873,15 @@ translate
         let decls' =
               OSL.ValidContext $
                 Map.insert varName (OSL.FreeVariable varType) declsMap
-        varDim <- lift $ getMappingDimensions decls varType
-        case varDim of
-          FiniteDimensions n -> do
-            TranslationContext _ qCtx <-
-              lift $ buildTranslationContext' decls' [varName]
-            let lc' =
-                  TranslationContext
-                    decls'
-                    (qCtx `Map.union` (incrementDeBruijnIndices (Arity 0) n <$> mappings))
-            bounds <- translateBound gc lc varType varBound
-            Formula . foldl' (.) id (S11.ForSome . S11.someFirstOrder <$> bounds)
-              <$> translateToFormula gc lc' p
-          InfiniteDimensions -> do
-            (qs, newMapping) <-
-              getExistentialQuantifierStringAndMapping gc lc varType
-                =<< lift (getExplicitOrInferredBound decls varType varBound)
-            let lc' =
-                  TranslationContext
-                    decls'
-                    (mergeMappings (Map.singleton varName newMapping) mappings)
-            Formula . (\f -> foldl' (flip S11.ForSome) f qs)
-              <$> translateToFormula gc lc' p
+        (qs, newMapping) <-
+          getExistentialQuantifierStringAndMapping gc lc varType
+            =<< lift (getExplicitOrInferredBound decls varType varBound)
+        let lc' =
+              TranslationContext
+                decls'
+                (mergeMappings (Map.singleton varName newMapping) mappings)
+        Formula . (\f -> foldl' (flip S11.ForSome) f qs)
+          <$> translateToFormula gc lc' p
       term ->
         lift . Left . ErrorMessage (termAnnotation term) $
           "could not translate term: " <> pack (show term)
@@ -985,8 +975,8 @@ getInstanceQuantifierStringAndMapping gc lc@(TranslationContext decls mappings) 
         Just (OSL.Data a) -> rec lc a
         _ -> lift . Left $ ErrorMessage ann "expected the name of a type"
     OSL.Maybe ann a -> do
-      (aQs, aM) <- rec lc a
       (cQs, cM) <- rec lc (OSL.Fin ann 2)
+      (aQs, aM) <- rec lc a
       pure
         ( cQs <> aQs,
           mergeMapping
@@ -1131,9 +1121,9 @@ getExistentialQuantifierStringAndMapping gc lc@(TranslationContext decls mapping
           pure
             ( [cQ] <> aQs <> bQs,
               mergeMapping
-                (\bM' aM' -> CoproductMapping cM (LeftMapping aM') (RightMapping bM'))
-                bM
+                (\aM' bM' -> CoproductMapping cM (LeftMapping aM') (RightMapping bM'))
                 aM
+                bM
             )
         _ -> lift . Left $ ErrorMessage (boundAnnotation varBound) "expected a coproduct bound"
     OSL.NamedType ann name ->
@@ -1379,7 +1369,7 @@ translateToFormula gc lc@(TranslationContext decls mappings) t = do
         OSL.Lambda _ varName varType body -> do
           (qs, mapping) <- getInstanceQuantifierStringAndMapping gc lc varType
           let decls' = addDeclaration varName (OSL.FreeVariable varType) decls
-              lc' = TranslationContext decls' (Map.insert varName mapping mappings)
+              lc' = TranslationContext decls' (mergeMappings (Map.singleton varName mapping) mappings)
           prependInstanceQuantifiers qs <$> translateToFormula gc lc' body
         _ ->
           lift . Left $
@@ -1846,3 +1836,30 @@ mconcatM [] = pure mempty
 mconcatM (xM : xMs) = do
   x <- xM
   (x <>) <$> mconcatM xMs
+
+translateToFormulaSimple ::
+  Show ann =>
+  OSL.ValidContext t ann ->
+  OSL.Name ->
+  Either (ErrorMessage (Maybe ann)) (OSL.Term ann, S11.Formula, S11.AuxTables)
+translateToFormulaSimple c name = do
+  tc <-
+    mapLeft
+      ( \e ->
+          ErrorMessage
+            (Just (e ^. #annotation))
+            ("Error building translation context: " <> e ^. #message)
+      )
+      (buildTranslationContext c)
+  let gtc = TranslationContext (OSL.ValidContext (tc ^. #context . #unValidContext)) (tc ^. #mappings)
+      ltc = TranslationContext (OSL.ValidContext (tc ^. #context . #unValidContext)) (tc ^. #mappings)
+  case OSL.getDeclaration c name of
+    Just (OSL.Defined _ def) ->
+      mapLeft
+        ( \e ->
+            ErrorMessage
+              (Just (e ^. #annotation))
+              ("Error translating: " <> e ^. #message)
+        )
+        $ (\(translated, aux) -> (def, translated, aux)) <$> runStateT (translateToFormula gtc ltc def) mempty
+    _ -> Left (ErrorMessage Nothing (pack (show name) <> " is not defined"))
