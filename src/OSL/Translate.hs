@@ -9,6 +9,7 @@ module OSL.Translate
   ( translate,
     translateToTerm,
     translateToFormula,
+    translateToFormulaSimple,
   )
 where
 
@@ -17,7 +18,8 @@ import Control.Lens ((^.))
 import Control.Monad (forM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExceptT)
-import Control.Monad.Trans.State.Strict (StateT, execStateT, get, put)
+import Control.Monad.Trans.State.Strict (StateT, execStateT, get, put, runStateT)
+import Data.Either.Extra (mapLeft)
 import Data.Functor.Identity (runIdentity)
 import Data.List (foldl')
 import qualified Data.Map as Map
@@ -25,7 +27,7 @@ import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
 import OSL.Bound (boundAnnotation)
-import OSL.BuildTranslationContext (addFreeVariableMapping, addTermMapping, buildTranslationContext', getBoundS11NamesInContext, getFreeOSLName, getFreeS11Name)
+import OSL.BuildTranslationContext (addFreeVariableMapping, addTermMapping, buildTranslationContext, buildTranslationContext', getBoundS11NamesInContext, getFreeOSLName, getFreeS11Name)
 import OSL.Sigma11 (incrementArities, incrementDeBruijnIndices, prependBounds, prependInstanceQuantifiers)
 import OSL.Term (termAnnotation)
 import OSL.TranslationContext (linearizeMapping, mergeMapping, mergeMapping3, mergeMappings)
@@ -38,6 +40,7 @@ import qualified OSL.Types.Sigma11 as S11
 import OSL.Types.Translation (Translation (Formula, Mapping, Term))
 import OSL.Types.TranslationContext (ChoiceMapping (..), KeysMapping (..), LeftMapping (..), LengthMapping (..), Mapping (..), MappingDimensions (..), RightMapping (..), TranslationContext (..), ValuesMapping (..))
 import OSL.ValidContext (addDeclaration, getDeclaration)
+import qualified OSL.ValidContext as OSL
 import OSL.ValidateContext (inferType)
 
 -- Provides a translation for the given term in
@@ -1833,3 +1836,30 @@ mconcatM [] = pure mempty
 mconcatM (xM : xMs) = do
   x <- xM
   (x <>) <$> mconcatM xMs
+
+translateToFormulaSimple ::
+  Show ann =>
+  OSL.ValidContext t ann ->
+  OSL.Name ->
+  Either (ErrorMessage (Maybe ann)) (OSL.Term ann, S11.Formula, S11.AuxTables)
+translateToFormulaSimple c name = do
+  tc <-
+    mapLeft
+      ( \e ->
+          ErrorMessage
+            (Just (e ^. #annotation))
+            ("Error building translation context: " <> e ^. #message)
+      )
+      (buildTranslationContext c)
+  let gtc = TranslationContext (OSL.ValidContext (tc ^. #context . #unValidContext)) (tc ^. #mappings)
+      ltc = TranslationContext (OSL.ValidContext (tc ^. #context . #unValidContext)) (tc ^. #mappings)
+  case OSL.getDeclaration c name of
+    Just (OSL.Defined _ def) ->
+      mapLeft
+        ( \e ->
+            ErrorMessage
+              (Just (e ^. #annotation))
+              ("Error translating: " <> e ^. #message)
+        )
+        $ (\(translated, aux) -> (def, translated, aux)) <$> runStateT (translateToFormula gtc ltc def) mempty
+    _ -> Left (ErrorMessage Nothing (pack (show name) <> " is not defined"))

@@ -78,6 +78,7 @@ library
     OSL.Term
     OSL.Tokenize
     OSL.Translate
+    OSL.TranslatedEvaluation
     OSL.TranslationContext
     OSL.Type
     OSL.Types.ArgumentForm

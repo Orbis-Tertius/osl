@@ -9,28 +9,22 @@ module OSL.Spec.SudokuSpec (spec) where
 
 import Control.Lens ((^.))
 import Control.Monad (forM_)
-import Control.Monad.Trans.State.Strict (runStateT)
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Die (die)
 import GHC.Generics (Generic)
-import OSL.Argument (toSigma11Argument)
 import OSL.ArgumentForm (getArgumentForm)
-import OSL.BuildTranslationContext (buildTranslationContext)
 import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
-import OSL.Sigma11 (auxTablesToEvalContext, evalFormula)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
-import OSL.Term (dropTermAnnotations)
-import OSL.Translate (translateToFormula)
+import OSL.TranslatedEvaluation (evalTranslatedFormula)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
 import OSL.Types.FileName (FileName (FileName))
-import OSL.Types.OSL (ContextType (Global), Declaration (Defined), Name (Sym), Type (F, Fin, NamedType, Product), ValidContext (ValidContext))
-import OSL.Types.TranslationContext (TranslationContext (TranslationContext))
+import OSL.Types.OSL (ContextType (Global), Declaration (Defined), Name (Sym), Type (F, Fin, NamedType, Product), ValidContext)
 import OSL.Types.Value (Value (Fin', Fun, Maybe'', Pair', To'))
-import OSL.ValidContext (getDeclaration, getNamedTermUnsafe)
+import OSL.ValidContext (getNamedTermUnsafe)
 import Stark.Types.Scalar (integerToScalar)
 import Test.Syd (Spec, describe, expectationFailure, it, liftIO, shouldBe)
 import Text.Parsec (SourcePos)
@@ -94,28 +88,12 @@ exampleSpec c = do
       (exampleUnsoundArgument c)
       `shouldBe` Right False
 
-  it "Sudoku spec's semantics are preserved in Sigma11 translation" $
-    case buildTranslationContext c of
-      Right tc ->
-        let ltc = TranslationContext (ValidContext (tc ^. #context . #unValidContext)) (tc ^. #mappings)
-         in case getDeclaration c "problemIsSolvable" of
-              Just (Defined _ def) ->
-                case runStateT (translateToFormula tc ltc def) mempty of
-                  Right (translated, aux) ->
-                    case auxTablesToEvalContext aux of
-                      Right ec -> do
-                        case toSigma11Argument c argumentForm (exampleArgument c) (dropTermAnnotations def) of
-                          Right arg -> do
-                            evalFormula ec arg translated `shouldBe` Right True
-                          Left err -> expectationFailure ("toSigma11Argument exampleArgument: " <> show err)
-                        case toSigma11Argument c argumentForm (exampleUnsoundArgument c) (dropTermAnnotations def) of
-                          Right arg ->
-                            evalFormula ec arg translated `shouldBe` Right False
-                          Left err -> expectationFailure ("toSigma11Argument exampleUnsoundArgument: " <> show err)
-                      Left err -> expectationFailure ("auxTablesToEvalContext: " <> show err)
-                  Left err -> expectationFailure ("translateToFormula: " <> show err)
-              _ -> expectationFailure "problemIsSolvable not defined"
-      Left err -> expectationFailure ("buildTranslationContext: " <> show err)
+  it "Sudoku spec's semantics are preserved in Sigma11 translation" $ do
+    evalTranslatedFormula c "problemIsSolvable" argumentForm (exampleArgument c)
+      `shouldBe` Right True
+
+    evalTranslatedFormula c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
+      `shouldBe` Right False
 
 exampleArgument :: ValidContext 'Global ann -> Argument
 exampleArgument c =
