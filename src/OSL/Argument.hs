@@ -3,7 +3,6 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module OSL.Argument (toSigma11Argument) where
 
@@ -13,7 +12,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (pack)
-import OSL.Debug (showTrace)
 import OSL.Evaluation (decodeScalar)
 import qualified OSL.Sigma11 as S11
 import qualified OSL.Term as OSL
@@ -73,7 +71,7 @@ toSigma11ValueTree ::
   OSL.Value ->
   OSL.Term () ->
   Either (ErrorMessage ()) S11.ValueTree
-toSigma11ValueTree gc lc lcs t = curry $ \(showTrace "val/term: " -> (val, term)) ->
+toSigma11ValueTree gc lc lcs t val term =
   case (t, val, term) of
     -- TODO: is the following commented out clause needed?
     -- (_, OSL.Fin' 0, _) ->

@@ -106,8 +106,6 @@ exampleSpec c = do
                       Right ec -> do
                         case toSigma11Argument c argumentForm (exampleArgument c) (dropTermAnnotations def) of
                           Right arg -> do
-                            liftIO . putStrLn . ("OSL witness: " <>) $ show (exampleArgument c ^. #witness)
-                            liftIO . putStrLn . ("sigma11 argument: " <>) $ show arg
                             evalFormula ec arg translated `shouldBe` Right True
                           Left err -> expectationFailure ("toSigma11Argument exampleArgument: " <> show err)
                         case toSigma11Argument c argumentForm (exampleUnsoundArgument c) (dropTermAnnotations def) of
