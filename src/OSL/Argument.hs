@@ -73,11 +73,6 @@ toSigma11ValueTree ::
   Either (ErrorMessage ()) S11.ValueTree
 toSigma11ValueTree gc lc lcs t val term =
   case (t, val, term) of
-    -- TODO: is the following commented out clause needed?
-    -- (_, OSL.Fin' 0, _) ->
-    --   -- the logic for this case is that there is no witness and so
-    --   -- we can just provide an empty tree.
-    --   pure emptyTree
     (_, _, OSL.Apply {}) ->
       -- the logic for this case works based on the assumption
       -- that the application head is a defined term which is

@@ -281,7 +281,7 @@ evalFormula c arg =
                 if x' == b'
                   then pure True
                   else go x' arg'''
-              else pure False -- Left (ErrorMessage () $ "ForAll: false " <> pack (show (x, p, arg, c)))
+              else pure False
       if b' == zero then pure True else go zero arg
   where
     rec = evalFormula c
