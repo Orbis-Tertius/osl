@@ -40,14 +40,14 @@ import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), Term (Add, App, AppInverse, Const, IndLess, Max, Mul), AuxTables, PredicateName)
+import OSL.Types.Sigma11 (AuxTables, Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), PredicateName, Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
 import OSL.Types.Sigma11.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.Sigma11.EvaluationContext (EvaluationContext (EvaluationContext))
 import OSL.Types.Sigma11.Value (Value (Value))
 import OSL.Types.Sigma11.ValueTree (ValueTree (ValueTree))
 import OSL.Types.TranslationContext (Mapping (..))
+import Stark.Types.Scalar (Scalar, integerToScalar, one, zero)
 import Prelude hiding (fromInteger)
-import Stark.Types.Scalar (Scalar, zero, one, integerToScalar)
 
 class MapNames a where
   mapNames :: (Name -> Name) -> a -> a
@@ -176,8 +176,9 @@ evalTerm (EvaluationContext c) =
           xs' <- mapM rec xs
           case Map.lookup xs' f' of
             Just y -> pure y
-            Nothing -> Left . ErrorMessage () $
-              "value not defined on given inputs: " <> pack (show (xs', f'))
+            Nothing ->
+              Left . ErrorMessage () $
+                "value not defined on given inputs: " <> pack (show (xs', f'))
         Nothing ->
           Left . ErrorMessage () $
             "name not defined in given evaluation context"
@@ -203,8 +204,9 @@ evalTerm (EvaluationContext c) =
     Const i ->
       case integerToScalar i of
         Just i' -> pure i'
-        Nothing -> Left . ErrorMessage () $
-          "constant out of range of scalar field"
+        Nothing ->
+          Left . ErrorMessage () $
+            "constant out of range of scalar field"
   where
     rec = evalTerm (EvaluationContext c)
 
@@ -224,14 +226,16 @@ evalFormula c arg =
     LessOrEqual x y ->
       (<=) <$> evalTerm c x <*> evalTerm c y
     Predicate p xs -> do
-       xs' <- mapM (evalTerm c) xs
-       case Map.lookup (Right p) (c ^. #unEvaluationContext) of
-         Just (Value p') ->
-           maybe (pure False) (const (pure True))
-             (Map.lookup xs' p')
-         Nothing ->
-           Left . ErrorMessage () $
-             "predicate not defined in given evaluation context"
+      xs' <- mapM (evalTerm c) xs
+      case Map.lookup (Right p) (c ^. #unEvaluationContext) of
+        Just (Value p') ->
+          maybe
+            (pure False)
+            (const (pure True))
+            (Map.lookup xs' p')
+        Nothing ->
+          Left . ErrorMessage () $
+            "predicate not defined in given evaluation context"
     Not p -> not <$> rec arg p
     And p q -> do
       let (arg0, arg1) = splitArg
@@ -249,7 +253,7 @@ evalFormula c arg =
     Bottom -> pure False
     Given n ibs ob p ->
       case arg ^. #statement . #unStatement of
-        (i:is') -> do
+        (i : is') -> do
           let c' = addToEvalContext c (Arity (length ibs)) i
           let arg' = Argument (Statement is') (arg ^. #witness)
           checkValueIsInBounds c n ibs ob i
@@ -257,7 +261,8 @@ evalFormula c arg =
         [] -> Left . ErrorMessage () $ "statement is too short"
     ForSome (Some n ibs ob) p ->
       existentialQuantifier n ibs ob p
-    ForSome (SomeP n ib ob) p -> -- TODO: also check witness value is a permutation
+    ForSome (SomeP n ib ob) p ->
+      -- TODO: also check witness value is a permutation
       existentialQuantifier n [ib] ob p
     ForAll FieldMaxBound _ ->
       Left . ErrorMessage () $
@@ -266,14 +271,18 @@ evalFormula c arg =
       b' <- evalTerm c b
       let go x arg' = do
             let (arg'', arg''') = popArg p arg'
-                c' = addToEvalContext c (Arity 0)
-                       (Value (Map.singleton [] x))
+                c' =
+                  addToEvalContext
+                    c
+                    (Arity 0)
+                    (Value (Map.singleton [] x))
                 x' = x Group.+ one
             r <- evalFormula c' arg'' p
             if r
-              then if x' == b'
-                   then pure True
-                   else go x' arg'''
+              then
+                if x' == b'
+                  then pure True
+                  else go x' arg'''
               else pure False -- Left (ErrorMessage () $ "ForAll: false " <> pack (show (x, p, arg, c)))
       if b' == zero then pure True else go zero arg
   where
@@ -289,34 +298,38 @@ evalFormula c arg =
     splitArg =
       case arg ^. #witness of
         Witness (ValueTree Nothing [w0, w1]) ->
-          (Argument (arg ^. #statement) (Witness w0),
-           Argument (arg ^. #statement) (Witness w1))
-        _ ->
-          (Argument (arg ^. #statement) (Witness (ValueTree Nothing [])),
-           Argument (arg ^. #statement) (Witness (ValueTree Nothing [])))
-
-    popArg :: Formula -> Argument -> (Argument, Argument)
-    popArg p arg' =
-      case arg' ^. #witness . #unWitness . #branches of
-        (b:bs) ->
-          ( Argument (arg ^. #statement) (Witness b),
-            Argument (arg ^. #statement) (Witness (ValueTree Nothing bs))
+          ( Argument (arg ^. #statement) (Witness w0),
+            Argument (arg ^. #statement) (Witness w1)
           )
-        [] -> trace ("popArg: ran out of witness branches: " <> show p) $
+        _ ->
           ( Argument (arg ^. #statement) (Witness (ValueTree Nothing [])),
             Argument (arg ^. #statement) (Witness (ValueTree Nothing []))
           )
 
+    popArg :: Formula -> Argument -> (Argument, Argument)
+    popArg p arg' =
+      case arg' ^. #witness . #unWitness . #branches of
+        (b : bs) ->
+          ( Argument (arg ^. #statement) (Witness b),
+            Argument (arg ^. #statement) (Witness (ValueTree Nothing bs))
+          )
+        [] ->
+          trace ("popArg: ran out of witness branches: " <> show p) $
+            ( Argument (arg ^. #statement) (Witness (ValueTree Nothing [])),
+              Argument (arg ^. #statement) (Witness (ValueTree Nothing []))
+            )
+
     existentialQuantifier n ibs ob p =
-      let arity = Arity (length ibs) in
-      case arg ^. #witness . #unWitness of
-        ValueTree (Just w) [ws'] -> do
-          let c' = addToEvalContext c arity w
-              arg' = Argument (arg ^. #statement) (Witness ws')
-          checkValueIsInBounds c n ibs ob w
-          traceEvalFormula c' arg' p
-        _ -> Left . ErrorMessage () $
-          "witness has wrong shape for an existential quantifier: " <> pack (show (arg ^. #witness . #unWitness, p))
+      let arity = Arity (length ibs)
+       in case arg ^. #witness . #unWitness of
+            ValueTree (Just w) [ws'] -> do
+              let c' = addToEvalContext c arity w
+                  arg' = Argument (arg ^. #statement) (Witness ws')
+              checkValueIsInBounds c n ibs ob w
+              traceEvalFormula c' arg' p
+            _ ->
+              Left . ErrorMessage () $
+                "witness has wrong shape for an existential quantifier: " <> pack (show (arg ^. #witness . #unWitness, p))
 
 checkValueIsInBounds ::
   EvaluationContext ->
@@ -327,12 +340,12 @@ checkValueIsInBounds ::
   Either (ErrorMessage ()) ()
 checkValueIsInBounds c (Cardinality n) ibs ob (Value v) =
   if intToInteger (Map.size v) <= n
-  then forM_ (Map.toList v) $ \(xs,y) ->
-         if length xs == length ibs
-         then do
-           checkPointIsInBounds c (zip xs ibs) (y, ob)
-         else Left (ErrorMessage () "point has wrong number of inputs")
-  else Left (ErrorMessage () ("value is too big: " <> pack (show (Map.size v)) <> " > " <> pack (show n)))
+    then forM_ (Map.toList v) $ \(xs, y) ->
+      if length xs == length ibs
+        then do
+          checkPointIsInBounds c (zip xs ibs) (y, ob)
+        else Left (ErrorMessage () "point has wrong number of inputs")
+    else Left (ErrorMessage () ("value is too big: " <> pack (show (Map.size v)) <> " > " <> pack (show n)))
 
 checkPointIsInBounds ::
   EvaluationContext ->
@@ -354,45 +367,50 @@ checkPointIsInBounds c ((x, InputBound (TermBound ib)) : ibs) (y, ob) = do
 
 addToEvalContext :: EvaluationContext -> Arity -> Value -> EvaluationContext
 addToEvalContext (EvaluationContext c) n x =
-  EvaluationContext . Map.insert (Left (Name n 0)) x
-    $ Map.mapKeys incIfN c
+  EvaluationContext . Map.insert (Left (Name n 0)) x $
+    Map.mapKeys incIfN c
   where
     incIfN (Left (Name n' i)) =
       if n == n'
-      then Left (Name n (i+1))
-      else Left (Name n' i)
+        then Left (Name n (i + 1))
+        else Left (Name n' i)
     incIfN (Right p) = Right p
 
 auxTablesToEvalContext :: AuxTables -> Either (ErrorMessage ()) EvaluationContext
 auxTablesToEvalContext aux =
-  mconcat <$> sequence
-    [ functionTablesToEvalContext (aux ^. #functionTables),
-      predicateTablesToEvalContext (aux ^. #predicateTables)
-    ]
+  mconcat
+    <$> sequence
+      [ functionTablesToEvalContext (aux ^. #functionTables),
+        predicateTablesToEvalContext (aux ^. #predicateTables)
+      ]
 
 functionTablesToEvalContext ::
   Map Name (Map [Integer] Integer) ->
   Either (ErrorMessage ()) EvaluationContext
 functionTablesToEvalContext m =
-  EvaluationContext . Map.fromList <$> sequence
-    [ (Left fName,) . Value . Map.fromList <$> sequence
-        [ (,) <$> mapM fromInteger xs <*> fromInteger y
-        | (xs, y) <- Map.toList f
-        ]
-    | (fName, f) <- Map.toList m
-    ]
+  EvaluationContext . Map.fromList
+    <$> sequence
+      [ (Left fName,) . Value . Map.fromList
+          <$> sequence
+            [ (,) <$> mapM fromInteger xs <*> fromInteger y
+              | (xs, y) <- Map.toList f
+            ]
+        | (fName, f) <- Map.toList m
+      ]
 
 predicateTablesToEvalContext ::
   Map PredicateName (Set [Integer]) ->
   Either (ErrorMessage ()) EvaluationContext
 predicateTablesToEvalContext m =
-  EvaluationContext . Map.fromList <$> sequence
-    [ (Right pName,) . Value . Map.fromList <$> sequence
-        [ (,zero) <$> mapM fromInteger xs
-        | xs <- Set.toList p
-        ]
-    | (pName, p) <- Map.toList m
-    ]
+  EvaluationContext . Map.fromList
+    <$> sequence
+      [ (Right pName,) . Value . Map.fromList
+          <$> sequence
+            [ (,zero) <$> mapM fromInteger xs
+              | xs <- Set.toList p
+            ]
+        | (pName, p) <- Map.toList m
+      ]
 
 fromInteger :: Integer -> Either (ErrorMessage ()) Scalar
 fromInteger = maybe (Left (ErrorMessage () "integer out of range of scalar field")) pure . integerToScalar

@@ -4,12 +4,13 @@ module OSL.Term
   ( applicationHead,
     lambdaBody,
     termAnnotation,
-    dropTermAnnotations
-  ) where
+    dropTermAnnotations,
+  )
+where
 
 import Control.Arrow ((***))
 import OSL.Type (dropTypeAnnotations)
-import OSL.Types.OSL (Term (..), Bound (..), LeftBound (..), RightBound (..), ValuesBound (..), KeysBound (..), DomainBound (..), CodomainBound (..))
+import OSL.Types.OSL (Bound (..), CodomainBound (..), DomainBound (..), KeysBound (..), LeftBound (..), RightBound (..), Term (..), ValuesBound (..))
 
 applicationHead :: Term ann -> Term ann
 applicationHead (Apply _ f _) = applicationHead f

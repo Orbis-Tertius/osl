@@ -14,22 +14,22 @@ import qualified Data.Map as Map
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (pack)
 import OSL.Debug (showTrace)
-import qualified OSL.Sigma11 as S11
-import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Evaluation (decodeScalar)
+import qualified OSL.Sigma11 as S11
 import qualified OSL.Term as OSL
 import qualified OSL.Type as OSL
-import qualified OSL.Types.ArgumentForm as OSL
 import qualified OSL.Types.Argument as OSL
+import qualified OSL.Types.ArgumentForm as OSL
+import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import qualified OSL.Types.OSL as OSL
-import qualified OSL.Types.Value as OSL
 import qualified OSL.Types.Sigma11.Argument as S11
 import qualified OSL.Types.Sigma11.Value as S11
 import qualified OSL.Types.Sigma11.ValueTree as S11
+import qualified OSL.Types.Value as OSL
 import qualified OSL.ValidContext as OSL
 import qualified OSL.Value as OSL
 import Safe (atMay)
-import Stark.Types.Scalar (Scalar, zero, one, integerToScalar)
+import Stark.Types.Scalar (Scalar, integerToScalar, one, zero)
 
 toSigma11Argument ::
   OSL.ValidContext t ann ->
@@ -41,6 +41,7 @@ toSigma11Argument c af a x =
   S11.Argument
     <$> toSigma11Statement c (af ^. #statementType) (a ^. #statement)
     <*> toSigma11Witness c (af ^. #witnessType) (a ^. #witness) x
+
 toSigma11Statement ::
   OSL.ValidContext t ann ->
   OSL.StatementType ->
@@ -73,7 +74,7 @@ toSigma11ValueTree ::
   OSL.Term () ->
   Either (ErrorMessage ()) S11.ValueTree
 toSigma11ValueTree gc lc lcs t = curry $ \(showTrace "val/term: " -> (val, term)) ->
-  case (t,val,term) of
+  case (t, val, term) of
     -- TODO: is the following commented out clause needed?
     -- (_, OSL.Fin' 0, _) ->
     --   -- the logic for this case is that there is no witness and so
@@ -91,17 +92,19 @@ toSigma11ValueTree gc lc lcs t = curry $ \(showTrace "val/term: " -> (val, term)
           case Map.lookup name (lc ^. #unValidContext) of
             Just (OSL.Defined _ def) ->
               let lc' = case Map.lookup name lcs of
-                          Just lc'' -> lc''
-                          Nothing -> OSL.ValidContext (OSL.dropDeclarationAnnotations <$> (gc ^. #unValidContext))
-              in toSigma11ValueTree gc lc' lcs t val (OSL.lambdaBody (OSL.dropTermAnnotations def))
-            _ -> Left . ErrorMessage () $
-              "expected application head to be the name of a defined predicate: " <> pack (show (t, val, term))
-        _ -> Left . ErrorMessage () $
-          "expected application head to be the name of a defined predicate: " <> pack (show (t, val, term))
+                    Just lc'' -> lc''
+                    Nothing -> OSL.ValidContext (OSL.dropDeclarationAnnotations <$> (gc ^. #unValidContext))
+               in toSigma11ValueTree gc lc' lcs t val (OSL.lambdaBody (OSL.dropTermAnnotations def))
+            _ ->
+              Left . ErrorMessage () $
+                "expected application head to be the name of a defined predicate: " <> pack (show (t, val, term))
+        _ ->
+          Left . ErrorMessage () $
+            "expected application head to be the name of a defined predicate: " <> pack (show (t, val, term))
     (a, w, OSL.Let _ name e d y) ->
       let lc' = lc <> OSL.ValidContext (Map.singleton name (OSL.Defined e d))
           lcs' = Map.insert name lc lcs
-      in toSigma11ValueTree gc lc' lcs' a w y
+       in toSigma11ValueTree gc lc' lcs' a w y
     (_, _, OSL.Lambda _ _ _ body) ->
       rec t val body
     (OSL.Product _ a b, OSL.Pair' x y, OSL.And _ p q) ->
@@ -128,14 +131,15 @@ toSigma11ValueTree gc lc lcs t = curry $ \(showTrace "val/term: " -> (val, term)
       forAllScalar b f p
     (OSL.F _ _ (OSL.Z _) _, _, _) -> Left (ErrorMessage () "unexpected Z -> b")
     (OSL.F _ _ (OSL.Fp _) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Fp _) _ p) ->
-       forAllScalar b f p
+      forAllScalar b f p
     (OSL.F _ _ (OSL.Fp _) _, _, _) -> Left (ErrorMessage () "unexpected Fp -> b")
     (OSL.F _ _ (OSL.Fin {}) b, OSL.Fun f, OSL.ForAll _ _ (OSL.Fin {}) _ p) ->
       forAllScalar b f p
     (OSL.F _ _ (OSL.Fin {}) _, _, _) -> Left (ErrorMessage () "unexpected Fin -> b")
     (OSL.F _ _ (OSL.Product _ a b) d, OSL.Fun f, OSL.ForAll _ x (OSL.Product {}) _ p) -> do
       f' <- curryFun f
-      rec (OSL.F () Nothing a (OSL.F () Nothing b d))
+      rec
+        (OSL.F () Nothing a (OSL.F () Nothing b d))
         (OSL.Fun f')
         -- Note that this step, and similar steps below, corrupt the input term by changing the usage of x,
         -- and also by removing any bounds on x, but none of that matters for this algorithm,
@@ -146,16 +150,28 @@ toSigma11ValueTree gc lc lcs t = curry $ \(showTrace "val/term: " -> (val, term)
       defaultA <- OSL.defaultValue gc a
       defaultB <- OSL.defaultValue gc b
       f' <- curryCoproductFun (defaultA, defaultB) f
-      rec (OSL.F () Nothing (OSL.N ()) (OSL.F () Nothing a (OSL.F () Nothing b d)))
+      rec
+        (OSL.F () Nothing (OSL.N ()) (OSL.F () Nothing a (OSL.F () Nothing b d)))
         (OSL.Fun f')
-        (OSL.ForAll () x (OSL.N ()) Nothing
-          (OSL.ForAll () x a Nothing
-            (OSL.ForAll () x b Nothing p)))
+        ( OSL.ForAll
+            ()
+            x
+            (OSL.N ())
+            Nothing
+            ( OSL.ForAll
+                ()
+                x
+                a
+                Nothing
+                (OSL.ForAll () x b Nothing p)
+            )
+        )
     (OSL.F _ _ (OSL.Coproduct {}) _, _, _) -> Left (ErrorMessage () "unexpected (a + b) -> c")
     (OSL.F _ _ (OSL.Maybe _ a) b, OSL.Fun f, OSL.ForAll _ x (OSL.Maybe {}) _ p) -> do
       defaultA <- OSL.defaultValue gc a
       f' <- curryMaybeFun defaultA f
-      rec (OSL.F () Nothing (OSL.N ()) (OSL.F () Nothing a b))
+      rec
+        (OSL.F () Nothing (OSL.N ()) (OSL.F () Nothing a b))
         (OSL.Fun f')
         (OSL.ForAll () x (OSL.N ()) Nothing (OSL.ForAll () x a Nothing p))
     (OSL.F _ _ (OSL.Maybe {}) _, _, _) -> Left (ErrorMessage () "unexpected Maybe(a) -> b")
@@ -163,8 +179,8 @@ toSigma11ValueTree gc lc lcs t = curry $ \(showTrace "val/term: " -> (val, term)
       case Map.lookup name (gc ^. #unValidContext) of
         Just (OSL.Data a) ->
           let f' = OSL.Fun $ mapKeysMaybe OSL.toInverse f
-              a' = OSL.dropTypeAnnotations a in
-          rec (OSL.F () Nothing a' b) f' (OSL.ForAll () x a' Nothing p)
+              a' = OSL.dropTypeAnnotations a
+           in rec (OSL.F () Nothing a' b) f' (OSL.ForAll () x a' Nothing p)
         _ -> Left (ErrorMessage () "expected the name of a type")
     (OSL.F _ _ (OSL.NamedType {}) _, _, _) ->
       Left (ErrorMessage () "unexpected Foo -> b")
@@ -206,77 +222,138 @@ toSigma11ValueTree gc lc lcs t = curry $ \(showTrace "val/term: " -> (val, term)
       -- NOTE: this is a fallthrough case
       Left . ErrorMessage () $ "unexpected Fin * a: " <> pack (show (t, val, term))
     (OSL.Product () (OSL.Product _ a b) d, OSL.Pair' (OSL.Pair' x y) z, OSL.ForSome ann v (OSL.Product {}) _ p) ->
-      rec (OSL.Product () a (OSL.Product () b d))
+      rec
+        (OSL.Product () a (OSL.Product () b d))
         (OSL.Pair' x (OSL.Pair' y z))
         (OSL.ForSome ann v a Nothing (OSL.ForSome ann v b Nothing p))
     (OSL.Product () (OSL.Product {}) _, _, _) ->
       Left (ErrorMessage () "unexpected (a * b) * c") -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.Coproduct _ a b) d, OSL.Pair' (OSL.Iota1' x) y, OSL.ForSome ann v (OSL.Coproduct {}) _ p) -> do
       defaultB <- OSL.defaultValue gc b
-      rec (OSL.Product () (OSL.N ()) (OSL.Product () a (OSL.Product () b d)))
+      rec
+        (OSL.Product () (OSL.N ()) (OSL.Product () a (OSL.Product () b d)))
         (OSL.Pair' (OSL.Nat zero) (OSL.Pair' x (OSL.Pair' defaultB y)))
-        (OSL.ForSome ann v (OSL.N ()) Nothing
-          (OSL.ForSome ann v a Nothing
-            (OSL.ForSome ann v b Nothing p)))
+        ( OSL.ForSome
+            ann
+            v
+            (OSL.N ())
+            Nothing
+            ( OSL.ForSome
+                ann
+                v
+                a
+                Nothing
+                (OSL.ForSome ann v b Nothing p)
+            )
+        )
     (OSL.Product _ (OSL.Coproduct _ a b) d, OSL.Pair' (OSL.Iota2' x) y, OSL.ForSome ann v (OSL.Coproduct {}) _ p) -> do
       defaultA <- OSL.defaultValue gc a
-      rec (OSL.Product () (OSL.N ()) (OSL.Product () a (OSL.Product () b d)))
+      rec
+        (OSL.Product () (OSL.N ()) (OSL.Product () a (OSL.Product () b d)))
         (OSL.Pair' (OSL.Nat one) (OSL.Pair' defaultA (OSL.Pair' x y)))
-        (OSL.ForSome ann v (OSL.N ()) Nothing
-          (OSL.ForSome ann v a Nothing
-            (OSL.ForSome ann v b Nothing p)))
+        ( OSL.ForSome
+            ann
+            v
+            (OSL.N ())
+            Nothing
+            ( OSL.ForSome
+                ann
+                v
+                a
+                Nothing
+                (OSL.ForSome ann v b Nothing p)
+            )
+        )
     (OSL.Product () (OSL.Coproduct {}) _, _, _) ->
       Left (ErrorMessage () "unexpected (a + b) * c") -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.Maybe _ a) b, OSL.Pair' (OSL.Maybe'' Nothing) y, OSL.ForSome ann v (OSL.Maybe {}) _ p) -> do
       defaultA <- OSL.defaultValue gc a
-      rec (OSL.Product () (OSL.N ()) (OSL.Product () a b))
+      rec
+        (OSL.Product () (OSL.N ()) (OSL.Product () a b))
         (OSL.Pair' (OSL.Nat zero) (OSL.Pair' defaultA y))
-        (OSL.ForSome ann v (OSL.N ()) Nothing
-          (OSL.ForSome ann v a Nothing p))
+        ( OSL.ForSome
+            ann
+            v
+            (OSL.N ())
+            Nothing
+            (OSL.ForSome ann v a Nothing p)
+        )
     (OSL.Product _ (OSL.Maybe _ a) b, OSL.Pair' (OSL.Maybe'' (Just x)) y, OSL.ForSome ann v (OSL.Maybe {}) _ p) -> do
-      rec (OSL.Product () (OSL.N ()) (OSL.Product () a b))
+      rec
+        (OSL.Product () (OSL.N ()) (OSL.Product () a b))
         (OSL.Pair' (OSL.Nat one) (OSL.Pair' x y))
-        (OSL.ForSome ann v (OSL.N ()) Nothing
-          (OSL.ForSome ann v a Nothing p))
+        ( OSL.ForSome
+            ann
+            v
+            (OSL.N ())
+            Nothing
+            (OSL.ForSome ann v a Nothing p)
+        )
     (OSL.Product _ (OSL.Maybe {}) _, _, _) ->
       Left (ErrorMessage () "unexpected Maybe(a) * b") -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.List _ _ a) b, OSL.Pair' (OSL.List'' xs) y, OSL.ForSome ann v (OSL.List {}) _ p) -> do
       n <- fromInt (length xs)
-      f <- OSL.Fun . Map.fromList <$> sequence
-           [ (,x) . OSL.Nat <$> fromInt i
-           | (i,x) <- zip [0..] xs
-           ]
-      rec (OSL.Product () (OSL.N ()) (OSL.Product () (OSL.F () Nothing (OSL.N ()) a) b))
+      f <-
+        OSL.Fun . Map.fromList
+          <$> sequence
+            [ (,x) . OSL.Nat <$> fromInt i
+              | (i, x) <- zip [0 ..] xs
+            ]
+      rec
+        (OSL.Product () (OSL.N ()) (OSL.Product () (OSL.F () Nothing (OSL.N ()) a) b))
         (OSL.Pair' (OSL.Nat n) (OSL.Pair' f y))
-        (OSL.ForSome ann v (OSL.N ann) Nothing
-          (OSL.ForSome ann v (OSL.F ann Nothing (OSL.N ()) a) Nothing p))
+        ( OSL.ForSome
+            ann
+            v
+            (OSL.N ann)
+            Nothing
+            (OSL.ForSome ann v (OSL.F ann Nothing (OSL.N ()) a) Nothing p)
+        )
     (OSL.Product _ (OSL.List {}) _, _, _) ->
       Left (ErrorMessage () "unexpected List(a) * b") -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.Map _ _ a b) d, OSL.Pair' (OSL.Map'' m) y, OSL.ForSome ann v (OSL.Map {}) _ p) -> do
       n <- OSL.Nat <$> fromInt (Map.size m)
-      ks <- OSL.Fun . Map.fromList <$> sequence
+      ks <-
+        OSL.Fun . Map.fromList
+          <$> sequence
             [ (,x) . OSL.Nat <$> fromInt i
-            | (i,x) <- zip [0..] (Map.keys m)
+              | (i, x) <- zip [0 ..] (Map.keys m)
             ]
       rec
-        (OSL.Product () (OSL.N ())
-          (OSL.Product () (OSL.F () Nothing (OSL.N ()) a)
-            (OSL.Product () (OSL.F () Nothing a b) d)))
+        ( OSL.Product
+            ()
+            (OSL.N ())
+            ( OSL.Product
+                ()
+                (OSL.F () Nothing (OSL.N ()) a)
+                (OSL.Product () (OSL.F () Nothing a b) d)
+            )
+        )
         (OSL.Pair' n (OSL.Pair' ks (OSL.Pair' (OSL.Fun m) y)))
-        (OSL.ForSome ann v (OSL.N ann) Nothing
-          (OSL.ForSome ann v (OSL.F ann Nothing (OSL.N ann) a) Nothing
-            (OSL.ForSome ann v (OSL.F ann Nothing a b) Nothing p)))
+        ( OSL.ForSome
+            ann
+            v
+            (OSL.N ann)
+            Nothing
+            ( OSL.ForSome
+                ann
+                v
+                (OSL.F ann Nothing (OSL.N ann) a)
+                Nothing
+                (OSL.ForSome ann v (OSL.F ann Nothing a b) Nothing p)
+            )
+        )
     (OSL.Product _ (OSL.Map {}) _, _, _) ->
       Left (ErrorMessage () "unexpected Map(a, b) * c") -- NOTE: this is a fallthrough case
     (OSL.Product _ (OSL.NamedType _ name) b, OSL.Pair' (OSL.To' _ x) y, OSL.ForSome ann v (OSL.NamedType {}) _ p) ->
       case Map.lookup name (gc ^. #unValidContext) of
         Just (OSL.Data a) ->
-          let a' = OSL.dropTypeAnnotations a in
-          rec (OSL.Product () a' b) (OSL.Pair' x y) (OSL.ForSome ann v a' Nothing p)
+          let a' = OSL.dropTypeAnnotations a
+           in rec (OSL.Product () a' b) (OSL.Pair' x y) (OSL.ForSome ann v a' Nothing p)
         _ -> Left (ErrorMessage () "expected the name of a type")
     (OSL.Product _ (OSL.NamedType {}) _, _, _) ->
-     -- NOTE: this is a fallthrough case; careful moving it
-     Left . ErrorMessage () $ "unexpected Foo * a: " <> pack (show (t, val, term))
+      -- NOTE: this is a fallthrough case; careful moving it
+      Left . ErrorMessage () $ "unexpected Foo * a: " <> pack (show (t, val, term))
     (OSL.Product _ (OSL.F _ _ a (OSL.N _)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
       forSomeScalarFun a (OSL.N ()) b f y p
     (OSL.Product _ (OSL.F _ _ a (OSL.Z _)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ _ (OSL.F {}) _ p) ->
@@ -289,36 +366,69 @@ toSigma11ValueTree gc lc lcs t = curry $ \(showTrace "val/term: " -> (val, term)
       let f0 = OSL.Fun $ Map.mapMaybe OSL.fstOfPairMay f
           f1 = OSL.Fun $ Map.mapMaybe OSL.sndOfPairMay f
       rec
-        (OSL.Product () (OSL.F () Nothing a b)
-          (OSL.Product () (OSL.F () Nothing a d) e))
+        ( OSL.Product
+            ()
+            (OSL.F () Nothing a b)
+            (OSL.Product () (OSL.F () Nothing a d) e)
+        )
         (OSL.Pair' f0 (OSL.Pair' f1 y))
-        (OSL.ForSome ann v (OSL.F ann Nothing a b) Nothing
-          (OSL.ForSome ann v (OSL.F ann Nothing a d) Nothing p))
+        ( OSL.ForSome
+            ann
+            v
+            (OSL.F ann Nothing a b)
+            Nothing
+            (OSL.ForSome ann v (OSL.F ann Nothing a d) Nothing p)
+        )
     (OSL.Product _ (OSL.F _ _ a (OSL.List _ _ b)) d, OSL.Pair' (OSL.Fun f) y, OSL.ForSome ann v (OSL.F {}) _ p) ->
       let fLengths = OSL.Fun $ Map.mapMaybe OSL.listLength f
-          fValues = OSL.Fun $ Map.mapMaybe OSL.listFun f in
-      rec
-        (OSL.Product () (OSL.F () Nothing a (OSL.N ()))
-          (OSL.Product () (OSL.F () Nothing a (OSL.F () Nothing (OSL.N ()) b)) d))
-        (OSL.Pair' fLengths (OSL.Pair' fValues y))
-        (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.N ann)) Nothing
-          (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.F ann Nothing (OSL.N ann) b)) Nothing p))
+          fValues = OSL.Fun $ Map.mapMaybe OSL.listFun f
+       in rec
+            ( OSL.Product
+                ()
+                (OSL.F () Nothing a (OSL.N ()))
+                (OSL.Product () (OSL.F () Nothing a (OSL.F () Nothing (OSL.N ()) b)) d)
+            )
+            (OSL.Pair' fLengths (OSL.Pair' fValues y))
+            ( OSL.ForSome
+                ann
+                v
+                (OSL.F ann Nothing a (OSL.N ann))
+                Nothing
+                (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.F ann Nothing (OSL.N ann) b)) Nothing p)
+            )
     (OSL.Product _ (OSL.F _ _ a (OSL.Map _ _ b d)) e, OSL.Pair' (OSL.Fun f) y, OSL.ForSome ann v (OSL.F {}) _ p) ->
       let fSizes = OSL.Fun $ Map.mapMaybe OSL.mapSize f
           fKeys = OSL.Fun $ Map.mapMaybe OSL.mapKeys f
-          fValues = OSL.Fun $ Map.mapMaybe OSL.mapFun f in
-      rec
-        (OSL.Product () (OSL.F () Nothing a (OSL.N ()))
-          (OSL.Product () (OSL.F () Nothing a (OSL.F () Nothing (OSL.N ()) b))
-            (OSL.Product () (OSL.F () Nothing a (OSL.F () Nothing a b)) e)))
-        (OSL.Pair' fSizes (OSL.Pair' fKeys (OSL.Pair' fValues y)))
-        (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.N ann)) Nothing
-          (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.F ann Nothing (OSL.N ann) a)) Nothing
-            (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.F ann Nothing b d)) Nothing p)))
+          fValues = OSL.Fun $ Map.mapMaybe OSL.mapFun f
+       in rec
+            ( OSL.Product
+                ()
+                (OSL.F () Nothing a (OSL.N ()))
+                ( OSL.Product
+                    ()
+                    (OSL.F () Nothing a (OSL.F () Nothing (OSL.N ()) b))
+                    (OSL.Product () (OSL.F () Nothing a (OSL.F () Nothing a b)) e)
+                )
+            )
+            (OSL.Pair' fSizes (OSL.Pair' fKeys (OSL.Pair' fValues y)))
+            ( OSL.ForSome
+                ann
+                v
+                (OSL.F ann Nothing a (OSL.N ann))
+                Nothing
+                ( OSL.ForSome
+                    ann
+                    v
+                    (OSL.F ann Nothing a (OSL.F ann Nothing (OSL.N ann) a))
+                    Nothing
+                    (OSL.ForSome ann v (OSL.F ann Nothing a (OSL.F ann Nothing b d)) Nothing p)
+                )
+            )
     (OSL.Product _ (OSL.F _ _ a (OSL.NamedType _ name)) b, OSL.Pair' (OSL.Fun f) y, OSL.ForSome _ v (OSL.F {}) _ p) ->
       case Map.lookup name (lc ^. #unValidContext) of
         Just (OSL.Data d) ->
-          rec (OSL.Product () (OSL.F () Nothing a d) b)
+          rec
+            (OSL.Product () (OSL.F () Nothing a d) b)
             (OSL.Pair' (OSL.Fun (Map.mapMaybe OSL.toInverse f)) y)
             (OSL.ForSome () v (OSL.F () Nothing a d) Nothing p)
         _ -> Left (ErrorMessage () "expected the name of a type")
@@ -354,47 +464,51 @@ toSigma11ValueTree gc lc lcs t = curry $ \(showTrace "val/term: " -> (val, term)
     forAllScalar b f p =
       -- we are relying on Map.elems outputting the elements in ascending
       -- order of their keys
-      S11.ValueTree Nothing <$> sequence
-        [ rec b y p | y <- Map.elems f ]
+      S11.ValueTree Nothing
+        <$> sequence
+          [rec b y p | y <- Map.elems f]
 
     forSomeScalar b x y p =
       S11.ValueTree <$> (Just . S11.Value . Map.singleton [] <$> decodeScalar () x)
-                    <*> ((:[]) <$> rec b y p)
+        <*> ((: []) <$> rec b y p)
 
     forSomeScalarFun a b d f y p = do
       f' <- toSigma11Values lc (OSL.F () Nothing a b) (OSL.Fun f)
       case f' of
-        [f''] -> S11.ValueTree (Just f'') . (:[]) <$> rec d y p
+        [f''] -> S11.ValueTree (Just f'') . (: []) <$> rec d y p
         _ -> Left (ErrorMessage () "forSomeScalarFun: pattern match failure (this is a compiler bug)")
 
 curryFun :: Map OSL.Value OSL.Value -> Either (ErrorMessage ()) (Map OSL.Value OSL.Value)
 curryFun f =
-  fmap OSL.Fun . Map.unionsWith (<>) <$> sequence
-    [ case x of
-        OSL.Pair' x0 x1 -> pure (Map.singleton x0 (Map.singleton x1 y))
-        _ -> Left (ErrorMessage () "curryFun: expected a pair")
-    | (x,y) <- Map.toList f
-    ]
+  fmap OSL.Fun . Map.unionsWith (<>)
+    <$> sequence
+      [ case x of
+          OSL.Pair' x0 x1 -> pure (Map.singleton x0 (Map.singleton x1 y))
+          _ -> Left (ErrorMessage () "curryFun: expected a pair")
+        | (x, y) <- Map.toList f
+      ]
 
 curryCoproductFun :: (OSL.Value, OSL.Value) -> Map OSL.Value OSL.Value -> Either (ErrorMessage ()) (Map OSL.Value OSL.Value)
 curryCoproductFun (defaultLeft, defaultRight) f =
-  fmap OSL.Fun . fmap (fmap OSL.Fun) . Map.unionsWith (Map.unionWith (<>)) <$> sequence
-    [ case x of
-        OSL.Iota1' x' -> pure (Map.singleton (OSL.Nat zero) (Map.singleton x' (Map.singleton defaultRight y)))
-        OSL.Iota2' x' -> pure (Map.singleton (OSL.Nat one) (Map.singleton defaultLeft (Map.singleton x' y)))
-        _ -> Left (ErrorMessage () "curryCoproductFun: expected a coproduct value")
-    | (x,y) <- Map.toList f
-    ]
+  fmap OSL.Fun . fmap (fmap OSL.Fun) . Map.unionsWith (Map.unionWith (<>))
+    <$> sequence
+      [ case x of
+          OSL.Iota1' x' -> pure (Map.singleton (OSL.Nat zero) (Map.singleton x' (Map.singleton defaultRight y)))
+          OSL.Iota2' x' -> pure (Map.singleton (OSL.Nat one) (Map.singleton defaultLeft (Map.singleton x' y)))
+          _ -> Left (ErrorMessage () "curryCoproductFun: expected a coproduct value")
+        | (x, y) <- Map.toList f
+      ]
 
 curryMaybeFun :: OSL.Value -> Map OSL.Value OSL.Value -> Either (ErrorMessage ()) (Map OSL.Value OSL.Value)
 curryMaybeFun defaultValue f =
-  fmap OSL.Fun . Map.unionsWith (<>) <$> sequence
-    [ case x of
-        OSL.Maybe'' Nothing -> pure (Map.singleton (OSL.Nat zero) (Map.singleton defaultValue y))
-        OSL.Maybe'' (Just x') -> pure (Map.singleton (OSL.Nat one) (Map.singleton x' y))
-        _ -> Left (ErrorMessage () "curryMaybeFun: expected a Maybe value")
-    | (x,y) <- Map.toList f
-    ]
+  fmap OSL.Fun . Map.unionsWith (<>)
+    <$> sequence
+      [ case x of
+          OSL.Maybe'' Nothing -> pure (Map.singleton (OSL.Nat zero) (Map.singleton defaultValue y))
+          OSL.Maybe'' (Just x') -> pure (Map.singleton (OSL.Nat one) (Map.singleton x' y))
+          _ -> Left (ErrorMessage () "curryMaybeFun: expected a Maybe value")
+        | (x, y) <- Map.toList f
+      ]
 
 toSigma11Values ::
   OSL.ValidContext t ann ->
@@ -415,17 +529,19 @@ toSigma11Values c t v =
       (<>) <$> rec a x <*> rec b y
     (OSL.Product {}, _) -> Left (ErrorMessage () "toSigma11Values: expected a Pair'")
     (OSL.Coproduct _ a b, OSL.Iota1' x) ->
-      mconcat <$> sequence
-        [ pure [scalarValue zero],
-          rec a x,
-          defaultSigma11Values c b
-        ]
+      mconcat
+        <$> sequence
+          [ pure [scalarValue zero],
+            rec a x,
+            defaultSigma11Values c b
+          ]
     (OSL.Coproduct _ a b, OSL.Iota2' x) ->
-      mconcat <$> sequence
-        [ pure [scalarValue one],
-          defaultSigma11Values c a,
-          rec b x
-        ]
+      mconcat
+        <$> sequence
+          [ pure [scalarValue one],
+            defaultSigma11Values c a,
+            rec b x
+          ]
     (OSL.Coproduct {}, _) -> Left (ErrorMessage () "toSigma11Values: expected a coproduct value")
     (OSL.F _ _ a (OSL.N ann), f) ->
       scalarFunction a (OSL.N ann) f
@@ -436,50 +552,54 @@ toSigma11Values c t v =
     (OSL.F _ _ a (OSL.Fp ann), f) ->
       scalarFunction a (OSL.Fp ann) f
     (OSL.F ann n a (OSL.Product _ b d), OSL.Fun f) ->
-      mconcat <$> sequence
-        [ rec (OSL.F ann n a b) . OSL.Fun =<< mapM OSL.fstOfPair f,
-          rec (OSL.F ann n a d) . OSL.Fun =<< mapM OSL.sndOfPair f
-        ]
+      mconcat
+        <$> sequence
+          [ rec (OSL.F ann n a b) . OSL.Fun =<< mapM OSL.fstOfPair f,
+            rec (OSL.F ann n a d) . OSL.Fun =<< mapM OSL.sndOfPair f
+          ]
     (OSL.F _ _ _ (OSL.Product {}), _) ->
       Left (ErrorMessage () "toSigma11Values: expected a product-valued function")
     (OSL.F ann n a (OSL.Coproduct _ b d), OSL.Fun f) ->
-      mconcat <$> sequence
-        [ rec (OSL.F ann n a (OSL.N ann)) . OSL.Fun . Map.fromList
-            =<< sequence
-              [ (x,) . OSL.Nat <$> iotaIndex y
-              | (x, y) <- Map.toList f
+      mconcat
+        <$> sequence
+          [ rec (OSL.F ann n a (OSL.N ann)) . OSL.Fun . Map.fromList
+              =<< sequence
+                [ (x,) . OSL.Nat <$> iotaIndex y
+                  | (x, y) <- Map.toList f
+                ],
+            rec (OSL.F ann n a b) . OSL.Fun . Map.fromList . catMaybes $
+              [ case y of
+                  OSL.Iota1' y' -> pure (x, y')
+                  _ -> Nothing
+                | (x, y) <- Map.toList f
               ],
-          rec (OSL.F ann n a b) . OSL.Fun . Map.fromList . catMaybes $
-            [ case y of
-                OSL.Iota1' y' -> pure (x, y')
-                _ -> Nothing
-            | (x,y) <- Map.toList f
-            ],
-          rec (OSL.F ann n a d) . OSL.Fun . Map.fromList . catMaybes $
-            [ case y of
-                OSL.Iota2' y' -> pure (x, y')
-                _ -> Nothing
-            | (x,y) <- Map.toList f
-            ]
-        ]
+            rec (OSL.F ann n a d) . OSL.Fun . Map.fromList . catMaybes $
+              [ case y of
+                  OSL.Iota2' y' -> pure (x, y')
+                  _ -> Nothing
+                | (x, y) <- Map.toList f
+              ]
+          ]
     (OSL.F _ _ _ (OSL.Coproduct {}), _) ->
       Left (ErrorMessage () "toSigma11Values: expected a coproduct-valued function")
     (OSL.F ann n a (OSL.Maybe _ b), OSL.Fun f) ->
-      mconcat <$> sequence
-        [ rec (OSL.F ann n a (OSL.N ann)) . OSL.Fun . Map.fromList
-            =<< sequence
-              [ (x,) . OSL.Nat <$> maybeIndex y
-              | (x,y) <- Map.toList f
-              ],
-          do rec (OSL.F ann n a b) . OSL.Fun . Map.fromList
-               =<< sequence
-                 [ case y of
-                     OSL.Maybe'' (Just y') -> pure (x, y')
-                     OSL.Maybe'' Nothing -> (x,) <$> OSL.defaultValue c b
-                     _ -> Left (ErrorMessage () "expected a maybe value")
-                 | (x, y) <- Map.toList f
-                 ]
-        ]
+      mconcat
+        <$> sequence
+          [ rec (OSL.F ann n a (OSL.N ann)) . OSL.Fun . Map.fromList
+              =<< sequence
+                [ (x,) . OSL.Nat <$> maybeIndex y
+                  | (x, y) <- Map.toList f
+                ],
+            do
+              rec (OSL.F ann n a b) . OSL.Fun . Map.fromList
+                =<< sequence
+                  [ case y of
+                      OSL.Maybe'' (Just y') -> pure (x, y')
+                      OSL.Maybe'' Nothing -> (x,) <$> OSL.defaultValue c b
+                      _ -> Left (ErrorMessage () "expected a maybe value")
+                    | (x, y) <- Map.toList f
+                  ]
+          ]
     (OSL.F _ _ _ (OSL.Maybe {}), _) ->
       Left (ErrorMessage () "toSigma11Values: expected a Maybe-valued function")
     (OSL.F ann n a (OSL.NamedType _ name), OSL.Fun f) ->
@@ -488,59 +608,65 @@ toSigma11Values c t v =
           rec (OSL.F ann n a (OSL.dropTypeAnnotations b)) . OSL.Fun . Map.fromList
             =<< sequence
               [ (x,) <$> fromTo y
-              | (x,y) <- Map.toList f
+                | (x, y) <- Map.toList f
               ]
         _ -> Left . ErrorMessage () $ "expected the name of a type"
     (OSL.F _ _ _ (OSL.NamedType {}), _) ->
       Left (ErrorMessage () "toSigma11Values: expected a Foo-valued function")
     (OSL.F ann n a (OSL.List _ m b), OSL.Fun f) ->
-      mconcat <$> sequence
-        [ rec (OSL.F ann n a (OSL.N ann)) . OSL.Fun . Map.fromList
-            =<< sequence
-              [ (x,) <$> OSL.Nat <$> listLength y
-              | (x,y) <- Map.toList f
-              ],
-          rec (OSL.F ann n a (OSL.F ann (Just m) (OSL.N ann) b)) . OSL.Fun . Map.fromList
-            =<< sequence
-              [ (x,) <$> listElems y
-              | (x,y) <- Map.toList f
-              ]
-        ]
+      mconcat
+        <$> sequence
+          [ rec (OSL.F ann n a (OSL.N ann)) . OSL.Fun . Map.fromList
+              =<< sequence
+                [ (x,) <$> OSL.Nat <$> listLength y
+                  | (x, y) <- Map.toList f
+                ],
+            rec (OSL.F ann n a (OSL.F ann (Just m) (OSL.N ann) b)) . OSL.Fun . Map.fromList
+              =<< sequence
+                [ (x,) <$> listElems y
+                  | (x, y) <- Map.toList f
+                ]
+          ]
     (OSL.F _ _ _ (OSL.List {}), _) ->
       Left (ErrorMessage () "toSigma11Values: expected a List-valued function")
     (OSL.F ann n a (OSL.Map _ m b d), OSL.Fun f) ->
-      mconcat <$> sequence
-        [ rec (OSL.F ann n a (OSL.N ann)) . OSL.Fun . Map.fromList
-            =<< sequence
-              [ (x,) <$> OSL.Nat <$> mapSize y
-              | (x,y) <- Map.toList f
-              ],
-          rec (OSL.F ann n a (OSL.F ann (Just m) (OSL.N ann) b)) . OSL.Fun . Map.fromList
-            =<< sequence
-              [ do ks <- mapKeys g
-                   (x,) . OSL.Fun . Map.fromList <$> sequence
-                     [ (,y) . OSL.Nat <$> fromInt i
-                     | (i,y) <- zip [0..] ks
-                     ]
-              | (x,g) <- Map.toList f
-              ],
-          rec (OSL.F ann n a (OSL.F ann (Just m) b d)) (OSL.Fun f)
-        ]
+      mconcat
+        <$> sequence
+          [ rec (OSL.F ann n a (OSL.N ann)) . OSL.Fun . Map.fromList
+              =<< sequence
+                [ (x,) <$> OSL.Nat <$> mapSize y
+                  | (x, y) <- Map.toList f
+                ],
+            rec (OSL.F ann n a (OSL.F ann (Just m) (OSL.N ann) b)) . OSL.Fun . Map.fromList
+              =<< sequence
+                [ do
+                    ks <- mapKeys g
+                    (x,) . OSL.Fun . Map.fromList
+                      <$> sequence
+                        [ (,y) . OSL.Nat <$> fromInt i
+                          | (i, y) <- zip [0 ..] ks
+                        ]
+                  | (x, g) <- Map.toList f
+                ],
+            rec (OSL.F ann n a (OSL.F ann (Just m) b d)) (OSL.Fun f)
+          ]
     (OSL.F _ _ _ (OSL.Map {}), _) ->
       Left (ErrorMessage () "toSigma11Values: expected a Map-valued function")
     (OSL.F ann _ a (OSL.F _ m b d), OSL.Fun f) -> do
-      xs <- Map.fromList <$> sequence
-        [(x,) <$> (toScalars =<< rec a x) | x <- Map.keys f]
+      xs <-
+        Map.fromList
+          <$> sequence
+            [(x,) <$> (toScalars =<< rec a x) | x <- Map.keys f]
       fs <- mapM (rec (OSL.F ann m b d)) f
       case Map.toList fs of
-        (fs0:_) ->
-          pure 
+        (fs0 : _) ->
+          pure
             [ S11.Value . Map.fromList $
-              [ (x' <> y, z)
-              | (x',fs') <- Map.elems (Map.intersectionWith (,) xs fs),
-                (y,z) <- Map.toList . (^. #unValue) $ fromMaybe mempty (fs' `atMay` i)
-              ]
-            | i <- [0 .. length fs0 - 1]
+                [ (x' <> y, z)
+                  | (x', fs') <- Map.elems (Map.intersectionWith (,) xs fs),
+                    (y, z) <- Map.toList . (^. #unValue) $ fromMaybe mempty (fs' `atMay` i)
+                ]
+              | i <- [0 .. length fs0 - 1]
             ]
         _ -> pure mempty
     (OSL.F _ _ _ (OSL.F {}), _) ->
@@ -554,15 +680,17 @@ toSigma11Values c t v =
     (OSL.Prop _, OSL.Bool x) -> pure [scalarValue (S11.boolToScalar x)]
     (OSL.Prop _, _) -> Left (ErrorMessage () "toSigma11Values: expected a Bool")
     (OSL.Maybe _ a, OSL.Maybe'' Nothing) ->
-      mconcat <$> sequence
-        [ pure [scalarValue zero],
-          defaultSigma11Values c a
-        ]
+      mconcat
+        <$> sequence
+          [ pure [scalarValue zero],
+            defaultSigma11Values c a
+          ]
     (OSL.Maybe _ a, OSL.Maybe'' (Just x)) ->
-      mconcat <$> sequence
-        [ pure [scalarValue one],
-          rec a x
-        ]
+      mconcat
+        <$> sequence
+          [ pure [scalarValue one],
+            rec a x
+          ]
     (OSL.Maybe {}, _) -> Left (ErrorMessage () "toSigma11Values: expected a Maybe value")
     (OSL.NamedType _ name, OSL.To' _ x) ->
       case Map.lookup name (c ^. #unValidContext) of
@@ -570,33 +698,41 @@ toSigma11Values c t v =
         _ -> Left . ErrorMessage () $ "expected the name of a type"
     (OSL.NamedType {}, _) -> Left (ErrorMessage () "toSigma11Values: expected a To'")
     (OSL.List ann n a, OSL.List'' xs) -> do
-      mconcat <$> sequence
-        [ (:[]) . scalarValue <$> fromInt (length xs),
-          rec (OSL.F ann (Just n) (OSL.N ann) a)
-            . OSL.Fun . Map.fromList =<< sequence
-            [ (,x) <$> (OSL.Nat <$> fromInt i)
-            | (i, x) <- zip [0..] xs
-            ]
-        ]
+      mconcat
+        <$> sequence
+          [ (: []) . scalarValue <$> fromInt (length xs),
+            rec (OSL.F ann (Just n) (OSL.N ann) a)
+              . OSL.Fun
+              . Map.fromList
+              =<< sequence
+                [ (,x) <$> (OSL.Nat <$> fromInt i)
+                  | (i, x) <- zip [0 ..] xs
+                ]
+          ]
     (OSL.List {}, _) -> Left (ErrorMessage () "toSigma11Values: expected a List value")
     (OSL.Map ann n a b, OSL.Map'' xs) -> do
-      mconcat <$> sequence
-        [ (:[]) . scalarValue <$> fromInt (Map.size xs),
-          rec (OSL.F ann (Just n) (OSL.N ann) a)
-            . OSL.Fun . Map.fromList =<< sequence
-            [ (,x) <$> (OSL.Nat <$> fromInt i)
-            | (i, x) <- zip [0..] (Map.keys xs)
-            ],
-          rec (OSL.F ann (Just n) a b)
-            (OSL.Fun xs)
-        ]
+      mconcat
+        <$> sequence
+          [ (: []) . scalarValue <$> fromInt (Map.size xs),
+            rec (OSL.F ann (Just n) (OSL.N ann) a)
+              . OSL.Fun
+              . Map.fromList
+              =<< sequence
+                [ (,x) <$> (OSL.Nat <$> fromInt i)
+                  | (i, x) <- zip [0 ..] (Map.keys xs)
+                ],
+            rec
+              (OSL.F ann (Just n) a b)
+              (OSL.Fun xs)
+          ]
     (OSL.Map {}, _) -> Left (ErrorMessage () "toSigma11Values: expected a Map value")
   where
     scalarFunction a b (OSL.Fun f) =
-      (:[]) . S11.Value . Map.fromList <$> sequence
-        [ (,) <$> (toScalars =<< rec a x) <*> (toScalar =<< rec b y)
-        | (x,y) <- Map.toList f
-        ]
+      (: []) . S11.Value . Map.fromList
+        <$> sequence
+          [ (,) <$> (toScalars =<< rec a x) <*> (toScalar =<< rec b y)
+            | (x, y) <- Map.toList f
+          ]
     scalarFunction _ _ _ = Left (ErrorMessage () "toSigma11Values: expected a scalar function")
 
     rec = toSigma11Values c
@@ -625,10 +761,11 @@ toSigma11Values c t v =
     listElems =
       \case
         OSL.List'' xs ->
-          OSL.Fun . Map.fromList <$> sequence
-            [ (,x) . OSL.Nat <$> fromInt i
-            | (i,x) <- zip [0..] xs
-            ]
+          OSL.Fun . Map.fromList
+            <$> sequence
+              [ (,x) . OSL.Nat <$> fromInt i
+                | (i, x) <- zip [0 ..] xs
+              ]
         _ -> Left (ErrorMessage () "expected a list")
 
     mapSize :: OSL.Value -> Either (ErrorMessage ()) Scalar
@@ -649,14 +786,15 @@ toSigma11Values c t v =
         OSL.To' _ x -> pure x
         _ -> Left (ErrorMessage () "expected a To value")
 
-
 fromInt :: Int -> Either (ErrorMessage ()) Scalar
 fromInt x =
-  maybe (Left (ErrorMessage () "int out of range of scalar field"))
-    pure (integerToScalar (intToInteger x))
+  maybe
+    (Left (ErrorMessage () "int out of range of scalar field"))
+    pure
+    (integerToScalar (intToInteger x))
 
 toScalars :: [S11.Value] -> Either (ErrorMessage ()) [Scalar]
-toScalars = mapM (toScalar . (:[]))
+toScalars = mapM (toScalar . (: []))
 
 toScalar :: [S11.Value] -> Either (ErrorMessage ()) Scalar
 toScalar [S11.Value u] =
@@ -690,21 +828,23 @@ defaultSigma11Values c =
     OSL.Product _ a b ->
       (<>) <$> rec a <*> rec b
     OSL.Coproduct _ a b ->
-      mconcat <$> sequence
-        [ pure scalarDefault,
-          rec a,
-          rec b
-        ]
+      mconcat
+        <$> sequence
+          [ pure scalarDefault,
+            rec a,
+            rec b
+          ]
     OSL.Maybe _ a ->
       (scalarDefault <>) <$> rec a
     OSL.List ann n a ->
       (scalarDefault <>) <$> rec (OSL.F ann (Just n) (OSL.N ann) a)
     OSL.Map ann n a b ->
-      mconcat <$> sequence
-        [ pure scalarDefault,
-          rec (OSL.F ann (Just n) (OSL.N ann) a),
-          rec (OSL.F ann (Just n) a b)
-        ]
+      mconcat
+        <$> sequence
+          [ pure scalarDefault,
+            rec (OSL.F ann (Just n) (OSL.N ann) a),
+            rec (OSL.F ann (Just n) a b)
+          ]
   where
     rec = defaultSigma11Values c
 
@@ -713,4 +853,4 @@ defaultSigma11Values c =
 mapKeysMaybe :: Ord k' => (k -> Maybe k') -> Map k a -> Map k' a
 mapKeysMaybe f m =
   Map.fromList . catMaybes $
-    [ (,v) <$> f k | (k,v) <- Map.toList m ]
+    [(,v) <$> f k | (k, v) <- Map.toList m]

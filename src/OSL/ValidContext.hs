@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module OSL.ValidContext
   ( getDeclaration,
@@ -15,9 +15,9 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Die (die)
-import OSL.Term (termAnnotation, dropTermAnnotations)
+import OSL.Term (dropTermAnnotations, termAnnotation)
 import OSL.Type (dropTypeAnnotations)
-import OSL.Types.OSL (Declaration (Defined, Data, FreeVariable), Name (GenSym, Sym), Term (NamedTerm), ValidContext (..))
+import OSL.Types.OSL (Declaration (Data, Defined, FreeVariable), Name (GenSym, Sym), Term (NamedTerm), ValidContext (..))
 
 getNamedTermUnsafe :: ValidContext t ann -> Name -> Term ann
 getNamedTermUnsafe c name =

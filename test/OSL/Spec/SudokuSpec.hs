@@ -20,7 +20,7 @@ import OSL.ArgumentForm (getArgumentForm)
 import OSL.BuildTranslationContext (buildTranslationContext)
 import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
-import OSL.Sigma11 (evalFormula, auxTablesToEvalContext)
+import OSL.Sigma11 (auxTablesToEvalContext, evalFormula)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
 import OSL.Term (dropTermAnnotations)
 import OSL.Translate (translateToFormula)
@@ -97,26 +97,26 @@ exampleSpec c = do
   it "Sudoku spec's semantics are preserved in Sigma11 translation" $
     case buildTranslationContext c of
       Right tc ->
-        let ltc = TranslationContext (ValidContext (tc ^. #context . #unValidContext)) (tc ^. #mappings) in
-        case getDeclaration c "problemIsSolvable" of
-          Just (Defined _ def) ->
-            case runStateT (translateToFormula tc ltc def) mempty of
-              Right (translated, aux) ->
-                case auxTablesToEvalContext aux of
-                  Right ec -> do
-                    case toSigma11Argument c argumentForm (exampleArgument c) (dropTermAnnotations def) of
-                      Right arg -> do
-                        liftIO . putStrLn . ("OSL witness: " <>) $ show (exampleArgument c ^. #witness)
-                        liftIO . putStrLn . ("sigma11 argument: " <>) $ show arg
-                        evalFormula ec arg translated `shouldBe` Right True
-                      Left err -> expectationFailure ("toSigma11Argument exampleArgument: " <> show err)
-                    case toSigma11Argument c argumentForm (exampleUnsoundArgument c) (dropTermAnnotations def) of
-                      Right arg ->
-                        evalFormula ec arg translated `shouldBe` Right False
-                      Left err -> expectationFailure ("toSigma11Argument exampleUnsoundArgument: " <> show err)
-                  Left err -> expectationFailure ("auxTablesToEvalContext: " <> show err)
-              Left err -> expectationFailure ("translateToFormula: " <> show err)
-          _ -> expectationFailure "problemIsSolvable not defined"
+        let ltc = TranslationContext (ValidContext (tc ^. #context . #unValidContext)) (tc ^. #mappings)
+         in case getDeclaration c "problemIsSolvable" of
+              Just (Defined _ def) ->
+                case runStateT (translateToFormula tc ltc def) mempty of
+                  Right (translated, aux) ->
+                    case auxTablesToEvalContext aux of
+                      Right ec -> do
+                        case toSigma11Argument c argumentForm (exampleArgument c) (dropTermAnnotations def) of
+                          Right arg -> do
+                            liftIO . putStrLn . ("OSL witness: " <>) $ show (exampleArgument c ^. #witness)
+                            liftIO . putStrLn . ("sigma11 argument: " <>) $ show arg
+                            evalFormula ec arg translated `shouldBe` Right True
+                          Left err -> expectationFailure ("toSigma11Argument exampleArgument: " <> show err)
+                        case toSigma11Argument c argumentForm (exampleUnsoundArgument c) (dropTermAnnotations def) of
+                          Right arg ->
+                            evalFormula ec arg translated `shouldBe` Right False
+                          Left err -> expectationFailure ("toSigma11Argument exampleUnsoundArgument: " <> show err)
+                      Left err -> expectationFailure ("auxTablesToEvalContext: " <> show err)
+                  Left err -> expectationFailure ("translateToFormula: " <> show err)
+              _ -> expectationFailure "problemIsSolvable not defined"
       Left err -> expectationFailure ("buildTranslationContext: " <> show err)
 
 exampleArgument :: ValidContext 'Global ann -> Argument
@@ -508,8 +508,8 @@ simpleWitnessType =
 argumentForm :: ArgumentForm
 argumentForm =
   ArgumentForm
-  (StatementType complexStatementType)
-  (WitnessType complexWitnessType)
+    (StatementType complexStatementType)
+    (WitnessType complexWitnessType)
 
 solutionToValue :: Solution -> Value
 solutionToValue (Solution s) =

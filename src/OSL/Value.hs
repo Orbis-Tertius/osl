@@ -21,26 +21,29 @@ module OSL.Value
     toInverse,
     uncurryFun,
     defaultValue,
-  ) where
+  )
+where
 
 import Cast (intToInteger)
 import Control.Lens ((^.))
 import Data.Map (Map)
-import Data.Maybe (catMaybes)
 import qualified Data.Map as Map
+import Data.Maybe (catMaybes)
 import OSL.Type (dropTypeAnnotations)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import qualified OSL.Types.OSL as OSL
-import OSL.Types.Value (Value (Pair', Bool, Fun, Nat, Int, Fp', Fin', Iota1', Iota2', Maybe'', List'', Map'', To'))
-import Stark.Types.Scalar (zero, one, integerToScalar)
+import OSL.Types.Value (Value (Bool, Fin', Fp', Fun, Int, Iota1', Iota2', List'', Map'', Maybe'', Nat, Pair', To'))
+import Stark.Types.Scalar (integerToScalar, one, zero)
 
 fstOfPair, sndOfPair :: Value -> Either (ErrorMessage ()) Value
 fstOfPair (Pair' x _) = pure x
-fstOfPair _ = Left . ErrorMessage () $
-  "fstOfPair: expected a pair"
+fstOfPair _ =
+  Left . ErrorMessage () $
+    "fstOfPair: expected a pair"
 sndOfPair (Pair' _ y) = pure y
-sndOfPair _ = Left . ErrorMessage () $
-  "sndOfPair: expected a pair"
+sndOfPair _ =
+  Left . ErrorMessage () $
+    "sndOfPair: expected a pair"
 
 fstOfPairMay, sndOfPairMay :: Value -> Maybe Value
 fstOfPairMay (Pair' x _) = pure x
@@ -77,8 +80,9 @@ listLength _ = Nothing
 
 listFun :: Value -> Maybe Value
 listFun (List'' xs) =
-  Fun . Map.fromList <$> sequence
-    [ (,x) . Nat <$> integerToScalar i | (i,x) <- zip [0..] xs ]
+  Fun . Map.fromList
+    <$> sequence
+      [(,x) . Nat <$> integerToScalar i | (i, x) <- zip [0 ..] xs]
 listFun _ = Nothing
 
 mapSize :: Value -> Maybe Value
@@ -87,8 +91,9 @@ mapSize _ = Nothing
 
 mapKeys :: Value -> Maybe Value
 mapKeys (Map'' xs) =
-  Fun . Map.fromList <$> sequence
-    [ (,x) . Nat <$> integerToScalar i | (i,x) <- zip [0..] (Map.keys xs) ]
+  Fun . Map.fromList
+    <$> sequence
+      [(,x) . Nat <$> integerToScalar i | (i, x) <- zip [0 ..] (Map.keys xs)]
 mapKeys _ = Nothing
 
 mapFun :: Value -> Maybe Value
@@ -100,12 +105,13 @@ toInverse (To' _ x) = pure x
 toInverse _ = Nothing
 
 uncurryFun :: Map Value Value -> Map Value Value
-uncurryFun f = Map.fromList . concat . catMaybes $
-  [ case g of
-      Fun g' -> pure [ (Pair' x0 x1, y) | (x1, y) <- Map.toList g' ]
-      _ -> Nothing
-  | (x0, g) <- Map.toList f
-  ]
+uncurryFun f =
+  Map.fromList . concat . catMaybes $
+    [ case g of
+        Fun g' -> pure [(Pair' x0 x1, y) | (x1, y) <- Map.toList g']
+        _ -> Nothing
+      | (x0, g) <- Map.toList f
+    ]
 
 defaultValue ::
   OSL.ValidContext t ann ->

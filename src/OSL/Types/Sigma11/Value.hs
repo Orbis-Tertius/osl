@@ -2,11 +2,12 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module OSL.Types.Sigma11.Value
-  ( Value (Value)
-  ) where
+  ( Value (Value),
+  )
+where
 
-import GHC.Generics (Generic)
 import Data.Map (Map)
+import GHC.Generics (Generic)
 import Stark.Types.Scalar (Scalar)
 
 -- All Sigma11 variable values are of this form.
@@ -16,6 +17,5 @@ import Stark.Types.Scalar (Scalar)
 --    arbitrary (can be zero); only the keys
 --    matter, and they represent the set of
 --    satisfying inputs
-newtype Value =
-  Value { unValue :: Map [Scalar] Scalar }
+newtype Value = Value {unValue :: Map [Scalar] Scalar}
   deriving (Generic, Semigroup, Monoid, Show)

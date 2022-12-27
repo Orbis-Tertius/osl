@@ -8,8 +8,8 @@ module OSL.Type
   )
 where
 
-import qualified Data.Map as Map
 import Control.Lens ((^.))
+import qualified Data.Map as Map
 import OSL.Types.OSL (Cardinality (..), Declaration (Data), Type (..), ValidContext)
 
 typeAnnotation :: Type ann -> ann
