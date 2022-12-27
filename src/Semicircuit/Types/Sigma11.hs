@@ -28,15 +28,18 @@ module Semicircuit.Types.Sigma11
     OutputBound (..),
     Quantifier (..),
     MapNames (..),
+    EvaluationContext (..),
   )
 where
 
 import Control.Lens ((^.))
 import Data.List (intercalate)
+import Data.Map (Map)
 import GHC.Generics (Generic)
 import OSL.Types.Arity (Arity)
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.Sigma11 (PredicateName)
+import OSL.Types.Sigma11.Value (Value)
 
 data Name = Name {arity :: Arity, sym :: Int}
   deriving (Eq, Ord, Generic)
@@ -207,3 +210,8 @@ instance Show Quantifier where
          )
       <> "<"
       <> show ob
+
+newtype EvaluationContext = EvaluationContext
+  { unEvaluationContext ::
+      Map (Either Name PredicateName) Value
+  }

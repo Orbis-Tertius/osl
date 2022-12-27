@@ -13,6 +13,7 @@ import qualified Data.Map as Map
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (pack)
 import OSL.Evaluation (decodeScalar)
+import OSL.Map (mapKeysMaybe)
 import qualified OSL.Sigma11 as S11
 import qualified OSL.Term as OSL
 import qualified OSL.Type as OSL
@@ -842,8 +843,3 @@ defaultSigma11Values c =
     rec = defaultSigma11Values c
 
     scalarDefault = [scalarValue zero]
-
-mapKeysMaybe :: Ord k' => (k -> Maybe k') -> Map k a -> Map k' a
-mapKeysMaybe f m =
-  Map.fromList . catMaybes $
-    [(,v) <$> f k | (k, v) <- Map.toList m]

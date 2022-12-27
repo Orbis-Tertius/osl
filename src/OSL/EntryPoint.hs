@@ -111,7 +111,7 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
           runStateT (translateToFormula gc lc targetTerm) mempty
       pnf <-
         mapLeft (ErrorMessage . ("Error converting to prenex normal form: " <>) . show) $
-          toPrenexNormalForm () (deBruijnToGensyms translated)
+          toPrenexNormalForm () (fst (deBruijnToGensyms translated))
       spnf <-
         mapLeft (ErrorMessage . ("Error converting to strong prenex normal form: " <>) . show) $
           uncurry (toStrongPrenexNormalForm ()) pnf

@@ -4,31 +4,40 @@
 
 module Semicircuit.Gensyms
   ( deBruijnToGensyms,
+    deBruijnToGensymsEvalContext,
     NextSym (NextSym),
   )
 where
 
+import Control.Arrow (second)
 import Control.Lens ((^.))
-import Control.Monad.State (State, evalState, get, put)
+import Control.Monad.State (State, get, put, runState)
 import Data.Functor ((<&>))
 import Data.Map (Map)
 import qualified Data.Map as Map
+import OSL.Map (mapKeysMaybe)
 import OSL.Sigma11 (incrementDeBruijnIndices)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import qualified OSL.Types.Sigma11 as DB
+import qualified OSL.Types.Sigma11.EvaluationContext as DB
 import qualified Semicircuit.Types.Sigma11 as GS
 
 -- Rename the de Bruijn indices in the given formula
 -- to gensyms.
-deBruijnToGensyms :: DB.Formula -> GS.Formula
+deBruijnToGensyms :: DB.Formula -> (GS.Formula, Map DB.Name GS.Name)
 deBruijnToGensyms a =
-  evalState (deBruijnToGensyms' a) (S 0 mempty)
+  second sMap $ runState (deBruijnToGensyms' a) (S 0 mempty)
+
+deBruijnToGensymsEvalContext :: Map DB.Name GS.Name -> DB.EvaluationContext -> GS.EvaluationContext
+deBruijnToGensymsEvalContext m (DB.EvaluationContext c) =
+  GS.EvaluationContext $
+    mapKeysMaybe (either (fmap Left . flip Map.lookup m) (pure . Right)) c
 
 newtype NextSym = NextSym Int
   deriving (Eq, Num)
 
-data S = S NextSym (Map DB.Name GS.Name)
+data S = S {_sNext :: NextSym, sMap :: Map DB.Name GS.Name}
 
 deBruijnToGensyms' ::
   DB.Formula ->

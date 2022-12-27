@@ -71,6 +71,7 @@ library
     OSL.EntryPoint
     OSL.Evaluation
     OSL.LoadContext
+    OSL.Map
     OSL.Parse
     OSL.Satisfaction
     OSL.Sigma11
