@@ -70,7 +70,7 @@ var :: name -> TermF name
 var x = App x []
 
 instance Show a => Show (TermF a) where
-  show (App name []) = show name
+  show (App nm []) = show nm
   show (App f xs) =
     show f <> "(" <> intercalate ", " (show <$> xs) <> ")"
   show (AppInverse f x) =
@@ -160,7 +160,7 @@ deriving newtype instance Show a => Show (OutputBoundF a)
 data ExistentialQuantifierF name
   = Some name Cardinality [InputBoundF name] (OutputBoundF name)
   | SomeP name Cardinality (InputBoundF name) (OutputBoundF name)
-  deriving (Functor)
+  deriving (Eq, Functor)
 
 type ExistentialQuantifier = ExistentialQuantifierF Name
 
@@ -187,7 +187,21 @@ instance Show name => Show (ExistentialQuantifierF name) where
       <> ")"
 
 data InstanceQuantifierF name
-  = Instance name Cardinality [InputBoundF name] (OutputBoundF name)
+  = Instance { name :: name,
+      cardinality :: Cardinality,
+      inputBounds :: [InputBoundF name],
+      outputBounds :: (OutputBoundF name)
+     }
+  deriving (Eq, Functor, Generic)
+
+instance Show name => Show (InstanceQuantifierF name) where
+  show (Instance _ (Cardinality n) bs b) =
+    "^"
+      <> show n
+      <> "("
+      <> intercalate ", " (show <$> bs)
+      <> ")<"
+      <> show b
 
 type InstanceQuantifier = InstanceQuantifierF Name
 
@@ -204,6 +218,19 @@ data QuantifierF name
   = ForAll' name (BoundF name)
   | ForSome' (ExistentialQuantifierF name)
   | Given' (InstanceQuantifierF name)
+  deriving Functor
+
+instance Show name => Show (QuantifierF name) where
+  show (ForAll' x b) = "∀" <> show x <> "<" <> show b
+  show (ForSome' q) = "∃" <> show q
+  show (Given' (Instance x n ibs ob)) =
+    "λ" <> show x
+      <> ( if null ibs
+             then ""
+             else "^" <> show n <> "(" <> intercalate ", " (show <$> ibs) <> ")"
+         )
+      <> "<"
+      <> show ob 
 
 type Quantifier = QuantifierF Name
 

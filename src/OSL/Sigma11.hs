@@ -8,6 +8,7 @@
 module OSL.Sigma11
   ( incrementDeBruijnIndices,
     incrementArities,
+    HasIncrementArity (incrementArity),
     unionIndices,
     termIndices,
     HasPrependBounds (prependBounds),
@@ -19,6 +20,8 @@ module OSL.Sigma11
     auxTablesToEvalContext,
     flipQuantifiers,
     flipQuantifier,
+    prependQuantifier,
+    prependQuantifiers,
   )
 where
 
@@ -421,6 +424,10 @@ mapQuantifiers f =
     Bottom -> pure Bottom
   where
     rec = mapQuantifiers f
+
+prependQuantifiers :: [QuantifierF name] -> FormulaF name -> FormulaF name
+prependQuantifiers qs f =
+  foldl' (flip prependQuantifier) f qs
 
 prependQuantifier :: QuantifierF name -> FormulaF name -> FormulaF name
 prependQuantifier =
