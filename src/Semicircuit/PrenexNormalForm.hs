@@ -7,6 +7,7 @@ module Semicircuit.PrenexNormalForm
   ( toSuperStrongPrenexNormalForm,
     toStrongPrenexNormalForm,
     toPrenexNormalForm,
+    mergeWitnessesConjunctive,
   )
 where
 
@@ -410,14 +411,14 @@ toPrenexNormalForm ann =
       q' <- rec q
       pure $ mergeQuantifiersConjunctive p' q'
     Or p q -> do
-      p' <- rec p
-      q' <- rec q
-      pure $ mergeQuantifiersDisjunctive p' q'
+      (pQs, p') <- rec p
+      (qQs, q') <- rec q
+      pure (pQs <> qQs, p' `Or` q')
     Implies p q -> do
       (pQs, p') <- rec p
       (qQs, q') <- rec q
       pQs' <- flipQuantifiers ann pQs
-      pure $ mergeQuantifiersDisjunctive (pQs', Not p') (qQs, q')
+      pure (pQs' <> qQs, p' `Implies` q')
     Iff p q -> do
       (pQs, p') <- rec p
       (qQs, q') <- rec q
@@ -586,87 +587,8 @@ zipAndPad' a [] _ (b1:bs) = (a,b1) : zipAndPad' a [] b1 bs
 zipAndPad' _ (a1:as) b [] = (a1,b) : zipAndPad' a1 as b []
 zipAndPad' _ (a1:as) _ (b1:bs) = (a1,b1) : zipAndPad' a1 as b1 bs
 
--- Perform prenex normal form conversion on a disjunction
--- of two prenex normal forms, merging existential quantifiers
--- where applicable.
-mergeQuantifiersDisjunctive ::
-  ([Quantifier], Formula) ->
-  ([Quantifier], Formula) ->
-  ([Quantifier], Formula)
-mergeQuantifiersDisjunctive =
-  \case
-    (ForSome' r@(Some x n [] ob@(OutputBound (TermBound obV))) : pQs, p) ->
-      \case
-        (ForSome' (Some x' _ [] ob'@(OutputBound (TermBound obV'))) : qQs, q) ->
-          let qQs' = substitute (FromName x') (ToName x) <$> qQs
-              q' = substitute (FromName x') (ToName x) q
-              obV'' = substitute (FromName x') (ToName x) obV'
-              obV''' =
-                if ob == ob'
-                  then obV
-                  else foldConstants (obV `Max` obV'')
-              p' =
-                if obV == obV'''
-                  then p
-                  else ((var x `Add` Const 1) `LessOrEqual` obV) `And` p
-              q'' =
-                if obV' == obV'''
-                  then q'
-                  else ((var x `Add` Const 1) `LessOrEqual` obV'') `And` q'
-              (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p') (qQs', q'')
-           in (ForSome' (Some x n [] (OutputBound (TermBound obV'''))) : pqQs, pq)
-        (ForSome' (Some x' _ [] (OutputBound FieldMaxBound)) : qQs, q) ->
-          let qQs' = substitute (FromName x') (ToName x) <$> qQs
-              q' = substitute (FromName x') (ToName x) q
-              p' = ((var x `Add` Const 1) `LessOrEqual` obV) `And` p
-              (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p') (qQs', q')
-           in (ForSome' (Some x n [] (OutputBound FieldMaxBound)) : pqQs, pq)
-        (qQs, q) ->
-          let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-           in (ForSome' r : pqQs, pq)
-    (ForSome' r@(Some x n [] (OutputBound FieldMaxBound)) : pQs, p) ->
-      \case
-        (ForSome' (Some x' _ [] (OutputBound (TermBound obV))) : qQs, q) ->
-          let qQs' = substitute (FromName x') (ToName x) <$> qQs
-              q' =
-                ((var x `Add` Const 1) `LessOrEqual` obV)
-                  `And` substitute (FromName x') (ToName x) q
-              (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs', q')
-           in (ForSome' (Some x n [] (OutputBound FieldMaxBound)) : pqQs, pq)
-        (ForSome' (Some x' _ [] (OutputBound FieldMaxBound)) : qQs, q) ->
-          let qQs' = substitute (FromName x') (ToName x) <$> qQs
-              q' = substitute (FromName x') (ToName x) q
-              (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs', q')
-           in (ForSome' r : pqQs, pq)
-        (qQs, q) ->
-          let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-           in (ForSome' r : pqQs, pq)
-    (ForSome' r@(Some {}) : pQs, p) -> \(qQs, q) ->
-      let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-       in (ForSome' r : pqQs, pq)
-    (ForSome' (SomeP x n ib ob) : pQs, p) ->
-      \case
-        (ForSome' (SomeP x' n' ib' ob') : rQs, r) ->
-          let ib'' = substitute (FromName x') (ToName x) ib'
-              ob'' = substitute (FromName x') (ToName x) ob'
-              rQs' = substitute (FromName x') (ToName x) <$> rQs
-              r' = substitute (FromName x') (ToName x) r
-              (prQs', pr') = mergeQuantifiersDisjunctive (pQs, p) (rQs', r')
-              (prQs, pr) = mergeQuantifiersDisjunctive (pQs, p) (rQs, r)
-           in if n == n' && ib'' == ib && ob'' == ob
-                then (ForSome' (SomeP x n ib ob) : prQs', pr')
-                else (ForSome' (SomeP x n ib ob) : ForSome' (SomeP x' n' ib' ob') : prQs, pr)
-        (rQs, r) ->
-          let (prQs, pr) = mergeQuantifiersDisjunctive (pQs, p) (rQs, r)
-           in (ForSome' (SomeP x n ib ob) : prQs, pr)
-    (ForAll' x a : pQs, p) -> \(qQs, q) ->
-      let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-       in (ForAll' x a : pqQs, pq)
-    (Given' (Instance x n ibs ob) : pQs, p) -> \(qQs, q) ->
-      let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-       in (Given' (Instance x n ibs ob) : pqQs, pq)
-    ([], p) -> second (Or p)
-
+-- Has the effect of putting a negation in front of a quantifier string
+-- and then carrying it through to the end, preserving semantics.
 flipQuantifiers ::
   ann ->
   [Quantifier] ->
