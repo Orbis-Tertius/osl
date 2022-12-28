@@ -186,12 +186,12 @@ instance Show name => Show (ExistentialQuantifierF name) where
       <> show b1
       <> ")"
 
-data InstanceQuantifierF name
-  = Instance { name :: name,
-      cardinality :: Cardinality,
-      inputBounds :: [InputBoundF name],
-      outputBounds :: (OutputBoundF name)
-     }
+data InstanceQuantifierF name = Instance
+  { name :: name,
+    cardinality :: Cardinality,
+    inputBounds :: [InputBoundF name],
+    outputBounds :: OutputBoundF name
+  }
   deriving (Eq, Functor, Generic)
 
 instance Show name => Show (InstanceQuantifierF name) where
@@ -218,7 +218,7 @@ data QuantifierF name
   = ForAll' name (BoundF name)
   | ForSome' (ExistentialQuantifierF name)
   | Given' (InstanceQuantifierF name)
-  deriving Functor
+  deriving (Functor)
 
 instance Show name => Show (QuantifierF name) where
   show (ForAll' x b) = "∀" <> show x <> "<" <> show b
@@ -230,7 +230,7 @@ instance Show name => Show (QuantifierF name) where
              else "^" <> show n <> "(" <> intercalate ", " (show <$> ibs) <> ")"
          )
       <> "<"
-      <> show ob 
+      <> show ob
 
 type Quantifier = QuantifierF Name
 

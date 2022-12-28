@@ -9,6 +9,7 @@ module OSL.Sigma11
   ( incrementDeBruijnIndices,
     incrementArities,
     HasIncrementArity (incrementArity),
+    HasAddToEvalContext (addToEvalContext),
     unionIndices,
     termIndices,
     HasPrependBounds (prependBounds),

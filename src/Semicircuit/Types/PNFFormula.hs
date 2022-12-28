@@ -17,7 +17,7 @@ import Control.Lens ((^.))
 import Data.List (intercalate)
 import GHC.Generics (Generic)
 import qualified Semicircuit.Types.QFFormula as QF
-import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier, ExistentialQuantifierF (..), InstanceQuantifierF (..), InstanceQuantifier, Name)
+import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier, ExistentialQuantifierF (..), InstanceQuantifier, InstanceQuantifierF (..), Name)
 
 data Formula = Formula
   { qfFormula :: QF.Formula,

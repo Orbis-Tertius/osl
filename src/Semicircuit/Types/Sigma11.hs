@@ -42,18 +42,23 @@ module Semicircuit.Types.Sigma11
 where
 
 import Control.Lens ((^.))
+import qualified Data.Map as Map
 import GHC.Generics (Generic)
-import OSL.Sigma11 (HasIncrementArity (incrementArity))
+import OSL.Sigma11 (HasAddToEvalContext (addToEvalContext), HasIncrementArity (incrementArity))
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality (..))
-import OSL.Types.Sigma11 (BoundF (FieldMaxBound, TermBound), OutputBoundF (OutputBound), TermF (Add, App, AppInverse, Const, IndLess, Max, Mul), FormulaF (..), BoundF (..), InputBoundF (..), OutputBoundF (..), QuantifierF (..), ExistentialQuantifierF (..), var, InstanceQuantifierF (..))
+import OSL.Types.Sigma11 (BoundF (..), ExistentialQuantifierF (..), FormulaF (..), InputBoundF (..), InstanceQuantifierF (..), OutputBoundF (..), QuantifierF (..), TermF (Add, App, AppInverse, Const, IndLess, Max, Mul), var)
 import OSL.Types.Sigma11.EvaluationContext (EvaluationContextF (EvaluationContext))
 
 data Name = Name {arity :: Arity, sym :: Int}
   deriving (Eq, Ord, Generic)
 
 instance HasIncrementArity Name where
-  incrementArity i (Name (Arity j) k) = Name (Arity (i+j)) k
+  incrementArity i (Name (Arity j) k) = Name (Arity (i + j)) k
+
+instance HasAddToEvalContext Name where
+  addToEvalContext (EvaluationContext c) nm val =
+    EvaluationContext (Map.insert nm val c)
 
 instance Show Name where
   show x = "x^" <> show (x ^. #arity) <> "_" <> show (x ^. #sym)

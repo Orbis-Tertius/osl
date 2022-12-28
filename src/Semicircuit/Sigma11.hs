@@ -30,7 +30,7 @@ import qualified Data.Set as Set
 import Die (die)
 import OSL.Sigma11 (HasPrependBounds (prependBounds), prependQuantifiers)
 import OSL.Types.Arity (Arity (..))
-import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), InstanceQuantifierF (Instance), ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), Formula, FormulaF (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound, InputBoundF (..), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (Given', ForAll', ForSome'), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), Formula, FormulaF (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound, InputBoundF (..), InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (ForAll', ForSome', Given'), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
 
 newtype FromName = FromName Name
 

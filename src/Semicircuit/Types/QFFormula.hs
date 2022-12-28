@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Semicircuit.Types.QFFormula (Formula, FormulaF (..)) where
 
@@ -20,7 +19,7 @@ data FormulaF name
   | Iff (FormulaF name) (FormulaF name)
   | Top
   | Bottom
-  deriving Functor
+  deriving (Functor)
 
 instance Show name => Show (FormulaF name) where
   show (Equal x y) =
