@@ -72,7 +72,7 @@ runMain (FileName fileName) (TargetName targetName) compileToCircuit = do
         (TargetName targetName)
         (Source source) -- TODO: specify BitsPerByte and RowCount with options
         (BitsPerByte 8)
-        (RowCount 8)
+        (RowCount 9)
         compileToCircuit of
         Left (ErrorMessage err) -> pure (Output err)
         Right (SuccessfulOutput result) -> pure (Output result)

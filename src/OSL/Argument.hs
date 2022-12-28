@@ -8,7 +8,8 @@ module OSL.Argument
   ( toSigma11Argument,
     emptyTree,
     pairTree,
-  ) where
+  )
+where
 
 import Cast (intToInteger)
 import Control.Lens ((^.))
