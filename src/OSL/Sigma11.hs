@@ -1,25 +1,28 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 
 module OSL.Sigma11
-  ( MapNames (mapNames),
-    incrementDeBruijnIndices,
+  ( incrementDeBruijnIndices,
     incrementArities,
+    HasIncrementArity (incrementArity),
+    HasAddToEvalContext (addToEvalContext),
     unionIndices,
     termIndices,
-    PrependBounds (prependBounds),
+    HasPrependBounds (prependBounds),
     prependInstanceQuantifiers,
     evalTerm,
     evalFormula,
     boolToScalar,
     scalarValue,
     auxTablesToEvalContext,
+    flipQuantifiers,
+    flipQuantifier,
+    prependQuantifier,
+    prependQuantifiers,
   )
 where
 
@@ -39,79 +42,33 @@ import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.Sigma11 (AuxTables, Bound (FieldMaxBound, TermBound), ExistentialQuantifier (Some, SomeP), Formula (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound (..), InstanceQuantifier (Instance), Name (..), OutputBound (..), PredicateName, Term (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import OSL.Types.Sigma11 (AuxTablesF, BoundF (FieldMaxBound, TermBound), ExistentialQuantifierF (Some, SomeP), Formula, FormulaF (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBoundF (..), InstanceQuantifierF (Instance), Name (..), OutputBoundF (..), PredicateName, Quantifier, QuantifierF (ForAll', ForSome', Given'), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
 import OSL.Types.Sigma11.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
-import OSL.Types.Sigma11.EvaluationContext (EvaluationContext (EvaluationContext))
+import OSL.Types.Sigma11.EvaluationContext (EvaluationContextF (EvaluationContext))
 import OSL.Types.Sigma11.Value (Value (Value))
 import OSL.Types.Sigma11.ValueTree (ValueTree (ValueTree))
-import OSL.Types.TranslationContext (Mapping (..))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, zero)
 import Prelude hiding (fromInteger)
 
-class MapNames a where
-  mapNames :: (Name -> Name) -> a -> a
+class HasIncrementArity name where
+  incrementArity :: Int -> name -> name
 
-instance MapNames Name where
-  mapNames = id
+instance HasIncrementArity Name where
+  incrementArity by (Name (Arity arity) index) =
+    Name (Arity (arity + by)) index
 
-instance MapNames Term where
-  mapNames f =
-    \case
-      App g xs -> App (f g) (mapNames f xs)
-      AppInverse g x -> AppInverse (f g) (mapNames f x)
-      Add x y -> Add (mapNames f x) (mapNames f y)
-      Mul x y -> Mul (mapNames f x) (mapNames f y)
-      IndLess x y -> IndLess (mapNames f x) (mapNames f y)
-      Max x y -> Max (mapNames f x) (mapNames f y)
-      Const x -> Const x
-
-instance MapNames Formula where
-  mapNames f =
-    \case
-      Equal x y -> Equal (mapNames f x) (mapNames f y)
-      LessOrEqual x y -> LessOrEqual (mapNames f x) (mapNames f y)
-      Predicate p q -> Predicate p (mapNames f q)
-      And p q -> And (mapNames f p) (mapNames f q)
-      Or p q -> Or (mapNames f p) (mapNames f q)
-      Not p -> Not (mapNames f p)
-      Implies p q -> Implies (mapNames f p) (mapNames f q)
-      Iff p q -> Iff (mapNames f p) (mapNames f q)
-      ForAll bound p -> ForAll (mapNames f bound) (mapNames f p)
-      ForSome (Some n inBounds outBound) p ->
-        ForSome (Some n (mapNames f inBounds) (mapNames f outBound)) (mapNames f p)
-      ForSome (SomeP n inBound outBound) p ->
-        ForSome (SomeP n (mapNames f inBound) (mapNames f outBound)) (mapNames f p)
-      Given n ibs ob p ->
-        Given n (mapNames f ibs) (mapNames f ob) (mapNames f p)
-      Top -> Top
-      Bottom -> Bottom
-
-instance MapNames Bound where
-  mapNames f =
-    \case
-      TermBound t -> TermBound (mapNames f t)
-      FieldMaxBound -> FieldMaxBound
-
-deriving newtype instance MapNames InputBound
-
-deriving newtype instance MapNames OutputBound
-
-instance MapNames a => MapNames (Mapping ann a) where
-  mapNames f = fmap (mapNames f)
-
-instance MapNames a => MapNames [a] where
-  mapNames f = fmap (mapNames f)
-
-incrementArities :: MapNames a => Int -> a -> a
+incrementArities ::
+  Functor f =>
+  HasIncrementArity name =>
+  Int ->
+  f name ->
+  f name
 incrementArities by =
-  mapNames
-    ( \(Name (Arity arity) index) ->
-        Name (Arity (arity + by)) index
-    )
+  fmap (incrementArity by)
 
-incrementDeBruijnIndices :: MapNames a => Arity -> Int -> a -> a
+incrementDeBruijnIndices :: Functor f => Arity -> Int -> f Name -> f Name
 incrementDeBruijnIndices arity by =
-  mapNames
+  fmap
     ( \(Name arity' index) ->
         if arity' == arity
           then Name arity' (index + DeBruijnIndex by)
@@ -142,31 +99,42 @@ termIndices =
     Max x y -> termIndices x `unionIndices` termIndices y
     Const _ -> mempty
 
-class PrependBounds a where
-  prependBounds :: Cardinality -> [InputBound] -> a -> a
+class HasPrependBounds f where
+  prependBounds :: HasIncrementArity name => Cardinality -> [InputBoundF name] -> f name -> f name
 
-instance PrependBounds ExistentialQuantifier where
-  prependBounds n bs (Some _ [] b) =
-    Some n bs b
-  prependBounds _ bs' (Some n bs b) =
-    Some n (bs' <> bs) b
+instance HasPrependBounds ExistentialQuantifierF where
+  prependBounds n bs (Some x _ [] b) =
+    Some (incrementArity (length bs) x) n bs b
+  prependBounds _ bs' (Some x n bs b) =
+    Some (incrementArity (length bs) x) n (bs' <> bs) b
   prependBounds _ _ (SomeP {}) =
     die "there is a compiler bug; applied prependBounds to SomeP"
 
-instance PrependBounds InstanceQuantifier where
-  prependBounds n bs (Instance _ [] b) =
-    Instance n bs b
-  prependBounds _ bs' (Instance n bs b) =
+instance HasPrependBounds InstanceQuantifierF where
+  prependBounds n bs (Instance x _ [] b) =
+    Instance (incrementArity (length bs) x) n bs b
+  prependBounds _ bs' (Instance x n bs b) =
     -- TODO: does the cardinality multiply?
-    Instance n (bs' <> bs) b
+    Instance (incrementArity (length bs) x) n (bs' <> bs) b
 
-prependInstanceQuantifiers :: [InstanceQuantifier] -> Formula -> Formula
-prependInstanceQuantifiers = foldl' (.) id . fmap prependInstanceQuantifier
+prependInstanceQuantifiers ::
+  [InstanceQuantifierF name] ->
+  FormulaF name ->
+  FormulaF name
+prependInstanceQuantifiers =
+  foldl' (.) id . fmap prependInstanceQuantifier
 
-prependInstanceQuantifier :: InstanceQuantifier -> Formula -> Formula
-prependInstanceQuantifier (Instance n bs b) = Given n bs b
+prependInstanceQuantifier ::
+  InstanceQuantifierF name ->
+  FormulaF name ->
+  FormulaF name
+prependInstanceQuantifier (Instance x n bs b) = Given x n bs b
 
-evalTerm :: EvaluationContext -> Term -> Either (ErrorMessage ()) Scalar
+evalTerm ::
+  (Show name, Ord name) =>
+  EvaluationContextF name ->
+  TermF name ->
+  Either (ErrorMessage ()) Scalar
 evalTerm (EvaluationContext c) =
   \case
     App f xs ->
@@ -180,7 +148,8 @@ evalTerm (EvaluationContext c) =
                 "value not defined on given inputs: " <> pack (show (xs', f'))
         Nothing ->
           Left . ErrorMessage () $
-            "name not defined in given evaluation context"
+            "name not defined in given evaluation context: "
+              <> pack (show (f, c))
     AppInverse f x ->
       case Map.lookup (Left f) c of
         Just (Value f') -> do
@@ -214,9 +183,10 @@ boolToScalar True = one
 boolToScalar False = zero
 
 evalFormula ::
-  EvaluationContext ->
+  (Show name, Ord name, HasAddToEvalContext name) =>
+  EvaluationContextF name ->
   Argument ->
-  Formula ->
+  FormulaF name ->
   Either (ErrorMessage ()) Bool
 evalFormula c arg =
   \case
@@ -250,30 +220,30 @@ evalFormula c arg =
       (==) <$> rec arg0 p <*> rec arg1 q
     Top -> pure True
     Bottom -> pure False
-    Given n ibs ob p ->
+    Given v n ibs ob p ->
       case arg ^. #statement . #unStatement of
         (i : is') -> do
-          let c' = addToEvalContext c (Arity (length ibs)) i
+          let c' = addToEvalContext c (Left v) i
           let arg' = Argument (Statement is') (arg ^. #witness)
           checkValueIsInBounds c n ibs ob i
           evalFormula c' arg' p
         [] -> Left . ErrorMessage () $ "statement is too short"
-    ForSome (Some n ibs ob) p ->
-      existentialQuantifier n ibs ob p
-    ForSome (SomeP n ib ob) p ->
+    ForSome (Some v n ibs ob) p ->
+      existentialQuantifier v n ibs ob p
+    ForSome (SomeP v n ib ob) p ->
       -- TODO: also check witness value is a permutation
-      existentialQuantifier n [ib] ob p
-    ForAll FieldMaxBound _ ->
+      existentialQuantifier v n [ib] ob p
+    ForAll _ FieldMaxBound _ ->
       Left . ErrorMessage () $
         "field max bound unsupported in universal quantifier"
-    ForAll (TermBound b) p -> do
+    ForAll v (TermBound b) p -> do
       b' <- evalTerm c b
       let go x arg' = do
             let (arg'', arg''') = popArg arg'
                 c' =
                   addToEvalContext
                     c
-                    (Arity 0)
+                    (Left v)
                     (scalarValue x)
                 x' = x Group.+ one
             r <- evalFormula c' arg'' p
@@ -310,23 +280,23 @@ evalFormula c arg =
             Argument (arg ^. #statement) (Witness (ValueTree Nothing []))
           )
 
-    existentialQuantifier n ibs ob p =
-      let arity = Arity (length ibs)
-       in case arg ^. #witness . #unWitness of
-            ValueTree (Just w) [ws'] -> do
-              let c' = addToEvalContext c arity w
-                  arg' = Argument (arg ^. #statement) (Witness ws')
-              checkValueIsInBounds c n ibs ob w
-              evalFormula c' arg' p
-            _ ->
-              Left . ErrorMessage () $
-                "witness has wrong shape for an existential quantifier: " <> pack (show (arg ^. #witness . #unWitness, p))
+    existentialQuantifier v n ibs ob p =
+      case arg ^. #witness . #unWitness of
+        ValueTree (Just w) [ws'] -> do
+          let c' = addToEvalContext c (Left v) w
+              arg' = Argument (arg ^. #statement) (Witness ws')
+          checkValueIsInBounds c n ibs ob w
+          evalFormula c' arg' p
+        _ ->
+          Left . ErrorMessage () $
+            "witness has wrong shape for an existential quantifier: " <> pack (show (arg ^. #witness . #unWitness, p))
 
 checkValueIsInBounds ::
-  EvaluationContext ->
+  (Show name, Ord name, HasAddToEvalContext name) =>
+  EvaluationContextF name ->
   Cardinality ->
-  [InputBound] ->
-  OutputBound ->
+  [InputBoundF name] ->
+  OutputBoundF name ->
   Value ->
   Either (ErrorMessage ()) ()
 checkValueIsInBounds c (Cardinality n) ibs ob (Value v) =
@@ -339,35 +309,51 @@ checkValueIsInBounds c (Cardinality n) ibs ob (Value v) =
     else Left (ErrorMessage () ("value is too big: " <> pack (show (Map.size v)) <> " > " <> pack (show n)))
 
 checkPointIsInBounds ::
-  EvaluationContext ->
-  [(Scalar, InputBound)] ->
-  (Scalar, OutputBound) ->
+  (Show name, Ord name, HasAddToEvalContext name) =>
+  EvaluationContextF name ->
+  [(Scalar, InputBoundF name)] ->
+  (Scalar, OutputBoundF name) ->
   Either (ErrorMessage ()) ()
 checkPointIsInBounds _ [] (_, OutputBound FieldMaxBound) = pure ()
 checkPointIsInBounds c [] (y, OutputBound (TermBound ob)) = do
   ob' <- evalTerm c ob
   when (y >= ob') (Left (ErrorMessage () "output is out of bounds"))
-checkPointIsInBounds c ((x, InputBound FieldMaxBound) : ibs) (y, ob) = do
-  let c' = addToEvalContext c (Arity 0) (scalarValue x)
+checkPointIsInBounds c ((x, NamedInputBound nm FieldMaxBound) : ibs) (y, ob) = do
+  let c' = addToEvalContext c (Left nm) (scalarValue x)
   checkPointIsInBounds c' ibs (y, ob)
-checkPointIsInBounds c ((x, InputBound (TermBound ib)) : ibs) (y, ob) = do
+checkPointIsInBounds c ((_, UnnamedInputBound FieldMaxBound) : ibs) (y, ob) =
+  checkPointIsInBounds c ibs (y, ob)
+checkPointIsInBounds c ((x, NamedInputBound nm (TermBound ib)) : ibs) (y, ob) = do
   ib' <- evalTerm c ib
   when (x >= ib') (Left (ErrorMessage () "input is out of bounds"))
-  let c' = addToEvalContext c (Arity 0) (scalarValue x)
+  let c' = addToEvalContext c (Left nm) (scalarValue x)
   checkPointIsInBounds c' ibs (y, ob)
+checkPointIsInBounds c ((x, UnnamedInputBound (TermBound ib)) : ibs) (y, ob) = do
+  ib' <- evalTerm c ib
+  when (x >= ib') (Left (ErrorMessage () "input is out of bounds"))
+  checkPointIsInBounds c ibs (y, ob)
 
-addToEvalContext :: EvaluationContext -> Arity -> Value -> EvaluationContext
-addToEvalContext (EvaluationContext c) n x =
-  EvaluationContext . Map.insert (Left (Name n 0)) x $
-    Map.mapKeys incIfN c
-  where
-    incIfN (Left (Name n' i)) =
-      if n == n'
-        then Left (Name n (i + 1))
-        else Left (Name n' i)
-    incIfN (Right p) = Right p
+class HasAddToEvalContext name where
+  addToEvalContext :: EvaluationContextF name -> Either name PredicateName -> Value -> EvaluationContextF name
 
-auxTablesToEvalContext :: AuxTables -> Either (ErrorMessage ()) EvaluationContext
+instance HasAddToEvalContext Name where
+  addToEvalContext (EvaluationContext c) (Left (Name n 0)) x =
+    EvaluationContext . Map.insert (Left (Name (n :: Arity) 0)) x $
+      Map.mapKeys incIfN c
+    where
+      incIfN (Left (Name n' i)) =
+        if n == n'
+          then Left (Name n (i + 1))
+          else Left (Name n' i)
+      incIfN (Right p) = Right p
+  addToEvalContext _ (Left (Name _ _)) _ = die "OSL.Sigma11.addToEvalContext: tried to add a name with a non-zero de Bruijn index (this is a compiler bug)"
+  addToEvalContext (EvaluationContext c) (Right p) x =
+    EvaluationContext (Map.insert (Right p) x c)
+
+auxTablesToEvalContext ::
+  Ord name =>
+  AuxTablesF name ->
+  Either (ErrorMessage ()) (EvaluationContextF name)
 auxTablesToEvalContext aux =
   mconcat
     <$> sequence
@@ -376,8 +362,9 @@ auxTablesToEvalContext aux =
       ]
 
 functionTablesToEvalContext ::
-  Map Name (Map [Integer] Integer) ->
-  Either (ErrorMessage ()) EvaluationContext
+  Ord name =>
+  Map name (Map [Integer] Integer) ->
+  Either (ErrorMessage ()) (EvaluationContextF name)
 functionTablesToEvalContext m =
   EvaluationContext . Map.fromList
     <$> sequence
@@ -390,8 +377,9 @@ functionTablesToEvalContext m =
       ]
 
 predicateTablesToEvalContext ::
+  Ord name =>
   Map PredicateName (Set [Integer]) ->
-  Either (ErrorMessage ()) EvaluationContext
+  Either (ErrorMessage ()) (EvaluationContextF name)
 predicateTablesToEvalContext m =
   EvaluationContext . Map.fromList
     <$> sequence
@@ -408,3 +396,59 @@ fromInteger = maybe (Left (ErrorMessage () "integer out of range of scalar field
 
 scalarValue :: Scalar -> Value
 scalarValue = Value . Map.singleton []
+
+flipQuantifiers ::
+  ann ->
+  Formula ->
+  Either (ErrorMessage ann) Formula
+flipQuantifiers ann = mapQuantifiers (flipQuantifier ann)
+
+mapQuantifiers ::
+  Monad m =>
+  (Quantifier -> m Quantifier) ->
+  Formula ->
+  m Formula
+mapQuantifiers f =
+  \case
+    Equal x y -> pure (Equal x y)
+    LessOrEqual x y -> pure (LessOrEqual x y)
+    Predicate p xs -> pure (Predicate p xs)
+    Not p -> Not <$> rec p
+    And p q -> And <$> rec p <*> rec q
+    Or p q -> Or <$> rec p <*> rec q
+    Implies p q -> Implies <$> rec p <*> rec q
+    Iff p q -> Iff <$> rec p <*> rec q
+    ForAll x b p -> prependQuantifier <$> f (ForAll' x b) <*> rec p
+    ForSome q p -> prependQuantifier <$> f (ForSome' q) <*> rec p
+    Given x n ibs ob p -> prependQuantifier <$> f (Given' (Instance x n ibs ob)) <*> rec p
+    Top -> pure Top
+    Bottom -> pure Bottom
+  where
+    rec = mapQuantifiers f
+
+prependQuantifiers :: [QuantifierF name] -> FormulaF name -> FormulaF name
+prependQuantifiers qs f =
+  foldl' (flip prependQuantifier) f qs
+
+prependQuantifier :: QuantifierF name -> FormulaF name -> FormulaF name
+prependQuantifier =
+  \case
+    ForAll' x b -> ForAll x b
+    ForSome' q -> ForSome q
+    Given' (Instance x n ibs ob) -> Given x n ibs ob
+
+flipQuantifier ::
+  ann ->
+  QuantifierF name ->
+  Either (ErrorMessage ann) (QuantifierF name)
+flipQuantifier ann =
+  \case
+    ForAll' x b ->
+      pure (ForSome' (Some x (1 :: Cardinality) [] (OutputBound b)))
+    ForSome' (Some x _ [] (OutputBound b)) ->
+      pure (ForAll' x b)
+    ForSome' _ ->
+      Left . ErrorMessage ann $
+        "not supported: second-order quantification in negative position"
+    Given' (Instance x n ibs ob) ->
+      pure (Given' (Instance x n ibs ob))

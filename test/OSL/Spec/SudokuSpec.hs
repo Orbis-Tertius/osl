@@ -18,7 +18,7 @@ import OSL.ArgumentForm (getArgumentForm)
 import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
-import OSL.TranslatedEvaluation (evalTranslatedFormula)
+import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
 import OSL.Types.FileName (FileName (FileName))
@@ -88,11 +88,18 @@ exampleSpec c = do
       (exampleUnsoundArgument c)
       `shouldBe` Right False
 
-  it "Sudoku spec's semantics are preserved in Sigma11 translation" $ do
-    evalTranslatedFormula c "problemIsSolvable" argumentForm (exampleArgument c)
+  it "Sudoku spec's semantics are preserved in codegen stage 1" $ do
+    evalTranslatedFormula1 c "problemIsSolvable" argumentForm (exampleArgument c)
       `shouldBe` Right True
 
-    evalTranslatedFormula c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
+    evalTranslatedFormula1 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
+      `shouldBe` Right False
+
+  it "Sudoku spec's semantics are preserved in codegen stage 2" $ do
+    evalTranslatedFormula2 c "problemIsSolvable" argumentForm (exampleArgument c)
+      `shouldBe` Right True
+
+    evalTranslatedFormula2 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
       `shouldBe` Right False
 
 exampleArgument :: ValidContext 'Global ann -> Argument

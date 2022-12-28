@@ -5,12 +5,16 @@ module OSL.Term
     lambdaBody,
     termAnnotation,
     dropTermAnnotations,
+    flipQuantifiers,
+    flipQuantifier,
+    mapQuantifiers,
   )
 where
 
 import Control.Arrow ((***))
 import OSL.Type (dropTypeAnnotations)
-import OSL.Types.OSL (Bound (..), CodomainBound (..), DomainBound (..), KeysBound (..), LeftBound (..), RightBound (..), Term (..), ValuesBound (..))
+import OSL.Types.ErrorMessage (ErrorMessage)
+import OSL.Types.OSL (Bound (..), CodomainBound (..), DomainBound (..), KeysBound (..), LeftBound (..), Quantifier (ForAll', ForSome'), RightBound (..), Term (..), ValuesBound (..))
 
 applicationHead :: Term ann -> Term ann
 applicationHead (Apply _ f _) = applicationHead f
@@ -199,3 +203,50 @@ dropBoundAnnotations =
     ToBound _ name a -> ToBound () name (rec a)
   where
     rec = dropBoundAnnotations
+
+mapQuantifiers ::
+  (Quantifier ann -> Either (ErrorMessage ann) (Quantifier ann)) ->
+  Term ann ->
+  Either (ErrorMessage ann) (Term ann)
+mapQuantifiers f =
+  \case
+    ForAll ann n a b p ->
+      prependQuantifier <$> f (ForAll' ann n a b) <*> rec p
+    ForSome ann n a b p ->
+      prependQuantifier <$> f (ForSome' ann n a b) <*> rec p
+    Not ann p -> Not ann <$> rec p
+    And ann p q -> And ann <$> rec p <*> rec q
+    Or ann p q -> Or ann <$> rec p <*> rec q
+    Implies ann p q -> Implies ann <$> rec p <*> rec q
+    Iff ann p q -> Iff ann <$> rec p <*> rec q
+    Let ann v a d y -> Let ann v a <$> rec d <*> rec y
+    Lambda ann v a y -> Lambda ann v a <$> rec y
+    p -> pure p
+  where
+    rec = mapQuantifiers f
+
+prependQuantifier ::
+  Quantifier ann ->
+  Term ann ->
+  Term ann
+prependQuantifier =
+  \case
+    ForAll' ann n a b ->
+      ForAll ann n a b
+    ForSome' ann n a b ->
+      ForSome ann n a b
+
+flipQuantifier ::
+  Quantifier ann ->
+  Either (ErrorMessage ann) (Quantifier ann)
+flipQuantifier =
+  \case
+    ForAll' ann x a b ->
+      pure (ForSome' ann x a b)
+    ForSome' ann x a b -> do
+      pure (ForAll' ann x a b)
+
+flipQuantifiers ::
+  Term ann ->
+  Either (ErrorMessage ann) (Term ann)
+flipQuantifiers = mapQuantifiers flipQuantifier

@@ -24,7 +24,7 @@ import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import Semicircuit.Gensyms (NextSym (NextSym))
 import Semicircuit.Sigma11 (FromName (FromName), HasArity (getArity), HasNames (getNames), ToName (ToName), foldConstants, getInputName, hasFieldMaxBound, prependArguments, prependBounds, substitute)
-import Semicircuit.Types.Sigma11 (Bound (FieldMaxBound, TermBound), ExistentialQuantifier (..), Formula (..), InputBound (..), Name (Name), OutputBound (..), Quantifier (..), Term (Add, Const, IndLess, Max, Mul), someFirstOrder, var)
+import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (..), Formula, FormulaF (..), InputBound, InputBoundF (..), InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (..), Term, TermF (Add, Const, IndLess, Max, Mul), someFirstOrder, var)
 
 -- Assumes input is in strong prenex normal form.
 -- Merges all consecutive same-type quantifiers that can be
@@ -84,18 +84,18 @@ padToArity ::
   (Quantifier, Formula -> Formula)
 padToArity arity =
   \case
-    Universal {} -> die "padToArity: saw a universal quantifier (this is a compiler bug)"
-    Existential (SomeP {}) -> die "padToArity: saw a permutation quantifier (this is a compiler bug)"
-    Existential (Some x n ibs ob) ->
+    ForAll' {} -> die "padToArity: saw a universal quantifier (this is a compiler bug)"
+    ForSome' (SomeP {}) -> die "padToArity: saw a permutation quantifier (this is a compiler bug)"
+    ForSome' (Some x n ibs ob) ->
       let d = (arity ^. #unArity) - length ibs
           x' = Name arity (x ^. #sym)
-       in ( Existential $ Some x' n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
+       in ( ForSome' $ Some x' n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
             prependArguments x (replicate d (Const 0))
           )
-    Instance x n ibs ob ->
+    Given' (Instance x n ibs ob) ->
       let d = (arity ^. #unArity) - length ibs
           x' = Name arity (x ^. #sym)
-       in ( Instance x' n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob,
+       in ( Given' (Instance x' n (replicate d (UnnamedInputBound (TermBound (Const 1))) <> ibs) ob),
             prependArguments x (replicate d (Const 0))
           )
 
@@ -111,11 +111,11 @@ mergePaddedQuantifiers ::
 mergePaddedQuantifiers =
   \case
     [] -> die "mergePaddedQuantifiers: empty quantifier list (this is a compiler bug)"
-    qs@(Existential _ : _) ->
+    qs@(ForSome' _ : _) ->
       mergePaddedExistentialQuantifiers qs
-    qs@(Instance {} : _) ->
+    qs@(Given' {} : _) ->
       mergePaddedInstanceQuantifiers qs
-    Universal {} : _ ->
+    ForAll' {} : _ ->
       die "mergePaddedQuantifiers: saw a universal quantifier (this is a compiler bug)"
 
 mergePaddedExistentialQuantifiers ::
@@ -133,16 +133,16 @@ mergePaddedInstanceQuantifiers qs =
 quantifierSig :: Quantifier -> (Name, Cardinality, [InputBound], OutputBound)
 quantifierSig =
   \case
-    Existential (Some x n ibs ob) -> (x, n, ibs, ob)
-    Existential (SomeP {}) -> die "quantifierSig: saw a permutation quantifier (this is a compiler bug)"
-    Instance x n ibs ob -> (x, n, ibs, ob)
-    Universal {} -> die "quantifierSig: saw a universal quantifier (this is a compiler bug)"
+    ForSome' (Some x n ibs ob) -> (x, n, ibs, ob)
+    ForSome' (SomeP {}) -> die "quantifierSig: saw a permutation quantifier (this is a compiler bug)"
+    Given' (Instance x n ibs ob) -> (x, n, ibs, ob)
+    ForAll' {} -> die "quantifierSig: saw a universal quantifier (this is a compiler bug)"
 
 sigToExistential :: (Name, Cardinality, [InputBound], OutputBound) -> Quantifier
-sigToExistential (x, n, ibs, ob) = Existential (Some x n ibs ob)
+sigToExistential (x, n, ibs, ob) = ForSome' (Some x n ibs ob)
 
 sigToInstance :: (Name, Cardinality, [InputBound], OutputBound) -> Quantifier
-sigToInstance (x, n, ibs, ob) = Instance x n ibs ob
+sigToInstance (x, n, ibs, ob) = Given' (Instance x n ibs ob)
 
 mergePaddedQuantifierSigs ::
   [(Name, Cardinality, [InputBound], OutputBound)] ->
@@ -263,37 +263,37 @@ groupMergeableQuantifiers ::
   [[Quantifier]]
 groupMergeableQuantifiers =
   \case
-    (Universal x a : qs) ->
+    (ForAll' x a : qs) ->
       -- Universals are never mergeable, and there is never another
       -- quantifier type after a universal.
-      ([Universal x a] : ((: []) <$> qs))
-    (Existential q : Universal x a : qs) ->
-      ([Existential q] : [Universal x a] : ((: []) <$> qs))
-    (Existential q : Existential r@(SomeP {}) : qs) ->
-      ([Existential q] : [Existential r] : rec qs)
-    (Existential q@(SomeP {}) : qs) ->
-      ([Existential q] : rec qs)
-    (Existential q@(Some x _ _ _) : Existential r : qs) ->
-      case rec (Existential r : qs) of
+      ([ForAll' x a] : ((: []) <$> qs))
+    (ForSome' q : ForAll' x a : qs) ->
+      ([ForSome' q] : [ForAll' x a] : ((: []) <$> qs))
+    (ForSome' q : ForSome' r@(SomeP {}) : qs) ->
+      ([ForSome' q] : [ForSome' r] : rec qs)
+    (ForSome' q@(SomeP {}) : qs) ->
+      ([ForSome' q] : rec qs)
+    (ForSome' q@(Some x _ _ _) : ForSome' r : qs) ->
+      case rec (ForSome' r : qs) of
         (rs : qss) ->
           if x `Set.member` mconcat (getNames <$> rs)
-            || hasFieldMaxBound (Existential q)
+            || hasFieldMaxBound (ForSome' q)
             || any hasFieldMaxBound rs
             then -- Not mergeable; since names are not reused, the name x
             -- being present in r indicates that a bound of r depends on x.
             -- Also, for now, quantifiers containing field max bounds are
             -- not mergeable.
-              [Existential q] : rs : qss
+              [ForSome' q] : rs : qss
             else -- mergeable
-              (Existential q : rs) : qss
+              (ForSome' q : rs) : qss
         [] -> die "groupMergeableQuantifiers: empty result for non-empty recursion (this is a compiler bug)"
-    (Existential _ : Instance {} : _) ->
+    (ForSome' _ : Given' {} : _) ->
       die "groupMergeableQuantifiers: input is not in strong prenex normal form (this is a compiler bug)"
-    (q@(Instance {}) : Existential r : qs) ->
-      [q] : rec (Existential r : qs)
-    (q@(Instance {}) : r@(Universal {}) : qs) ->
+    (q@(Given' {}) : ForSome' r : qs) ->
+      [q] : rec (ForSome' r : qs)
+    (q@(Given' {}) : r@(ForAll' {}) : qs) ->
       [q] : rec (r : qs)
-    (q@(Instance x _ _ _) : r@(Instance {}) : qs) ->
+    (q@(Given' (Instance x _ _ _)) : r@(Given' {}) : qs) ->
       case rec (r : qs) of
         (rs : qss) ->
           if x `Set.member` mconcat (getNames <$> rs)
@@ -326,23 +326,23 @@ toStrongPrenexNormalForm ::
 toStrongPrenexNormalForm ann qs f =
   case qs of
     [] -> pure ([], f)
-    Existential q : qs' -> do
+    ForSome' q : qs' -> do
       (qs'', f') <- rec qs' f
       case qs'' of
-        Instance {} : _ ->
+        Given' {} : _ ->
           pure (pushExistentialQuantifierDown q qs'', f')
-        _ -> pure (Existential q : qs'', f')
-    Universal x b : qs' -> do
+        _ -> pure (ForSome' q : qs'', f')
+    ForAll' x b : qs' -> do
       (qs'', f') <- rec qs' f
       case qs'' of
-        [] -> pure ([Universal x b], f')
-        Universal _ _ : _ ->
-          pure (Universal x b : qs'', f')
+        [] -> pure ([ForAll' x b], f')
+        ForAll' _ _ : _ ->
+          pure (ForAll' x b : qs'', f')
         _ ->
           pushUniversalQuantifiersDown ann [(x, b)] qs'' f'
-    Instance x n ibs ob : qs' -> do
+    Given' (Instance x n ibs ob) : qs' -> do
       (qs'', f') <- rec qs' f
-      pure (Instance x n ibs ob : qs'', f')
+      pure (Given' (Instance x n ibs ob) : qs'', f')
   where
     rec = toStrongPrenexNormalForm ann
 
@@ -352,13 +352,13 @@ pushExistentialQuantifierDown ::
   [Quantifier]
 pushExistentialQuantifierDown q =
   \case
-    [] -> [Existential q]
-    Universal x b : qs ->
-      Existential q : Universal x b : qs
-    Existential q' : qs ->
-      Existential q : Existential q' : qs
-    Instance x n ibs obs : qs ->
-      Instance x n ibs obs : pushExistentialQuantifierDown q qs
+    [] -> [ForSome' q]
+    ForAll' x b : qs ->
+      ForSome' q : ForAll' x b : qs
+    ForSome' q' : qs ->
+      ForSome' q : ForSome' q' : qs
+    Given' (Instance x n ibs obs) : qs ->
+      Given' (Instance x n ibs obs) : pushExistentialQuantifierDown q qs
 
 pushUniversalQuantifiersDown ::
   ann ->
@@ -368,22 +368,22 @@ pushUniversalQuantifiersDown ::
   Either (ErrorMessage ann) ([Quantifier], Formula)
 pushUniversalQuantifiersDown ann us qs f =
   case qs of
-    [] -> pure (uncurry Universal <$> us, f)
-    Universal x b : qs' ->
+    [] -> pure (uncurry ForAll' <$> us, f)
+    ForAll' x b : qs' ->
       pushUniversalQuantifiersDown ann (us <> [(x, b)]) qs' f
-    Existential q : qs' -> do
+    ForSome' q : qs' -> do
       (qs'', f') <- pushUniversalQuantifiersDown ann us qs' f
       case q of
-        Some g _ _ _ -> do
-          let q' = prependBounds (uncurry NamedInputBound <$> us) q
+        Some g n _ _ -> do
+          let q' = prependBounds n (uncurry NamedInputBound <$> us) q
               f'' = prependArguments g (var . fst <$> us) f'
-          pure ([Existential q'] <> qs'', f'')
+          pure ([ForSome' q'] <> qs'', f'')
         SomeP {} ->
           Left . ErrorMessage ann $
             "unsupported: permutation quantifier inside a universal quantifier"
-    Instance x n ibs ob : qs' -> do
+    Given' (Instance x n ibs ob) : qs' -> do
       (qs'', f') <- pushUniversalQuantifiersDown ann us qs' f
-      pure (Instance x n ibs ob : qs'', f')
+      pure (Given' (Instance x n ibs ob) : qs'', f')
 
 toPrenexNormalForm ::
   ann ->
@@ -422,13 +422,13 @@ toPrenexNormalForm ann =
             "not supported: quantifiers inside <->"
     ForAll x b p -> do
       (pQs, p') <- rec p
-      pure (Universal x b : pQs, p')
+      pure (ForAll' x b : pQs, p')
     ForSome q p -> do
       (pQs, p') <- rec p
-      pure (Existential q : pQs, p')
+      pure (ForSome' q : pQs, p')
     Given x n ibs ob p -> do
       (pQs, p') <- rec p
-      pure (Instance x n ibs ob : pQs, p')
+      pure (Given' (Instance x n ibs ob) : pQs, p')
   where
     rec = toPrenexNormalForm ann
 
@@ -441,9 +441,9 @@ mergeQuantifiersConjunctive ::
   ([Quantifier], Formula)
 mergeQuantifiersConjunctive =
   \case
-    (Universal x (TermBound a) : pQs, p) ->
+    (ForAll' x (TermBound a) : pQs, p) ->
       \case
-        (Universal y (TermBound b) : qQs, q) ->
+        (ForAll' y (TermBound b) : qQs, q) ->
           let ab = if a == b then a else foldConstants (a `Max` b')
               p' =
                 if ab == a
@@ -457,45 +457,45 @@ mergeQuantifiersConjunctive =
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               b' = substitute (FromName y) (ToName x) b
               (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q'')
-           in (Universal x (TermBound ab) : pqQs, pq)
-        (Universal y FieldMaxBound : qQs, q) ->
+           in (ForAll' x (TermBound ab) : pqQs, pq)
+        (ForAll' y FieldMaxBound : qQs, q) ->
           let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
               q' = substitute (FromName y) (ToName x) q
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q')
-           in (Universal x FieldMaxBound : pqQs, pq)
+           in (ForAll' x FieldMaxBound : pqQs, pq)
         (q : rQs, r) ->
           let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (rQs, r)
-           in (q : Universal x (TermBound a) : prQs, pr)
-        ([], q) -> (Universal x (TermBound a) : pQs, p `And` q)
-    (Universal x FieldMaxBound : pQs, p) ->
+           in (q : ForAll' x (TermBound a) : prQs, pr)
+        ([], q) -> (ForAll' x (TermBound a) : pQs, p `And` q)
+    (ForAll' x FieldMaxBound : pQs, p) ->
       \case
-        (Universal y FieldMaxBound : qQs, q) ->
+        (ForAll' y FieldMaxBound : qQs, q) ->
           let qQs' = substitute (FromName y) (ToName x) <$> qQs
               (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs', q)
-           in (Universal x FieldMaxBound : pqQs, pq)
-        (Universal y (TermBound b) : qQs, q) ->
+           in (ForAll' x FieldMaxBound : pqQs, pq)
+        (ForAll' y (TermBound b) : qQs, q) ->
           let q' = ((var x `Add` Const 1) `LessOrEqual` b) `And` substitute (FromName y) (ToName x) q
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs', q')
-           in (Universal x FieldMaxBound : pqQs, pq)
+           in (ForAll' x FieldMaxBound : pqQs, pq)
         (q : rQs, r) ->
           let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (rQs, r)
-           in (q : Universal x FieldMaxBound : prQs, pr)
-        ([], q) -> (Universal x FieldMaxBound : pQs, p `And` q)
-    (Existential q : pQs, p) ->
+           in (q : ForAll' x FieldMaxBound : prQs, pr)
+        ([], q) -> (ForAll' x FieldMaxBound : pQs, p `And` q)
+    (ForSome' q : pQs, p) ->
       \case
-        (Universal x a : rQs, r) ->
-          let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (Universal x a : rQs, r)
-           in (Existential q : prQs, pr)
+        (ForAll' x a : rQs, r) ->
+          let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (ForAll' x a : rQs, r)
+           in (ForSome' q : prQs, pr)
         (r : sQs, s) ->
           let (psQs, ps) = mergeQuantifiersConjunctive (pQs, p) (sQs, s)
-           in (r : Existential q : psQs, ps)
-        ([], r) -> (Existential q : pQs, p `And` r)
-    (Instance x a ibs ob : pQs, p) ->
+           in (r : ForSome' q : psQs, ps)
+        ([], r) -> (ForSome' q : pQs, p `And` r)
+    (Given' (Instance x a ibs ob) : pQs, p) ->
       \(qQs, q) ->
         let (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs, q)
-         in (Instance x a ibs ob : pqQs, pq)
+         in (Given' (Instance x a ibs ob) : pqQs, pq)
     ([], p) -> second (And p)
 
 -- Perform prenex normal form conversion on a disjunction
@@ -507,9 +507,9 @@ mergeQuantifiersDisjunctive ::
   ([Quantifier], Formula)
 mergeQuantifiersDisjunctive =
   \case
-    (Existential r@(Some x n [] ob@(OutputBound (TermBound obV))) : pQs, p) ->
+    (ForSome' r@(Some x n [] ob@(OutputBound (TermBound obV))) : pQs, p) ->
       \case
-        (Existential (Some x' _ [] ob'@(OutputBound (TermBound obV'))) : qQs, q) ->
+        (ForSome' (Some x' _ [] ob'@(OutputBound (TermBound obV'))) : qQs, q) ->
           let qQs' = substitute (FromName x') (ToName x) <$> qQs
               q' = substitute (FromName x') (ToName x) q
               obV'' = substitute (FromName x') (ToName x) obV'
@@ -526,39 +526,39 @@ mergeQuantifiersDisjunctive =
                   then q'
                   else ((var x `Add` Const 1) `LessOrEqual` obV'') `And` q'
               (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p') (qQs', q'')
-           in (Existential (Some x n [] (OutputBound (TermBound obV'''))) : pqQs, pq)
-        (Existential (Some x' _ [] (OutputBound FieldMaxBound)) : qQs, q) ->
+           in (ForSome' (Some x n [] (OutputBound (TermBound obV'''))) : pqQs, pq)
+        (ForSome' (Some x' _ [] (OutputBound FieldMaxBound)) : qQs, q) ->
           let qQs' = substitute (FromName x') (ToName x) <$> qQs
               q' = substitute (FromName x') (ToName x) q
               p' = ((var x `Add` Const 1) `LessOrEqual` obV) `And` p
               (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p') (qQs', q')
-           in (Existential (Some x n [] (OutputBound FieldMaxBound)) : pqQs, pq)
+           in (ForSome' (Some x n [] (OutputBound FieldMaxBound)) : pqQs, pq)
         (qQs, q) ->
           let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-           in (Existential r : pqQs, pq)
-    (Existential r@(Some x n [] (OutputBound FieldMaxBound)) : pQs, p) ->
+           in (ForSome' r : pqQs, pq)
+    (ForSome' r@(Some x n [] (OutputBound FieldMaxBound)) : pQs, p) ->
       \case
-        (Existential (Some x' _ [] (OutputBound (TermBound obV))) : qQs, q) ->
+        (ForSome' (Some x' _ [] (OutputBound (TermBound obV))) : qQs, q) ->
           let qQs' = substitute (FromName x') (ToName x) <$> qQs
               q' =
                 ((var x `Add` Const 1) `LessOrEqual` obV)
                   `And` substitute (FromName x') (ToName x) q
               (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs', q')
-           in (Existential (Some x n [] (OutputBound FieldMaxBound)) : pqQs, pq)
-        (Existential (Some x' _ [] (OutputBound FieldMaxBound)) : qQs, q) ->
+           in (ForSome' (Some x n [] (OutputBound FieldMaxBound)) : pqQs, pq)
+        (ForSome' (Some x' _ [] (OutputBound FieldMaxBound)) : qQs, q) ->
           let qQs' = substitute (FromName x') (ToName x) <$> qQs
               q' = substitute (FromName x') (ToName x) q
               (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs', q')
-           in (Existential r : pqQs, pq)
+           in (ForSome' r : pqQs, pq)
         (qQs, q) ->
           let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-           in (Existential r : pqQs, pq)
-    (Existential r@(Some {}) : pQs, p) -> \(qQs, q) ->
+           in (ForSome' r : pqQs, pq)
+    (ForSome' r@(Some {}) : pQs, p) -> \(qQs, q) ->
       let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-       in (Existential r : pqQs, pq)
-    (Existential (SomeP x n ib ob) : pQs, p) ->
+       in (ForSome' r : pqQs, pq)
+    (ForSome' (SomeP x n ib ob) : pQs, p) ->
       \case
-        (Existential (SomeP x' n' ib' ob') : rQs, r) ->
+        (ForSome' (SomeP x' n' ib' ob') : rQs, r) ->
           let ib'' = substitute (FromName x') (ToName x) ib'
               ob'' = substitute (FromName x') (ToName x) ob'
               rQs' = substitute (FromName x') (ToName x) <$> rQs
@@ -566,17 +566,17 @@ mergeQuantifiersDisjunctive =
               (prQs', pr') = mergeQuantifiersDisjunctive (pQs, p) (rQs', r')
               (prQs, pr) = mergeQuantifiersDisjunctive (pQs, p) (rQs, r)
            in if n == n' && ib'' == ib && ob'' == ob
-                then (Existential (SomeP x n ib ob) : prQs', pr')
-                else (Existential (SomeP x n ib ob) : Existential (SomeP x' n' ib' ob') : prQs, pr)
+                then (ForSome' (SomeP x n ib ob) : prQs', pr')
+                else (ForSome' (SomeP x n ib ob) : ForSome' (SomeP x' n' ib' ob') : prQs, pr)
         (rQs, r) ->
           let (prQs, pr) = mergeQuantifiersDisjunctive (pQs, p) (rQs, r)
-           in (Existential (SomeP x n ib ob) : prQs, pr)
-    (Universal x a : pQs, p) -> \(qQs, q) ->
+           in (ForSome' (SomeP x n ib ob) : prQs, pr)
+    (ForAll' x a : pQs, p) -> \(qQs, q) ->
       let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-       in (Universal x a : pqQs, pq)
-    (Instance x n ibs ob : pQs, p) -> \(qQs, q) ->
+       in (ForAll' x a : pqQs, pq)
+    (Given' (Instance x n ibs ob) : pQs, p) -> \(qQs, q) ->
       let (pqQs, pq) = mergeQuantifiersDisjunctive (pQs, p) (qQs, q)
-       in (Instance x n ibs ob : pqQs, pq)
+       in (Given' (Instance x n ibs ob) : pqQs, pq)
     ([], p) -> second (Or p)
 
 flipQuantifiers ::
@@ -591,12 +591,12 @@ flipQuantifier ::
   Either (ErrorMessage ann) Quantifier
 flipQuantifier ann =
   \case
-    Universal x b ->
-      pure (Existential (someFirstOrder x b))
-    Existential (Some x _ [] (OutputBound b)) ->
-      pure (Universal x b)
-    Existential _ ->
+    ForAll' x b ->
+      pure (ForSome' (someFirstOrder x b))
+    ForSome' (Some x _ [] (OutputBound b)) ->
+      pure (ForAll' x b)
+    ForSome' _ ->
       Left . ErrorMessage ann $
         "not supported: second-order quantification in negative position"
-    Instance x n ibs ob ->
-      pure (Instance x n ibs ob)
+    Given' (Instance x n ibs ob) ->
+      pure (Given' (Instance x n ibs ob))

@@ -8,6 +8,7 @@ module OSL.ArgumentForm (getArgumentForm) where
 import Control.Lens ((^.))
 import Data.Map (Map)
 import qualified Data.Map as Map
+import OSL.Term (flipQuantifiers)
 import OSL.Type (dropTypeAnnotations)
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
@@ -109,7 +110,7 @@ getWitnessType gc lc lcs =
     Apply _ f _ -> rec lc lcs f
     Iff _ p q -> prod <$> rec lc lcs p <*> rec lc lcs q
     Implies _ p q -> prod <$> rec lc lcs p <*> rec lc lcs q
-    Not _ p -> rec lc lcs p
+    Not _ p -> rec lc lcs =<< flipQuantifiers p
     Or _ p q -> prod <$> rec lc lcs p <*> rec lc lcs q
     And _ p q -> prod <$> rec lc lcs p <*> rec lc lcs q
     LessOrEqual {} -> pure empty

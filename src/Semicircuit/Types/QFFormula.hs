@@ -1,24 +1,27 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveFunctor #-}
 
-module Semicircuit.Types.QFFormula (Formula (..)) where
+module Semicircuit.Types.QFFormula (Formula, FormulaF (..)) where
 
 import Data.List (intercalate)
 import OSL.Types.Sigma11 (PredicateName)
-import Semicircuit.Types.Sigma11 (MapNames (..), Term)
+import Semicircuit.Types.Sigma11 (Name, TermF)
 
-data Formula
-  = Equal Term Term
-  | LessOrEqual Term Term
-  | Predicate PredicateName [Term]
-  | Not Formula
-  | And Formula Formula
-  | Or Formula Formula
-  | Implies Formula Formula
-  | Iff Formula Formula
+type Formula = FormulaF Name
+
+data FormulaF name
+  = Equal (TermF name) (TermF name)
+  | LessOrEqual (TermF name) (TermF name)
+  | Predicate PredicateName [TermF name]
+  | Not (FormulaF name)
+  | And (FormulaF name) (FormulaF name)
+  | Or (FormulaF name) (FormulaF name)
+  | Implies (FormulaF name) (FormulaF name)
+  | Iff (FormulaF name) (FormulaF name)
   | Top
   | Bottom
+  deriving (Functor)
 
-instance Show Formula where
+instance Show name => Show (FormulaF name) where
   show (Equal x y) =
     "(" <> show x <> " = " <> show y <> ")"
   show (LessOrEqual x y) =
@@ -36,17 +39,3 @@ instance Show Formula where
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
   show Top = "⊤"
   show Bottom = "⊥"
-
-instance MapNames Formula where
-  mapNames f =
-    \case
-      Equal x y -> Equal (mapNames f x) (mapNames f y)
-      LessOrEqual x y -> LessOrEqual (mapNames f x) (mapNames f y)
-      Predicate p q -> Predicate p (mapNames f q)
-      And p q -> And (mapNames f p) (mapNames f q)
-      Or p q -> Or (mapNames f p) (mapNames f q)
-      Not p -> Not (mapNames f p)
-      Implies p q -> Implies (mapNames f p) (mapNames f q)
-      Iff p q -> Iff (mapNames f p) (mapNames f q)
-      Top -> Top
-      Bottom -> Bottom

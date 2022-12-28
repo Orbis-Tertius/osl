@@ -42,7 +42,7 @@ mergeMappings as bs =
         foldl'
           (.)
           id
-          [ incrementDeBruijnIndices arity (m + 1)
+          [ fmap (incrementDeBruijnIndices arity (m + 1))
             | (arity, DeBruijnIndex m) <- Map.toList aMaxes
           ]
    in Map.union as (f <$> bs)
@@ -58,7 +58,7 @@ mergeMapping f a b =
         foldl'
           (.)
           id
-          [ incrementDeBruijnIndices arity (m + 1)
+          [ fmap (incrementDeBruijnIndices arity (m + 1))
             | (arity, DeBruijnIndex m) <- Map.toList aMaxes
           ]
    in f (g a) b
@@ -75,7 +75,7 @@ mergeMapping3 f a b c =
         foldl'
           (.)
           id
-          [ incrementDeBruijnIndices arity (m + 1)
+          [ fmap (incrementDeBruijnIndices arity (m + 1))
             | (arity, DeBruijnIndex m) <- Map.toList aMaxes
           ]
       b' = g b
@@ -84,7 +84,7 @@ mergeMapping3 f a b c =
         foldl'
           (.)
           id
-          [ incrementDeBruijnIndices arity (m + 1)
+          [ fmap (incrementDeBruijnIndices arity (m + 1))
             | (arity, DeBruijnIndex m) <- Map.toList bMaxes
           ]
    in f (h a) b' c

@@ -4,31 +4,39 @@
 
 module Semicircuit.Gensyms
   ( deBruijnToGensyms,
+    deBruijnToGensymsEvalContext,
     NextSym (NextSym),
   )
 where
 
-import Control.Lens ((^.))
-import Control.Monad.State (State, evalState, get, put)
-import Data.Functor ((<&>))
+import Control.Arrow (second)
+import Control.Lens (Identity (Identity, runIdentity), (^.))
+import Control.Monad.State (State, get, put, runState)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import OSL.Map (mapKeysMaybe)
 import OSL.Sigma11 (incrementDeBruijnIndices)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
 import qualified OSL.Types.Sigma11 as DB
+import qualified OSL.Types.Sigma11.EvaluationContext as DB
 import qualified Semicircuit.Types.Sigma11 as GS
 
 -- Rename the de Bruijn indices in the given formula
 -- to gensyms.
-deBruijnToGensyms :: DB.Formula -> GS.Formula
+deBruijnToGensyms :: DB.Formula -> (GS.Formula, Map DB.Name GS.Name)
 deBruijnToGensyms a =
-  evalState (deBruijnToGensyms' a) (S 0 mempty)
+  second sMap $ runState (deBruijnToGensyms' a) (S 0 mempty)
+
+deBruijnToGensymsEvalContext :: Map DB.Name GS.Name -> DB.EvaluationContext -> GS.EvaluationContext
+deBruijnToGensymsEvalContext m (DB.EvaluationContext c) =
+  GS.EvaluationContext $
+    mapKeysMaybe (either (fmap Left . flip Map.lookup m) (pure . Right)) c
 
 newtype NextSym = NextSym Int
   deriving (Eq, Num)
 
-data S = S NextSym (Map DB.Name GS.Name)
+data S = S {_sNext :: NextSym, sMap :: Map DB.Name GS.Name}
 
 deBruijnToGensyms' ::
   DB.Formula ->
@@ -48,22 +56,25 @@ deBruijnToGensyms' =
     DB.Iff p q -> GS.Iff <$> rec p <*> rec q
     DB.Top -> pure GS.Top
     DB.Bottom -> pure GS.Bottom
-    DB.ForAll b p -> do
+    DB.ForAll _ b p -> do
       b' <- bound b
       pushIndices (Arity 0)
       x <- mapName (DB.Name (Arity 0) (DeBruijnIndex 0))
       r <- GS.ForAll x b' <$> rec p
       popIndices (Arity 0)
       pure r
-    DB.ForSome (DB.Some n bs b) p -> do
+    DB.ForSome (DB.Some _ n bs b) p -> do
       bs' <-
         mapM
-          ( \b'' ->
-              GS.NamedInputBound
-                <$> (GS.Name (Arity 0) <$> nextSym)
-                <*> bound b''
+          ( \case
+              DB.NamedInputBound _ b'' ->
+                GS.NamedInputBound
+                  <$> (GS.Name (Arity 0) <$> nextSym)
+                  <*> bound b''
+              DB.UnnamedInputBound b'' ->
+                GS.UnnamedInputBound <$> bound b''
           )
-          (bs <&> (^. #unInputBound))
+          bs
       b' <-
         GS.OutputBound
           <$> bound (b ^. #unOutputBound)
@@ -73,11 +84,15 @@ deBruijnToGensyms' =
       r <- GS.ForSome (GS.Some x n bs' b') <$> rec p
       popIndices arity
       pure r
-    DB.ForSome (DB.SomeP n b0 b1) p -> do
+    DB.ForSome (DB.SomeP _ n b0 b1) p -> do
       b0' <-
-        GS.NamedInputBound
-          <$> (GS.Name 0 <$> nextSym)
-          <*> bound (b0 ^. #unInputBound)
+        case b0 of
+          DB.NamedInputBound _ b0' ->
+            GS.NamedInputBound
+              <$> (GS.Name 0 <$> nextSym)
+              <*> bound b0'
+          DB.UnnamedInputBound b0' ->
+            GS.UnnamedInputBound <$> bound b0'
       b1' <-
         GS.OutputBound
           <$> bound (b1 ^. #unOutputBound)
@@ -89,15 +104,18 @@ deBruijnToGensyms' =
           <$> rec p
       popIndices (Arity 1)
       pure r
-    DB.Given n ibs ob p -> do
+    DB.Given _ n ibs ob p -> do
       ibs' <-
         mapM
-          ( \b'' ->
-              GS.NamedInputBound
-                <$> (GS.Name (Arity 0) <$> nextSym)
-                <*> bound b''
+          ( \case
+              DB.NamedInputBound _ b'' ->
+                GS.NamedInputBound
+                  <$> (GS.Name (Arity 0) <$> nextSym)
+                  <*> bound b''
+              DB.UnnamedInputBound b'' ->
+                GS.UnnamedInputBound <$> bound b''
           )
-          (ibs <&> (^. #unInputBound))
+          ibs
       ob' <-
         GS.OutputBound
           <$> bound (ob ^. #unOutputBound)
@@ -150,7 +168,7 @@ nextSym = do
 pushIndices :: Arity -> State S ()
 pushIndices arity = do
   S n m <- get
-  put (S n (Map.mapKeys (incrementDeBruijnIndices arity 1) m))
+  put (S n (Map.mapKeys (runIdentity . incrementDeBruijnIndices arity 1 . Identity) m))
 
 popIndices :: Arity -> State S ()
 popIndices arity = do
@@ -159,7 +177,7 @@ popIndices arity = do
     ( S
         n
         ( Map.mapKeys
-            (incrementDeBruijnIndices arity (-1))
+            (runIdentity . incrementDeBruijnIndices arity (-1) . Identity)
             (Map.delete (DB.Name arity 0) m)
         )
     )
