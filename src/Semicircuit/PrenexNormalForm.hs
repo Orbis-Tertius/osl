@@ -22,6 +22,8 @@ import Die (die)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
+import OSL.Types.Sigma11.Argument (Witness (Witness))
+import OSL.Types.Sigma11.ValueTree (ValueTree (ValueTree))
 import Semicircuit.Gensyms (NextSym (NextSym))
 import Semicircuit.Sigma11 (FromName (FromName), HasArity (getArity), HasNames (getNames), ToName (ToName), foldConstants, getInputName, hasFieldMaxBound, prependArguments, prependBounds, substitute)
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (..), Formula, FormulaF (..), InputBound, InputBoundF (..), InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (..), Term, TermF (Add, Const, IndLess, Max, Mul), someFirstOrder, var)
@@ -309,15 +311,18 @@ groupMergeableQuantifiers =
 
 -- Assumes input is in prenex normal form.
 -- Brings all instance quantifiers to the front.
--- Brings all second-order quantifiers next up,
--- along with any first-order existential quantifiers
--- preceding them. Said first-order existential
+-- Brings all existential quantifiers next up.
+-- First-order existential
 -- quantifiers become second-order existential
 -- quantifiers if there are any universal quantifiers
 -- preceding them. Second-order existential quantifiers
 -- increase in arity when preceded by universal
 -- quantifiers, becoming dependent on those universally
 -- quantified values.
+-- In the result, quantifiers are all at the front,
+-- and they consist of a string of instance quantifiers,
+-- followed by a string of existential quantifiers,
+-- followed by a string of universal quantifiers.
 toStrongPrenexNormalForm ::
   ann ->
   [Quantifier] ->
@@ -497,6 +502,41 @@ mergeQuantifiersConjunctive =
         let (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs, q)
          in (Given' (Instance x a ibs ob) : pqQs, pq)
     ([], p) -> second (And p)
+
+-- Performs the analogous operation to mergeQuantifiersConjunctive,
+-- but on the witness.
+mergeWitnessesConjunctive ::
+  ([Quantifier], Formula, Witness) ->
+  ([Quantifier], Formula, Witness) ->
+  Witness
+mergeWitnessesConjunctive =
+  curry $
+    \case
+      ((ForAll' {} : qs0, p, Witness (ValueTree Nothing w0)),
+       (ForAll' {} : qs1, q, Witness (ValueTree Nothing w1))) ->
+        Witness . ValueTree Nothing $
+          [ rec (qs0, p, Witness v0) (qs1, q, Witness v1) ^. #unWitness
+           | (v0, v1) <- zipAndPad w0 w1
+          ]
+  where
+    rec = mergeWitnessesConjunctive
+
+-- Zip the two lists, resulting a list as long as the longest list,
+-- with repetition of the last element of the shorter list (if any).
+-- Results in an empty list if one of the input lists is empty.
+zipAndPad :: [a] -> [b] -> [(a,b)]
+zipAndPad [] _ = []
+zipAndPad _ [] = []
+zipAndPad (a:as) (b:bs) = zipAndPad' a as b bs
+
+zipAndPad' :: a -> [a] -> b -> [b] -> [(a,b)]
+zipAndPad' _ [] _ [] = []
+zipAndPad' a [] b0 (b1:bs) = (a,b1) : zipAndPad' a [] b1 bs
+zipAndPad' a0 (a1:as) b [] = (a1,b) : zipAndPad' a1 as b []
+zipAndPad' _ (a1:as) _ (b1:bs) = (a1,b1) : zipAndPad' a1 as b1 bs
+
+todo :: a
+todo = todo
 
 -- Perform prenex normal form conversion on a disjunction
 -- of two prenex normal forms, merging existential quantifiers
