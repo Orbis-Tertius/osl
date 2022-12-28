@@ -19,6 +19,7 @@ import Data.List (foldl', transpose)
 import Data.Maybe (catMaybes)
 import qualified Data.Set as Set
 import Die (die)
+import OSL.Argument (pairTree)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
@@ -504,20 +505,70 @@ mergeQuantifiersConjunctive =
     ([], p) -> second (And p)
 
 -- Performs the analogous operation to mergeQuantifiersConjunctive,
--- but on the witness.
+-- but on the witness. Assumes the provided formulas are quantifier free.
 mergeWitnessesConjunctive ::
   ([Quantifier], Formula, Witness) ->
   ([Quantifier], Formula, Witness) ->
-  Witness
+  Either (ErrorMessage ()) Witness
 mergeWitnessesConjunctive =
   curry $
     \case
+      (([], _, Witness w0), ([], _, Witness w1)) ->
+        pure (Witness (pairTree w0 w1))
       ((ForAll' {} : qs0, p, Witness (ValueTree Nothing w0)),
        (ForAll' {} : qs1, q, Witness (ValueTree Nothing w1))) ->
-        Witness . ValueTree Nothing $
-          [ rec (qs0, p, Witness v0) (qs1, q, Witness v1) ^. #unWitness
+        Witness . ValueTree Nothing <$> sequence
+          [ rec (qs0, p, Witness v0) (qs1, q, Witness v1) <&> (^. #unWitness)
            | (v0, v1) <- zipAndPad w0 w1
           ]
+      ((ForAll' {} : _, _, _), (ForAll' {} : _, _, _)) ->
+        Left (ErrorMessage () "expected two universal quantifier shaped witnesses but at least one of two was not")
+      ((ForSome' {} : qs0, p, Witness (ValueTree (Just f) [w0])),
+       (qs1@(ForAll' {} : _), q, Witness (ValueTree Nothing w1))) ->
+        Witness . ValueTree (Just f) . (:[]) . (^. #unWitness) <$>
+          rec (qs0, p, Witness w0) (qs1, q, Witness (ValueTree Nothing w1))
+      ((ForSome' {} : _, _, _), (ForAll' {} : _, _, _)) ->
+        Left (ErrorMessage () "expected an existential shaped witness and a universal shaped witness")
+      ((qs0@(ForAll' {} : _), p, Witness (ValueTree Nothing w0)),
+       (ForSome' {} : qs1, q, Witness (ValueTree (Just f) [w1]))) ->
+        Witness . ValueTree (Just f) . (:[]) . (^. #unWitness) <$>
+          rec (qs0, p, Witness (ValueTree Nothing w0)) (qs1, q, Witness w1)
+      ((ForAll' {} : _, _, _), (ForSome' {} : _, _, _)) ->
+        Left (ErrorMessage () "expected a universal shaped witness and an existential witness")
+      ((ForSome' {} : qs0, p, Witness (ValueTree (Just f) [w0])),
+       (ForSome' {} : qs1, q, Witness (ValueTree (Just g) [w1]))) ->
+        Witness . ValueTree (Just f) . (:[]) . ValueTree (Just g) . (:[]) . (^. #unWitness)
+          <$> rec (qs0, p, Witness w0) (qs1, q, Witness w1)
+      ((ForSome' {} : _, _, _), (ForSome' {} : _, _, _)) ->
+        Left (ErrorMessage () "expected two existential shaped witnesses but at least one was not")
+      ((Given' {} : qs0, p, w0), (qs1, q, w1)) ->
+        rec (qs0, p, w0) (qs1, q, w1)
+      ((qs0, p, w0), (Given' {} : qs1, q, w1)) ->
+        rec (qs0, p, w0) (qs1, q, w1)
+      ((ForAll' {} : qs, p, Witness (ValueTree Nothing w0s)), ([], q, w1)) ->
+        Witness . ValueTree Nothing <$> sequence
+          [ rec (qs, p, w0) ([], q, w1) <&> (^. #unWitness)
+           | w0 <- Witness <$> w0s
+          ]
+      ((ForAll' {} : _, _, _), ([], _, _)) ->
+        Left (ErrorMessage () "expected a universal quantifier shaped witness on the left")
+      (([], p, w0), (ForAll' {} : qs, q, Witness (ValueTree Nothing w1s))) ->
+        Witness . ValueTree Nothing <$> sequence
+          [ rec ([], p, w0) (qs, q, w1) <&> (^. #unWitness)
+           | w1 <- Witness <$> w1s
+          ]
+      (([], _, _), (ForAll' {} : _, _, _)) ->
+        Left (ErrorMessage () "expected a universal quantifier shaped witness on the right")
+      ((ForSome' {} : qs, p, Witness (ValueTree (Just f) [w0])), ([], q, w1)) ->
+        Witness . ValueTree (Just f) . (:[]) . (^. #unWitness) <$>
+          rec (qs, p, Witness w0) ([], q, w1)
+      ((ForSome' {} : _, _, _), ([], _, _)) ->
+        Left (ErrorMessage () "expected an existential quantifier shaped witness on the left")
+      (([], p, w0), (ForSome' {} : qs, q, Witness (ValueTree (Just f) [w1]))) ->
+        Witness . ValueTree (Just f) . (:[]) . (^. #unWitness) <$>
+          rec ([], p, w0) (qs, q, Witness w1)
+      (([], _, _), (ForSome' {} : _, _, _)) ->
+        Left (ErrorMessage () "expected an existential quantifier shaped witness on the right")
   where
     rec = mergeWitnessesConjunctive
 
@@ -531,12 +582,9 @@ zipAndPad (a:as) (b:bs) = zipAndPad' a as b bs
 
 zipAndPad' :: a -> [a] -> b -> [b] -> [(a,b)]
 zipAndPad' _ [] _ [] = []
-zipAndPad' a [] b0 (b1:bs) = (a,b1) : zipAndPad' a [] b1 bs
-zipAndPad' a0 (a1:as) b [] = (a1,b) : zipAndPad' a1 as b []
+zipAndPad' a [] _ (b1:bs) = (a,b1) : zipAndPad' a [] b1 bs
+zipAndPad' _ (a1:as) b [] = (a1,b) : zipAndPad' a1 as b []
 zipAndPad' _ (a1:as) _ (b1:bs) = (a1,b1) : zipAndPad' a1 as b1 bs
-
-todo :: a
-todo = todo
 
 -- Perform prenex normal form conversion on a disjunction
 -- of two prenex normal forms, merging existential quantifiers
