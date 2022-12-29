@@ -20,7 +20,7 @@ import Data.List (foldl', transpose)
 import Data.Maybe (catMaybes)
 import qualified Data.Set as Set
 import Die (die)
-import OSL.Argument (pairTree)
+import OSL.Argument (pairTree, emptyTree)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
@@ -526,11 +526,11 @@ witnessToPrenexNormalForm =
       (Not (ForAll {}), _) -> Left (ErrorMessage () "expected a negated universal shaped witness")
       (ForSome _ p, Witness (ValueTree (Just f) [w])) ->
         Witness . ValueTree (Just f) . (: []) . (^. #unWitness) <$> rec p (Witness w)
+      (ForSome {}, _) -> Left (ErrorMessage () "expected an existential shaped witness")
       (Not (ForSome _ p), Witness (ValueTree Nothing ws)) ->
         Witness . ValueTree Nothing
           <$> mapM (fmap (^. #unWitness) . rec (Not p) . Witness) ws
       (Not (ForSome {}), _) -> Left (ErrorMessage () "expected a negated existential shaped witness")
-      (ForSome {}, _) -> Left (ErrorMessage () "expected an existential shaped witness")
       (Given _ _ _ _ p, w) -> rec p w
       (Not (Given {}), _) -> Left (ErrorMessage () "unsupported: instance quantifier in negative position")
       (Not Top, w) -> pure w
@@ -660,13 +660,13 @@ mergeWitnessesConjunctive =
     \case
       (([], _, Witness w0), ([], _, Witness w1)) ->
         pure (Witness (pairTree w0 w1))
-      ( (ForAll' {} : qs0, p, Witness (ValueTree Nothing w0)),
-        (ForAll' {} : qs1, q, Witness (ValueTree Nothing w1))
+      ( (ForAll' {} : qs0, p, Witness (ValueTree Nothing w0s)),
+        (ForAll' {} : qs1, q, Witness (ValueTree Nothing w1s))
         ) ->
           Witness . ValueTree Nothing
             <$> sequence
-              [ rec (qs0, p, Witness v0) (qs1, q, Witness v1) <&> (^. #unWitness)
-                | (v0, v1) <- zipAndPad w0 w1
+              [ rec (qs0, p, Witness w0) (qs1, q, Witness w1) <&> (^. #unWitness)
+                | (w0, w1) <- zipAndPad emptyTree w0s emptyTree w1s
               ]
       ((ForAll' {} : _, _, _), (ForAll' {} : _, _, _)) ->
         Left (ErrorMessage () "expected two universal quantifier shaped witnesses but at least one of two was not")
@@ -724,19 +724,11 @@ mergeWitnessesConjunctive =
   where
     rec = mergeWitnessesConjunctive
 
--- Zip the two lists, resulting a list as long as the longest list,
--- with repetition of the last element of the shorter list (if any).
--- Results in an empty list if one of the input lists is empty.
-zipAndPad :: [a] -> [b] -> [(a, b)]
-zipAndPad [] _ = []
-zipAndPad _ [] = []
-zipAndPad (a : as) (b : bs) = zipAndPad' a as b bs
-
-zipAndPad' :: a -> [a] -> b -> [b] -> [(a, b)]
-zipAndPad' _ [] _ [] = []
-zipAndPad' a [] _ (b1 : bs) = (a, b1) : zipAndPad' a [] b1 bs
-zipAndPad' _ (a1 : as) b [] = (a1, b) : zipAndPad' a1 as b []
-zipAndPad' _ (a1 : as) _ (b1 : bs) = (a1, b1) : zipAndPad' a1 as b1 bs
+zipAndPad :: a -> [a] -> b -> [b] -> [(a, b)]
+zipAndPad _ [] _ [] = []
+zipAndPad a [] _ (b1 : bs) = (a, b1) : zipAndPad a [] b1 bs
+zipAndPad _ (a1 : as) b [] = (a1, b) : zipAndPad a1 as b []
+zipAndPad _ (a1 : as) _ (b1 : bs) = (a1, b1) : zipAndPad a1 as b1 bs
 
 -- Has the effect of putting a negation in front of a quantifier string
 -- and then carrying it through to the end, preserving semantics.
