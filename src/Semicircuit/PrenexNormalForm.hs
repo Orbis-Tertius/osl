@@ -564,47 +564,49 @@ mergeQuantifiersConjunctive =
                   else ((var x `Add` Const 1) `LessOrEqual` b) `And` q'
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               b' = substitute (FromName y) (ToName x) b
-              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q'')
+              (pqQs, pq) = rec (pQs, p') (qQs', q'')
            in (ForAll' x (TermBound ab) : pqQs, pq)
         (ForAll' y FieldMaxBound : qQs, q) ->
           let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
               q' = substitute (FromName y) (ToName x) q
               qQs' = substitute (FromName y) (ToName x) <$> qQs
-              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p') (qQs', q')
+              (pqQs, pq) = rec (pQs, p') (qQs', q')
            in (ForAll' x FieldMaxBound : pqQs, pq)
         (q : rQs, r) ->
-          let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (rQs, r)
+          let (prQs, pr) = rec (pQs, p) (rQs, r)
            in (q : ForAll' x (TermBound a) : prQs, pr)
         ([], q) -> (ForAll' x (TermBound a) : pQs, p `And` q)
     (ForAll' x FieldMaxBound : pQs, p) ->
       \case
         (ForAll' y FieldMaxBound : qQs, q) ->
           let qQs' = substitute (FromName y) (ToName x) <$> qQs
-              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs', q)
+              (pqQs, pq) = rec (pQs, p) (qQs', q)
            in (ForAll' x FieldMaxBound : pqQs, pq)
         (ForAll' y (TermBound b) : qQs, q) ->
           let q' = ((var x `Add` Const 1) `LessOrEqual` b) `And` substitute (FromName y) (ToName x) q
               qQs' = substitute (FromName y) (ToName x) <$> qQs
-              (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs', q')
+              (pqQs, pq) = rec (pQs, p) (qQs', q')
            in (ForAll' x FieldMaxBound : pqQs, pq)
         (q : rQs, r) ->
-          let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (rQs, r)
+          let (prQs, pr) = rec (pQs, p) (rQs, r)
            in (q : ForAll' x FieldMaxBound : prQs, pr)
         ([], q) -> (ForAll' x FieldMaxBound : pQs, p `And` q)
     (ForSome' q : pQs, p) ->
       \case
         (ForAll' x a : rQs, r) ->
-          let (prQs, pr) = mergeQuantifiersConjunctive (pQs, p) (ForAll' x a : rQs, r)
+          let (prQs, pr) = rec (pQs, p) (ForAll' x a : rQs, r)
            in (ForSome' q : prQs, pr)
         (r : sQs, s) ->
-          let (psQs, ps) = mergeQuantifiersConjunctive (pQs, p) (sQs, s)
-           in (r : ForSome' q : psQs, ps)
+          let (psQs, ps) = rec (pQs, p) (sQs, s)
+           in (ForSome' q : r : psQs, ps)
         ([], r) -> (ForSome' q : pQs, p `And` r)
     (Given' (Instance x a ibs ob) : pQs, p) ->
       \(qQs, q) ->
-        let (pqQs, pq) = mergeQuantifiersConjunctive (pQs, p) (qQs, q)
+        let (pqQs, pq) = rec (pQs, p) (qQs, q)
          in (Given' (Instance x a ibs ob) : pqQs, pq)
     ([], p) -> second (And p)
+  where
+    rec = mergeQuantifiersConjunctive
 
 -- mergeWitnessesDisjunctive does the corresponding operation on witnesses
 -- to the disjunctive cases of prenex normal form conversion.

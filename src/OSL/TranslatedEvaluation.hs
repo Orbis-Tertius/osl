@@ -82,7 +82,7 @@ evalTranslatedFormula3 ::
 evalTranslatedFormula3 c name argumentForm argument = do
   (def, translated, aux) <- translateToFormulaSimple c name
   let (translated', mapping) = deBruijnToGensyms translated
-  translated'' <-
+  translated'' <- showTrace "translated'': " <$>
     mapLeft
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("toPrenexNormalForm: " <> msg))
       (uncurry S11.prependQuantifiers <$> toPrenexNormalForm () translated')
@@ -91,7 +91,7 @@ evalTranslatedFormula3 c name argumentForm argument = do
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("auxTablesToEvalContext: " <> msg))
       (S11.auxTablesToEvalContext aux)
   let ec' = deBruijnToGensymsEvalContext mapping ec
-  s11arg <- showTrace "s11arg" <$>
+  s11arg <-
     mapLeft
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("toSigma11Argument: " <> msg))
       (toSigma11Argument c argumentForm argument (dropTermAnnotations def))
@@ -99,7 +99,7 @@ evalTranslatedFormula3 c name argumentForm argument = do
     mapLeft
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("witnessToPrenexNormalForm: " <> msg))
       (witnessToPrenexNormalForm translated' (s11arg ^. #witness))
-  let s11arg' = showTrace "s11arg'" $ S11.Argument (s11arg ^. #statement) s11witness'
+  let s11arg' = S11.Argument (s11arg ^. #statement) s11witness'
   mapLeft
     (\(ErrorMessage () msg) -> ErrorMessage Nothing
       ("evalFormula: " <> msg))
