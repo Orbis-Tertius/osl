@@ -31,6 +31,7 @@ import qualified Algebra.Ring as Ring
 import Cast (intToInteger)
 import Control.Lens ((^.))
 import Control.Monad (forM_, when)
+import Control.Monad.Extra ((&&^), (||^))
 import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -208,13 +209,13 @@ evalFormula c arg =
     Not p -> not <$> rec arg p
     And p q -> do
       let (arg0, arg1) = splitArg
-      (&&) <$> rec arg0 p <*> rec arg1 q
+      rec arg0 p &&^ rec arg1 q
     Or p q -> do
       let (arg0, arg1) = splitArg
-      (||) <$> rec arg0 p <*> rec arg1 q
+      rec arg0 p ||^ rec arg1 q
     Implies p q -> do
       let (arg0, arg1) = splitArg
-      (||) <$> (not <$> rec arg0 p) <*> rec arg1 q
+      (not <$> rec arg0 p) ||^ rec arg1 q
     Iff p q -> do
       let (arg0, arg1) = splitArg
       (==) <$> rec arg0 p <*> rec arg1 q
@@ -306,7 +307,7 @@ checkValueIsInBounds c (Cardinality n) ibs ob (Value v) =
         then do
           checkPointIsInBounds c (zip xs ibs) (y, ob)
         else Left (ErrorMessage () "point has wrong number of inputs")
-    else Left (ErrorMessage () ("value is too big: " <> pack (show (Map.size v)) <> " > " <> pack (show n)))
+    else Left (ErrorMessage () ("value is too big: " <> pack (show (Map.size v)) <> " > " <> pack (show n) <> "; " <> pack (show (ibs, ob, v, c))))
 
 checkPointIsInBounds ::
   (Show name, Ord name, HasAddToEvalContext name) =>
@@ -428,7 +429,7 @@ mapQuantifiers f =
 
 prependQuantifiers :: [QuantifierF name] -> FormulaF name -> FormulaF name
 prependQuantifiers qs f =
-  foldl' (flip prependQuantifier) f qs
+  foldr prependQuantifier f qs
 
 prependQuantifier :: QuantifierF name -> FormulaF name -> FormulaF name
 prependQuantifier =

@@ -4,7 +4,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
-module OSL.Argument (toSigma11Argument) where
+module OSL.Argument
+  ( toSigma11Argument,
+    emptyTree,
+    pairTree,
+  )
+where
 
 import Cast (intToInteger)
 import Control.Lens ((^.))
@@ -451,10 +456,6 @@ toSigma11ValueTree gc lc lcs t val term =
   where
     rec = toSigma11ValueTree gc lc lcs
 
-    pairTree x y = S11.ValueTree Nothing [x, y]
-
-    emptyTree = S11.ValueTree Nothing []
-
     forAllScalar b f p =
       -- we are relying on Map.elems outputting the elements in ascending
       -- order of their keys
@@ -471,6 +472,12 @@ toSigma11ValueTree gc lc lcs t val term =
       case f' of
         [f''] -> S11.ValueTree (Just f'') . (: []) <$> rec d y p
         _ -> Left (ErrorMessage () "forSomeScalarFun: pattern match failure (this is a compiler bug)")
+
+emptyTree :: S11.ValueTree
+emptyTree = S11.ValueTree Nothing []
+
+pairTree :: S11.ValueTree -> S11.ValueTree -> S11.ValueTree
+pairTree x y = S11.ValueTree Nothing [x, y]
 
 curryFun :: Map OSL.Value OSL.Value -> Either (ErrorMessage ()) (Map OSL.Value OSL.Value)
 curryFun f =
