@@ -306,7 +306,7 @@ checkValueIsInBounds c (Cardinality n) ibs ob (Value v) =
         then do
           checkPointIsInBounds c (zip xs ibs) (y, ob)
         else Left (ErrorMessage () "point has wrong number of inputs")
-    else Left (ErrorMessage () ("value is too big: " <> pack (show (Map.size v)) <> " > " <> pack (show n)))
+    else Left (ErrorMessage () ("value is too big: " <> pack (show (Map.size v)) <> " > " <> pack (show n) <> "; " <> pack (show (ibs, ob, v, c))))
 
 checkPointIsInBounds ::
   (Show name, Ord name, HasAddToEvalContext name) =>

@@ -11,6 +11,7 @@ where
 import Control.Lens ((^.))
 import Data.Either.Extra (mapLeft)
 import OSL.Argument (toSigma11Argument)
+import OSL.Debug (showTrace)
 import qualified OSL.Sigma11 as S11
 import qualified OSL.Types.Sigma11.Argument as S11
 import OSL.Term (dropTermAnnotations)
@@ -90,7 +91,7 @@ evalTranslatedFormula3 c name argumentForm argument = do
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("auxTablesToEvalContext: " <> msg))
       (S11.auxTablesToEvalContext aux)
   let ec' = deBruijnToGensymsEvalContext mapping ec
-  s11arg <-
+  s11arg <- showTrace "s11arg" <$>
     mapLeft
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("toSigma11Argument: " <> msg))
       (toSigma11Argument c argumentForm argument (dropTermAnnotations def))
@@ -98,6 +99,8 @@ evalTranslatedFormula3 c name argumentForm argument = do
     mapLeft
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("witnessToPrenexNormalForm: " <> msg))
       (witnessToPrenexNormalForm translated' (s11arg ^. #witness))
+  let s11arg' = showTrace "s11arg'" $ S11.Argument (s11arg ^. #statement) s11witness'
   mapLeft
-    (\(ErrorMessage () msg) -> ErrorMessage Nothing ("evalFormula: " <> msg))
-    (S11.evalFormula ec' (S11.Argument (s11arg ^. #statement) s11witness') translated'')
+    (\(ErrorMessage () msg) -> ErrorMessage Nothing
+      ("evalFormula: " <> msg))
+    (S11.evalFormula ec' s11arg' translated'')
