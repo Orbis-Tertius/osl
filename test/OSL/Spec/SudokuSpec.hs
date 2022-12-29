@@ -109,7 +109,6 @@ exampleSpec c = do
     evalTranslatedFormula3 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
       `shouldBe` Right False
 
-
 exampleArgument :: ValidContext 'Global ann -> Argument
 exampleArgument c =
   Argument

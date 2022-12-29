@@ -4,7 +4,6 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module OSL.Sigma11
   ( incrementDeBruijnIndices,
@@ -39,9 +38,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (pack)
-import Debug.Trace (trace)
 import Die (die)
-import OSL.Debug (showTrace)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (..))
 import OSL.Types.DeBruijnIndex (DeBruijnIndex (..))
@@ -224,7 +221,7 @@ evalFormula c arg =
       (==) <$> rec arg0 p <*> rec arg1 q
     Top -> pure True
     Bottom -> pure False
-    Given v n ibs ob (showTrace "given " -> p) ->
+    Given v n ibs ob p ->
       case arg ^. #statement . #unStatement of
         (i : is') -> do
           let c' = addToEvalContext c (Left v) i
@@ -240,7 +237,7 @@ evalFormula c arg =
     ForAll _ FieldMaxBound _ ->
       Left . ErrorMessage () $
         "field max bound unsupported in universal quantifier"
-    ForAll v (TermBound b) (showTrace "forAll " -> p) -> do
+    ForAll v (TermBound b) p -> do
       b' <- evalTerm c b
       let go x arg' = do
             let (arg'', arg''') = popArg arg'
@@ -250,7 +247,7 @@ evalFormula c arg =
                     (Left v)
                     (scalarValue x)
                 x' = x Group.+ one
-            r <- evalTrace c' arg'' p
+            r <- evalFormula c' arg'' p
             if r
               then
                 if x' == b'
@@ -259,14 +256,7 @@ evalFormula c arg =
               else pure False
       if b' == zero then pure True else go zero arg
   where
-    rec = evalTrace c
-
-    evalTrace c' arg' p' = do
-      r <- evalFormula c' arg' p'
-      case (r, p') of
-        (False, _) ->
-          pure $ trace ("False! " <> show (r, p', c', arg')) r
-        _ -> pure r
+    rec = evalFormula c
 
     splitArg =
       case arg ^. #witness of
@@ -291,13 +281,13 @@ evalFormula c arg =
             Argument (arg ^. #statement) (Witness (ValueTree Nothing []))
           )
 
-    existentialQuantifier v n ibs ob (showTrace ("forSome " <> show v <> " ") -> p) =
+    existentialQuantifier v n ibs ob p =
       case arg ^. #witness . #unWitness of
         ValueTree (Just w) [ws'] -> do
           let c' = addToEvalContext c (Left v) w
               arg' = Argument (arg ^. #statement) (Witness ws')
           checkValueIsInBounds c n ibs ob w
-          evalTrace c' arg' p
+          evalFormula c' arg' p
         _ ->
           Left . ErrorMessage () $
             "witness has wrong shape for an existential quantifier: " <> pack (show (arg ^. #witness . #unWitness, p))

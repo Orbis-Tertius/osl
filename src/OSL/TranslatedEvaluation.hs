@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module OSL.TranslatedEvaluation
   ( evalTranslatedFormula1,
@@ -11,15 +11,14 @@ where
 import Control.Lens ((^.))
 import Data.Either.Extra (mapLeft)
 import OSL.Argument (toSigma11Argument)
-import OSL.Debug (showTrace)
 import qualified OSL.Sigma11 as S11
-import qualified OSL.Types.Sigma11.Argument as S11
 import OSL.Term (dropTermAnnotations)
 import OSL.Translate (translateToFormulaSimple)
 import OSL.Types.Argument (Argument)
 import OSL.Types.ArgumentForm (ArgumentForm)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.OSL (Name, ValidContext)
+import qualified OSL.Types.Sigma11.Argument as S11
 import Semicircuit.Gensyms (deBruijnToGensyms, deBruijnToGensymsEvalContext)
 import Semicircuit.PrenexNormalForm (toPrenexNormalForm, witnessToPrenexNormalForm)
 
@@ -82,7 +81,7 @@ evalTranslatedFormula3 ::
 evalTranslatedFormula3 c name argumentForm argument = do
   (def, translated, aux) <- translateToFormulaSimple c name
   let (translated', mapping) = deBruijnToGensyms translated
-  translated'' <- showTrace "translated'': " <$>
+  translated'' <-
     mapLeft
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("toPrenexNormalForm: " <> msg))
       (uncurry S11.prependQuantifiers <$> toPrenexNormalForm () translated')
@@ -101,6 +100,9 @@ evalTranslatedFormula3 c name argumentForm argument = do
       (witnessToPrenexNormalForm translated' (s11arg ^. #witness))
   let s11arg' = S11.Argument (s11arg ^. #statement) s11witness'
   mapLeft
-    (\(ErrorMessage () msg) -> ErrorMessage Nothing
-      ("evalFormula: " <> msg))
+    ( \(ErrorMessage () msg) ->
+        ErrorMessage
+          Nothing
+          ("evalFormula: " <> msg)
+    )
     (S11.evalFormula ec' s11arg' translated'')

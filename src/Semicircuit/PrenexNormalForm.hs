@@ -20,7 +20,7 @@ import Data.List (foldl', transpose)
 import Data.Maybe (catMaybes)
 import qualified Data.Set as Set
 import Die (die)
-import OSL.Argument (pairTree, emptyTree)
+import OSL.Argument (emptyTree, pairTree)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
