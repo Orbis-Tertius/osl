@@ -556,18 +556,18 @@ mergeQuantifiersConjunctive =
               p' =
                 if ab == a
                   then p
-                  else ((var x `Add` Const 1) `LessOrEqual` a) `And` p
+                  else ((var x `Add` Const 1) `LessOrEqual` a) `Implies` p
               q' = substitute (FromName y) (ToName x) q
               q'' =
                 if ab == b
                   then q'
-                  else ((var x `Add` Const 1) `LessOrEqual` b) `And` q'
+                  else ((var x `Add` Const 1) `LessOrEqual` b) `Implies` q'
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               b' = substitute (FromName y) (ToName x) b
               (pqQs, pq) = rec (pQs, p') (qQs', q'')
            in (ForAll' x (TermBound ab) : pqQs, pq)
         (ForAll' y FieldMaxBound : qQs, q) ->
-          let p' = ((var x `Add` Const 1) `LessOrEqual` a) `And` p
+          let p' = ((var x `Add` Const 1) `LessOrEqual` a) `Implies` p
               q' = substitute (FromName y) (ToName x) q
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               (pqQs, pq) = rec (pQs, p') (qQs', q')
@@ -575,7 +575,7 @@ mergeQuantifiersConjunctive =
         (q : rQs, r) ->
           let (prQs, pr) = rec (pQs, p) (rQs, r)
            in (q : ForAll' x (TermBound a) : prQs, pr)
-        ([], q) -> (ForAll' x (TermBound a) : pQs, p `And` q)
+        ([], q) -> (ForAll' x (TermBound a) : pQs, p `Implies` q)
     (ForAll' x FieldMaxBound : pQs, p) ->
       \case
         (ForAll' y FieldMaxBound : qQs, q) ->
@@ -583,7 +583,7 @@ mergeQuantifiersConjunctive =
               (pqQs, pq) = rec (pQs, p) (qQs', q)
            in (ForAll' x FieldMaxBound : pqQs, pq)
         (ForAll' y (TermBound b) : qQs, q) ->
-          let q' = ((var x `Add` Const 1) `LessOrEqual` b) `And` substitute (FromName y) (ToName x) q
+          let q' = ((var x `Add` Const 1) `LessOrEqual` b) `Implies` substitute (FromName y) (ToName x) q
               qQs' = substitute (FromName y) (ToName x) <$> qQs
               (pqQs, pq) = rec (pQs, p) (qQs', q')
            in (ForAll' x FieldMaxBound : pqQs, pq)

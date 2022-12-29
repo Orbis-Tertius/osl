@@ -264,9 +264,7 @@ evalFormula c arg =
     evalTrace c' arg' p' = do
       r <- evalFormula c' arg' p'
       case (r, p') of
-        (False, ForAll {}) ->
-          pure $ trace ("False! " <> show (r, p', c', arg')) r
-        (False, ForSome {}) ->
+        (False, _) ->
           pure $ trace ("False! " <> show (r, p', c', arg')) r
         _ -> pure r
 
