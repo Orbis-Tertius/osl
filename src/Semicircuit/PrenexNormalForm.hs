@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Semicircuit.PrenexNormalForm
   ( toSuperStrongPrenexNormalForm,
@@ -17,8 +18,10 @@ import Control.Applicative (liftA2)
 import Control.Lens ((<&>), (^.), _1, _2, _3, _4)
 import Control.Monad.State (State, evalState, get, put, replicateM)
 import Data.Bifunctor (first, second)
+import Data.Either.Combinators (mapLeft)
 import Data.List (foldl', transpose)
 import Data.Maybe (catMaybes)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Die (die)
 import OSL.Argument (emptyTree, pairTree)
@@ -26,10 +29,12 @@ import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.Sigma11.Argument (Witness (Witness))
+import OSL.Types.Sigma11.Value (Value (Value))
 import OSL.Types.Sigma11.ValueTree (ValueTree (ValueTree))
 import Semicircuit.Gensyms (NextSym (NextSym))
 import Semicircuit.Sigma11 (FromName (FromName), HasArity (getArity), HasNames (getNames), ToName (ToName), foldConstants, getInputName, hasFieldMaxBound, prependArguments, prependBounds, substitute)
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (..), Formula, FormulaF (..), InputBound, InputBoundF (..), InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (..), Term, TermF (Add, Const, IndLess, Max, Mul), someFirstOrder, var)
+import Stark.Types.Scalar (Scalar, integerToScalar)
 
 -- Assumes input is in strong prenex normal form.
 -- Merges all consecutive same-type quantifiers that can be
@@ -367,9 +372,11 @@ witnessToStrongPrenexNormalForm ann qs w =
         Witness (ValueTree (Just f) [w']) -> do
           Witness . ValueTree (Just f) . (:[]) . (^. #unWitness)
             <$> rec qs' (Witness w')
-        _ -> Left (ErrorMessage ann "expected an existential-shaped witness")
+        _ -> Left . ErrorMessage ann $
+          "expected an existential-shaped witness"
     ForAll' x b : qs' ->
-      pushUniversalQuantifiersDownWitness ann [(x, b)] qs' w
+      mapLeft (\(ErrorMessage ann' msg) -> ErrorMessage ann' ("pushUniversalQuantifiersDownWitness: " <> msg))
+        $ pushUniversalQuantifiersDownWitness ann [(x, b)] qs' w
     Given' _ : qs' -> rec qs' w
   where
     rec = witnessToStrongPrenexNormalForm ann
@@ -424,9 +431,37 @@ pushUniversalQuantifiersDownWitness ann us qs (Witness w) =
     [] -> pure (Witness w)
     ForAll' x b : qs' ->
       rec (us <> [(x,b)]) qs' (Witness w)
-    ForSome' q : qs' -> todo q qs'
+    ForSome' _ : qs' ->
+      case us of
+        [] -> pure (Witness w)
+        [_] ->
+          case w of
+            ValueTree Nothing ws -> do
+              gs <- sequence
+                [ case w' of
+                    ValueTree (Just g) _ -> pure g
+                    _ -> Left (ErrorMessage ann "gs: expected an existential shaped witness")
+                 | w' <- ws
+                ]
+              f <- Value . Map.fromList <$> sequence
+                [ (,y) . (:x) <$> fromInt ann i
+                 | (i, Value g) <- zip [0..] gs,
+                   (x,y) <- Map.toList g
+                ]
+              vs <- sequence
+                [ case w' of
+                    ValueTree (Just _) [v] -> pure v
+                    _ -> Left (ErrorMessage ann "vs: expected an existential shaped witness")
+                 | w' <- ws
+                ]
+              Witness vs' <- rec us qs' (Witness (ValueTree Nothing vs))
+              pure (Witness (ValueTree (Just f) [vs']))
+            _ -> Left (ErrorMessage ann "expected a universal shaped witness")
+        (_:us') ->
+          case w of
+            ValueTree Nothing ws -> todo us' ws
     Given' _ : _ ->
-      Left (ErrorMessage ann "pushUniversalQuantifiersDownWitness: encountered a lambda but expected lambdas to be stripped (this is a compiler bug)")
+      Left (ErrorMessage ann "encountered a lambda but expected lambdas to be stripped off already")
   where
     rec = pushUniversalQuantifiersDownWitness ann
 
@@ -796,3 +831,10 @@ flipQuantifier ann =
         "not supported: second-order quantification in negative position"
     Given' (Instance x n ibs ob) ->
       pure (Given' (Instance x n ibs ob))
+
+fromInt :: ann -> Int -> Either (ErrorMessage ann) Scalar
+fromInt ann x =
+  maybe
+    (Left (ErrorMessage ann "int out of range of scalar field"))
+    pure
+    (integerToScalar (intToInteger x))
