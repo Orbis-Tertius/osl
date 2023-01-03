@@ -6,6 +6,7 @@
 module Semicircuit.PrenexNormalForm
   ( toSuperStrongPrenexNormalForm,
     toStrongPrenexNormalForm,
+    witnessToStrongPrenexNormalForm,
     toPrenexNormalForm,
     witnessToPrenexNormalForm,
   )
@@ -353,6 +354,26 @@ toStrongPrenexNormalForm ann qs f =
   where
     rec = toStrongPrenexNormalForm ann
 
+witnessToStrongPrenexNormalForm ::
+  ann ->
+  [Quantifier] ->
+  Witness ->
+  Either (ErrorMessage ann) Witness
+witnessToStrongPrenexNormalForm ann qs w =
+  case qs of
+    [] -> pure w
+    ForSome' _ : qs' ->
+      case w of
+        Witness (ValueTree (Just f) [w']) -> do
+          Witness . ValueTree (Just f) . (:[]) . (^. #unWitness)
+            <$> rec qs' (Witness w')
+        _ -> Left (ErrorMessage ann "expected an existential-shaped witness")
+    ForAll' x b : qs' ->
+      pushUniversalQuantifiersDownWitness ann [(x, b)] qs' w
+    Given' _ : qs' -> rec qs' w
+  where
+    rec = witnessToStrongPrenexNormalForm ann
+
 pushExistentialQuantifierDown ::
   ExistentialQuantifier ->
   [Quantifier] ->
@@ -391,6 +412,26 @@ pushUniversalQuantifiersDown ann us qs f =
     Given' (Instance x n ibs ob) : qs' -> do
       (qs'', f') <- pushUniversalQuantifiersDown ann us qs' f
       pure (Given' (Instance x n ibs ob) : qs'', f')
+
+pushUniversalQuantifiersDownWitness ::
+  ann ->
+  [(Name, Bound)] ->
+  [Quantifier] ->
+  Witness ->
+  Either (ErrorMessage ann) Witness
+pushUniversalQuantifiersDownWitness ann us qs (Witness w) =
+  case qs of
+    [] -> pure (Witness w)
+    ForAll' x b : qs' ->
+      rec (us <> [(x,b)]) qs' (Witness w)
+    ForSome' q : qs' -> todo q qs'
+    Given' _ : _ ->
+      Left (ErrorMessage ann "pushUniversalQuantifiersDownWitness: encountered a lambda but expected lambdas to be stripped (this is a compiler bug)")
+  where
+    rec = pushUniversalQuantifiersDownWitness ann
+
+todo :: a
+todo = todo
 
 toPrenexNormalForm ::
   ann ->
