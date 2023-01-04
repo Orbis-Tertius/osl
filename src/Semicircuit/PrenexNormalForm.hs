@@ -26,14 +26,16 @@ import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
 import OSL.Argument (emptyTree, pairTree)
+import OSL.Sigma11 (HasMultiplyCardinalities (multiplyCardinalities))
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
 import OSL.Types.Sigma11.Argument (Witness (Witness))
+import OSL.Types.Sigma11.StaticEvaluationContext (StaticEvaluationContextF)
 import OSL.Types.Sigma11.Value (Value (Value))
 import OSL.Types.Sigma11.ValueTree (ValueTree (ValueTree))
 import Semicircuit.Gensyms (NextSym (NextSym))
-import Semicircuit.Sigma11 (FromName (FromName), HasArity (getArity), HasNames (getNames), ToName (ToName), foldConstants, getInputName, hasFieldMaxBound, prependArguments, prependBounds, substitute)
+import Semicircuit.Sigma11 (FromName (FromName), HasArity (getArity), HasNames (getNames), ToName (ToName), foldConstants, getInputName, hasFieldMaxBound, prependArguments, prependBounds, substitute, getUniversalQuantifierStringCardinality, addExistentialQuantifierToStaticContext, addUniversalQuantifierToStaticContext, addInstanceQuantifierToStaticContext)
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (..), Formula, FormulaF (..), InputBound, InputBoundF (..), InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (..), Term, TermF (Add, Const, IndLess, Max, Mul), someFirstOrder, var)
 import Stark.Types.Scalar (Scalar, integerToScalar)
 
@@ -353,7 +355,7 @@ toStrongPrenexNormalForm ann qs f =
         ForAll' _ _ : _ ->
           pure (ForAll' x b : qs'', f')
         _ ->
-          pushUniversalQuantifiersDown ann [(x, b)] qs'' f'
+          pushUniversalQuantifiersDown ann mempty [(x, b)] qs'' f'
     Given' (Instance x n ibs ob) : qs' -> do
       (qs'', f') <- rec qs' f
       pure (Given' (Instance x n ibs ob) : qs'', f')
@@ -362,23 +364,28 @@ toStrongPrenexNormalForm ann qs f =
 
 witnessToStrongPrenexNormalForm ::
   ann ->
+  StaticEvaluationContextF Name ->
   [Quantifier] ->
   Witness ->
   Either (ErrorMessage ann) Witness
-witnessToStrongPrenexNormalForm ann qs w =
+witnessToStrongPrenexNormalForm ann ec qs w =
   case qs of
     [] -> pure w
-    ForSome' _ : qs' ->
+    ForSome' q : qs' ->
       case w of
         Witness (ValueTree (Just f) [w']) -> do
+          ec' <- addExistentialQuantifierToStaticContext ann ec q
           Witness . ValueTree (Just f) . (:[]) . (^. #unWitness)
-            <$> rec qs' (Witness w')
+            <$> rec ec' qs' (Witness w')
         _ -> Left . ErrorMessage ann $
           "expected an existential-shaped witness"
-    ForAll' x b : qs' ->
+    ForAll' x b : qs' -> do
+      ec' <- addUniversalQuantifierToStaticContext ann ec (x,b)
       mapLeft (\(ErrorMessage ann' msg) -> ErrorMessage ann' ("pushUniversalQuantifiersDownWitness: " <> msg))
-        $ pushUniversalQuantifiersDownWitness ann [(x, b)] qs' w
-    Given' _ : qs' -> rec qs' w
+        $ pushUniversalQuantifiersDownWitness ann ec' [(x, b)] qs' w
+    Given' q : qs' -> do
+      ec' <- addInstanceQuantifierToStaticContext ann ec q
+      rec ec' qs' w
   where
     rec = witnessToStrongPrenexNormalForm ann
 
@@ -398,41 +405,45 @@ pushExistentialQuantifierDown q =
 
 pushUniversalQuantifiersDown ::
   ann ->
+  StaticEvaluationContextF Name ->
   [(Name, Bound)] ->
   [Quantifier] ->
   Formula ->
   Either (ErrorMessage ann) ([Quantifier], Formula)
-pushUniversalQuantifiersDown ann us qs f =
+pushUniversalQuantifiersDown ann ec us qs f =
   case qs of
     [] -> pure (uncurry ForAll' <$> us, f)
     ForAll' x b : qs' ->
-      pushUniversalQuantifiersDown ann (us <> [(x, b)]) qs' f
+      pushUniversalQuantifiersDown ann ec (us <> [(x, b)]) qs' f
     ForSome' q : qs' -> do
-      (qs'', f') <- pushUniversalQuantifiersDown ann us qs' f
+      ec' <- addExistentialQuantifierToStaticContext ann ec q
+      (qs'', f') <- pushUniversalQuantifiersDown ann ec' us qs' f
+      m <- getUniversalQuantifierStringCardinality ann ec us
       case q of
         Some g n _ _ -> do
-          let q' = prependBounds n (uncurry NamedInputBound <$> us) q
+          let q' = multiplyCardinalities m $ prependBounds n (uncurry NamedInputBound <$> us) q
               f'' = prependArguments g (var . fst <$> us) f'
           pure ([ForSome' q'] <> qs'', f'')
         SomeP {} ->
           Left . ErrorMessage ann $
             "unsupported: permutation quantifier inside a universal quantifier"
     Given' (Instance x n ibs ob) : qs' -> do
-      (qs'', f') <- pushUniversalQuantifiersDown ann us qs' f
+      (qs'', f') <- pushUniversalQuantifiersDown ann ec us qs' f
       pure (Given' (Instance x n ibs ob) : qs'', f')
 
 pushUniversalQuantifiersDownWitness ::
   ann ->
+  StaticEvaluationContextF Name ->
   [(Name, Bound)] ->
   [Quantifier] ->
   Witness ->
   Either (ErrorMessage ann) Witness
-pushUniversalQuantifiersDownWitness ann us qs (Witness w) =
+pushUniversalQuantifiersDownWitness ann ec us qs (Witness w) =
   case qs of
     [] -> pure (Witness w)
     ForAll' x b : qs' ->
-      rec (us <> [(x,b)]) qs' (Witness w)
-    ForSome' _ : qs' ->
+      rec ec (us <> [(x,b)]) qs' (Witness w)
+    ForSome' q : qs' ->
       case us of
         [] -> pure (Witness w)
         [_] ->
@@ -455,17 +466,19 @@ pushUniversalQuantifiersDownWitness ann us qs (Witness w) =
                     _ -> Left (ErrorMessage ann "vs: expected an existential shaped witness")
                  | w' <- ws
                 ]
-              Witness vs' <- rec us qs' (Witness (ValueTree Nothing vs))
+              ec' <- addExistentialQuantifierToStaticContext ann ec q
+              Witness vs' <- rec ec' us qs' (Witness (ValueTree Nothing vs))
               pure (Witness (ValueTree (Just f) [vs']))
             _ -> Left . ErrorMessage ann $ "expected a universal shaped witness (1): "
               <> pack (show (us, qs))
         (u:us'@(_:_)) ->
           case w of
             ValueTree Nothing ws -> do
+              ec' <- addUniversalQuantifierToStaticContext ann ec u
               wss' <- sequence
-                [ rec us' qs (Witness w') <&> (^. #unWitness) | w' <- ws ]
-              (qs'', _) <- pushUniversalQuantifiersDown ann us' qs Top
-              rec [u] qs'' (Witness (ValueTree Nothing wss'))
+                [ rec ec' us' qs (Witness w') <&> (^. #unWitness) | w' <- ws ]
+              (qs'', _) <- pushUniversalQuantifiersDown ann ec' us' qs Top
+              rec ec' [u] qs'' (Witness (ValueTree Nothing wss'))
             _ -> Left . ErrorMessage ann $ "expected a universal shaped witness (2): "
               <> pack (show (us, qs))
     Given' _ : _ ->

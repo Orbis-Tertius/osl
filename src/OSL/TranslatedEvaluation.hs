@@ -143,7 +143,7 @@ evalTranslatedFormula4 c name argumentForm argument = do
   s11witness'' <-
     mapLeft
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("witnessToStrongPrenexNormalForm: " <> msg))
-      (witnessToStrongPrenexNormalForm () qs s11witness')
+      (witnessToStrongPrenexNormalForm () mempty qs s11witness')
   let s11arg' = S11.Argument (s11arg ^. #statement) s11witness''
   mapLeft
     ( \(ErrorMessage () msg) ->

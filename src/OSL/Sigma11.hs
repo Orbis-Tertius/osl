@@ -104,6 +104,12 @@ termIndices =
 class HasMultiplyCardinalities f where
   multiplyCardinalities :: Cardinality -> f name -> f name
 
+instance HasMultiplyCardinalities ExistentialQuantifierF where
+  multiplyCardinalities m =
+    \case
+      Some v n ibs ob -> Some v (m * n) ibs ob
+      SomeP v n ib ob -> SomeP v (m * n) ib ob
+
 class HasPrependBounds f where
   prependBounds :: HasIncrementArity name => Cardinality -> [InputBoundF name] -> f name -> f name
 
