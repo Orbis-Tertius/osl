@@ -12,6 +12,7 @@ module OSL.Sigma11
     HasAddToEvalContext (addToEvalContext),
     unionIndices,
     termIndices,
+    HasMultiplyCardinalities (multiplyCardinalities),
     HasPrependBounds (prependBounds),
     prependInstanceQuantifiers,
     evalTerm,
@@ -99,6 +100,9 @@ termIndices =
     IndLess x y -> termIndices x `unionIndices` termIndices y
     Max x y -> termIndices x `unionIndices` termIndices y
     Const _ -> mempty
+
+class HasMultiplyCardinalities f where
+  multiplyCardinalities :: Cardinality -> f name -> f name
 
 class HasPrependBounds f where
   prependBounds :: HasIncrementArity name => Cardinality -> [InputBoundF name] -> f name -> f name

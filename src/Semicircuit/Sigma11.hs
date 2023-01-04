@@ -21,6 +21,7 @@ module Semicircuit.Sigma11
     foldConstants,
     getInputName,
     hasFieldMaxBound,
+    getUniversalQuantifierStringCardinality,
   )
 where
 
@@ -30,6 +31,8 @@ import qualified Data.Set as Set
 import Die (die)
 import OSL.Sigma11 (HasPrependBounds (prependBounds), prependQuantifiers)
 import OSL.Types.Arity (Arity (..))
+import OSL.Types.Cardinality (Cardinality)
+import OSL.Types.ErrorMessage (ErrorMessage)
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), Formula, FormulaF (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound, InputBoundF (..), InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (ForAll', ForSome', Given'), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
 
 newtype FromName = FromName Name
@@ -270,3 +273,12 @@ hasFieldMaxBound =
     bound' :: Bound -> Bool
     bound' FieldMaxBound = True
     bound' (TermBound _) = False
+
+getUniversalQuantifierStringCardinality ::
+  ann ->
+  [(Name, Bound)] ->
+  Either (ErrorMessage ann) Cardinality
+getUniversalQuantifierStringCardinality = todo
+
+todo :: a
+todo = todo

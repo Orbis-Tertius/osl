@@ -23,6 +23,7 @@ import Data.List (foldl', transpose)
 import Data.Maybe (catMaybes)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Text (pack)
 import Die (die)
 import OSL.Argument (emptyTree, pairTree)
 import OSL.Types.Arity (Arity (Arity))
@@ -456,17 +457,21 @@ pushUniversalQuantifiersDownWitness ann us qs (Witness w) =
                 ]
               Witness vs' <- rec us qs' (Witness (ValueTree Nothing vs))
               pure (Witness (ValueTree (Just f) [vs']))
-            _ -> Left (ErrorMessage ann "expected a universal shaped witness")
-        (_:us') ->
+            _ -> Left . ErrorMessage ann $ "expected a universal shaped witness (1): "
+              <> pack (show (us, qs))
+        (u:us'@(_:_)) ->
           case w of
-            ValueTree Nothing ws -> todo us' ws
+            ValueTree Nothing ws -> do
+              wss' <- sequence
+                [ rec us' qs (Witness w') <&> (^. #unWitness) | w' <- ws ]
+              (qs'', _) <- pushUniversalQuantifiersDown ann us' qs Top
+              rec [u] qs'' (Witness (ValueTree Nothing wss'))
+            _ -> Left . ErrorMessage ann $ "expected a universal shaped witness (2): "
+              <> pack (show (us, qs))
     Given' _ : _ ->
       Left (ErrorMessage ann "encountered a lambda but expected lambdas to be stripped off already")
   where
     rec = pushUniversalQuantifiersDownWitness ann
-
-todo :: a
-todo = todo
 
 toPrenexNormalForm ::
   ann ->
