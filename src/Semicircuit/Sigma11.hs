@@ -34,6 +34,7 @@ import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage)
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), Formula, FormulaF (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound, InputBoundF (..), InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (ForAll', ForSome', Given'), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import OSL.Types.Sigma11.StaticEvaluationContext (StaticEvaluationContextF)
 
 newtype FromName = FromName Name
 
@@ -276,6 +277,7 @@ hasFieldMaxBound =
 
 getUniversalQuantifierStringCardinality ::
   ann ->
+  StaticEvaluationContextF Name ->
   [(Name, Bound)] ->
   Either (ErrorMessage ann) Cardinality
 getUniversalQuantifierStringCardinality = todo
