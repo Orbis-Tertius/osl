@@ -4,16 +4,17 @@
 
 module OSL.Types.Sigma11.StaticEvaluationContext
   ( StaticBound (StaticBound),
-    StaticEvaluationContextF (StaticEvaluationContext)
-  ) where
+    StaticEvaluationContextF (StaticEvaluationContext),
+  )
+where
 
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Data.Map (Map)
 import GHC.Generics (Generic)
-import Stark.Types.Scalar (Scalar, zero, one)
+import Stark.Types.Scalar (Scalar, one, zero)
 
-newtype StaticBound = StaticBound { unStaticBound :: Maybe Scalar }
+newtype StaticBound = StaticBound {unStaticBound :: Maybe Scalar}
   deriving (Eq, Generic)
 
 instance Group.C StaticBound where
@@ -33,10 +34,9 @@ instance Ord StaticBound where
   StaticBound Nothing <= StaticBound (Just _) = False
   StaticBound (Just x) <= StaticBound (Just y) = x <= y
 
-newtype StaticEvaluationContextF name =
-  StaticEvaluationContext
-    { unStaticEvaluationContext ::
-        Map name StaticBound
-    }
-  deriving stock Generic
+newtype StaticEvaluationContextF name = StaticEvaluationContext
+  { unStaticEvaluationContext ::
+      Map name StaticBound
+  }
+  deriving stock (Generic)
   deriving newtype (Semigroup, Monoid)

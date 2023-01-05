@@ -109,11 +109,12 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
       (translated, aux) <-
         mapLeft (ErrorMessage . ("Error translating: " <>) . show) $
           runStateT (translateToFormula gc lc targetTerm) mempty
-      let translatedOutput = "Translated OSL:\n"
-            <> show translated
-            <> (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
+      let translatedOutput =
+            "Translated OSL:\n"
+              <> show translated
+              <> (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
       case compileToCircuit of
-        DONTCompileToCircuit -> 
+        DONTCompileToCircuit ->
           pure (SuccessfulOutput translatedOutput)
         CompileToCircuit -> do
           pnf <-

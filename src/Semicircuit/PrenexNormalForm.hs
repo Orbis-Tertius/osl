@@ -20,8 +20,8 @@ import Control.Monad.State (State, evalState, get, put, replicateM)
 import Data.Bifunctor (first, second)
 import Data.Either.Combinators (mapLeft)
 import Data.List (foldl', transpose)
-import Data.Maybe (catMaybes)
 import qualified Data.Map as Map
+import Data.Maybe (catMaybes)
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
@@ -35,7 +35,7 @@ import OSL.Types.Sigma11.StaticEvaluationContext (StaticEvaluationContextF)
 import OSL.Types.Sigma11.Value (Value (Value))
 import OSL.Types.Sigma11.ValueTree (ValueTree (ValueTree))
 import Semicircuit.Gensyms (NextSym (NextSym))
-import Semicircuit.Sigma11 (FromName (FromName), HasArity (getArity), HasNames (getNames), ToName (ToName), foldConstants, getInputName, hasFieldMaxBound, prependArguments, prependBounds, substitute, getUniversalQuantifierStringCardinality, addExistentialQuantifierToStaticContext, addUniversalQuantifierToStaticContext, addInstanceQuantifierToStaticContext)
+import Semicircuit.Sigma11 (FromName (FromName), HasArity (getArity), HasNames (getNames), ToName (ToName), addExistentialQuantifierToStaticContext, addInstanceQuantifierToStaticContext, addUniversalQuantifierToStaticContext, foldConstants, getInputName, getUniversalQuantifierStringCardinality, hasFieldMaxBound, prependArguments, prependBounds, substitute)
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (..), Formula, FormulaF (..), InputBound, InputBoundF (..), InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (..), Term, TermF (Add, Const, IndLess, Max, Mul), someFirstOrder, var)
 import Stark.Types.Scalar (Scalar, integerToScalar)
 
@@ -375,14 +375,15 @@ witnessToStrongPrenexNormalForm ann ec qs w =
       case w of
         Witness (ValueTree (Just f) [w']) -> do
           ec' <- addExistentialQuantifierToStaticContext ann ec q
-          Witness . ValueTree (Just f) . (:[]) . (^. #unWitness)
+          Witness . ValueTree (Just f) . (: []) . (^. #unWitness)
             <$> rec ec' qs' (Witness w')
-        _ -> Left . ErrorMessage ann $
-          "expected an existential-shaped witness"
+        _ ->
+          Left . ErrorMessage ann $
+            "expected an existential-shaped witness"
     ForAll' x b : qs' -> do
-      ec' <- addUniversalQuantifierToStaticContext ann ec (x,b)
-      mapLeft (\(ErrorMessage ann' msg) -> ErrorMessage ann' ("pushUniversalQuantifiersDownWitness: " <> msg))
-        $ pushUniversalQuantifiersDownWitness ann ec' [(x, b)] qs' w
+      ec' <- addUniversalQuantifierToStaticContext ann ec (x, b)
+      mapLeft (\(ErrorMessage ann' msg) -> ErrorMessage ann' ("pushUniversalQuantifiersDownWitness: " <> msg)) $
+        pushUniversalQuantifiersDownWitness ann ec' [(x, b)] qs' w
     Given' q : qs' -> do
       ec' <- addInstanceQuantifierToStaticContext ann ec q
       rec ec' qs' w
@@ -421,8 +422,9 @@ pushUniversalQuantifiersDown ann ec us qs f =
       m <- getUniversalQuantifierStringCardinality ann ec us
       case q of
         Some g n _ _ -> do
-          let q' = multiplyCardinalities m $
-                     prependBounds n (uncurry NamedInputBound <$> us) q
+          let q' =
+                multiplyCardinalities m $
+                  prependBounds n (uncurry NamedInputBound <$> us) q
               f'' = prependArguments g (var . fst <$> us) f'
           pure ([ForSome' q'] <> qs'', f'')
         SomeP {} ->
@@ -443,45 +445,54 @@ pushUniversalQuantifiersDownWitness ann ec us qs (Witness w) =
   case qs of
     [] -> pure (Witness w)
     ForAll' x b : qs' ->
-      rec ec (us <> [(x,b)]) qs' (Witness w)
+      rec ec (us <> [(x, b)]) qs' (Witness w)
     ForSome' q : qs' ->
       case us of
         [] -> pure (Witness w)
         [_] ->
           case w of
             ValueTree Nothing ws -> do
-              gs <- sequence
-                [ case w' of
-                    ValueTree (Just g) _ -> pure g
-                    _ -> Left (ErrorMessage ann "gs: expected an existential shaped witness")
-                 | w' <- ws
-                ]
-              f <- Value . Map.fromList <$> sequence
-                [ (,y) . (:x) <$> fromInt ann i
-                 | (i, Value g) <- zip [0..] gs,
-                   (x,y) <- Map.toList g
-                ]
-              vs <- sequence
-                [ case w' of
-                    ValueTree (Just _) [v] -> pure v
-                    _ -> Left (ErrorMessage ann "vs: expected an existential shaped witness")
-                 | w' <- ws
-                ]
+              gs <-
+                sequence
+                  [ case w' of
+                      ValueTree (Just g) _ -> pure g
+                      _ -> Left (ErrorMessage ann "gs: expected an existential shaped witness")
+                    | w' <- ws
+                  ]
+              f <-
+                Value . Map.fromList
+                  <$> sequence
+                    [ (,y) . (: x) <$> fromInt ann i
+                      | (i, Value g) <- zip [0 ..] gs,
+                        (x, y) <- Map.toList g
+                    ]
+              vs <-
+                sequence
+                  [ case w' of
+                      ValueTree (Just _) [v] -> pure v
+                      _ -> Left (ErrorMessage ann "vs: expected an existential shaped witness")
+                    | w' <- ws
+                  ]
               ec' <- addExistentialQuantifierToStaticContext ann ec q
               Witness vs' <- rec ec' us qs' (Witness (ValueTree Nothing vs))
               pure (Witness (ValueTree (Just f) [vs']))
-            _ -> Left . ErrorMessage ann $ "expected a universal shaped witness (1): "
-              <> pack (show (us, qs))
-        (u:us'@(_:_)) ->
+            _ ->
+              Left . ErrorMessage ann $
+                "expected a universal shaped witness (1): "
+                  <> pack (show (us, qs))
+        (u : us'@(_ : _)) ->
           case w of
             ValueTree Nothing ws -> do
               ec' <- addUniversalQuantifierToStaticContext ann ec u
-              wss' <- sequence
-                [ rec ec' us' qs (Witness w') <&> (^. #unWitness) | w' <- ws ]
+              wss' <-
+                sequence
+                  [rec ec' us' qs (Witness w') <&> (^. #unWitness) | w' <- ws]
               (qs'', _) <- pushUniversalQuantifiersDown ann ec' us' qs Top
               rec ec' [u] qs'' (Witness (ValueTree Nothing wss'))
-            _ -> Left . ErrorMessage ann $ "expected a universal shaped witness (2): "
-              <> pack (show (us, qs))
+            _ ->
+              Left . ErrorMessage ann $
+                "expected a universal shaped witness (2): "
+                  <> pack (show (us, qs))
     Given' _ : _ ->
       Left (ErrorMessage ann "encountered a lambda but expected lambdas to be stripped off already")
   where

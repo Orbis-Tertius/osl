@@ -21,7 +21,7 @@ import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.OSL (Name, ValidContext)
 import qualified OSL.Types.Sigma11.Argument as S11
 import Semicircuit.Gensyms (deBruijnToGensyms, deBruijnToGensymsEvalContext)
-import Semicircuit.PrenexNormalForm (toPrenexNormalForm, witnessToPrenexNormalForm, toStrongPrenexNormalForm, witnessToStrongPrenexNormalForm)
+import Semicircuit.PrenexNormalForm (toPrenexNormalForm, toStrongPrenexNormalForm, witnessToPrenexNormalForm, witnessToStrongPrenexNormalForm)
 
 -- First codegen pass: OSL -> OSL.Sigma11
 evalTranslatedFormula1 ::
@@ -124,8 +124,10 @@ evalTranslatedFormula4 c name argumentForm argument = do
     mapLeft
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("toPrenexNormalForm: " <> msg))
       (toPrenexNormalForm () translated')
-  translated'' <- uncurry S11.prependQuantifiers
-    <$> mapLeft (\(ErrorMessage _ msg) -> ErrorMessage Nothing ("toStrongPrenexNormalForm: " <> msg))
+  translated'' <-
+    uncurry S11.prependQuantifiers
+      <$> mapLeft
+        (\(ErrorMessage _ msg) -> ErrorMessage Nothing ("toStrongPrenexNormalForm: " <> msg))
         (toStrongPrenexNormalForm Nothing qs qff)
   ec <-
     mapLeft
@@ -152,4 +154,3 @@ evalTranslatedFormula4 c name argumentForm argument = do
           ("evalFormula: " <> msg)
     )
     (S11.evalFormula ec' s11arg' translated'')
-

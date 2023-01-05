@@ -41,9 +41,9 @@ import OSL.Sigma11 (HasPrependBounds (prependBounds), prependQuantifiers)
 import OSL.Types.Arity (Arity (..))
 import OSL.Types.Cardinality (Cardinality (Cardinality))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import OSL.Types.Sigma11.StaticEvaluationContext (StaticEvaluationContextF (StaticEvaluationContext), StaticBound (StaticBound))
-import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), Formula, FormulaF (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound, InputBoundF (..), InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (ForAll', ForSome', Given'), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul), InstanceQuantifier)
-import Stark.Types.Scalar (one, integerToScalar, scalarToInteger, two)
+import OSL.Types.Sigma11.StaticEvaluationContext (StaticBound (StaticBound), StaticEvaluationContextF (StaticEvaluationContext))
+import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), Formula, FormulaF (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound, InputBoundF (..), InstanceQuantifier, InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (ForAll', ForSome', Given'), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import Stark.Types.Scalar (integerToScalar, one, scalarToInteger, two)
 
 newtype FromName = FromName Name
 
