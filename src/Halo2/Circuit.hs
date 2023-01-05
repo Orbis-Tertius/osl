@@ -19,31 +19,38 @@ module Halo2.Circuit
   )
 where
 
-import Cast (integerToInt)
+import qualified Algebra.Additive as Group
+import qualified Algebra.Ring as Ring
+import Cast (integerToInt, intToInteger)
+import Control.Lens ((<&>))
+import Control.Monad.Extra (allM)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Die (die)
+import Halo2.Polynomial (degree)
 import Halo2.Prelude
 import Halo2.Types.Argument (Argument)
-import Halo2.Types.CellReference (CellReference)
+import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (Circuit, LogicCircuit)
-import Halo2.Types.Coefficient (Coefficient (getCoefficient))
+import Halo2.Types.Coefficient (Coefficient (Coefficient, getCoefficient))
 import Halo2.Types.ColumnIndex (ColumnIndex)
-import Halo2.Types.ColumnTypes (ColumnTypes)
-import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
-import Halo2.Types.EqualityConstraints (EqualityConstraints)
-import Halo2.Types.FixedValues (FixedValues)
+import Halo2.Types.ColumnType (ColumnType (Fixed, Advice, Instance))
+import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
+import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (EqualityConstrainableColumns))
+import Halo2.Types.EqualityConstraint (EqualityConstraint (EqualityConstraint))
+import Halo2.Types.EqualityConstraints (EqualityConstraints (EqualityConstraints))
+import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.InputExpression (InputExpression (..))
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), LookupTableOutputColumn (LookupTableOutputColumn), Term (Const, IndLess, Lookup, Max, Plus, Times, Var))
 import Halo2.Types.LogicConstraints (LogicConstraints)
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn)
-import Halo2.Types.Polynomial (Polynomial)
-import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
+import Halo2.Types.Polynomial (Polynomial (Polynomial))
+import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
-import Halo2.Types.PowerProduct (PowerProduct (getPowerProduct))
+import Halo2.Types.PowerProduct (PowerProduct (PowerProduct, getPowerProduct))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
 import OSL.Types.ErrorMessage (ErrorMessage)
@@ -243,8 +250,19 @@ getLookupTables x =
 class HasEvaluate a b | a -> b where
   evaluate :: ann -> Argument -> a -> Either (ErrorMessage ann) b
 
-instance HasEvaluate Polynomial (Map (RowIndex 'Absolute) Scalar) where
+instance HasEvaluate PolynomialVariable (Map (RowIndex 'Absolute) Scalar) where
   evaluate = todo
+
+instance HasEvaluate (PowerProduct, Coefficient) (Map (RowIndex 'Absolute) Scalar) where
+  evaluate ann arg (PowerProduct m, Coefficient c) =
+    fmap (Ring.* c) . foldr (Map.unionWith (Ring.*)) mempty <$> sequence
+      [ evaluate ann arg v <&> fmap (Ring.^ intToInteger (e ^. #getExponent))
+       | (v, e) <- Map.toList m ]
+
+instance HasEvaluate Polynomial (Map (RowIndex 'Absolute) Scalar) where
+  evaluate ann arg (Polynomial monos) =
+    foldr (Map.unionWith (Group.+)) mempty
+      <$> mapM (evaluate ann arg) (Map.toList monos)
 
 instance HasEvaluate Term (Map (RowIndex 'Absolute) Scalar) where
   evaluate = todo
@@ -253,7 +271,10 @@ instance HasEvaluate LogicConstraints Bool where
   evaluate = todo
 
 instance HasEvaluate PolynomialConstraints Bool where
-  evaluate = todo
+  evaluate ann arg (PolynomialConstraints polys degreeBound) = do
+    allM (\poly -> (degree poly <= degreeBound ^. #getPolynomialDegreeBound
+               &&) . all (== 0) <$> evaluate ann arg poly)
+        polys
 
 instance HasEvaluate (LookupArguments Polynomial) Bool where
   evaluate = todo
@@ -275,13 +296,40 @@ instance ( HasEvaluate a Bool, HasEvaluate (LookupArguments b) Bool ) =>
       ]
 
 instance HasEvaluate ColumnTypes Bool where
-  evaluate = todo
+  evaluate _ arg (ColumnTypes m) =
+    pure $ getColumns (arg ^. #statement . #unStatement) ==
+      Map.keysSet (Map.filter (== Instance) m) &&
+      getColumns (arg ^. #witness . #unWitness) ==
+      (Map.keysSet (Map.filter (== Advice) m) `Set.union`
+         Map.keysSet (Map.filter (== Fixed) m))
 
 instance HasEvaluate FixedValues Bool where
-  evaluate = todo
+  evaluate _ arg fvs = pure $
+    fixedValuesToCellMap fvs `Map.isSubmapOf` (arg ^. #witness . #unWitness)
+
+fixedValuesToCellMap :: FixedValues -> Map CellReference Scalar
+fixedValuesToCellMap (FixedValues m) =
+  Map.fromList
+    [ (CellReference colIdx rowIdx, v)
+     | (colIdx, col) <- Map.toList m,
+       (rowIdx, v) <- zip (RowIndex <$> [0..]) (col ^. #unFixedColumn)
+    ]
 
 instance HasEvaluate (EqualityConstrainableColumns, EqualityConstraints) Bool where
-  evaluate = todo
+  evaluate _ _ (eqcs, eqs) =
+    pure $ equalityConstraintsMatchEqualityConstrainableColumns eqcs eqs
+
+equalityConstraintsMatchEqualityConstrainableColumns ::
+  EqualityConstrainableColumns ->
+  EqualityConstraints ->
+  Bool
+equalityConstraintsMatchEqualityConstrainableColumns
+  (EqualityConstrainableColumns eqcs)
+  (EqualityConstraints eqs) =
+  all f eqs
+  where
+    f (EqualityConstraint cells) =
+      Set.map (^. #colIndex) cells `Set.isSubsetOf` eqcs
 
 instance HasEvaluate RowCount Bool where
   evaluate _ arg (RowCount n) =
@@ -299,10 +347,12 @@ instance HasEvaluate RowCount Bool where
              $ integerToInt (scalarToInteger n)
 
 getColumns :: Map CellReference Scalar -> Set ColumnIndex
-getColumns = todo
+getColumns =
+  Set.map (^. #colIndex) . Map.keysSet
 
 getRow :: ColumnIndex -> Map CellReference Scalar -> Map (RowIndex 'Absolute) Scalar
-getRow = todo
+getRow colIndex =
+  Map.mapKeys (^. #rowIndex) . Map.filterWithKey (\k _ -> k ^. #colIndex == colIndex)
 
 todo :: a
 todo = todo
