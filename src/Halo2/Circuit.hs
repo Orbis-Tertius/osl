@@ -1,9 +1,13 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module Halo2.Circuit
@@ -11,14 +15,25 @@ module Halo2.Circuit
     HasScalars (getScalars),
     HasLookupArguments (getLookupArguments),
     getLookupTables,
+    HasEvaluate (evaluate),
   )
 where
 
+import Cast (integerToInt)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
+import Die (die)
 import Halo2.Prelude
+import Halo2.Types.Argument (Argument)
+import Halo2.Types.CellReference (CellReference)
 import Halo2.Types.Circuit (Circuit, LogicCircuit)
 import Halo2.Types.Coefficient (Coefficient (getCoefficient))
+import Halo2.Types.ColumnIndex (ColumnIndex)
+import Halo2.Types.ColumnTypes (ColumnTypes)
+import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
+import Halo2.Types.EqualityConstraints (EqualityConstraints)
+import Halo2.Types.FixedValues (FixedValues)
 import Halo2.Types.InputExpression (InputExpression (..))
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), LookupTableOutputColumn (LookupTableOutputColumn), Term (Const, IndLess, Lookup, Max, Plus, Times, Var))
 import Halo2.Types.LogicConstraints (LogicConstraints)
@@ -29,7 +44,10 @@ import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (getPowerProduct))
-import Stark.Types.Scalar (Scalar, zero)
+import Halo2.Types.RowCount (RowCount (RowCount))
+import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
+import OSL.Types.ErrorMessage (ErrorMessage)
+import Stark.Types.Scalar (Scalar, zero, scalarToInteger)
 
 class HasPolynomialVariables a where
   getPolynomialVariables :: a -> Set PolynomialVariable
@@ -221,3 +239,70 @@ getLookupTables x =
     [ (a ^. #gate, snd <$> (a ^. #tableMap))
       | a <- Set.toList (getLookupArguments x ^. #getLookupArguments)
     ]
+
+class HasEvaluate a b | a -> b where
+  evaluate :: ann -> Argument -> a -> Either (ErrorMessage ann) b
+
+instance HasEvaluate Polynomial (Map (RowIndex 'Absolute) Scalar) where
+  evaluate = todo
+
+instance HasEvaluate Term (Map (RowIndex 'Absolute) Scalar) where
+  evaluate = todo
+
+instance HasEvaluate LogicConstraints Bool where
+  evaluate = todo
+
+instance HasEvaluate PolynomialConstraints Bool where
+  evaluate = todo
+
+instance HasEvaluate (LookupArguments Polynomial) Bool where
+  evaluate = todo
+
+instance HasEvaluate (LookupArguments Term) Bool where
+  evaluate = todo
+
+instance ( HasEvaluate a Bool, HasEvaluate (LookupArguments b) Bool ) =>
+         HasEvaluate (Circuit a b) Bool where
+  evaluate ann arg c =
+    and <$> sequence
+      [ evaluate ann arg (c ^. #columnTypes),
+        evaluate ann arg (c ^. #rowCount),
+        evaluate ann arg (c ^. #gateConstraints),
+        evaluate ann arg (c ^. #lookupArguments),
+        evaluate ann arg (c ^. #equalityConstrainableColumns,
+                          c ^. #equalityConstraints),
+        evaluate ann arg (c ^. #fixedValues)
+      ]
+
+instance HasEvaluate ColumnTypes Bool where
+  evaluate = todo
+
+instance HasEvaluate FixedValues Bool where
+  evaluate = todo
+
+instance HasEvaluate (EqualityConstrainableColumns, EqualityConstraints) Bool where
+  evaluate = todo
+
+instance HasEvaluate RowCount Bool where
+  evaluate _ arg (RowCount n) =
+     pure $ f (arg ^. #statement . #unStatement)
+         && f (arg ^. #witness . #unWitness)
+    where
+      f m =
+        let cols = getColumns m
+        in and [ Set.fromList (RowIndex <$> [0 .. n' - 1])
+                   == Map.keysSet (getRow i m)
+                | i <- Set.toList cols
+               ]
+
+      n' = fromMaybe (die "Halo2.Circuit.evaluate: row count out of range of Int")
+             $ integerToInt (scalarToInteger n)
+
+getColumns :: Map CellReference Scalar -> Set ColumnIndex
+getColumns = todo
+
+getRow :: ColumnIndex -> Map CellReference Scalar -> Map (RowIndex 'Absolute) Scalar
+getRow = todo
+
+todo :: a
+todo = todo

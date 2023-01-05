@@ -26,6 +26,7 @@ library
     Halo2.TruthTable
     Halo2.Types.AIR
     Halo2.Types.ArithmetizationConfig
+    Halo2.Types.Argument
     Halo2.Types.Byte
     Halo2.Types.ByteDecompositionSize
     Halo2.Types.ByteDecomposition
