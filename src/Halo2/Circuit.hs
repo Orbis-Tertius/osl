@@ -283,7 +283,45 @@ instance HasEvaluate (RowCount, Term) (Map (RowIndex 'Absolute) Scalar) where
       Times x y -> Map.unionWith (Ring.*) <$> rec x <*> rec y
       Max x y -> Map.unionWith max <$> rec x <*> rec y
       IndLess x y -> Map.intersectionWith lessIndicator <$> rec x <*> rec y
-      Lookup {} -> todo
+      Lookup is outCol -> performLookups ann rc Nothing arg is outCol
+
+-- Get the column vector of outputs corresponding to the given input expressions
+-- looked up in the given lookup table. The lookups are performed only on the given
+-- set of rows indices. If no set of row indices is provided, then the lookup is
+-- performed on all rows.
+performLookups ::
+  ann ->
+  RowCount ->
+  Maybe (Set (RowIndex 'Absolute)) ->
+  Argument ->
+  [(InputExpression Term, LookupTableColumn)] ->
+  LookupTableOutputColumn ->
+  Either (ErrorMessage ann) (Map (RowIndex 'Absolute) Scalar)
+performLookups ann rc mRowSet arg is outCol = do
+  inputTable <- mapM (evaluate ann arg . (rc,) . (^. #getInputExpression) . fst) is
+  permutation <- getLookupResults ann rc mRowSet (getCellMap arg) (zip inputTable (snd <$> is))
+  pure . Map.fromList $
+    [ (cell ^. #rowIndex, v)
+     | (cell, v) <- Map.toList permutation,
+       cell ^. #colIndex == outCol ^. #unLookupTableOutputColumn . #unLookupTableColumn
+    ]
+
+-- Succeeds only if each lookup table input row expressed by the provided
+-- column vectors is a member of the lookup table as expressed by the cell map, and
+-- the rows so expressed cover the provided set of row indices, or all rows if
+-- there is no provided set of row indices. Returns a cell map resulting from
+-- rearranging the rows (with duplications and deletions allowed) of the provided
+-- cell map, such that the lookup argument input table is expressed in that
+-- cell map.
+getLookupResults ::
+  ann ->
+  RowCount ->
+  Maybe (Set (RowIndex 'Absolute)) ->
+  Map CellReference Scalar ->
+  [(Map (RowIndex 'Absolute) Scalar, LookupTableColumn)] ->
+  Either (ErrorMessage ann) (Map CellReference Scalar)
+getLookupResults ann mRowSet cellMap table =
+  todo ann mRowSet cellMap table
 
 lessIndicator :: Scalar -> Scalar -> Scalar
 lessIndicator x y =
@@ -367,7 +405,7 @@ instance HasEvaluate RowCount Bool where
       f m =
         let cols = getColumns m
         in and [ Set.fromList (RowIndex <$> [0 .. n' - 1])
-                   == Map.keysSet (getRow i m)
+                   == Map.keysSet (getColumn i m)
                 | i <- Set.toList cols
                ]
 
@@ -378,8 +416,8 @@ getColumns :: Map CellReference Scalar -> Set ColumnIndex
 getColumns =
   Set.map (^. #colIndex) . Map.keysSet
 
-getRow :: ColumnIndex -> Map CellReference Scalar -> Map (RowIndex 'Absolute) Scalar
-getRow colIndex =
+getColumn :: ColumnIndex -> Map CellReference Scalar -> Map (RowIndex 'Absolute) Scalar
+getColumn colIndex =
   Map.mapKeys (^. #rowIndex) . Map.filterWithKey (\k _ -> k ^. #colIndex == colIndex)
 
 getCellMap :: Argument -> Map CellReference Scalar
