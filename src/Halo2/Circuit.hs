@@ -9,6 +9,7 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
 
 module Halo2.Circuit
   ( HasPolynomialVariables (getPolynomialVariables),
@@ -53,8 +54,8 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (PowerProduct, getPowerProduct))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
-import OSL.Types.ErrorMessage (ErrorMessage)
-import Stark.Types.Scalar (Scalar, zero, scalarToInteger)
+import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+import Stark.Types.Scalar (Scalar, zero, one, scalarToInteger)
 
 class HasPolynomialVariables a where
   getPolynomialVariables :: a -> Set PolynomialVariable
@@ -251,7 +252,11 @@ class HasEvaluate a b | a -> b where
   evaluate :: ann -> Argument -> a -> Either (ErrorMessage ann) b
 
 instance HasEvaluate PolynomialVariable (Map (RowIndex 'Absolute) Scalar) where
-  evaluate = todo
+  evaluate _ arg v =
+    pure . Map.mapKeys (^. #rowIndex) $
+      Map.filterWithKey
+        (\k _ -> (k ^. #colIndex) == v ^. #colIndex)
+        (getCellMap arg)
 
 instance HasEvaluate (PowerProduct, Coefficient) (Map (RowIndex 'Absolute) Scalar) where
   evaluate ann arg (PowerProduct m, Coefficient c) =
@@ -264,7 +269,30 @@ instance HasEvaluate Polynomial (Map (RowIndex 'Absolute) Scalar) where
     foldr (Map.unionWith (Group.+)) mempty
       <$> mapM (evaluate ann arg) (Map.toList monos)
 
-instance HasEvaluate Term (Map (RowIndex 'Absolute) Scalar) where
+instance HasEvaluate (RowCount, Term) (Map (RowIndex 'Absolute) Scalar) where
+  evaluate ann arg = uncurry $ \rc@(RowCount n) ->
+    let rec = evaluate ann arg . (rc,) in
+    \case
+      Var v -> evaluate ann arg v
+      Const i -> do
+        n' <- case integerToInt (scalarToInteger n) of
+                Just n' -> pure n'
+                Nothing -> Left (ErrorMessage ann "row count outside range of Int")
+        pure $ Map.fromList [(RowIndex x, i) | x <- [0..n'-1]]
+      Plus x y -> Map.unionWith (Group.+) <$> rec x <*> rec y
+      Times x y -> Map.unionWith (Ring.*) <$> rec x <*> rec y
+      Max x y -> Map.unionWith max <$> rec x <*> rec y
+      IndLess x y -> Map.intersectionWith lessIndicator <$> rec x <*> rec y
+      Lookup {} -> todo
+
+lessIndicator :: Scalar -> Scalar -> Scalar
+lessIndicator x y =
+  if x < y then one else zero
+
+instance HasEvaluate AtomicLogicConstraint Bool where
+  evaluate = todo
+
+instance HasEvaluate LogicConstraint Bool where
   evaluate = todo
 
 instance HasEvaluate LogicConstraints Bool where
@@ -353,6 +381,9 @@ getColumns =
 getRow :: ColumnIndex -> Map CellReference Scalar -> Map (RowIndex 'Absolute) Scalar
 getRow colIndex =
   Map.mapKeys (^. #rowIndex) . Map.filterWithKey (\k _ -> k ^. #colIndex == colIndex)
+
+getCellMap :: Argument -> Map CellReference Scalar
+getCellMap arg = (arg ^. #statement . #unStatement) `Map.union` (arg ^. #witness . #unWitness)
 
 todo :: a
 todo = todo
