@@ -46,7 +46,7 @@ data Name = Name {arity :: Arity, deBruijnIndex :: DeBruijnIndex}
   deriving (Eq, Ord, Generic)
 
 instance Show Name where
-  show (Name a i) = show i <> "^" <> show a
+  show (Name a i) = "x_" <> show i <> "^" <> show a
 
 data PredicateName = PredicateName {arity :: Arity, deBruijnIndex :: DeBruijnIndex}
   deriving (Eq, Ord, Generic)
@@ -115,14 +115,14 @@ instance Show name => Show (FormulaF name) where
     "(" <> show p <> " -> " <> show q <> ")"
   show (Iff p q) =
     "(" <> show p <> " <-> " <> show q <> ")"
-  show (ForAll _ b p) =
-    "(∀<" <> show b <> ", " <> show p <> ")"
+  show (ForAll v b p) =
+    "(∀" <> show v <> "<" <> show b <> ", " <> show p <> ")"
   show (ForSome q p) =
     "(∃" <> show q <> ", " <> show p <> ")"
-  show (Given _ _ [] ob p) =
-    "(λ<" <> show ob <> ", " <> show p <> ")"
-  show (Given _ n ibs ob p) =
-    "(λ^" <> show n <> "<" <> show ob <> "(" <> intercalate ", " (show <$> ibs) <> "), " <> show p <> ")"
+  show (Given v _ [] ob p) =
+    "(λ" <> show v <> "<" <> show ob <> ", " <> show p <> ")"
+  show (Given v n ibs ob p) =
+    "(λ" <> show v <> "#" <> show n <> "(" <> intercalate ", " (show <$> ibs) <> ")<" <> show ob <> ", " <> show p <> ")"
   show (Predicate p qs) =
     show p <> "(" <> intercalate ", " (show <$> qs) <> ")"
   show Top = "⊤"
@@ -169,22 +169,21 @@ someFirstOrder b =
   Some (Name (0 :: Arity) (0 :: DeBruijnIndex)) (Cardinality 1) [] (OutputBound b)
 
 instance Show name => Show (ExistentialQuantifierF name) where
-  show (Some _ _ [] b) = "<" <> show b
-  show (Some _ (Cardinality n) bs b) =
-    "^"
+  show (Some v _ [] b) = show v <> "<" <> show b
+  show (Some v (Cardinality n) bs b) =
+    show v <> "#"
       <> show n
       <> "("
       <> intercalate ", " (show <$> bs)
       <> ")<"
       <> show b
-  show (SomeP _ (Cardinality n) b0 b1) =
-    "^"
+  show (SomeP v (Cardinality n) b0 b1) =
+    show v <> "#"
       <> show n
-      <> "<"
-      <> show b0
       <> "("
+      <> show b0
+      <> ")<"
       <> show b1
-      <> ")"
 
 data InstanceQuantifierF name = Instance
   { name :: name,
@@ -195,8 +194,8 @@ data InstanceQuantifierF name = Instance
   deriving (Eq, Functor, Generic)
 
 instance Show name => Show (InstanceQuantifierF name) where
-  show (Instance _ (Cardinality n) bs b) =
-    "^"
+  show (Instance v (Cardinality n) bs b) =
+    show v <> "#"
       <> show n
       <> "("
       <> intercalate ", " (show <$> bs)
@@ -227,7 +226,7 @@ instance Show name => Show (QuantifierF name) where
     "λ" <> show x
       <> ( if null ibs
              then ""
-             else "^" <> show n <> "(" <> intercalate ", " (show <$> ibs) <> ")"
+             else "#" <> show n <> "(" <> intercalate ", " (show <$> ibs) <> ")"
          )
       <> "<"
       <> show ob

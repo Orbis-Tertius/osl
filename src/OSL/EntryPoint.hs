@@ -109,51 +109,51 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
       (translated, aux) <-
         mapLeft (ErrorMessage . ("Error translating: " <>) . show) $
           runStateT (translateToFormula gc lc targetTerm) mempty
-      pnf <-
-        mapLeft (ErrorMessage . ("Error converting to prenex normal form: " <>) . show) $
-          toPrenexNormalForm () (fst (deBruijnToGensyms translated))
-      spnf <-
-        mapLeft (ErrorMessage . ("Error converting to strong prenex normal form: " <>) . show) $
-          uncurry (toStrongPrenexNormalForm ()) pnf
-      let sspnf = uncurry toSuperStrongPrenexNormalForm spnf
-      pnff <-
-        mapLeft (ErrorMessage . ("Error converting to PNF formula: " <>) . show) $
-          toPNFFormula () (uncurry prependQuantifiers sspnf)
-      let semi = toSemicircuit pnff
-          (logic, layout) = semicircuitToLogicCircuit rowCount semi
-          traceType = logicCircuitToTraceType bitsPerByte logic
-          circuit = traceTypeToArithmeticCircuit traceType
-          circuitMetrics = getCircuitMetrics circuit
-          traceTypeMetrics = getTraceTypeMetrics traceType
-      pure . SuccessfulOutput $
-        "Translated OSL:\n"
-          <> show translated
-          <> (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
-          <> ( case compileToCircuit of
-                 CompileToCircuit ->
-                   "\n\nTrace type metrics: "
-                     <> show traceTypeMetrics
-                     <> "\n\nCircuit metrics: "
-                     <> show circuitMetrics
-                     <> "\n\nPrenex normal form: "
-                     <> show pnf
-                     <> "\n\nStrong prenex normal form: "
-                     <> show spnf
-                     <> "\n\nSuper strong prenex normal form: "
-                     <> show sspnf
-                     <> "\n\nPNF formula: "
-                     <> show pnff
-                     <> "\n\nSemicircuit: "
-                     <> show semi
-                     <> "\n\nLayout: "
-                     <> show layout
-                     <> "\n\nLogic circuit: "
-                     <> show logic
-                     <> "\n\nTrace type: "
-                     <> show traceType
-                     <> "\n\nArithmetic circuit:\n"
-                     <> show circuit
-                 DONTCompileToCircuit ->
-                   mempty
-             )
+      let translatedOutput = "Translated OSL:\n"
+            <> show translated
+            <> (if aux == mempty then "" else "\n\nAux Data:\n" <> show aux)
+      case compileToCircuit of
+        DONTCompileToCircuit -> 
+          pure (SuccessfulOutput translatedOutput)
+        CompileToCircuit -> do
+          pnf <-
+            mapLeft (ErrorMessage . ("Error converting to prenex normal form: " <>) . show) $
+              toPrenexNormalForm () (fst (deBruijnToGensyms translated))
+          spnf <-
+            mapLeft (ErrorMessage . ("Error converting to strong prenex normal form: " <>) . show) $
+              uncurry (toStrongPrenexNormalForm ()) pnf
+          let sspnf = uncurry toSuperStrongPrenexNormalForm spnf
+          pnff <-
+            mapLeft (ErrorMessage . ("Error converting to PNF formula: " <>) . show) $
+              toPNFFormula () (uncurry prependQuantifiers sspnf)
+          let semi = toSemicircuit pnff
+              (logic, layout) = semicircuitToLogicCircuit rowCount semi
+              traceType = logicCircuitToTraceType bitsPerByte logic
+              circuit = traceTypeToArithmeticCircuit traceType
+              circuitMetrics = getCircuitMetrics circuit
+              traceTypeMetrics = getTraceTypeMetrics traceType
+          pure . SuccessfulOutput $
+            translatedOutput
+              <> "\n\nTrace type metrics: "
+              <> show traceTypeMetrics
+              <> "\n\nCircuit metrics: "
+              <> show circuitMetrics
+              <> "\n\nPrenex normal form: "
+              <> show pnf
+              <> "\n\nStrong prenex normal form: "
+              <> show spnf
+              <> "\n\nSuper strong prenex normal form: "
+              <> show sspnf
+              <> "\n\nPNF formula: "
+              <> show pnff
+              <> "\n\nSemicircuit: "
+              <> show semi
+              <> "\n\nLayout: "
+              <> show layout
+              <> "\n\nLogic circuit: "
+              <> show logic
+              <> "\n\nTrace type: "
+              <> show traceType
+              <> "\n\nArithmetic circuit:\n"
+              <> show circuit
     _ -> Left . ErrorMessage $ "please provide the name of a defined term"
