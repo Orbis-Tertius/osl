@@ -19,6 +19,7 @@ module OSL.Sigma11
     evalFormula,
     boolToScalar,
     scalarValue,
+    indexedCoproduct,
     auxTablesToEvalContext,
     flipQuantifiers,
     flipQuantifier,
@@ -185,7 +186,7 @@ evalTerm (EvaluationContext c) =
         Just i' -> pure i'
         Nothing ->
           Left . ErrorMessage () $
-            "constant out of range of scalar field"
+            "constant out of range of scalar field: " <> pack (show i)
   where
     rec = evalTerm (EvaluationContext c)
 
@@ -407,6 +408,25 @@ fromInteger = maybe (Left (ErrorMessage () "integer out of range of scalar field
 
 scalarValue :: Scalar -> Value
 scalarValue = Value . Map.singleton []
+
+indexedCoproduct :: [Value] -> Value
+indexedCoproduct vs =
+  maybe
+    (die "indexedCoproduct: partiality (this is a bug in indexedCoproduct)")
+    (Value . Map.fromList)
+    $ sequence
+      [ do
+          i' <- integerToScalar i
+          pure (i' : pad xs, y)
+        | (i, Value f) <- zip [0 ..] vs,
+          (xs, y) <- Map.toList f
+      ]
+  where
+    numArgs :: Int
+    numArgs = foldl' max 0 (length <$> concatMap (Map.keys . (^. #unValue)) vs)
+
+    pad :: [Scalar] -> [Scalar]
+    pad xs = replicate (numArgs - length xs) zero <> xs
 
 flipQuantifiers ::
   ann ->

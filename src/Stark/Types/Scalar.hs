@@ -40,7 +40,7 @@ import Cast
     word64ToRatio,
     word8ToInteger,
   )
-import Control.Monad (guard, (<=<))
+import Control.Monad (guard)
 import Data.Bits (shiftR, toIntegralSized, (.&.))
 import qualified Data.ByteString as BS
 import Data.Kind (Type)
@@ -202,7 +202,10 @@ scalarToRational :: Scalar -> Rational
 scalarToRational = word64ToRatio . unScalar
 
 integerToScalar :: Integer -> Maybe Scalar
-integerToScalar = fromWord64 <=< integerToWord64
+integerToScalar n =
+  if n >= 0
+    then fromWord64 =<< integerToWord64 n
+    else negateScalar <$> integerToScalar (negate n)
 
 scalarToInt :: Scalar -> Int
 scalarToInt = fromMaybe (die "scalarToInt partiality") . toIntegralSized . toWord64

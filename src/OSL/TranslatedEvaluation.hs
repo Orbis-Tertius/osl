@@ -6,6 +6,7 @@ module OSL.TranslatedEvaluation
     evalTranslatedFormula2,
     evalTranslatedFormula3,
     evalTranslatedFormula4,
+    evalTranslatedFormula5,
   )
 where
 
@@ -21,7 +22,7 @@ import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.OSL (Name, ValidContext)
 import qualified OSL.Types.Sigma11.Argument as S11
 import Semicircuit.Gensyms (deBruijnToGensyms, deBruijnToGensymsEvalContext)
-import Semicircuit.PrenexNormalForm (toPrenexNormalForm, toStrongPrenexNormalForm, witnessToPrenexNormalForm, witnessToStrongPrenexNormalForm)
+import Semicircuit.PrenexNormalForm (statementToSuperStrongPrenexNormalForm, toPrenexNormalForm, toStrongPrenexNormalForm, toSuperStrongPrenexNormalForm, witnessToPrenexNormalForm, witnessToStrongPrenexNormalForm, witnessToSuperStrongPrenexNormalForm)
 
 -- First codegen pass: OSL -> OSL.Sigma11
 evalTranslatedFormula1 ::
@@ -154,3 +155,56 @@ evalTranslatedFormula4 c name argumentForm argument = do
           ("evalFormula: " <> msg)
     )
     (S11.evalFormula ec' s11arg' translated'')
+
+-- Fifth codegen pass: Semicircuit.Sigma11 -> Semicircuit.Sigma11
+-- (super strong prenex normal form conversion)
+evalTranslatedFormula5 ::
+  Show ann =>
+  ValidContext t ann ->
+  Name ->
+  ArgumentForm ->
+  Argument ->
+  Either (ErrorMessage (Maybe ann)) Bool
+evalTranslatedFormula5 c name argumentForm argument = do
+  (def, translated, aux) <- translateToFormulaSimple c name
+  let (translated', mapping) = deBruijnToGensyms translated
+  (qs, qff) <-
+    mapLeft
+      (\(ErrorMessage () msg) -> ErrorMessage Nothing ("toPrenexNormalForm: " <> msg))
+      (toPrenexNormalForm () translated')
+  (qs', qff') <-
+    mapLeft
+      (\(ErrorMessage _ msg) -> ErrorMessage Nothing ("toStrongPrenexNormalForm: " <> msg))
+      (toStrongPrenexNormalForm Nothing qs qff)
+  let (qs'', qff'') = toSuperStrongPrenexNormalForm qs' qff'
+      translated''' = S11.prependQuantifiers qs'' qff''
+  ec <-
+    mapLeft
+      (\(ErrorMessage () msg) -> ErrorMessage Nothing ("auxTablesToEvalContext: " <> msg))
+      (S11.auxTablesToEvalContext aux)
+  let ec' = deBruijnToGensymsEvalContext mapping ec
+  s11arg <-
+    mapLeft
+      (\(ErrorMessage () msg) -> ErrorMessage Nothing ("toSigma11Argument: " <> msg))
+      (toSigma11Argument c argumentForm argument (dropTermAnnotations def))
+  s11witness' <-
+    mapLeft
+      (\(ErrorMessage () msg) -> ErrorMessage Nothing ("witnessToPrenexNormalForm: " <> msg))
+      (witnessToPrenexNormalForm translated' (s11arg ^. #witness))
+  s11witness'' <-
+    mapLeft
+      (\(ErrorMessage () msg) -> ErrorMessage Nothing ("witnessToStrongPrenexNormalForm: " <> msg))
+      (witnessToStrongPrenexNormalForm () mempty qs s11witness')
+  s11witness''' <-
+    mapLeft
+      (\(ErrorMessage () msg) -> ErrorMessage Nothing ("witnessToSuperStrongPrenexNormalForm: " <> msg))
+      (witnessToSuperStrongPrenexNormalForm () qs' s11witness'')
+  let s11statement' = statementToSuperStrongPrenexNormalForm (s11arg ^. #statement)
+      s11arg' = S11.Argument s11statement' s11witness'''
+  mapLeft
+    ( \(ErrorMessage () msg) ->
+        ErrorMessage
+          Nothing
+          ("evalFormula: " <> msg)
+    )
+    (S11.evalFormula ec' s11arg' translated''')
