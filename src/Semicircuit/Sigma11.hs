@@ -21,16 +21,29 @@ module Semicircuit.Sigma11
     foldConstants,
     getInputName,
     hasFieldMaxBound,
+    getUniversalQuantifierStringCardinality,
+    addExistentialQuantifierToStaticContext,
+    addUniversalQuantifierToStaticContext,
+    addInstanceQuantifierToStaticContext,
+    getStaticBound,
   )
 where
 
+import qualified Algebra.Additive as Group
+import qualified Algebra.Ring as Ring
 import Control.Lens ((^.))
+import Control.Monad (foldM)
+import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Die (die)
 import OSL.Sigma11 (HasPrependBounds (prependBounds), prependQuantifiers)
 import OSL.Types.Arity (Arity (..))
-import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), Formula, FormulaF (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound, InputBoundF (..), InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (ForAll', ForSome', Given'), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import OSL.Types.Cardinality (Cardinality (Cardinality))
+import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+import OSL.Types.Sigma11.StaticEvaluationContext (StaticBound (StaticBound), StaticEvaluationContextF (StaticEvaluationContext))
+import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), Formula, FormulaF (And, Bottom, Equal, ForAll, ForSome, Given, Iff, Implies, LessOrEqual, Not, Or, Predicate, Top), InputBound, InputBoundF (..), InstanceQuantifier, InstanceQuantifierF (Instance), Name (Name), OutputBound, OutputBoundF (..), Quantifier, QuantifierF (ForAll', ForSome', Given'), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
+import Stark.Types.Scalar (integerToScalar, one, scalarToInteger, two)
 
 newtype FromName = FromName Name
 
@@ -270,3 +283,92 @@ hasFieldMaxBound =
     bound' :: Bound -> Bool
     bound' FieldMaxBound = True
     bound' (TermBound _) = False
+
+getUniversalQuantifierStringCardinality ::
+  ann ->
+  StaticEvaluationContextF Name ->
+  [(Name, Bound)] ->
+  Either (ErrorMessage ann) Cardinality
+getUniversalQuantifierStringCardinality ann ec us =
+  snd <$> foldM f (ec, 1) us
+  where
+    f (ec', n) u = do
+      ec'' <- addUniversalQuantifierToStaticContext ann ec' u
+      m <- getUniversalQuantifierCardinality ann ec' u
+      pure (ec'', n * m)
+
+getUniversalQuantifierCardinality ::
+  ann ->
+  StaticEvaluationContextF Name ->
+  (Name, Bound) ->
+  Either (ErrorMessage ann) Cardinality
+getUniversalQuantifierCardinality ann ec (_, b) = do
+  StaticBound sb <- getStaticBound ann ec b
+  case sb of
+    Nothing ->
+      Left (ErrorMessage ann "unbounded universal quantifier")
+    Just sb' -> pure (Cardinality (scalarToInteger sb'))
+
+addExistentialQuantifierToStaticContext ::
+  ann ->
+  StaticEvaluationContextF Name ->
+  ExistentialQuantifier ->
+  Either (ErrorMessage ann) (StaticEvaluationContextF Name)
+addExistentialQuantifierToStaticContext ann ec =
+  \case
+    Some v _ _ (OutputBound b) -> do
+      sb <- getStaticBound ann ec b
+      pure (ec <> StaticEvaluationContext (Map.singleton v sb))
+    SomeP v _ _ (OutputBound b) -> do
+      sb <- getStaticBound ann ec b
+      pure (ec <> StaticEvaluationContext (Map.singleton v sb))
+
+addUniversalQuantifierToStaticContext ::
+  ann ->
+  StaticEvaluationContextF Name ->
+  (Name, Bound) ->
+  Either (ErrorMessage ann) (StaticEvaluationContextF Name)
+addUniversalQuantifierToStaticContext ann ec (v, b) = do
+  sb <- getStaticBound ann ec b
+  pure (ec <> StaticEvaluationContext (Map.singleton v sb))
+
+addInstanceQuantifierToStaticContext ::
+  ann ->
+  StaticEvaluationContextF Name ->
+  InstanceQuantifier ->
+  Either (ErrorMessage ann) (StaticEvaluationContextF Name)
+addInstanceQuantifierToStaticContext ann ec (Instance v _ _ (OutputBound b)) = do
+  sb <- getStaticBound ann ec b
+  pure (ec <> StaticEvaluationContext (Map.singleton v sb))
+
+getStaticBound ::
+  ann ->
+  StaticEvaluationContextF Name ->
+  Bound ->
+  Either (ErrorMessage ann) StaticBound
+getStaticBound ann ec =
+  \case
+    FieldMaxBound -> pure (StaticBound Nothing)
+    TermBound b -> getTermStaticBound ann ec b
+
+getTermStaticBound ::
+  ann ->
+  StaticEvaluationContextF Name ->
+  Term ->
+  Either (ErrorMessage ann) StaticBound
+getTermStaticBound ann ec =
+  \case
+    Const x -> pure . StaticBound $ (Group.+ one) <$> integerToScalar x
+    App x _ -> nameBound x
+    AppInverse x _ -> nameBound x
+    Add x y -> (Group.+) <$> rec x <*> rec y
+    Mul x y -> (Ring.*) <$> rec x <*> rec y
+    IndLess {} -> pure (StaticBound (Just two))
+    Max x y -> max <$> rec x <*> rec y
+  where
+    rec = getTermStaticBound ann ec
+
+    nameBound x =
+      case Map.lookup x (ec ^. #unStaticEvaluationContext) of
+        Just b -> pure b
+        Nothing -> Left (ErrorMessage ann "name lookup failed")

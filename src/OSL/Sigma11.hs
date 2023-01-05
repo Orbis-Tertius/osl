@@ -12,6 +12,7 @@ module OSL.Sigma11
     HasAddToEvalContext (addToEvalContext),
     unionIndices,
     termIndices,
+    HasMultiplyCardinalities (multiplyCardinalities),
     HasPrependBounds (prependBounds),
     prependInstanceQuantifiers,
     evalTerm,
@@ -100,6 +101,15 @@ termIndices =
     Max x y -> termIndices x `unionIndices` termIndices y
     Const _ -> mempty
 
+class HasMultiplyCardinalities f where
+  multiplyCardinalities :: Cardinality -> f name -> f name
+
+instance HasMultiplyCardinalities ExistentialQuantifierF where
+  multiplyCardinalities m =
+    \case
+      Some v n ibs ob -> Some v (m * n) ibs ob
+      SomeP v n ib ob -> SomeP v (m * n) ib ob
+
 class HasPrependBounds f where
   prependBounds :: HasIncrementArity name => Cardinality -> [InputBoundF name] -> f name -> f name
 
@@ -107,7 +117,7 @@ instance HasPrependBounds ExistentialQuantifierF where
   prependBounds n bs (Some x _ [] b) =
     Some (incrementArity (length bs) x) n bs b
   prependBounds _ bs' (Some x n bs b) =
-    Some (incrementArity (length bs) x) n (bs' <> bs) b
+    Some (incrementArity (length bs') x) n (bs' <> bs) b
   prependBounds _ _ (SomeP {}) =
     die "there is a compiler bug; applied prependBounds to SomeP"
 
