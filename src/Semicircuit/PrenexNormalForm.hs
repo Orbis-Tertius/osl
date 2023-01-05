@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Semicircuit.PrenexNormalForm
   ( toSuperStrongPrenexNormalForm,
