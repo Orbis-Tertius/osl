@@ -5,6 +5,8 @@
 
 module Semicircuit.PrenexNormalForm
   ( toSuperStrongPrenexNormalForm,
+    statementToSuperStrongPrenexNormalForm,
+    witnessToSuperStrongPrenexNormalForm,
     toStrongPrenexNormalForm,
     witnessToStrongPrenexNormalForm,
     toPrenexNormalForm,
@@ -15,21 +17,22 @@ where
 import Cast (intToInteger)
 import Control.Applicative (liftA2)
 import Control.Lens ((<&>), (^.), _1, _2, _3, _4)
+import Control.Monad (foldM)
 import Control.Monad.State (State, evalState, get, put, replicateM)
 import Data.Bifunctor (first, second)
 import Data.Either.Combinators (mapLeft)
 import Data.List (foldl', transpose)
 import qualified Data.Map as Map
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, maybeToList)
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
 import OSL.Argument (emptyTree, pairTree)
-import OSL.Sigma11 (HasMultiplyCardinalities (multiplyCardinalities))
+import OSL.Sigma11 (HasMultiplyCardinalities (multiplyCardinalities), indexedCoproduct)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
-import OSL.Types.Sigma11.Argument (Witness (Witness))
+import OSL.Types.Sigma11.Argument (Statement (Statement), Witness (Witness))
 import OSL.Types.Sigma11.StaticEvaluationContext (StaticEvaluationContextF)
 import OSL.Types.Sigma11.Value (Value (Value))
 import OSL.Types.Sigma11.ValueTree (ValueTree (ValueTree))
@@ -58,6 +61,24 @@ toSuperStrongPrenexNormalForm qs f =
     nextSym :: NextSym
     nextSym = NextSym (1 + foldl' max 0 ((^. #sym) <$> Set.toList (mconcat (getNames <$> qs) <> getNames f)))
 
+statementToSuperStrongPrenexNormalForm :: Statement -> Statement
+statementToSuperStrongPrenexNormalForm (Statement vs) =
+  Statement [indexedCoproduct (take (length vs - 1) vs)]
+
+witnessToSuperStrongPrenexNormalForm ::
+  ann ->
+  [Quantifier] ->
+  Witness ->
+  Either (ErrorMessage ann) Witness
+witnessToSuperStrongPrenexNormalForm ann qs w = do
+  let gs = groupMergeableQuantifiers qs
+  (w', vs) <- foldM f (w, []) gs
+  pure (foldr (\v w'' -> Witness (ValueTree (Just v) [w'' ^. #unWitness])) w' vs)
+  where
+    f (w', vs) g = do
+      (mv, w'') <- mergeWitnessQuantifiers ann g w'
+      pure (w'', vs <> maybeToList mv)
+
 -- Assumes the quantifier sequence is mergeable into a single
 -- quantifier. Returns the merged quantifier and the substitution
 -- function to apply to replace applications of the non-merged
@@ -71,6 +92,34 @@ mergeQuantifiers qs = do
   let (qs', padSubst) = padToSameArity qs
   (q, mergeSubst) <- mergePaddedQuantifiers qs'
   pure (q, mergeSubst . padSubst)
+
+-- Performs the operation analogous to mergeQuantifiers,
+-- on the witness.
+mergeWitnessQuantifiers ::
+  ann ->
+  [Quantifier] ->
+  Witness ->
+  Either (ErrorMessage ann) (Maybe Value, Witness)
+mergeWitnessQuantifiers ann [] _ = Left (ErrorMessage ann "mergeWitnessQuantifiers: empty group")
+mergeWitnessQuantifiers _ [_] w = pure (Nothing, w)
+mergeWitnessQuantifiers ann qs@(ForSome' {} : _) w = do
+  (fs, w') <- extractExistentialWitnesses ann (length qs) w
+  pure (Just (indexedCoproduct fs), w')
+mergeWitnessQuantifiers ann (ForAll' {} : _) _ =
+  Left (ErrorMessage ann "mergeWitnessQuantifiers: universal group of length greater than one")
+mergeWitnessQuantifiers _ (Given' {} : _) w = pure (Nothing, w)
+
+extractExistentialWitnesses ::
+  ann ->
+  Int ->
+  Witness ->
+  Either (ErrorMessage ann) ([Value], Witness)
+extractExistentialWitnesses _ 0 w = pure ([], w)
+extractExistentialWitnesses ann n (Witness (ValueTree (Just f) [w])) = do
+  (vs, w') <- extractExistentialWitnesses ann (n - 1) (Witness w)
+  pure (f : vs, w')
+extractExistentialWitnesses ann _ _ =
+  Left (ErrorMessage ann "extractExistentialWitnesses: expected an existential shaped witness")
 
 -- Assumes the quantifier sequence is mergeable into a single
 -- quantifier. Returns the same quantifier sequence but with all
