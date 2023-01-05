@@ -421,7 +421,8 @@ pushUniversalQuantifiersDown ann ec us qs f =
       m <- getUniversalQuantifierStringCardinality ann ec us
       case q of
         Some g n _ _ -> do
-          let q' = multiplyCardinalities m $ prependBounds n (uncurry NamedInputBound <$> us) q
+          let q' = multiplyCardinalities m $
+                     prependBounds n (uncurry NamedInputBound <$> us) q
               f'' = prependArguments g (var . fst <$> us) f'
           pure ([ForSome' q'] <> qs'', f'')
         SomeP {} ->

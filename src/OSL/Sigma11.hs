@@ -117,7 +117,7 @@ instance HasPrependBounds ExistentialQuantifierF where
   prependBounds n bs (Some x _ [] b) =
     Some (incrementArity (length bs) x) n bs b
   prependBounds _ bs' (Some x n bs b) =
-    Some (incrementArity (length bs) x) n (bs' <> bs) b
+    Some (incrementArity (length bs') x) n (bs' <> bs) b
   prependBounds _ _ (SomeP {}) =
     die "there is a compiler bug; applied prependBounds to SomeP"
 
