@@ -27,8 +27,9 @@ where
 
 import Cast (word64ToInteger, integerToInt, intToInteger)
 import Control.Lens ((<&>), (^.))
-import Control.Monad (replicateM)
+import Control.Monad (replicateM, forM, foldM)
 import Control.Monad.State (State, evalState, get, put)
+import Data.Either.Extra (mapLeft)
 import Data.List.Extra (foldl', (!?))
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -57,8 +58,10 @@ import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative, Absolute))
+import qualified OSL.Sigma11 as S11
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import qualified OSL.Types.Sigma11.Argument as S11
+import qualified OSL.Types.Sigma11.EvaluationContext as S11
 import OSL.Types.Sigma11.Value (Value (Value))
 import Semicircuit.Argument (getNameValues)
 import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound, getInputName)
@@ -67,7 +70,7 @@ import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), ZeroVectorIndex (..))
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), InputBound, Name, OutputBound, OutputBoundF (OutputBound), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
-import Stark.Types.Scalar (Scalar, one, order, scalarToInt, zero, scalarToInteger)
+import Stark.Types.Scalar (Scalar, one, order, scalarToInt, zero, scalarToInteger, integerToScalar)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
@@ -111,7 +114,7 @@ getUniversalTableArgument ::
   Map Name Value ->
   Either (ErrorMessage ann) Halo2.Argument
 getUniversalTableArgument ann (RowCount n) f layout vs = do
-  t <- getUniversalTable ann f layout vs
+  t <- getUniversalTable ann (f ^. #formula . #quantifiers . #universalQuantifiers) layout vs
   Halo2.Argument mempty . Halo2.Witness . rowsToCellMap . Map.fromList
     <$> pad n' (Map.toList t)
   where
@@ -124,12 +127,63 @@ getUniversalTableArgument ann (RowCount n) f layout vs = do
     pad n'' ((i,x):xs) = ((i,x):) <$> pad (n''-1) xs
 
 getUniversalTable ::
+  forall ann.
   ann ->
-  Semicircuit ->
+  [UniversalQuantifier] ->
   Layout ->
   Map Name Value ->
   Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Map ColumnIndex Scalar))
-getUniversalTable = todo
+getUniversalTable _ [] _ _ = pure mempty
+getUniversalTable ann [All x b] layout vs = do
+  let ec = S11.EvaluationContext (Map.mapKeys Left vs)
+      dummyCol = layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
+  outCol <-
+    case Map.lookup x (layout ^. #nameMappings) of
+      Just nm -> pure (nm ^. #outputMapping . #unOutputMapping)
+      Nothing -> Left (ErrorMessage ann "name not defined in circuit layout")
+  b' <- mapLeft (\(ErrorMessage () msg) -> ErrorMessage ann msg)
+    $ S11.evalTerm ec b
+  if b' == zero
+    then pure . Map.singleton (0 :: RowIndex 'Absolute)
+           $ Map.fromList [(dummyCol, one), (outCol, zero)]
+    else pure . Map.fromList $
+           [ (RowIndex ri, Map.fromList [ (dummyCol, zero), (outCol, si) ])
+            | i <- [0 .. scalarToInteger b' - 1],
+              let ri = fromMaybe (die "Semicircuit.ToLogicCircuit.getUniversalTable: value out of range of Int")
+                       (integerToInt i),
+              let si = fromMaybe (die "Semicircuit.ToLogicCircuit.getUniversalTable: value out of range of scalar")
+                       (integerToScalar i)
+           ]
+getUniversalTable ann qs@(All x b : qs') layout vs = do
+  let ec = S11.EvaluationContext (Map.mapKeys Left vs)
+      dummyCol = layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
+  outCols <- forM qs $ \(All x' _) ->
+    case Map.lookup x' (layout ^. #nameMappings) of
+      Just nm -> pure (nm ^. #outputMapping . #unOutputMapping)
+      Nothing -> Left (ErrorMessage ann "name not defined in circuit layout")
+  outCol <-
+    case outCols of
+      (outCol':_) -> pure outCol'
+      _ -> Left (ErrorMessage ann "unreachable case in getUniversalTable (this is a bug)")
+  b' <- mapLeft (\(ErrorMessage () msg) -> ErrorMessage ann msg)
+    $ S11.evalTerm ec b
+  if b' == zero
+    then pure . Map.singleton (0 :: RowIndex 'Absolute)
+           . Map.fromList $ [(dummyCol, one)] <> ((,zero) <$> outCols)
+    else foldM (f outCol) mempty ([0 .. scalarToInteger b' - 1] :: [Integer])
+  where
+    f :: ColumnIndex ->
+         Map (RowIndex 'Absolute) (Map ColumnIndex Scalar) ->
+         Integer ->
+         Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Map ColumnIndex Scalar))
+    f outCol t v = do
+      v' <- maybe (Left (ErrorMessage ann "value out of range of scalar field")) pure
+            (integerToScalar v)
+      let vs' = Map.insert x (Value (Map.singleton [] v')) vs
+      t' <- getUniversalTable ann qs' layout vs'
+      let j = maybe 0 (fst . fst) (Map.maxViewWithKey t)
+          t'' = Map.insert outCol v' <$> Map.mapKeys (+j) t'
+      pure (t <> t'')
 
 nameValuesToLogicCircuitArgument ::
   ann ->
