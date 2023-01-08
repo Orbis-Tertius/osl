@@ -19,7 +19,7 @@ data LookupArgument a = LookupArgument
 instance Show a => Show (LookupArgument a) where
   show arg =
     arg ^. #label
-      <> ":"
+      <> ":= "
       <> show (arg ^. #gate)
       <> " = 0 => ("
       <> intercalate ", " (show <$> inputs)

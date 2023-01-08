@@ -6,7 +6,6 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE ViewPatterns #-}
 
--- Choose an appropriate finite field class from some library
 module Stark.Types.Scalar
   ( Scalar,
     order,
