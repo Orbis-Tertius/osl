@@ -43,10 +43,12 @@ toPNFFormula ann =
     S11.Iff a b -> rec' QF.Iff a b
     S11.Predicate p args ->
       pure $ PNF.Formula (QF.Predicate p args) mempty
-    S11.ForAll x b a -> do
+    S11.ForAll x (S11.TermBound b) a -> do
       PNF.Formula a' aq <- rec a
       let qNew = PNF.Quantifiers [] [PNF.All x b] []
       pure (PNF.Formula a' (qNew <> aq))
+    S11.ForAll _ S11.FieldMaxBound _ ->
+      Left (ErrorMessage ann "universal quantification with field max bound is not supported")
     S11.ForSome (S11.Some x c bs b) a -> do
       PNF.Formula a' aq <- rec a
       let qNew = PNF.Quantifiers [PNF.Some x c bs b] [] []

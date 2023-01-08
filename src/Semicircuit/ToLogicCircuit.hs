@@ -589,7 +589,7 @@ universalQuantifierBounds ::
   LogicConstraints ->
   LogicConstraints
 universalQuantifierBounds x layout (All name bound) =
-  quantifierBounds "universal" x layout name [] (OutputBound bound)
+  quantifierBounds "universal" x layout name [] (OutputBound (TermBound bound))
 
 dummyRowAdviceColumnBounds ::
   Layout ->
@@ -842,20 +842,9 @@ universalQuantifierBoundTerms ::
   Layout ->
   [LC.Term]
 universalQuantifierBoundTerms x layout =
-  let bounds =
-        (^. #bound) <$> x
-          ^. #formula . #quantifiers
-            . #universalQuantifiers
-   in boundTerm layout <$> bounds
-
-boundTerm ::
-  Layout ->
-  Bound ->
-  LC.Term
-boundTerm layout =
-  \case
-    TermBound x -> sigma11TermToLogicConstraintTerm layout x
-    FieldMaxBound -> LC.Const maxBound
+  sigma11TermToLogicConstraintTerm layout . (^. #bound) <$> x
+    ^. #formula . #quantifiers
+      . #universalQuantifiers
 
 existentialOutputsInBoundsConstraints ::
   Semicircuit ->
@@ -868,9 +857,9 @@ existentialOutputsInBoundsConstraints x layout =
           x
             ^. #formula . #quantifiers
               . #existentialQuantifiers,
-        let bp =
-              boundTerm layout $
-                existentialQuantifierOutputBound q,
+        bp <- case existentialQuantifierOutputBound q of
+                TermBound bp' -> [sigma11TermToLogicConstraintTerm layout bp']
+                FieldMaxBound -> [],
         let y = mapName $ existentialQuantifierName q
     ]
     mempty
@@ -893,7 +882,9 @@ existentialInputsInBoundsConstraints x layout =
             ^. #formula . #quantifiers
               . #existentialQuantifiers,
         (i, ib) <- zip [0 ..] (existentialQuantifierInputBounds q),
-        let bp = boundTerm layout (ib ^. #bound),
+        bp <- case ib ^. #bound of
+                TermBound bp' -> [sigma11TermToLogicConstraintTerm layout bp']
+                FieldMaxBound -> [],
         let y = name (existentialQuantifierName q) i
     ]
     mempty
@@ -992,7 +983,7 @@ universalTableConstraints x layout =
                  . #universalQuantifiers
            )
         !? unUniQIndex i of
-        Just q -> boundTerm layout (q ^. #bound)
+        Just q -> sigma11TermToLogicConstraintTerm layout (q ^. #bound)
         Nothing ->
           die "universalTableConstraints: bound index out of range (this is a compiler bug)"
 
