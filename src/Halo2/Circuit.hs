@@ -320,8 +320,26 @@ getLookupResults ::
   Map CellReference Scalar ->
   [(Map (RowIndex 'Absolute) Scalar, LookupTableColumn)] ->
   Either (ErrorMessage ann) (Map CellReference Scalar)
-getLookupResults ann mRowSet cellMap table =
-  todo ann mRowSet cellMap table
+getLookupResults ann rc mRowSet cellMap table = do
+  cellMapRows <- getCellMapRows ann rc mRowSet cellMap
+  tableRows <- getColumnListRows ann rc mRowSet table
+  todo cellMapRows tableRows
+
+getCellMapRows ::
+  ann ->
+  RowCount ->
+  Maybe (Set (RowIndex 'Absolute)) ->
+  Map CellReference Scalar ->
+  Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Map ColumnIndex Scalar))
+getCellMapRows = todo
+
+getColumnListRows ::
+  ann ->
+  RowCount ->
+  Maybe (Set (RowIndex 'Absolute)) ->
+  [(Map (RowIndex 'Absolute) Scalar, LookupTableColumn)] ->
+  Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Map ColumnIndex Scalar))
+getColumnListRows = todo
 
 lessIndicator :: Scalar -> Scalar -> Scalar
 lessIndicator x y =
