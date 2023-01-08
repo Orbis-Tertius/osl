@@ -19,7 +19,7 @@ module OSL.Sigma11
     evalFormula,
     boolToScalar,
     scalarValue,
-    indexedCoproduct,
+    indexedProduct,
     auxTablesToEvalContext,
     flipQuantifiers,
     flipQuantifier,
@@ -409,8 +409,8 @@ fromInteger = maybe (Left (ErrorMessage () "integer out of range of scalar field
 scalarValue :: Scalar -> Value
 scalarValue = Value . Map.singleton []
 
-indexedCoproduct :: [Value] -> Value
-indexedCoproduct vs =
+indexedProduct :: [Value] -> Value
+indexedProduct vs =
   maybe
     (die "indexedCoproduct: partiality (this is a bug in indexedCoproduct)")
     (Value . Map.fromList)
