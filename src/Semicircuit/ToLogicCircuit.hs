@@ -36,6 +36,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Data.Text (Text, pack)
 import Die (die)
+import Halo2.Circuit (rowsToCellMap)
 import qualified Halo2.Types.Argument as Halo2
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
@@ -55,7 +56,7 @@ import Halo2.Types.LogicConstraints (LogicConstraints (..))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
-import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative))
+import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative, Absolute))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import qualified OSL.Types.Sigma11.Argument as S11
 import OSL.Types.Sigma11.Value (Value (Value))
@@ -109,7 +110,26 @@ getUniversalTableArgument ::
   Layout ->
   Map Name Value ->
   Either (ErrorMessage ann) Halo2.Argument
-getUniversalTableArgument = todo
+getUniversalTableArgument ann (RowCount n) f layout vs = do
+  t <- getUniversalTable ann f layout vs
+  Halo2.Argument mempty . Halo2.Witness . rowsToCellMap . Map.fromList
+    <$> pad n' (Map.toList t)
+  where
+    n' = scalarToInteger n
+
+    pad 0 [] = pure []
+    pad _ [] = Left (ErrorMessage ann "empty universal table")
+    pad 0 _ = Left (ErrorMessage ann "universal table size exceeds row count")
+    pad n'' [(i,x)] = ((i,x):) <$> pad (n''-1) [(i+1,x)]
+    pad n'' ((i,x):xs) = ((i,x):) <$> pad (n''-1) xs
+
+getUniversalTable ::
+  ann ->
+  Semicircuit ->
+  Layout ->
+  Map Name Value ->
+  Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Map ColumnIndex Scalar))
+getUniversalTable = todo
 
 nameValuesToLogicCircuitArgument ::
   ann ->
@@ -145,12 +165,16 @@ nameMappingArgument ann (RowCount n) nm (Value f) =
   else do
     indices <- mapM sToI [0 .. n'-1]
     let f' = Map.toList f
+    (defaultIns, defaultOut) <-
+      case f' of
+        ((xs,y):_) -> pure (xs, y)
+        _ -> Left (ErrorMessage ann "empty value")
     pure $ Map.fromList ([(CellReference ci ri, x)
-                          | (ri, x) <- zip indices (snd <$> f'),
+                          | (ri, x) <- zip indices ((snd <$> f') <> repeat defaultOut),
                             let ci = nm ^. #outputMapping . #unOutputMapping
                          ])
       <> Map.fromList ([(CellReference ci ri, x)
-                        | (ri, inputs) <- zip indices (fst <$> f'),
+                        | (ri, inputs) <- zip indices ((fst <$> f') <> repeat defaultIns),
                           (ci, x) <- zip ((nm ^. #argMappings) <&> (^. #unArgMapping)) inputs
                        ])
   where
