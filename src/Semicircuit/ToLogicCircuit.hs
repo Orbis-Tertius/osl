@@ -9,6 +9,7 @@
 
 module Semicircuit.ToLogicCircuit
   ( semicircuitToLogicCircuit,
+    semicircuitArgumentToLogicCircuitArgument,
     columnLayout,
     fixedValues,
     equalityConstraints,
@@ -24,7 +25,7 @@ module Semicircuit.ToLogicCircuit
   )
 where
 
-import Cast (word64ToInteger)
+import Cast (word64ToInteger, integerToInt, intToInteger)
 import Control.Lens ((<&>), (^.))
 import Control.Monad (replicateM)
 import Control.Monad.State (State, evalState, get, put)
@@ -35,6 +36,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Data.Text (Text, pack)
 import Die (die)
+import qualified Halo2.Types.Argument as Halo2
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
@@ -54,13 +56,17 @@ import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative))
+import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+import qualified OSL.Types.Sigma11.Argument as S11
+import OSL.Types.Sigma11.Value (Value (Value))
+import Semicircuit.Argument (getNameValues)
 import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound, getInputName)
 import Semicircuit.Types.PNFFormula (ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), InstanceQuantifier, InstanceQuantifierF (Instance), UniversalQuantifier (All))
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), ZeroVectorIndex (..))
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), InputBound, Name, OutputBound, OutputBoundF (OutputBound), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
-import Stark.Types.Scalar (one, order, scalarToInt, zero)
+import Stark.Types.Scalar (Scalar, one, order, scalarToInt, zero, scalarToInteger)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
@@ -80,6 +86,87 @@ semicircuitToLogicCircuit rowCount x =
           (fixedValues rowCount layout),
         layout
       )
+
+semicircuitArgumentToLogicCircuitArgument ::
+  ann ->
+  RowCount ->
+  Semicircuit ->
+  Layout ->
+  S11.Argument ->
+  Either (ErrorMessage ann) Halo2.Argument
+semicircuitArgumentToLogicCircuitArgument ann rc f layout arg = do
+  vals <- getNameValues ann f arg
+  mconcat <$> sequence
+    [ getUniversalTableArgument ann rc f layout vals,
+      nameValuesToLogicCircuitArgument ann rc f layout vals,
+      getFixedValuesArgument ann rc f layout
+    ]
+
+getUniversalTableArgument ::
+  ann ->
+  RowCount ->
+  Semicircuit ->
+  Layout ->
+  Map Name Value ->
+  Either (ErrorMessage ann) Halo2.Argument
+getUniversalTableArgument = todo
+
+nameValuesToLogicCircuitArgument ::
+  ann ->
+  RowCount ->
+  Semicircuit ->
+  Layout ->
+  Map Name Value ->
+  Either (ErrorMessage ann) Halo2.Argument
+nameValuesToLogicCircuitArgument ann rc f layout vs =
+  Halo2.Argument
+    <$> (Halo2.Statement . mconcat <$> sequence
+           [ nameMappingArgument ann rc nm v
+            | (n, (nm, v)) <- Map.toList $
+                Map.intersectionWith (,) (layout ^. #nameMappings) vs,
+              n `Set.member` Set.fromList ((f ^. #formula . #quantifiers . #instanceQuantifiers) <&> (^. #name))
+           ])
+    <*> (Halo2.Witness . mconcat <$> sequence
+           [ nameMappingArgument ann rc nm v
+            | (n, (nm, v)) <- Map.toList $
+                Map.intersectionWith (,) (layout ^. #nameMappings) vs,
+              n `Set.member` Set.fromList ((f ^. #formula . #quantifiers . #existentialQuantifiers) <&> (^. #name))
+           ])
+
+nameMappingArgument ::
+  ann ->
+  RowCount ->
+  NameMapping ->
+  Value ->
+  Either (ErrorMessage ann) (Map CellReference Scalar)
+nameMappingArgument ann (RowCount n) nm (Value f) =
+  if intToInteger (Map.size f) > n'
+  then Left (ErrorMessage ann "value cardinality exceeds row count")
+  else do
+    indices <- mapM sToI [0 .. n'-1]
+    let f' = Map.toList f
+    pure $ Map.fromList ([(CellReference ci ri, x)
+                          | (ri, x) <- zip indices (snd <$> f'),
+                            let ci = nm ^. #outputMapping . #unOutputMapping
+                         ])
+      <> Map.fromList ([(CellReference ci ri, x)
+                        | (ri, inputs) <- zip indices (fst <$> f'),
+                          (ci, x) <- zip ((nm ^. #argMappings) <&> (^. #unArgMapping)) inputs
+                       ])
+  where
+    n' = scalarToInteger n
+    sToI = maybe (Left (ErrorMessage ann "index is out of range of Int")) (pure . RowIndex) . integerToInt
+
+getFixedValuesArgument ::
+  ann ->
+  RowCount ->
+  Semicircuit ->
+  Layout ->
+  Either (ErrorMessage ann) Halo2.Argument
+getFixedValuesArgument = todo
+
+todo :: a
+todo = todo
 
 newtype S = S (ColumnIndex, ColumnTypes)
 

@@ -14,7 +14,7 @@ module OSL.Types.Sigma11
     var,
     FormulaF (..),
     Formula,
-    ExistentialQuantifierF (..),
+    ExistentialQuantifierF (Some, SomeP),
     ExistentialQuantifier,
     someFirstOrder,
     InstanceQuantifierF (..),
@@ -158,9 +158,19 @@ newtype OutputBoundF name = OutputBound {unOutputBound :: BoundF name}
 deriving newtype instance Show a => Show (OutputBoundF a)
 
 data ExistentialQuantifierF name
-  = Some name Cardinality [InputBoundF name] (OutputBoundF name)
-  | SomeP name Cardinality (InputBoundF name) (OutputBoundF name)
-  deriving (Eq, Functor)
+  = Some
+    { name :: name,
+      cardinality :: Cardinality,
+      _inputBounds :: [InputBoundF name],
+      outputBound :: OutputBoundF name
+    }
+  | SomeP
+    { name :: name,
+      cardinality :: Cardinality,
+      _inputBound :: InputBoundF name,
+      outputBound :: OutputBoundF name
+    }
+  deriving (Generic, Eq, Functor)
 
 type ExistentialQuantifier = ExistentialQuantifierF Name
 

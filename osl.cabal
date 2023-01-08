@@ -108,6 +108,7 @@ library
     OSL.ValidateContext
     OSL.Value
     OSL.Witness
+    Semicircuit.Argument
     Semicircuit.DNFFormula
     Semicircuit.Gensyms
     Semicircuit.PrenexNormalForm
