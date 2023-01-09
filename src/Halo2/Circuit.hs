@@ -10,6 +10,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-unused-imports -Wno-unused-matches #-}
 
 module Halo2.Circuit
   ( HasPolynomialVariables (getPolynomialVariables),
@@ -25,11 +26,13 @@ import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Lens ((<&>))
-import Control.Monad.Extra (allM)
+import Control.Monad.Extra (allM, when)
+import Data.Either.Extra (mapLeft)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import qualified Data.Set as Set
+import Debug.Trace (trace)
 import Die (die)
 import Halo2.Polynomial (degree)
 import Halo2.Prelude
@@ -57,6 +60,7 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (PowerProduct, getPowerProduct))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
+import OSL.Map (inverseMap)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, one, scalarToInteger, toWord64, zero)
 
@@ -310,7 +314,11 @@ instance HasEvaluate (RowCount, Term) (Map (RowIndex 'Absolute) Scalar) where
           Times x y -> Map.unionWith (Ring.*) <$> rec x <*> rec y
           Max x y -> Map.unionWith max <$> rec x <*> rec y
           IndLess x y -> Map.intersectionWith lessIndicator <$> rec x <*> rec y
-          Lookup is outCol -> performLookups ann rc Nothing arg is outCol
+          l@(Lookup is outCol) ->
+            mapLeft
+              (\(ErrorMessage ann' msg) ->
+                ErrorMessage ann' ("performLookups " <> pack (show l) <> ": " <> msg))
+              (performLookups ann rc Nothing arg is outCol)
 
 -- Get the column vector of outputs corresponding to the given input expressions
 -- looked up in the given lookup table. The lookups are performed only on the given
@@ -325,12 +333,20 @@ performLookups ::
   [(InputExpression a, LookupTableColumn)] ->
   LookupTableOutputColumn ->
   Either (ErrorMessage ann) (Map (RowIndex 'Absolute) Scalar)
-performLookups ann rc mRowSet arg is outCol = do
+performLookups ann rc@(RowCount n) mRowSet arg is outCol = do
   inputTable <- mapM (evaluate ann arg . (rc,) . (^. #getInputExpression) . fst) is
-  permutation <- getLookupResults ann rc mRowSet (getCellMap arg) (zip inputTable (snd <$> is))
-  pure . Map.fromList $
+  results <- getLookupResults ann rc mRowSet (getCellMap arg) (zip inputTable (snd <$> is))
+  n' <- case integerToInt (scalarToInteger n) of
+          Just n' -> pure n'
+          Nothing -> Left (ErrorMessage ann "row count out of range of Int")
+  let rowSet = getRowSet rc mRowSet
+      emptyRows = Map.fromList
+        [ (ri, zero)
+         | ri <- RowIndex <$> [0 .. n'-1],
+           not (ri `Set.member` rowSet) ]
+  pure . (<> emptyRows) . Map.fromList $
     [ (cell ^. #rowIndex, v)
-      | (cell, v) <- Map.toList permutation,
+      | (cell, v) <- Map.toList results,
         cell ^. #colIndex == outCol ^. #unLookupTableOutputColumn . #unLookupTableColumn
     ]
 
@@ -351,6 +367,9 @@ getLookupResults ::
 getLookupResults ann rc mRowSet cellMap table = do
   let rowSet = getRowSet rc mRowSet
       cellMapRows = getCellMapRows rowSet cellMap
+      tableCols = Map.fromList (((,()) . (^. #unLookupTableColumn) . snd) <$> table)
+      cellMapTableRows = (`Map.intersection` tableCols) <$> cellMapRows
+      cellMapTableInverse = inverseMap cellMapTableRows
       tableRows = getColumnListRows rowSet table
   rowsToCellMap . Map.fromList
     <$> sequence
@@ -360,7 +379,16 @@ getLookupResults ann rc mRowSet cellMap table = do
               (Left (ErrorMessage ann "input table row index missing"))
               pure
               (Map.lookup ri tableRows)
-          (,tableRow) <$> getRowIndex ann cellMapRows tableRow
+          when (Map.size tableRow /= length table)
+            (Left (ErrorMessage ann ("table row is wrong size; duplicate column index in lookup table, or missing value in input column vectors? " <> pack (show tableRow))))
+          (,tableRow) <$>
+            case Map.lookup tableRow cellMapTableInverse of
+              Just ri' -> pure ri'
+              Nothing ->
+                trace ("table: " <> show cellMapTableInverse)
+                (Left (ErrorMessage ann
+                  ("input table row not present in lookup table: "
+                     <> pack (show tableRow))))
         | ri <- Set.toList rowSet
       ]
 
@@ -387,17 +415,6 @@ rowsToCellMap rows =
       | (ri, cols) <- Map.toList rows,
         (ci, x) <- Map.toList cols
     ]
-
-getRowIndex ::
-  ann ->
-  Map (RowIndex 'Absolute) (Map ColumnIndex Scalar) ->
-  Map ColumnIndex Scalar ->
-  Either (ErrorMessage ann) (RowIndex 'Absolute)
-getRowIndex ann rows row =
-  case Map.keys (Map.filter (== row) rows) of
-    (ri : _) -> pure ri
-    _ -> Left . ErrorMessage ann $
-      "lookup argument input row is not present in lookup table: " <> pack (show row)
 
 -- Gets the row vectors for the given set of rows out of the given cell map.
 getCellMapRows ::
