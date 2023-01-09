@@ -103,7 +103,7 @@ semicircuitArgumentToLogicCircuitArgument ann rc f layout arg = do
   mconcat <$> sequence
     [ getUniversalTableArgument ann rc f layout vals,
       nameValuesToLogicCircuitArgument ann rc f layout vals,
-      getFixedValuesArgument ann rc f layout
+      getFixedValuesArgument ann rc layout
     ]
 
 getUniversalTableArgument ::
@@ -115,14 +115,15 @@ getUniversalTableArgument ::
   Either (ErrorMessage ann) Halo2.Argument
 getUniversalTableArgument ann (RowCount n) f layout vs = do
   t <- getUniversalTable ann (f ^. #formula . #quantifiers . #universalQuantifiers) layout vs
-  Halo2.Argument mempty . Halo2.Witness . rowsToCellMap . Map.fromList
-    <$> pad n' (Map.toList t)
+  if intToInteger (Map.size t) > n'
+    then Left (ErrorMessage ann "universal table size exceeds row count")
+    else Halo2.Argument mempty . Halo2.Witness . rowsToCellMap . Map.fromList
+           <$> pad n' (Map.toList t)
   where
     n' = scalarToInteger n
 
-    pad 0 [] = pure []
+    pad 0 _ = pure []
     pad _ [] = Left (ErrorMessage ann "empty universal table")
-    pad 0 _ = Left (ErrorMessage ann "universal table size exceeds row count")
     pad n'' [(i,x)] = ((i,x):) <$> pad (n''-1) [(i+1,x)]
     pad n'' ((i,x):xs) = ((i,x):) <$> pad (n''-1) xs
 
@@ -238,13 +239,27 @@ nameMappingArgument ann (RowCount n) nm (Value f) =
 getFixedValuesArgument ::
   ann ->
   RowCount ->
-  Semicircuit ->
   Layout ->
   Either (ErrorMessage ann) Halo2.Argument
-getFixedValuesArgument = todo
-
-todo :: a
-todo = todo
+getFixedValuesArgument ann (RowCount n) layout = do
+  n' <- maybe (Left (ErrorMessage ann "row count of range of Int")) pure
+        (integerToInt (scalarToInteger n))
+  pure . Halo2.Argument mempty . Halo2.Witness . Map.fromList $
+    mconcat
+      [ [ (CellReference (layout ^. #fixedColumns . #zeroVector . #unZeroVectorIndex)
+            (RowIndex ri), zero)
+         | ri <- [0 .. n' - 1]
+        ],
+        [ (CellReference (layout ^. #fixedColumns . #oneVector . #unOneVectorIndex)
+            (RowIndex ri), one)
+         | ri <- [0 .. n' - 1]
+        ],
+        [ (CellReference (layout ^. #fixedColumns . #lastRowIndicator . #unLastRowIndicatorColumnIndex)
+            (RowIndex ri), v)
+         | ri <- [0 .. n' - 1],
+           let v = if ri == n' - 1 then one else zero
+        ]
+      ]
 
 newtype S = S (ColumnIndex, ColumnTypes)
 

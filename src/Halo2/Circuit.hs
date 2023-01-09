@@ -28,6 +28,7 @@ import Control.Lens ((<&>))
 import Control.Monad.Extra (allM)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
+import Data.Text (pack)
 import qualified Data.Set as Set
 import Die (die)
 import Halo2.Polynomial (degree)
@@ -395,7 +396,8 @@ getRowIndex ::
 getRowIndex ann rows row =
   case Map.keys (Map.filter (== row) rows) of
     (ri : _) -> pure ri
-    _ -> Left (ErrorMessage ann "lookup argument input row is not present in lookup table")
+    _ -> Left . ErrorMessage ann $
+      "lookup argument input row is not present in lookup table: " <> pack (show row)
 
 -- Gets the row vectors for the given set of rows out of the given cell map.
 getCellMapRows ::
