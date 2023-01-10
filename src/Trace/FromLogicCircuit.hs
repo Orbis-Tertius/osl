@@ -131,8 +131,10 @@ data TruthTableColumnIndices = TruthTableColumnIndices
 
 data Operator
   = Plus
-  | TimesAnd -- and & are the same operation, actually
+  | TimesAnd -- (*) and (&) are the same operation, actually
+  | TimesAndShortCircuit -- first argument is zero / false
   | Or
+  | OrShortCircuit -- first argument is true
   | Not
   | Iff
   | Equals
@@ -164,7 +166,9 @@ data StepTypeIdMapping = StepTypeIdMapping
     constants :: Map Scalar StepTypeId,
     plus :: StepTypeIdOf Plus,
     timesAnd :: StepTypeIdOf TimesAnd,
+    timesAndShortCircuit :: StepTypeIdOf TimesAndShortCircuit,
     or :: StepTypeIdOf Or,
+    orShortCircuit :: StepTypeIdOf OrShortCircuit,
     not :: StepTypeIdOf Not,
     iff :: StepTypeIdOf Iff,
     equals :: StepTypeIdOf Equals,
@@ -184,10 +188,12 @@ data Void
 
 data Operation
   = Or' SubexpressionId SubexpressionId
+  | OrShortCircuit' SubexpressionId
   | Not' SubexpressionId
   | Iff' SubexpressionId SubexpressionId
   | Plus' SubexpressionId SubexpressionId
   | TimesAnd' SubexpressionId SubexpressionId
+  | TimesAndShortCircuit' SubexpressionId
   | Equals' SubexpressionId SubexpressionId
   | LessThan' SubexpressionId SubexpressionId
   | Max' SubexpressionId SubexpressionId
@@ -366,7 +372,9 @@ getMapping bitsPerByte c =
                     )
                 <*> (nextSid' :: State S (StepTypeIdOf Plus))
                 <*> (nextSid' :: State S (StepTypeIdOf TimesAnd))
+                <*> (nextSid' :: State S (StepTypeIdOf TimesAndShortCircuit))
                 <*> (nextSid' :: State S (StepTypeIdOf Or))
+                <*> (nextSid' :: State S (StepTypeIdOf OrShortCircuit))
                 <*> (nextSid' :: State S (StepTypeIdOf Not))
                 <*> (nextSid' :: State S (StepTypeIdOf Iff))
                 <*> (nextSid' :: State S (StepTypeIdOf Equals))
@@ -449,11 +457,13 @@ getMapping bitsPerByte c =
         LC.And x y -> do
           (xId, m'') <- traverseConstraint out m' x
           (yId, m''') <- traverseConstraint out m'' y
-          addOp m''' (TimesAnd' xId yId) <$> nextEid'
+          (zId, m'''') <- addOp m''' (TimesAnd' xId yId) <$> nextEid'
+          pure $ addOp m'''' (TimesAndShortCircuit' xId) (SubexpressionIdOf zId)
         LC.Or x y -> do
           (xId, m'') <- traverseConstraint out m' x
           (yId, m''') <- traverseConstraint out m'' y
-          addOp m''' (Or' xId yId) <$> nextEid'
+          (zId, m'''') <- addOp m''' (Or' xId yId) <$> nextEid'
+          pure $ addOp m'''' (OrShortCircuit' xId) (SubexpressionIdOf zId)
         LC.Iff x y -> do
           (xId, m'') <- traverseConstraint out m' x
           (yId, m''') <- traverseConstraint out m'' y
@@ -767,7 +777,9 @@ operatorStepTypes bitsPerByte c m =
   mconcat
     [ plusStepType m,
       timesStepType m,
+      timesShortCircuitStepType m,
       orStepType m,
+      orShortCircuitStepType m,
       notStepType m,
       iffStepType m,
       equalsStepType bitsPerByte c m,
@@ -786,7 +798,9 @@ firstTwoInputs m =
 
 plusStepType,
   timesStepType,
+  timesShortCircuitStepType,
   orStepType,
+  orShortCircuitStepType,
   notStepType,
   iffStepType,
   voidStepType ::
@@ -830,6 +844,21 @@ timesStepType m =
     )
   where
     (i0, i1) = firstTwoInputs m
+timesShortCircuitStepType m =
+  Map.singleton
+    (m ^. #stepTypeIds . #timesAndShortCircuit . #unOf)
+    ( StepType
+        ( PolynomialConstraints
+            [ P.var' (m ^. #output . #unOutputColumnIndex),
+              P.var' (i0 ^. #unInputColumnIndex)
+            ]
+            2
+        )
+        mempty
+        mempty
+    )
+  where
+    (i0, _) = firstTwoInputs m
 orStepType m =
   Map.singleton
     (m ^. #stepTypeIds . #or . #unOf)
@@ -848,6 +877,21 @@ orStepType m =
     (i0, i1) = firstTwoInputs m
     v0 = P.var' (i0 ^. #unInputColumnIndex)
     v1 = P.var' (i1 ^. #unInputColumnIndex)
+orShortCircuitStepType m =
+  Map.singleton
+    (m ^. #stepTypeIds . #orShortCircuit . #unOf)
+    ( StepType
+        ( PolynomialConstraints
+            [ P.minus P.one (P.var' (m ^. #output . #unOutputColumnIndex)),
+              P.minus P.one (P.var' (i0 ^. #unInputColumnIndex))
+            ]
+            2
+        )
+        mempty
+        mempty
+    )
+  where
+    (i0, _) = firstTwoInputs m
 notStepType m =
   Map.singleton
     (m ^. #stepTypeIds . #not . #unOf)
@@ -1215,6 +1259,11 @@ getSubexpressionLinks m =
             (m ^. #stepTypeIds . #or . #unOf)
             (padInputs (InputSubexpressionId <$> [x, y]))
             (OutputSubexpressionId (z ^. #unOf))
+        OrShortCircuit' x -> \z ->
+          SubexpressionLink
+            (m ^. #stepTypeIds . #or . #unOf)
+            (padInputs (InputSubexpressionId <$> [x]))
+            (OutputSubexpressionId (z ^. #unOf))
         Not' x -> \z ->
           SubexpressionLink
             (m ^. #stepTypeIds . #not . #unOf)
@@ -1234,6 +1283,11 @@ getSubexpressionLinks m =
           SubexpressionLink
             (m ^. #stepTypeIds . #timesAnd . #unOf)
             (padInputs (InputSubexpressionId <$> [x, y]))
+            (OutputSubexpressionId (z ^. #unOf))
+        TimesAndShortCircuit' x -> \z ->
+          SubexpressionLink
+            (m ^. #stepTypeIds . #timesAndShortCircuit . #unOf)
+            (padInputs [InputSubexpressionId x])
             (OutputSubexpressionId (z ^. #unOf))
         Equals' x y -> \z ->
           SubexpressionLink
