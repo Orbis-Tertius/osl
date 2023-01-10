@@ -10,6 +10,7 @@ module Halo2.LogicConstraint
 where
 
 import Data.List.Extra (foldl')
+import Data.Tuple.Extra (second)
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint, LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
 import Halo2.Types.LogicConstraints (LogicConstraints (LogicConstraints))
 import Prelude hiding (and, or)
@@ -26,7 +27,7 @@ data Parity = Positive | Negative
 
 toDisjunctiveNormalForms :: LogicConstraints -> LogicConstraints
 toDisjunctiveNormalForms (LogicConstraints gates bounds) =
-  LogicConstraints (toDisjunctiveNormalForm <$> gates) bounds
+  LogicConstraints (second toDisjunctiveNormalForm <$> gates) bounds
 
 toDisjunctiveNormalForm :: LogicConstraint -> LogicConstraint
 toDisjunctiveNormalForm = fromDisjunction . toDisjunction

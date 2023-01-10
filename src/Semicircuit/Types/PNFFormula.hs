@@ -17,7 +17,7 @@ import Control.Lens ((^.))
 import Data.List (intercalate)
 import GHC.Generics (Generic)
 import qualified Semicircuit.Types.QFFormula as QF
-import Semicircuit.Types.Sigma11 (Bound, ExistentialQuantifier, ExistentialQuantifierF (..), InstanceQuantifier, InstanceQuantifierF (..), Name)
+import Semicircuit.Types.Sigma11 (ExistentialQuantifier, ExistentialQuantifierF (..), InstanceQuantifier, InstanceQuantifierF (..), Name, Term)
 
 data Formula = Formula
   { qfFormula :: QF.Formula,
@@ -53,7 +53,7 @@ instance Monoid Quantifiers where
 
 data UniversalQuantifier = All
   { name :: Name,
-    bound :: Bound
+    bound :: Term
   }
   deriving (Eq, Generic)
 

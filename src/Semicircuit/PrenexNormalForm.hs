@@ -28,7 +28,7 @@ import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
 import OSL.Argument (emptyTree, pairTree)
-import OSL.Sigma11 (HasMultiplyCardinalities (multiplyCardinalities), indexedCoproduct)
+import OSL.Sigma11 (HasMultiplyCardinalities (multiplyCardinalities), indexedProduct)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.Cardinality (Cardinality)
 import OSL.Types.ErrorMessage (ErrorMessage (..))
@@ -63,7 +63,7 @@ toSuperStrongPrenexNormalForm qs f =
 
 statementToSuperStrongPrenexNormalForm :: Statement -> Statement
 statementToSuperStrongPrenexNormalForm (Statement vs) =
-  Statement [indexedCoproduct (take (length vs - 1) vs)]
+  Statement [indexedProduct (take (length vs - 1) vs)]
 
 witnessToSuperStrongPrenexNormalForm ::
   ann ->
@@ -104,7 +104,7 @@ mergeWitnessQuantifiers ann [] _ = Left (ErrorMessage ann "mergeWitnessQuantifie
 mergeWitnessQuantifiers _ [_] w = pure (Nothing, w)
 mergeWitnessQuantifiers ann qs@(ForSome' {} : _) w = do
   (fs, w') <- extractExistentialWitnesses ann (length qs) w
-  pure (Just (indexedCoproduct fs), w')
+  pure (Just (indexedProduct fs), w')
 mergeWitnessQuantifiers ann (ForAll' {} : _) _ =
   Left (ErrorMessage ann "mergeWitnessQuantifiers: universal group of length greater than one")
 mergeWitnessQuantifiers _ (Given' {} : _) w = pure (Nothing, w)

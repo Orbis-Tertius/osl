@@ -1,35 +1,70 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-unused-imports -Wno-unused-matches #-}
 
 module Halo2.Circuit
   ( HasPolynomialVariables (getPolynomialVariables),
     HasScalars (getScalars),
     HasLookupArguments (getLookupArguments),
     getLookupTables,
+    HasEvaluate (evaluate),
+    rowsToCellMap,
   )
 where
 
+import qualified Algebra.Additive as Group
+import qualified Algebra.Ring as Ring
+import Cast (intToInteger, integerToInt)
+import Control.Applicative (liftA2)
+import Control.Lens ((<&>))
+import Control.Monad.Extra (allM, andM, when, (&&^), (||^))
+import Data.Either.Extra (mapLeft)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
+import Data.Text (pack)
+import Data.Tuple.Extra (second, swap, uncurry3)
+import Debug.Trace (trace)
+import Die (die)
+import Halo2.Polynomial (degree)
 import Halo2.Prelude
+import Halo2.Types.Argument (Argument)
+import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (Circuit, LogicCircuit)
-import Halo2.Types.Coefficient (Coefficient (getCoefficient))
+import Halo2.Types.Coefficient (Coefficient (Coefficient, getCoefficient))
+import Halo2.Types.ColumnIndex (ColumnIndex)
+import Halo2.Types.ColumnType (ColumnType (Advice, Fixed, Instance))
+import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
+import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (EqualityConstrainableColumns))
+import Halo2.Types.EqualityConstraint (EqualityConstraint (EqualityConstraint))
+import Halo2.Types.EqualityConstraints (EqualityConstraints (EqualityConstraints))
+import Halo2.Types.FixedBound (FixedBound)
+import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.InputExpression (InputExpression (..))
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top), LookupTableOutputColumn (LookupTableOutputColumn), Term (Const, IndLess, Lookup, Max, Plus, Times, Var))
-import Halo2.Types.LogicConstraints (LogicConstraints)
+import Halo2.Types.LogicConstraints (LogicConstraints (LogicConstraints))
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
-import Halo2.Types.LookupTableColumn (LookupTableColumn)
-import Halo2.Types.Polynomial (Polynomial)
-import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
+import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
+import Halo2.Types.Polynomial (Polynomial (Polynomial))
+import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
-import Halo2.Types.PowerProduct (PowerProduct (getPowerProduct))
-import Stark.Types.Scalar (Scalar, zero)
+import Halo2.Types.PowerProduct (PowerProduct (PowerProduct, getPowerProduct))
+import Halo2.Types.RowCount (RowCount (RowCount))
+import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
+import OSL.Map (inverseMap)
+import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInteger, toWord64, zero)
 
 class HasPolynomialVariables a where
   getPolynomialVariables :: a -> Set PolynomialVariable
@@ -81,7 +116,7 @@ instance HasPolynomialVariables LogicConstraint where
 
 instance HasPolynomialVariables LogicConstraints where
   getPolynomialVariables =
-    mconcat . fmap getPolynomialVariables . (^. #constraints)
+    mconcat . fmap (getPolynomialVariables . snd) . (^. #constraints)
 
 deriving newtype instance HasPolynomialVariables a => HasPolynomialVariables (InputExpression a)
 
@@ -147,7 +182,7 @@ instance HasScalars LogicConstraint where
 
 instance HasScalars LogicConstraints where
   getScalars =
-    mconcat . fmap getScalars . (^. #constraints)
+    mconcat . fmap (getScalars . snd) . (^. #constraints)
 
 deriving newtype instance HasScalars a => HasScalars (InputExpression a)
 
@@ -213,7 +248,8 @@ instance HasLookupArguments LogicConstraint Term where
 
 instance HasLookupArguments LogicCircuit Term where
   getLookupArguments c =
-    (c ^. #lookupArguments) <> getLookupArguments (c ^. #gateConstraints . #constraints)
+    (c ^. #lookupArguments)
+      <> getLookupArguments (snd <$> (c ^. #gateConstraints . #constraints))
 
 getLookupTables :: HasLookupArguments a b => Ord b => a -> Set (b, [LookupTableColumn])
 getLookupTables x =
@@ -221,3 +257,412 @@ getLookupTables x =
     [ (a ^. #gate, snd <$> (a ^. #tableMap))
       | a <- Set.toList (getLookupArguments x ^. #getLookupArguments)
     ]
+
+class HasColumnVectorToBools a where
+  -- Here the a is irrelevant at runtime; it is only passed to select
+  -- the correct implementation.
+  columnVectorToBools :: a -> Map (RowIndex 'Absolute) (Maybe Scalar) -> Map (RowIndex 'Absolute) Bool
+
+instance HasColumnVectorToBools Polynomial where
+  columnVectorToBools _ = fmap (== Just zero)
+
+instance HasColumnVectorToBools Term where
+  columnVectorToBools _ = fmap (== Just one)
+
+class HasEvaluate a b | a -> b where
+  evaluate :: ann -> Argument -> a -> Either (ErrorMessage ann) b
+
+instance HasEvaluate PolynomialVariable (Map (RowIndex 'Absolute) Scalar) where
+  evaluate _ arg v =
+    pure . Map.mapKeys (^. #rowIndex) $
+      Map.filterWithKey
+        (\k _ -> (k ^. #colIndex) == v ^. #colIndex)
+        (getCellMap arg)
+
+instance
+  HasEvaluate
+    (RowCount, (PowerProduct, Coefficient))
+    (Map (RowIndex 'Absolute) Scalar)
+  where
+  evaluate ann arg (RowCount n, (PowerProduct m, Coefficient c)) =
+    if Map.null m
+      then do
+        n' <- case integerToInt (scalarToInteger n) of
+          Just n' -> pure n'
+          Nothing -> Left (ErrorMessage ann "row count outside range of Int")
+        pure (Map.fromList ((,c) . RowIndex <$> [0 .. n' - 1]))
+      else
+        fmap (Ring.* c) . foldr (Map.unionWith (Ring.*)) mempty
+          <$> sequence
+            [ evaluate ann arg v <&> fmap (Ring.^ intToInteger (e ^. #getExponent))
+              | (v, e) <- Map.toList m
+            ]
+
+instance HasEvaluate (RowCount, Polynomial) (Map (RowIndex 'Absolute) Scalar) where
+  evaluate ann arg (rc, Polynomial monos) =
+    foldr (Map.unionWith (Group.+)) mempty
+      <$> mapM (evaluate ann arg . (rc,)) (Map.toList monos)
+
+instance HasEvaluate (RowCount, Term) (Map (RowIndex 'Absolute) (Maybe Scalar)) where
+  evaluate ann arg = uncurry $ \rc@(RowCount n) ->
+    let rec = evaluate ann arg . (rc,)
+     in \case
+          Var v -> fmap Just <$> evaluate ann arg v
+          Const i -> do
+            n' <- case integerToInt (scalarToInteger n) of
+              Just n' -> pure n'
+              Nothing -> Left (ErrorMessage ann "row count outside range of Int")
+            pure $ Map.fromList [(RowIndex x, Just i) | x <- [0 .. n' - 1]]
+          Plus x y -> Map.unionWith (liftA2 (Group.+)) <$> rec x <*> rec y
+          Times x y -> Map.unionWith (liftA2 (Ring.*)) <$> rec x <*> rec y
+          Max x y -> Map.unionWith (liftA2 max) <$> rec x <*> rec y
+          IndLess x y -> Map.unionWith (liftA2 lessIndicator) <$> rec x <*> rec y
+          l@(Lookup is outCol) ->
+            mapLeft
+              ( \(ErrorMessage ann' msg) ->
+                  ErrorMessage ann' ("performLookups " <> pack (show l) <> ": " <> msg)
+              )
+              (performLookups ann rc arg is outCol)
+
+-- Get the output corresponding to the given input expressions
+-- looked up in the given lookup table.
+performLookups ::
+  HasEvaluate (RowCount, a) (Map (RowIndex 'Absolute) (Maybe Scalar)) =>
+  ann ->
+  RowCount ->
+  Argument ->
+  [(InputExpression a, LookupTableColumn)] ->
+  LookupTableOutputColumn ->
+  Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Maybe Scalar))
+performLookups ann rc arg is outCol = do
+  inputTable <-
+    fmap (Map.mapMaybe id)
+      <$> mapM (evaluate ann arg . (rc,) . (^. #getInputExpression) . fst) is
+  results <-
+    getLookupResults
+      ann
+      rc
+      Nothing
+      (getCellMap arg)
+      (zip inputTable (snd <$> is))
+  let allRows = getRowSet rc Nothing
+      results' =
+        fmap Just . Map.mapKeys (^. #rowIndex) $
+          Map.filterWithKey (\k _ -> k ^. #colIndex == outCol') results
+  pure $ results' <> Map.fromList ((,Nothing) <$> Set.toList allRows)
+  where
+    outCol' = outCol ^. #unLookupTableOutputColumn . #unLookupTableColumn
+
+getLookupResults ::
+  ann ->
+  RowCount ->
+  Maybe (Set (RowIndex 'Absolute)) ->
+  Map CellReference Scalar ->
+  [(Map (RowIndex 'Absolute) Scalar, LookupTableColumn)] ->
+  Either (ErrorMessage ann) (Map CellReference Scalar)
+getLookupResults ann rc mRowSet cellMap table = do
+  let rowSet = getRowSet rc mRowSet
+      allRows = getRowSet rc Nothing
+      cellMapAllRows = getCellMapRows allRows cellMap
+      tableCols = Map.fromList ((,()) . (^. #unLookupTableColumn) . snd <$> table)
+      cellMapTableRows = (`Map.intersection` tableCols) <$> cellMapAllRows
+      cellMapTableInverse = inverseMap cellMapTableRows
+      tableRows = getColumnListRows rowSet table
+  rowsToCellMap . Map.fromList
+    <$> sequence
+      [ do
+          tableRow <-
+            maybe
+              (Left (ErrorMessage ann "input table row index missing"))
+              pure
+              (Map.lookup ri tableRows)
+          when (Map.size tableRow /= length table) $
+            trace
+              ("table: " <> show table)
+              (Left (ErrorMessage ann ("table row is wrong size; duplicate column index in lookup table, or missing value in input column vectors? " <> pack (show (snd <$> table, tableRow)))))
+          case Map.lookup tableRow cellMapTableInverse of
+            Just ri' ->
+              case Map.lookup ri' cellMapAllRows of
+                Just r -> pure (ri, r)
+                Nothing ->
+                  Left
+                    ( ErrorMessage
+                        ann
+                        ("argument table row lookup failed: " <> pack (show ri'))
+                    )
+            Nothing ->
+              pure (ri, mempty) -- returning an empty row will result in no cells for this row
+        | ri <- Set.toList rowSet
+      ]
+
+getRowSet ::
+  RowCount ->
+  Maybe (Set (RowIndex 'Absolute)) ->
+  Set (RowIndex 'Absolute)
+getRowSet (RowCount n) =
+  \case
+    Nothing ->
+      let n' =
+            fromMaybe
+              (die "getRowSet: row count of range of Int")
+              (integerToInt (scalarToInteger n))
+       in Set.fromList (RowIndex <$> [0 .. n' - 1])
+    Just x -> x
+
+rowsToCellMap ::
+  Map (RowIndex 'Absolute) (Map ColumnIndex Scalar) ->
+  Map CellReference Scalar
+rowsToCellMap rows =
+  Map.fromList
+    [ (CellReference ci ri, x)
+      | (ri, cols) <- Map.toList rows,
+        (ci, x) <- Map.toList cols
+    ]
+
+-- Gets the row vectors for the given set of rows out of the given cell map.
+getCellMapRows ::
+  Set (RowIndex 'Absolute) ->
+  Map CellReference Scalar ->
+  Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
+getCellMapRows rows cellMap =
+  Map.unionsWith
+    (<>)
+    [ Map.singleton ri (Map.singleton ci x)
+      | (CellReference ci ri, x) <- Map.toList cellMap,
+        ri `Set.member` rows
+    ]
+
+-- getCellMapColumns ::
+--   Map CellReference Scalar ->
+--   Map ColumnIndex (Map (RowIndex 'Absolute) Scalar)
+-- getCellMapColumns cellMap =
+--   Map.unionsWith
+--     (<>)
+--     [ Map.singleton ci (Map.singleton ri x)
+--       | (CellReference ci ri, x) <- Map.toList cellMap
+--     ]
+
+columnListToCellMap ::
+  [(Map (RowIndex 'Absolute) Scalar, LookupTableColumn)] ->
+  Map CellReference Scalar
+columnListToCellMap cols =
+  Map.fromList
+    [ (CellReference ci ri, x)
+      | (row, LookupTableColumn ci) <- cols,
+        (ri, x) <- Map.toList row
+    ]
+
+getColumnListRows ::
+  Set (RowIndex 'Absolute) ->
+  [(Map (RowIndex 'Absolute) Scalar, LookupTableColumn)] ->
+  Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
+getColumnListRows rows = getCellMapRows rows . columnListToCellMap
+
+lessIndicator :: Scalar -> Scalar -> Scalar
+lessIndicator x y =
+  if x < y then one else zero
+
+instance HasEvaluate (RowCount, AtomicLogicConstraint) (Map (RowIndex 'Absolute) (Maybe Bool)) where
+  evaluate ann arg =
+    uncurry $ \rc ->
+      \case
+        Equals x y ->
+          Map.intersectionWith (liftA2 (==))
+            <$> evaluate ann arg (rc, x)
+            <*> evaluate ann arg (rc, y)
+        LessThan x y ->
+          Map.intersectionWith (liftA2 (<))
+            <$> evaluate ann arg (rc, x)
+            <*> evaluate ann arg (rc, y)
+
+instance HasEvaluate (RowCount, LogicConstraint) (Map (RowIndex 'Absolute) (Maybe Bool)) where
+  evaluate ann arg =
+    uncurry $ \rc@(RowCount n) ->
+      let getN = case integerToInt (scalarToInteger n) of
+            Just n' -> pure n'
+            Nothing -> Left (ErrorMessage ann "row count exceeds max Int")
+       in \case
+            Atom p -> evaluate ann arg (rc, p)
+            Not p -> fmap (fmap not) <$> rec (rc, p)
+            And p q ->
+              Map.intersectionWith (&&^)
+                <$> rec (rc, p)
+                <*> rec (rc, q)
+            Or p q ->
+              Map.intersectionWith (||^)
+                <$> rec (rc, p)
+                <*> rec (rc, q)
+            Iff p q ->
+              Map.intersectionWith (liftA2 (==))
+                <$> rec (rc, p)
+                <*> rec (rc, q)
+            Top -> do
+              n' <- getN
+              pure (Map.fromList ((,Just True) . RowIndex <$> [0 .. n' - 1]))
+            Bottom -> do
+              n' <- getN
+              pure (Map.fromList ((,Just False) . RowIndex <$> [0 .. n' - 1]))
+    where
+      rec = evaluate ann arg
+
+-- rec x = do
+--   r <- evaluate ann arg x
+--   pure (trace (show (foldr (liftA2 (&&)) (Just True) r, x)) r)
+
+instance HasEvaluate (Map ColumnIndex FixedBound) Bool where
+  evaluate _ arg bs =
+    pure $
+      and
+        [ toWord64 x < b ^. #unFixedBound
+          | (ci, b) <- Map.toList bs,
+            x <-
+              Map.elems
+                ( Map.filterWithKey
+                    (\k _ -> k ^. #colIndex == ci)
+                    (getCellMap arg)
+                )
+        ]
+
+instance HasEvaluate (RowCount, LogicConstraints) Bool where
+  evaluate ann arg (rc, LogicConstraints cs bs) = do
+    -- let cols = getCellMapColumns (getCellMap arg)
+    (&&) -- trace ("column sizes: " <> show (Map.size <$> cols)) . (&&)
+      <$> evaluate ann arg bs
+      <*> allM
+        ( \(lbl, c) -> do
+            r <- evaluate ann arg (rc, c)
+            let r' = r == Map.fromList ((,Just True) <$> Set.toList allRows)
+            pure r' -- pure (trace (show (r', lbl, c, r)) r')
+        )
+        cs
+    where
+      allRows = getRowSet rc Nothing
+
+instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
+  evaluate ann arg (rc, PolynomialConstraints polys degreeBound) = do
+    allM
+      ( \poly ->
+          ( degree poly <= degreeBound ^. #getPolynomialDegreeBound
+              &&
+          )
+            . all (== 0)
+            <$> evaluate ann arg (rc, poly)
+      )
+      polys
+
+instance
+  ( HasColumnVectorToBools a,
+    HasEvaluate (RowCount, a) (Map (RowIndex 'Absolute) (Maybe Scalar))
+  ) =>
+  HasEvaluate (RowCount, LookupArgument a) Bool
+  where
+  evaluate ann arg (rc, LookupArgument _ gate tableMap) = do
+    gateVals <- columnVectorToBools gate <$> evaluate ann arg (rc, gate)
+    let rowSet = Map.keysSet (Map.filter id gateVals)
+    inputTable <-
+      fmap (Map.mapMaybe id)
+        <$> mapM (evaluate ann arg . (rc,) . (^. #getInputExpression) . fst) tableMap
+    rowSet' <-
+      Set.fromList . fmap (^. #rowIndex) . Map.keys
+        <$> getLookupResults
+          ann
+          rc
+          (Just rowSet)
+          (getCellMap arg)
+          (zip inputTable (snd <$> tableMap))
+    pure (rowSet' == rowSet)
+
+instance
+  HasEvaluate (RowCount, LookupArgument a) Bool =>
+  HasEvaluate (RowCount, LookupArguments a) Bool
+  where
+  evaluate ann arg =
+    uncurry $ \rc -> allM (evaluate ann arg . (rc,)) . Set.toList . (^. #getLookupArguments)
+
+instance
+  (HasEvaluate (RowCount, a) Bool, HasEvaluate (RowCount, LookupArguments b) Bool) =>
+  HasEvaluate (Circuit a b) Bool
+  where
+  evaluate ann arg c =
+    and
+      <$> sequence
+        [ evaluate ann arg (c ^. #columnTypes),
+          evaluate ann arg (c ^. #rowCount),
+          evaluate ann arg (c ^. #rowCount, c ^. #gateConstraints),
+          evaluate ann arg (c ^. #rowCount, c ^. #lookupArguments),
+          evaluate
+            ann
+            arg
+            ( c ^. #equalityConstrainableColumns,
+              c ^. #equalityConstraints
+            ),
+          evaluate ann arg (c ^. #fixedValues)
+        ]
+
+instance HasEvaluate ColumnTypes Bool where
+  evaluate _ arg (ColumnTypes m) =
+    pure $
+      getColumns (arg ^. #statement . #unStatement)
+        == Map.keysSet (Map.filter (== Instance) m)
+        && getColumns (arg ^. #witness . #unWitness)
+        == ( Map.keysSet (Map.filter (== Advice) m)
+               `Set.union` Map.keysSet (Map.filter (== Fixed) m)
+           )
+
+instance HasEvaluate FixedValues Bool where
+  evaluate _ arg fvs =
+    pure $
+      fixedValuesToCellMap fvs `Map.isSubmapOf` (arg ^. #witness . #unWitness)
+
+fixedValuesToCellMap :: FixedValues -> Map CellReference Scalar
+fixedValuesToCellMap (FixedValues m) =
+  Map.fromList
+    [ (CellReference colIdx rowIdx, v)
+      | (colIdx, col) <- Map.toList m,
+        (rowIdx, v) <- zip (RowIndex <$> [0 ..]) (col ^. #unFixedColumn)
+    ]
+
+instance HasEvaluate (EqualityConstrainableColumns, EqualityConstraints) Bool where
+  evaluate _ _ (eqcs, eqs) =
+    pure $ equalityConstraintsMatchEqualityConstrainableColumns eqcs eqs
+
+equalityConstraintsMatchEqualityConstrainableColumns ::
+  EqualityConstrainableColumns ->
+  EqualityConstraints ->
+  Bool
+equalityConstraintsMatchEqualityConstrainableColumns
+  (EqualityConstrainableColumns eqcs)
+  (EqualityConstraints eqs) =
+    all f eqs
+    where
+      f (EqualityConstraint cells) =
+        Set.map (^. #colIndex) cells `Set.isSubsetOf` eqcs
+
+instance HasEvaluate RowCount Bool where
+  evaluate _ arg (RowCount n) =
+    pure $
+      f (arg ^. #statement . #unStatement)
+        && f (arg ^. #witness . #unWitness)
+    where
+      f m =
+        let cols = getColumns m
+         in and
+              [ Set.fromList (RowIndex <$> [0 .. n' - 1])
+                  == Map.keysSet (getColumn i m)
+                | i <- Set.toList cols
+              ]
+
+      n' =
+        fromMaybe (die "Halo2.Circuit.evaluate: row count out of range of Int") $
+          integerToInt (scalarToInteger n)
+
+getColumns :: Map CellReference Scalar -> Set ColumnIndex
+getColumns =
+  Set.map (^. #colIndex) . Map.keysSet
+
+getColumn :: ColumnIndex -> Map CellReference Scalar -> Map (RowIndex 'Absolute) Scalar
+getColumn colIndex =
+  Map.mapKeys (^. #rowIndex) . Map.filterWithKey (\k _ -> k ^. #colIndex == colIndex)
+
+getCellMap :: Argument -> Map CellReference Scalar
+getCellMap arg = (arg ^. #statement . #unStatement) `Map.union` (arg ^. #witness . #unWitness)

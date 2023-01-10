@@ -18,7 +18,7 @@ import OSL.ArgumentForm (getArgumentForm)
 import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
-import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5)
+import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
 import OSL.Types.FileName (FileName (FileName))
@@ -121,6 +121,13 @@ exampleSpec c = do
       `shouldBe` Right True
 
     evalTranslatedFormula5 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
+      `shouldBe` Right False
+
+  it "Sudoku spec's semantics are preserved in codegen stage 6" $ do
+    evalTranslatedFormula6 c "problemIsSolvable" argumentForm (exampleArgument c)
+      `shouldBe` Right True
+
+    evalTranslatedFormula6 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
       `shouldBe` Right False
 
 exampleArgument :: ValidContext 'Global ann -> Argument

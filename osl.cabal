@@ -26,6 +26,7 @@ library
     Halo2.TruthTable
     Halo2.Types.AIR
     Halo2.Types.ArithmetizationConfig
+    Halo2.Types.Argument
     Halo2.Types.Byte
     Halo2.Types.ByteDecompositionSize
     Halo2.Types.ByteDecomposition
@@ -47,6 +48,7 @@ library
     Halo2.Types.FixedColumn
     Halo2.Types.FixedValues
     Halo2.Types.InputExpression
+    Halo2.Types.Label
     Halo2.Types.LogicConstraint
     Halo2.Types.LogicConstraints
     Halo2.Types.LogicToArithmeticColumnLayout
@@ -107,6 +109,7 @@ library
     OSL.ValidateContext
     OSL.Value
     OSL.Witness
+    Semicircuit.Argument
     Semicircuit.DNFFormula
     Semicircuit.Gensyms
     Semicircuit.PrenexNormalForm

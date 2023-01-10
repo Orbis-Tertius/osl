@@ -44,7 +44,7 @@ instance Show Term where
       Lookup is o -> show o <> "(" <> intercalate ", " (show <$> is) <> ")"
       Const x -> show x
       Plus x y -> "(" <> show x <> " + " <> show y <> ")"
-      Times x y -> "(" <> show x <> " + " <> show y <> ")"
+      Times x y -> "(" <> show x <> " * " <> show y <> ")"
       Max x y -> "(" <> show x <> " max " <> show y <> ")"
       IndLess x y -> "ind<(" <> show x <> ", " <> show y <> ")"
 

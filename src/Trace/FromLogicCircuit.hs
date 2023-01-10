@@ -36,6 +36,7 @@ import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
+import Halo2.Types.Label (Label (Label))
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint, LogicConstraint)
 import qualified Halo2.Types.LogicConstraint as LC
 import Halo2.Types.LogicConstraints (LogicConstraints)
@@ -238,7 +239,7 @@ instance Semigroup SubexpressionIdMapping where
 
 getStepArity :: LogicCircuit -> Arity
 getStepArity c =
-  max (max 2 (foldl' max 0 (getConstraintArity <$> (c ^. #gateConstraints . #constraints)))) $
+  max (max 2 (foldl' max 0 (getConstraintArity . snd <$> (c ^. #gateConstraints . #constraints)))) $
     getLookupArgumentsArity (c ^. #lookupArguments)
 
 getConstraintArity :: LogicConstraint -> Arity
@@ -430,7 +431,7 @@ getMapping bitsPerByte c =
 
     traverseLogicConstraints :: OutputColumnIndex -> SubexpressionIdMapping -> LogicConstraints -> State S SubexpressionIdMapping
     traverseLogicConstraints out m' lcs =
-      foldM (traverseAssertion out) m' (lcs ^. #constraints)
+      foldM (traverseAssertion out) m' (snd <$> (lcs ^. #constraints))
 
     traverseAssertion :: OutputColumnIndex -> SubexpressionIdMapping -> LogicConstraint -> State S SubexpressionIdMapping
     traverseAssertion out m' lc = do
@@ -726,7 +727,7 @@ lookupStepType m p (LookupTable t) =
   StepType
     mempty
     ( LookupArguments . Set.singleton $
-        LookupArgument ("lookup-" <> show t) p (zip inputExprs t)
+        LookupArgument (Label ("lookup-" <> show t)) p (zip inputExprs t)
     )
     mempty
   where

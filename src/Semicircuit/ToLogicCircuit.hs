@@ -9,6 +9,7 @@
 
 module Semicircuit.ToLogicCircuit
   ( semicircuitToLogicCircuit,
+    semicircuitArgumentToLogicCircuitArgument,
     columnLayout,
     fixedValues,
     equalityConstraints,
@@ -24,10 +25,11 @@ module Semicircuit.ToLogicCircuit
   )
 where
 
-import Cast (word64ToInteger)
+import Cast (intToInteger, integerToInt, word64ToInteger)
 import Control.Lens ((<&>), (^.))
-import Control.Monad (replicateM)
+import Control.Monad (foldM, forM, replicateM)
 import Control.Monad.State (State, evalState, get, put)
+import Data.Either.Extra (mapLeft)
 import Data.List.Extra (foldl', (!?))
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -35,6 +37,8 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Data.Text (Text, pack)
 import Die (die)
+import Halo2.Circuit (rowsToCellMap)
+import qualified Halo2.Types.Argument as Halo2
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex)
@@ -47,20 +51,27 @@ import Halo2.Types.FixedBound (FixedBound (FixedBound), boolBound, integerToFixe
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
+import Halo2.Types.Label (Label (Label))
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
 import qualified Halo2.Types.LogicConstraint as LC
 import Halo2.Types.LogicConstraints (LogicConstraints (..))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
-import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative))
+import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Absolute, Relative))
+import qualified OSL.Sigma11 as S11
+import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+import qualified OSL.Types.Sigma11.Argument as S11
+import qualified OSL.Types.Sigma11.EvaluationContext as S11
+import OSL.Types.Sigma11.Value (Value (Value))
+import Semicircuit.Argument (getNameValues)
 import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantifierName, existentialQuantifierOutputBound, getInputName)
 import Semicircuit.Types.PNFFormula (ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), InstanceQuantifier, InstanceQuantifierF (Instance), UniversalQuantifier (All))
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), ZeroVectorIndex (..))
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), InputBound, Name, OutputBound, OutputBoundF (OutputBound), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
-import Stark.Types.Scalar (one, order, scalarToInt, zero)
+import Stark.Types.Scalar (Scalar, integerToScalar, one, order, scalarToInt, scalarToInteger, zero)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
@@ -80,6 +91,215 @@ semicircuitToLogicCircuit rowCount x =
           (fixedValues rowCount layout),
         layout
       )
+
+semicircuitArgumentToLogicCircuitArgument ::
+  ann ->
+  RowCount ->
+  Semicircuit ->
+  Layout ->
+  S11.Argument ->
+  Either (ErrorMessage ann) Halo2.Argument
+semicircuitArgumentToLogicCircuitArgument ann rc f layout arg = do
+  vals <- getNameValues ann f arg
+  mconcat
+    <$> sequence
+      [ getUniversalTableArgument ann rc f layout vals,
+        nameValuesToLogicCircuitArgument ann rc f layout vals,
+        getFixedValuesArgument ann rc layout
+      ]
+
+getUniversalTableArgument ::
+  ann ->
+  RowCount ->
+  Semicircuit ->
+  Layout ->
+  Map Name Value ->
+  Either (ErrorMessage ann) Halo2.Argument
+getUniversalTableArgument ann (RowCount n) f layout vs = do
+  t <- getUniversalTable ann (f ^. #formula . #quantifiers . #universalQuantifiers) layout vs
+  if intToInteger (Map.size t) > n'
+    then Left (ErrorMessage ann "universal table size exceeds row count")
+    else
+      Halo2.Argument mempty . Halo2.Witness . rowsToCellMap . Map.fromList
+        <$> pad n' (Map.toList t)
+  where
+    n' = scalarToInteger n
+
+    pad 0 _ = pure []
+    pad _ [] = Left (ErrorMessage ann "empty universal table")
+    pad n'' [(i, x)] = ((i, x) :) <$> pad (n'' - 1) [(i + 1, x)]
+    pad n'' ((i, x) : xs) = ((i, x) :) <$> pad (n'' - 1) xs
+
+getUniversalTable ::
+  forall ann.
+  ann ->
+  [UniversalQuantifier] ->
+  Layout ->
+  Map Name Value ->
+  Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Map ColumnIndex Scalar))
+getUniversalTable _ [] _ _ = pure mempty
+getUniversalTable ann [All x b] layout vs = do
+  let ec = S11.EvaluationContext (Map.mapKeys Left vs)
+      dummyCol = layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
+  outCol <-
+    case Map.lookup x (layout ^. #nameMappings) of
+      Just nm -> pure (nm ^. #outputMapping . #unOutputMapping)
+      Nothing -> Left (ErrorMessage ann "name not defined in circuit layout")
+  b' <-
+    mapLeft (\(ErrorMessage () msg) -> ErrorMessage ann msg) $
+      S11.evalTerm ec b
+  if b' == zero
+    then
+      pure . Map.singleton (0 :: RowIndex 'Absolute) $
+        Map.fromList [(dummyCol, one), (outCol, zero)]
+    else
+      pure . Map.fromList $
+        [ (RowIndex ri, Map.fromList [(dummyCol, zero), (outCol, si)])
+          | i <- [0 .. scalarToInteger b' - 1],
+            let ri =
+                  fromMaybe
+                    (die "Semicircuit.ToLogicCircuit.getUniversalTable: value out of range of Int")
+                    (integerToInt i),
+            let si =
+                  fromMaybe
+                    (die "Semicircuit.ToLogicCircuit.getUniversalTable: value out of range of scalar")
+                    (integerToScalar i)
+        ]
+getUniversalTable ann qs@(All x b : qs') layout vs = do
+  let ec = S11.EvaluationContext (Map.mapKeys Left vs)
+      dummyCol = layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
+  outCols <- forM qs $ \(All x' _) ->
+    case Map.lookup x' (layout ^. #nameMappings) of
+      Just nm -> pure (nm ^. #outputMapping . #unOutputMapping)
+      Nothing -> Left (ErrorMessage ann "name not defined in circuit layout")
+  outCol <-
+    case outCols of
+      (outCol' : _) -> pure outCol'
+      _ -> Left (ErrorMessage ann "unreachable case in getUniversalTable (this is a bug)")
+  b' <-
+    mapLeft (\(ErrorMessage () msg) -> ErrorMessage ann msg) $
+      S11.evalTerm ec b
+  if b' == zero
+    then
+      pure . Map.singleton (0 :: RowIndex 'Absolute)
+        . Map.fromList
+        $ [(dummyCol, one)] <> ((,zero) <$> outCols)
+    else foldM (f outCol) mempty ([0 .. scalarToInteger b' - 1] :: [Integer])
+  where
+    f ::
+      ColumnIndex ->
+      Map (RowIndex 'Absolute) (Map ColumnIndex Scalar) ->
+      Integer ->
+      Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Map ColumnIndex Scalar))
+    f outCol t v = do
+      v' <-
+        maybe
+          (Left (ErrorMessage ann "value out of range of scalar field"))
+          pure
+          (integerToScalar v)
+      let vs' = Map.insert x (Value (Map.singleton [] v')) vs
+      t' <- getUniversalTable ann qs' layout vs'
+      let j = maybe 0 ((+ 1) . fst . fst) (Map.maxViewWithKey t)
+          t'' = Map.insert outCol v' <$> Map.mapKeys (+ j) t'
+      pure (t <> t'')
+
+nameValuesToLogicCircuitArgument ::
+  ann ->
+  RowCount ->
+  Semicircuit ->
+  Layout ->
+  Map Name Value ->
+  Either (ErrorMessage ann) Halo2.Argument
+nameValuesToLogicCircuitArgument ann rc f layout vs =
+  Halo2.Argument
+    <$> ( Halo2.Statement . mconcat
+            <$> sequence
+              [ nameMappingArgument ann rc nm v
+                | (n, (nm, v)) <-
+                    Map.toList $
+                      Map.intersectionWith (,) (layout ^. #nameMappings) vs,
+                  n `Set.member` Set.fromList ((f ^. #formula . #quantifiers . #instanceQuantifiers) <&> (^. #name))
+              ]
+        )
+    <*> ( Halo2.Witness . mconcat
+            <$> sequence
+              [ nameMappingArgument ann rc nm v
+                | (n, (nm, v)) <-
+                    Map.toList $
+                      Map.intersectionWith (,) (layout ^. #nameMappings) vs,
+                  n `Set.member` Set.fromList ((f ^. #formula . #quantifiers . #existentialQuantifiers) <&> (^. #name))
+              ]
+        )
+
+nameMappingArgument ::
+  ann ->
+  RowCount ->
+  NameMapping ->
+  Value ->
+  Either (ErrorMessage ann) (Map CellReference Scalar)
+nameMappingArgument ann (RowCount n) nm (Value f) =
+  if intToInteger (Map.size f) > n'
+    then Left (ErrorMessage ann "value cardinality exceeds row count")
+    else do
+      indices <- mapM sToI [0 .. n' - 1]
+      let f' = Map.toList f
+      (defaultIns, defaultOut) <-
+        case f' of
+          ((xs, y) : _) -> pure (xs, y)
+          _ -> Left (ErrorMessage ann "empty value")
+      pure $
+        Map.fromList
+          ( [ (CellReference ci ri, x)
+              | let ci = nm ^. #outputMapping . #unOutputMapping,
+                (ri, x) <- zip indices ((snd <$> f') <> repeat defaultOut)
+            ]
+          )
+          <> Map.fromList
+            ( [ (CellReference ci ri, x)
+                | (ri, inputs) <- zip indices ((fst <$> f') <> repeat defaultIns),
+                  (ci, x) <- zip ((nm ^. #argMappings) <&> (^. #unArgMapping)) inputs
+              ]
+            )
+  where
+    n' = scalarToInteger n
+    sToI = maybe (Left (ErrorMessage ann "index is out of range of Int")) (pure . RowIndex) . integerToInt
+
+getFixedValuesArgument ::
+  ann ->
+  RowCount ->
+  Layout ->
+  Either (ErrorMessage ann) Halo2.Argument
+getFixedValuesArgument ann (RowCount n) layout = do
+  n' <-
+    maybe
+      (Left (ErrorMessage ann "row count of range of Int"))
+      pure
+      (integerToInt (scalarToInteger n))
+  pure . Halo2.Argument mempty . Halo2.Witness . Map.fromList $
+    mconcat
+      [ [ ( CellReference
+              (layout ^. #fixedColumns . #zeroVector . #unZeroVectorIndex)
+              (RowIndex ri),
+            zero
+          )
+          | ri <- [0 .. n' - 1]
+        ],
+        [ ( CellReference
+              (layout ^. #fixedColumns . #oneVector . #unOneVectorIndex)
+              (RowIndex ri),
+            one
+          )
+          | ri <- [0 .. n' - 1]
+        ],
+        [ ( CellReference
+              (layout ^. #fixedColumns . #lastRowIndicator . #unLastRowIndicatorColumnIndex)
+              (RowIndex ri),
+            v
+          )
+          | ri <- [0 .. n' - 1],
+            let v = if ri == n' - 1 then one else zero
+        ]
+      ]
 
 newtype S = S (ColumnIndex, ColumnTypes)
 
@@ -478,7 +698,7 @@ universalQuantifierBounds ::
   LogicConstraints ->
   LogicConstraints
 universalQuantifierBounds x layout (All name bound) =
-  quantifierBounds "universal" x layout name [] (OutputBound bound)
+  quantifierBounds "universal" x layout name [] (OutputBound (TermBound bound))
 
 dummyRowAdviceColumnBounds ::
   Layout ->
@@ -538,10 +758,12 @@ instanceFunctionTablesDefineFunctionsConstraints ::
   LogicConstraints
 instanceFunctionTablesDefineFunctionsConstraints x layout =
   LogicConstraints
-    [ Atom (lastRowIndicator `Equals` LC.Const one)
-        `Or` nextRowIsEqualConstraint layout v
-        `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v
-      | v <- Set.toList (x ^. #freeVariables . #unFreeVariables)
+    [ ( Label ("instanceFunctionTablesDefineFunctions(" <> show v <> ")"),
+        Atom (lastRowIndicator `Equals` LC.Const one)
+          `Or` nextRowIsEqualConstraint layout v
+          `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v
+      )
+      | v <- (x ^. #formula . #quantifiers . #instanceQuantifiers) <&> (^. #name)
     ]
     mempty
   where
@@ -596,9 +818,11 @@ existentialFunctionTablesDefineFunctionsConstraints ::
   LogicConstraints
 existentialFunctionTablesDefineFunctionsConstraints x layout =
   LogicConstraints
-    [ Atom (lastRowIndicator `Equals` LC.Const one)
-        `Or` nextRowIsEqualConstraint layout v
-        `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v
+    [ ( Label ("existentialFunctionTablesDefineFunctions(" <> show v <> ")"),
+        Atom (lastRowIndicator `Equals` LC.Const one)
+          `Or` nextRowIsEqualConstraint layout v
+          `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v
+      )
       | v <-
           existentialQuantifierName
             <$> x ^. #formula . #quantifiers . #existentialQuantifiers
@@ -687,10 +911,12 @@ quantifierFreeFormulaIsTrueConstraints ::
   LogicConstraints
 quantifierFreeFormulaIsTrueConstraints x layout =
   LogicConstraints
-    [ Atom (dummyRowIndicator `Equals` LC.Const one)
-        `Or` qfFormulaToLogicConstraint
-          layout
-          (x ^. #formula . #qfFormula)
+    [ ( "quantifierFreeFormulaIsTrue",
+        Atom (dummyRowIndicator `Equals` LC.Const one)
+          `Or` qfFormulaToLogicConstraint
+            layout
+            (x ^. #formula . #qfFormula)
+      )
     ]
     mempty
   where
@@ -704,10 +930,14 @@ dummyRowIndicatorConstraints ::
   LogicConstraints
 dummyRowIndicatorConstraints x layout =
   LogicConstraints
-    [ Atom (dummyRowIndicator `Equals` LC.Const zero)
-        `Or` Atom (dummyRowIndicator `Equals` LC.Const one),
-      Atom (dummyRowIndicator `Equals` LC.Const zero)
-        `Iff` someUniversalQuantifierBoundIsZeroConstraint x layout
+    [ ( "dummyRowIndicatorRangeCheck",
+        Atom (dummyRowIndicator `Equals` LC.Const zero)
+          `Or` Atom (dummyRowIndicator `Equals` LC.Const one)
+      ),
+      ( "dummyRowIndicatorConstraint",
+        Atom (dummyRowIndicator `Equals` LC.Const zero)
+          `Iff` someUniversalQuantifierBoundIsZeroConstraint x layout
+      )
     ]
     mempty
   where
@@ -731,20 +961,9 @@ universalQuantifierBoundTerms ::
   Layout ->
   [LC.Term]
 universalQuantifierBoundTerms x layout =
-  let bounds =
-        (^. #bound) <$> x
-          ^. #formula . #quantifiers
-            . #universalQuantifiers
-   in boundTerm layout <$> bounds
-
-boundTerm ::
-  Layout ->
-  Bound ->
-  LC.Term
-boundTerm layout =
-  \case
-    TermBound x -> sigma11TermToLogicConstraintTerm layout x
-    FieldMaxBound -> LC.Const maxBound
+  sigma11TermToLogicConstraintTerm layout . (^. #bound) <$> x
+    ^. #formula . #quantifiers
+      . #universalQuantifiers
 
 existentialOutputsInBoundsConstraints ::
   Semicircuit ->
@@ -752,15 +971,17 @@ existentialOutputsInBoundsConstraints ::
   LogicConstraints
 existentialOutputsInBoundsConstraints x layout =
   LogicConstraints
-    [ Atom (LessThan y bp)
+    [ ( Label ("existentialOutputsInBounds(" <> show q <> ")"),
+        Atom (LessThan y bp)
+      )
       | q <-
           x
             ^. #formula . #quantifiers
               . #existentialQuantifiers,
-        let bp =
-              boundTerm layout $
-                existentialQuantifierOutputBound q,
-        let y = mapName $ existentialQuantifierName q
+        let y = mapName $ existentialQuantifierName q,
+        bp <- case existentialQuantifierOutputBound q of
+          TermBound bp' -> [sigma11TermToLogicConstraintTerm layout bp']
+          FieldMaxBound -> []
     ]
     mempty
   where
@@ -776,14 +997,18 @@ existentialInputsInBoundsConstraints ::
   LogicConstraints
 existentialInputsInBoundsConstraints x layout =
   LogicConstraints
-    [ Atom (LessThan y bp)
+    [ ( Label ("existentialInputsInBounds(" <> show q <> ")"),
+        Atom (LessThan y bp)
+      )
       | q <-
           x
             ^. #formula . #quantifiers
               . #existentialQuantifiers,
         (i, ib) <- zip [0 ..] (existentialQuantifierInputBounds q),
-        let bp = boundTerm layout (ib ^. #bound),
-        let y = name (existentialQuantifierName q) i
+        let y = name (existentialQuantifierName q) i,
+        bp <- case ib ^. #bound of
+          TermBound bp' -> [sigma11TermToLogicConstraintTerm layout bp']
+          FieldMaxBound -> []
     ]
     mempty
   where
@@ -808,22 +1033,24 @@ universalTableConstraints ::
   LogicConstraints
 universalTableConstraints x layout =
   LogicConstraints
-    [ foldl'
-        Or
-        ( Atom (lastRowIndicator `Equals` LC.Const one)
-            `Or` next lastU
-        )
-        [ foldl'
-            And
-            ( Atom (bound i `Equals` LC.Const zero)
-                `And` next (i - 1)
-            )
-            [ Atom (u j 0 `Equals` LC.Const zero) -- TODO is this needed?
-                `And` Atom (u j 1 `Equals` LC.Const zero)
-              | j <- [i .. lastU]
-            ]
-          | i <- [0 .. lastU]
-        ]
+    [ ( "universalTableConstraint",
+        foldl'
+          Or
+          ( Atom (lastRowIndicator `Equals` LC.Const one)
+              `Or` next lastU
+          )
+          [ foldl'
+              And
+              ( Atom (bound i `Equals` LC.Const zero)
+                  `And` next (i - 1)
+              )
+              [ Atom (u j 0 `Equals` LC.Const zero) -- TODO is this needed?
+                  `And` Atom (u j 1 `Equals` LC.Const zero)
+                | j <- [i .. lastU]
+              ]
+            | i <- [0 .. lastU]
+          ]
+      )
     ]
     mempty
   where
@@ -881,7 +1108,7 @@ universalTableConstraints x layout =
                  . #universalQuantifiers
            )
         !? unUniQIndex i of
-        Just q -> boundTerm layout (q ^. #bound)
+        Just q -> sigma11TermToLogicConstraintTerm layout (q ^. #bound)
         Nothing ->
           die "universalTableConstraints: bound index out of range (this is a compiler bug)"
 
