@@ -182,7 +182,7 @@ getUniversalTable ann qs@(All x b : qs') layout vs = do
             (integerToScalar v)
       let vs' = Map.insert x (Value (Map.singleton [] v')) vs
       t' <- getUniversalTable ann qs' layout vs'
-      let j = maybe 0 (fst . fst) (Map.maxViewWithKey t)
+      let j = maybe 0 ((+1) . fst . fst) (Map.maxViewWithKey t)
           t'' = Map.insert outCol v' <$> Map.mapKeys (+j) t'
       pure (t <> t'')
 
