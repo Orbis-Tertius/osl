@@ -26,7 +26,7 @@ import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Lens ((<&>))
-import Control.Monad.Extra (allM, when)
+import Control.Monad.Extra (allM, when, (&&^), (||^))
 import Data.Either.Extra (mapLeft)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -378,9 +378,10 @@ getLookupResults ::
   Either (ErrorMessage ann) (Map CellReference Scalar)
 getLookupResults ann rc mRowSet cellMap table = do
   let rowSet = getRowSet rc mRowSet
-      cellMapRows = getCellMapRows rowSet cellMap
+      allRows = getRowSet rc Nothing
+      cellMapAllRows = getCellMapRows allRows cellMap
       tableCols = Map.fromList (((,()) . (^. #unLookupTableColumn) . snd) <$> table)
-      cellMapTableRows = (`Map.intersection` tableCols) <$> cellMapRows
+      cellMapTableRows = (`Map.intersection` tableCols) <$> cellMapAllRows
       cellMapTableInverse = inverseMap cellMapTableRows
       tableRows = getColumnListRows rowSet table
   rowsToCellMap . Map.fromList
@@ -399,11 +400,12 @@ getLookupResults ann rc mRowSet cellMap table = do
               Just ri' -> pure ri'
               Nothing ->
                 trace ("cellMapTableRows = " <> show cellMapTableRows
-                  <> "\ncellMapTableInverse = " <> show cellMapTableInverse)
+                  <> "\ncellMapTableInverse = " <> show cellMapTableInverse
+                  <> "\ncellMapAllRows = " <> show cellMapAllRows)
                   $ Left (ErrorMessage ann
                       ("input table row not present in lookup table: "
-                     <> pack (show tableRow)))
-          case Map.lookup ri' cellMapRows of
+                        <> pack (show tableRow)))
+          case Map.lookup ri' cellMapAllRows of
             Just r -> pure (ri, r)
             Nothing ->
               Left (ErrorMessage ann
@@ -488,11 +490,11 @@ instance HasEvaluate (RowCount, LogicConstraint) Bool where
         Atom p -> evaluate ann arg (rc, p)
         Not p -> not <$> evaluate ann arg (rc, p)
         And p q ->
-          (&&) <$> evaluate ann arg (rc, p)
-            <*> evaluate ann arg (rc, q)
+          evaluate ann arg (rc, p) &&^
+            evaluate ann arg (rc, q)
         Or p q ->
-          (||) <$> evaluate ann arg (rc, p)
-            <*> evaluate ann arg (rc, q)
+          evaluate ann arg (rc, p) ||^
+            evaluate ann arg (rc, q)
         Iff p q ->
           (==) <$> evaluate ann arg (rc, p)
             <*> evaluate ann arg (rc, q)
