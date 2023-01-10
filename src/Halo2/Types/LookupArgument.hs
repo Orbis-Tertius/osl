@@ -7,10 +7,11 @@ module Halo2.Types.LookupArgument (LookupArgument (LookupArgument)) where
 import Data.List (intercalate)
 import Halo2.Prelude
 import Halo2.Types.InputExpression (InputExpression)
+import Halo2.Types.Label (Label)
 import Halo2.Types.LookupTableColumn (LookupTableColumn)
 
 data LookupArgument a = LookupArgument
-  { label :: String,
+  { label :: Label,
     gate :: a,
     tableMap :: [(InputExpression a, LookupTableColumn)]
   }
@@ -18,7 +19,7 @@ data LookupArgument a = LookupArgument
 
 instance Show a => Show (LookupArgument a) where
   show arg =
-    arg ^. #label
+    show (arg ^. #label)
       <> ":= "
       <> show (arg ^. #gate)
       <> " = 0 => ("

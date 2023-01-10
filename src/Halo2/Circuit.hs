@@ -117,7 +117,7 @@ instance HasPolynomialVariables LogicConstraint where
 
 instance HasPolynomialVariables LogicConstraints where
   getPolynomialVariables =
-    mconcat . fmap getPolynomialVariables . (^. #constraints)
+    mconcat . fmap (getPolynomialVariables . snd) . (^. #constraints)
 
 deriving newtype instance HasPolynomialVariables a => HasPolynomialVariables (InputExpression a)
 
@@ -183,7 +183,7 @@ instance HasScalars LogicConstraint where
 
 instance HasScalars LogicConstraints where
   getScalars =
-    mconcat . fmap getScalars . (^. #constraints)
+    mconcat . fmap (getScalars . snd) . (^. #constraints)
 
 deriving newtype instance HasScalars a => HasScalars (InputExpression a)
 
@@ -249,7 +249,8 @@ instance HasLookupArguments LogicConstraint Term where
 
 instance HasLookupArguments LogicCircuit Term where
   getLookupArguments c =
-    (c ^. #lookupArguments) <> getLookupArguments (c ^. #gateConstraints . #constraints)
+    (c ^. #lookupArguments) <>
+      getLookupArguments (snd <$> (c ^. #gateConstraints . #constraints))
 
 getLookupTables :: HasLookupArguments a b => Ord b => a -> Set (b, [LookupTableColumn])
 getLookupTables x =
@@ -512,9 +513,9 @@ instance HasEvaluate (Map ColumnIndex FixedBound) Bool where
 instance HasEvaluate (RowCount, LogicConstraints) Bool where
   evaluate ann arg (rc, LogicConstraints cs bs) =
     (&&) <$> evaluate ann arg bs
-      <*> allM (\c -> do
+      <*> allM (\(lbl, c) -> do
                  r <- fmap (and . fmap (== Just True)) . evaluate ann arg . (rc,) $ c
-                 pure (trace (show (r, c)) r))
+                 pure (trace (show (r, lbl, c)) r))
           cs
 
 instance HasEvaluate (RowCount, PolynomialConstraints) Bool where

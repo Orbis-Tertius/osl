@@ -48,6 +48,7 @@ library
     Halo2.Types.FixedColumn
     Halo2.Types.FixedValues
     Halo2.Types.InputExpression
+    Halo2.Types.Label
     Halo2.Types.LogicConstraint
     Halo2.Types.LogicConstraints
     Halo2.Types.LogicToArithmeticColumnLayout

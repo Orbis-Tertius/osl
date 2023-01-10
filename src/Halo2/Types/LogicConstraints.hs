@@ -9,10 +9,11 @@ where
 import Halo2.Prelude
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.FixedBound (FixedBound)
+import Halo2.Types.Label (Label)
 import Halo2.Types.LogicConstraint (LogicConstraint)
 
 data LogicConstraints = LogicConstraints
-  { constraints :: [LogicConstraint],
+  { constraints :: [(Label, LogicConstraint)],
     bounds :: Map ColumnIndex FixedBound
   }
   deriving (Generic, Show)

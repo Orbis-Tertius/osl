@@ -51,6 +51,7 @@ import Halo2.Types.FixedBound (FixedBound (FixedBound), boolBound, integerToFixe
 import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.FixedValues (FixedValues (..))
 import Halo2.Types.InputExpression (InputExpression (..))
+import Halo2.Types.Label (Label (Label))
 import Halo2.Types.LogicConstraint (AtomicLogicConstraint (Equals, LessThan), LogicConstraint (And, Atom, Bottom, Iff, Not, Or, Top))
 import qualified Halo2.Types.LogicConstraint as LC
 import Halo2.Types.LogicConstraints (LogicConstraints (..))
@@ -757,10 +758,11 @@ instanceFunctionTablesDefineFunctionsConstraints ::
   LogicConstraints
 instanceFunctionTablesDefineFunctionsConstraints x layout =
   LogicConstraints
-    [ Atom (lastRowIndicator `Equals` LC.Const one)
+    [ (Label ("instanceFunctionTablesDefineFunctions(" <> show v <> ")"),
+       Atom (lastRowIndicator `Equals` LC.Const one)
         `Or` nextRowIsEqualConstraint layout v
-        `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v
-      | v <- Set.toList (x ^. #freeVariables . #unFreeVariables)
+        `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v)
+      | v <- (x ^. #formula . #quantifiers . #instanceQuantifiers) <&> (^. #name)
     ]
     mempty
   where
@@ -815,9 +817,10 @@ existentialFunctionTablesDefineFunctionsConstraints ::
   LogicConstraints
 existentialFunctionTablesDefineFunctionsConstraints x layout =
   LogicConstraints
-    [ Atom (lastRowIndicator `Equals` LC.Const one)
+    [ (Label ("existentialFunctionTablesDefineFunctions(" <> show v <> ")"),
+       Atom (lastRowIndicator `Equals` LC.Const one)
         `Or` nextRowIsEqualConstraint layout v
-        `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v
+        `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v)
       | v <-
           existentialQuantifierName
             <$> x ^. #formula . #quantifiers . #existentialQuantifiers
@@ -906,10 +909,11 @@ quantifierFreeFormulaIsTrueConstraints ::
   LogicConstraints
 quantifierFreeFormulaIsTrueConstraints x layout =
   LogicConstraints
-    [ Atom (dummyRowIndicator `Equals` LC.Const one)
+    [ ("quantifierFreeFormulaIsTrue",
+       Atom (dummyRowIndicator `Equals` LC.Const one)
         `Or` qfFormulaToLogicConstraint
           layout
-          (x ^. #formula . #qfFormula)
+          (x ^. #formula . #qfFormula))
     ]
     mempty
   where
@@ -923,10 +927,12 @@ dummyRowIndicatorConstraints ::
   LogicConstraints
 dummyRowIndicatorConstraints x layout =
   LogicConstraints
-    [ Atom (dummyRowIndicator `Equals` LC.Const zero)
-        `Or` Atom (dummyRowIndicator `Equals` LC.Const one),
-      Atom (dummyRowIndicator `Equals` LC.Const zero)
-        `Iff` someUniversalQuantifierBoundIsZeroConstraint x layout
+    [ ("dummyRowIndicatorRangeCheck",
+       Atom (dummyRowIndicator `Equals` LC.Const zero)
+        `Or` Atom (dummyRowIndicator `Equals` LC.Const one)),
+      ("dummyRowIndicatorConstraint",
+       Atom (dummyRowIndicator `Equals` LC.Const zero)
+        `Iff` someUniversalQuantifierBoundIsZeroConstraint x layout)
     ]
     mempty
   where
@@ -960,7 +966,8 @@ existentialOutputsInBoundsConstraints ::
   LogicConstraints
 existentialOutputsInBoundsConstraints x layout =
   LogicConstraints
-    [ Atom (LessThan y bp)
+    [ (Label ("existentialOutputsInBounds(" <> show q <> ")"),
+       Atom (LessThan y bp))
       | q <-
           x
             ^. #formula . #quantifiers
@@ -984,7 +991,8 @@ existentialInputsInBoundsConstraints ::
   LogicConstraints
 existentialInputsInBoundsConstraints x layout =
   LogicConstraints
-    [ Atom (LessThan y bp)
+    [ (Label ("existentialInputsInBounds(" <> show q <> ")"),
+       Atom (LessThan y bp))
       | q <-
           x
             ^. #formula . #quantifiers
@@ -1018,7 +1026,8 @@ universalTableConstraints ::
   LogicConstraints
 universalTableConstraints x layout =
   LogicConstraints
-    [ foldl'
+    [ ("universalTableConstraint",
+       foldl'
         Or
         ( Atom (lastRowIndicator `Equals` LC.Const one)
             `Or` next lastU
@@ -1033,7 +1042,7 @@ universalTableConstraints x layout =
               | j <- [i .. lastU]
             ]
           | i <- [0 .. lastU]
-        ]
+        ])
     ]
     mempty
   where

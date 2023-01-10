@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit) where
 
@@ -17,6 +18,7 @@ import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns (.
 import Halo2.Types.EqualityConstraint (EqualityConstraint (..))
 import Halo2.Types.EqualityConstraints (EqualityConstraints (..))
 import Halo2.Types.InputExpression (InputExpression (InputExpression))
+import Halo2.Types.Label (Label (Label))
 import Halo2.Types.LookupArgument (LookupArgument (LookupArgument))
 import Halo2.Types.LookupArguments (LookupArguments (LookupArguments))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
@@ -67,7 +69,7 @@ inputChecks t m =
   LookupArguments $
     Set.fromList
       [ LookupArgument
-          ("input-" <> show i)
+          (Label ("input-" <> show i))
           (stepIndicatorGate t)
           [ (InputExpression alpha, LookupTableColumn beta),
             (InputExpression sigma', LookupTableColumn sigma),
