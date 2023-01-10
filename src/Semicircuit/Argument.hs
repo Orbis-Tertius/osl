@@ -3,19 +3,20 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Semicircuit.Argument
-  ( getNameValues
-  ) where
+  ( getNameValues,
+  )
+where
 
 import Control.Lens ((^.))
 import Control.Monad (foldM)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import OSL.Types.Sigma11.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+import OSL.Types.Sigma11.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.Sigma11.Value (Value)
 import OSL.Types.Sigma11.ValueTree (ValueTree (ValueTree))
 import Semicircuit.Types.Semicircuit (Semicircuit)
-import Semicircuit.Types.Sigma11 (Name, InstanceQuantifier, ExistentialQuantifier)
+import Semicircuit.Types.Sigma11 (ExistentialQuantifier, InstanceQuantifier, Name)
 
 -- Gets a map from instance and existential names
 -- to their assigned values. This makes sense for
@@ -35,7 +36,7 @@ getNameValues ann f arg0 = do
     iq :: forall ann. ann -> (Argument, Map Name Value) -> InstanceQuantifier -> Either (ErrorMessage ann) (Argument, Map Name Value)
     iq ann' (arg', m') q =
       case arg' ^. #statement . #unStatement of
-        v:vs -> pure (Argument (Statement vs) (arg' ^. #witness), Map.insert (q ^. #name) v m')
+        v : vs -> pure (Argument (Statement vs) (arg' ^. #witness), Map.insert (q ^. #name) v m')
         _ -> Left (ErrorMessage ann' "statement is too short")
 
     eq :: forall ann. ann -> (Argument, Map Name Value) -> ExistentialQuantifier -> Either (ErrorMessage ann) (Argument, Map Name Value)

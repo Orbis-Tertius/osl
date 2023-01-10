@@ -25,9 +25,9 @@ module Semicircuit.ToLogicCircuit
   )
 where
 
-import Cast (word64ToInteger, integerToInt, intToInteger)
+import Cast (intToInteger, integerToInt, word64ToInteger)
 import Control.Lens ((<&>), (^.))
-import Control.Monad (replicateM, forM, foldM)
+import Control.Monad (foldM, forM, replicateM)
 import Control.Monad.State (State, evalState, get, put)
 import Data.Either.Extra (mapLeft)
 import Data.List.Extra (foldl', (!?))
@@ -57,7 +57,7 @@ import Halo2.Types.LogicConstraints (LogicConstraints (..))
 import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
-import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Relative, Absolute))
+import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Absolute, Relative))
 import qualified OSL.Sigma11 as S11
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import qualified OSL.Types.Sigma11.Argument as S11
@@ -70,7 +70,7 @@ import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit)
 import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), ZeroVectorIndex (..))
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), InputBound, Name, OutputBound, OutputBoundF (OutputBound), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
-import Stark.Types.Scalar (Scalar, one, order, scalarToInt, zero, scalarToInteger, integerToScalar)
+import Stark.Types.Scalar (Scalar, integerToScalar, one, order, scalarToInt, scalarToInteger, zero)
 
 type Layout = SemicircuitToLogicCircuitColumnLayout
 
@@ -100,11 +100,12 @@ semicircuitArgumentToLogicCircuitArgument ::
   Either (ErrorMessage ann) Halo2.Argument
 semicircuitArgumentToLogicCircuitArgument ann rc f layout arg = do
   vals <- getNameValues ann f arg
-  mconcat <$> sequence
-    [ getUniversalTableArgument ann rc f layout vals,
-      nameValuesToLogicCircuitArgument ann rc f layout vals,
-      getFixedValuesArgument ann rc layout
-    ]
+  mconcat
+    <$> sequence
+      [ getUniversalTableArgument ann rc f layout vals,
+        nameValuesToLogicCircuitArgument ann rc f layout vals,
+        getFixedValuesArgument ann rc layout
+      ]
 
 getUniversalTableArgument ::
   ann ->
@@ -117,15 +118,16 @@ getUniversalTableArgument ann (RowCount n) f layout vs = do
   t <- getUniversalTable ann (f ^. #formula . #quantifiers . #universalQuantifiers) layout vs
   if intToInteger (Map.size t) > n'
     then Left (ErrorMessage ann "universal table size exceeds row count")
-    else Halo2.Argument mempty . Halo2.Witness . rowsToCellMap . Map.fromList
-           <$> pad n' (Map.toList t)
+    else
+      Halo2.Argument mempty . Halo2.Witness . rowsToCellMap . Map.fromList
+        <$> pad n' (Map.toList t)
   where
     n' = scalarToInteger n
 
     pad 0 _ = pure []
     pad _ [] = Left (ErrorMessage ann "empty universal table")
-    pad n'' [(i,x)] = ((i,x):) <$> pad (n''-1) [(i+1,x)]
-    pad n'' ((i,x):xs) = ((i,x):) <$> pad (n''-1) xs
+    pad n'' [(i, x)] = ((i, x) :) <$> pad (n'' - 1) [(i + 1, x)]
+    pad n'' ((i, x) : xs) = ((i, x) :) <$> pad (n'' - 1) xs
 
 getUniversalTable ::
   forall ann.
@@ -142,19 +144,26 @@ getUniversalTable ann [All x b] layout vs = do
     case Map.lookup x (layout ^. #nameMappings) of
       Just nm -> pure (nm ^. #outputMapping . #unOutputMapping)
       Nothing -> Left (ErrorMessage ann "name not defined in circuit layout")
-  b' <- mapLeft (\(ErrorMessage () msg) -> ErrorMessage ann msg)
-    $ S11.evalTerm ec b
+  b' <-
+    mapLeft (\(ErrorMessage () msg) -> ErrorMessage ann msg) $
+      S11.evalTerm ec b
   if b' == zero
-    then pure . Map.singleton (0 :: RowIndex 'Absolute)
-           $ Map.fromList [(dummyCol, one), (outCol, zero)]
-    else pure . Map.fromList $
-           [ (RowIndex ri, Map.fromList [ (dummyCol, zero), (outCol, si) ])
-            | i <- [0 .. scalarToInteger b' - 1],
-              let ri = fromMaybe (die "Semicircuit.ToLogicCircuit.getUniversalTable: value out of range of Int")
-                       (integerToInt i),
-              let si = fromMaybe (die "Semicircuit.ToLogicCircuit.getUniversalTable: value out of range of scalar")
-                       (integerToScalar i)
-           ]
+    then
+      pure . Map.singleton (0 :: RowIndex 'Absolute) $
+        Map.fromList [(dummyCol, one), (outCol, zero)]
+    else
+      pure . Map.fromList $
+        [ (RowIndex ri, Map.fromList [(dummyCol, zero), (outCol, si)])
+          | i <- [0 .. scalarToInteger b' - 1],
+            let ri =
+                  fromMaybe
+                    (die "Semicircuit.ToLogicCircuit.getUniversalTable: value out of range of Int")
+                    (integerToInt i),
+            let si =
+                  fromMaybe
+                    (die "Semicircuit.ToLogicCircuit.getUniversalTable: value out of range of scalar")
+                    (integerToScalar i)
+        ]
 getUniversalTable ann qs@(All x b : qs') layout vs = do
   let ec = S11.EvaluationContext (Map.mapKeys Left vs)
       dummyCol = layout ^. #dummyRowAdviceColumn . #unDummyRowAdviceColumn
@@ -164,26 +173,33 @@ getUniversalTable ann qs@(All x b : qs') layout vs = do
       Nothing -> Left (ErrorMessage ann "name not defined in circuit layout")
   outCol <-
     case outCols of
-      (outCol':_) -> pure outCol'
+      (outCol' : _) -> pure outCol'
       _ -> Left (ErrorMessage ann "unreachable case in getUniversalTable (this is a bug)")
-  b' <- mapLeft (\(ErrorMessage () msg) -> ErrorMessage ann msg)
-    $ S11.evalTerm ec b
+  b' <-
+    mapLeft (\(ErrorMessage () msg) -> ErrorMessage ann msg) $
+      S11.evalTerm ec b
   if b' == zero
-    then pure . Map.singleton (0 :: RowIndex 'Absolute)
-           . Map.fromList $ [(dummyCol, one)] <> ((,zero) <$> outCols)
+    then
+      pure . Map.singleton (0 :: RowIndex 'Absolute)
+        . Map.fromList
+        $ [(dummyCol, one)] <> ((,zero) <$> outCols)
     else foldM (f outCol) mempty ([0 .. scalarToInteger b' - 1] :: [Integer])
   where
-    f :: ColumnIndex ->
-         Map (RowIndex 'Absolute) (Map ColumnIndex Scalar) ->
-         Integer ->
-         Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Map ColumnIndex Scalar))
+    f ::
+      ColumnIndex ->
+      Map (RowIndex 'Absolute) (Map ColumnIndex Scalar) ->
+      Integer ->
+      Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Map ColumnIndex Scalar))
     f outCol t v = do
-      v' <- maybe (Left (ErrorMessage ann "value out of range of scalar field")) pure
-            (integerToScalar v)
+      v' <-
+        maybe
+          (Left (ErrorMessage ann "value out of range of scalar field"))
+          pure
+          (integerToScalar v)
       let vs' = Map.insert x (Value (Map.singleton [] v')) vs
       t' <- getUniversalTable ann qs' layout vs'
-      let j = maybe 0 ((+1) . fst . fst) (Map.maxViewWithKey t)
-          t'' = Map.insert outCol v' <$> Map.mapKeys (+j) t'
+      let j = maybe 0 ((+ 1) . fst . fst) (Map.maxViewWithKey t)
+          t'' = Map.insert outCol v' <$> Map.mapKeys (+ j) t'
       pure (t <> t'')
 
 nameValuesToLogicCircuitArgument ::
@@ -195,18 +211,24 @@ nameValuesToLogicCircuitArgument ::
   Either (ErrorMessage ann) Halo2.Argument
 nameValuesToLogicCircuitArgument ann rc f layout vs =
   Halo2.Argument
-    <$> (Halo2.Statement . mconcat <$> sequence
-           [ nameMappingArgument ann rc nm v
-            | (n, (nm, v)) <- Map.toList $
-                Map.intersectionWith (,) (layout ^. #nameMappings) vs,
-              n `Set.member` Set.fromList ((f ^. #formula . #quantifiers . #instanceQuantifiers) <&> (^. #name))
-           ])
-    <*> (Halo2.Witness . mconcat <$> sequence
-           [ nameMappingArgument ann rc nm v
-            | (n, (nm, v)) <- Map.toList $
-                Map.intersectionWith (,) (layout ^. #nameMappings) vs,
-              n `Set.member` Set.fromList ((f ^. #formula . #quantifiers . #existentialQuantifiers) <&> (^. #name))
-           ])
+    <$> ( Halo2.Statement . mconcat
+            <$> sequence
+              [ nameMappingArgument ann rc nm v
+                | (n, (nm, v)) <-
+                    Map.toList $
+                      Map.intersectionWith (,) (layout ^. #nameMappings) vs,
+                  n `Set.member` Set.fromList ((f ^. #formula . #quantifiers . #instanceQuantifiers) <&> (^. #name))
+              ]
+        )
+    <*> ( Halo2.Witness . mconcat
+            <$> sequence
+              [ nameMappingArgument ann rc nm v
+                | (n, (nm, v)) <-
+                    Map.toList $
+                      Map.intersectionWith (,) (layout ^. #nameMappings) vs,
+                  n `Set.member` Set.fromList ((f ^. #formula . #quantifiers . #existentialQuantifiers) <&> (^. #name))
+              ]
+        )
 
 nameMappingArgument ::
   ann ->
@@ -216,22 +238,27 @@ nameMappingArgument ::
   Either (ErrorMessage ann) (Map CellReference Scalar)
 nameMappingArgument ann (RowCount n) nm (Value f) =
   if intToInteger (Map.size f) > n'
-  then Left (ErrorMessage ann "value cardinality exceeds row count")
-  else do
-    indices <- mapM sToI [0 .. n'-1]
-    let f' = Map.toList f
-    (defaultIns, defaultOut) <-
-      case f' of
-        ((xs,y):_) -> pure (xs, y)
-        _ -> Left (ErrorMessage ann "empty value")
-    pure $ Map.fromList ([(CellReference ci ri, x)
-                          | (ri, x) <- zip indices ((snd <$> f') <> repeat defaultOut),
-                            let ci = nm ^. #outputMapping . #unOutputMapping
-                         ])
-      <> Map.fromList ([(CellReference ci ri, x)
-                        | (ri, inputs) <- zip indices ((fst <$> f') <> repeat defaultIns),
-                          (ci, x) <- zip ((nm ^. #argMappings) <&> (^. #unArgMapping)) inputs
-                       ])
+    then Left (ErrorMessage ann "value cardinality exceeds row count")
+    else do
+      indices <- mapM sToI [0 .. n' - 1]
+      let f' = Map.toList f
+      (defaultIns, defaultOut) <-
+        case f' of
+          ((xs, y) : _) -> pure (xs, y)
+          _ -> Left (ErrorMessage ann "empty value")
+      pure $
+        Map.fromList
+          ( [ (CellReference ci ri, x)
+              | (ri, x) <- zip indices ((snd <$> f') <> repeat defaultOut),
+                let ci = nm ^. #outputMapping . #unOutputMapping
+            ]
+          )
+          <> Map.fromList
+            ( [ (CellReference ci ri, x)
+                | (ri, inputs) <- zip indices ((fst <$> f') <> repeat defaultIns),
+                  (ci, x) <- zip ((nm ^. #argMappings) <&> (^. #unArgMapping)) inputs
+              ]
+            )
   where
     n' = scalarToInteger n
     sToI = maybe (Left (ErrorMessage ann "index is out of range of Int")) (pure . RowIndex) . integerToInt
@@ -242,22 +269,34 @@ getFixedValuesArgument ::
   Layout ->
   Either (ErrorMessage ann) Halo2.Argument
 getFixedValuesArgument ann (RowCount n) layout = do
-  n' <- maybe (Left (ErrorMessage ann "row count of range of Int")) pure
-        (integerToInt (scalarToInteger n))
+  n' <-
+    maybe
+      (Left (ErrorMessage ann "row count of range of Int"))
+      pure
+      (integerToInt (scalarToInteger n))
   pure . Halo2.Argument mempty . Halo2.Witness . Map.fromList $
     mconcat
-      [ [ (CellReference (layout ^. #fixedColumns . #zeroVector . #unZeroVectorIndex)
-            (RowIndex ri), zero)
-         | ri <- [0 .. n' - 1]
+      [ [ ( CellReference
+              (layout ^. #fixedColumns . #zeroVector . #unZeroVectorIndex)
+              (RowIndex ri),
+            zero
+          )
+          | ri <- [0 .. n' - 1]
         ],
-        [ (CellReference (layout ^. #fixedColumns . #oneVector . #unOneVectorIndex)
-            (RowIndex ri), one)
-         | ri <- [0 .. n' - 1]
+        [ ( CellReference
+              (layout ^. #fixedColumns . #oneVector . #unOneVectorIndex)
+              (RowIndex ri),
+            one
+          )
+          | ri <- [0 .. n' - 1]
         ],
-        [ (CellReference (layout ^. #fixedColumns . #lastRowIndicator . #unLastRowIndicatorColumnIndex)
-            (RowIndex ri), v)
-         | ri <- [0 .. n' - 1],
-           let v = if ri == n' - 1 then one else zero
+        [ ( CellReference
+              (layout ^. #fixedColumns . #lastRowIndicator . #unLastRowIndicatorColumnIndex)
+              (RowIndex ri),
+            v
+          )
+          | ri <- [0 .. n' - 1],
+            let v = if ri == n' - 1 then one else zero
         ]
       ]
 
@@ -927,8 +966,8 @@ existentialOutputsInBoundsConstraints x layout =
             ^. #formula . #quantifiers
               . #existentialQuantifiers,
         bp <- case existentialQuantifierOutputBound q of
-                TermBound bp' -> [sigma11TermToLogicConstraintTerm layout bp']
-                FieldMaxBound -> [],
+          TermBound bp' -> [sigma11TermToLogicConstraintTerm layout bp']
+          FieldMaxBound -> [],
         let y = mapName $ existentialQuantifierName q
     ]
     mempty
@@ -952,8 +991,8 @@ existentialInputsInBoundsConstraints x layout =
               . #existentialQuantifiers,
         (i, ib) <- zip [0 ..] (existentialQuantifierInputBounds q),
         bp <- case ib ^. #bound of
-                TermBound bp' -> [sigma11TermToLogicConstraintTerm layout bp']
-                FieldMaxBound -> [],
+          TermBound bp' -> [sigma11TermToLogicConstraintTerm layout bp']
+          FieldMaxBound -> [],
         let y = name (existentialQuantifierName q) i
     ]
     mempty

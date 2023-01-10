@@ -240,7 +240,7 @@ evalTranslatedFormula6 c name argumentForm argument = do
       (\(ErrorMessage _ msg) -> ErrorMessage Nothing ("toPNFFormula: " <> msg))
       (toPNFFormula () translated''')
   let semi = toSemicircuit pnff
-      rowCount = RowCount 10000 -- TODO: calculate or pass this in
+      rowCount = RowCount 2000 -- TODO: calculate or pass this in
       (logic, layout) = semicircuitToLogicCircuit rowCount semi
   s11arg <-
     mapLeft

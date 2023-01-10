@@ -159,17 +159,17 @@ deriving newtype instance Show a => Show (OutputBoundF a)
 
 data ExistentialQuantifierF name
   = Some
-    { name :: name,
-      cardinality :: Cardinality,
-      _inputBounds :: [InputBoundF name],
-      outputBound :: OutputBoundF name
-    }
+      { name :: name,
+        cardinality :: Cardinality,
+        _inputBounds :: [InputBoundF name],
+        outputBound :: OutputBoundF name
+      }
   | SomeP
-    { name :: name,
-      cardinality :: Cardinality,
-      _inputBound :: InputBoundF name,
-      outputBound :: OutputBoundF name
-    }
+      { name :: name,
+        cardinality :: Cardinality,
+        _inputBound :: InputBoundF name,
+        outputBound :: OutputBoundF name
+      }
   deriving (Generic, Eq, Functor)
 
 type ExistentialQuantifier = ExistentialQuantifierF Name
