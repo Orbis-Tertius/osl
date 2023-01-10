@@ -18,6 +18,10 @@ module Trace.Types
     CaseNumberColumnIndex (CaseNumberColumnIndex),
     NumberOfCases (NumberOfCases),
     TraceType (TraceType),
+    Trace (Trace),
+    SubexpressionTrace (SubexpressionTrace),
+    Statement (Statement),
+    Witness (Witness),
   )
 where
 
@@ -117,5 +121,30 @@ data TraceType = TraceType
     outputColumnIndex :: OutputColumnIndex,
     numCases :: NumberOfCases,
     rowCount :: RowCount
+  }
+  deriving (Generic, Show)
+
+newtype Case = Case { unCase :: Scalar }
+  deriving (Generic, Show)
+
+newtype Statement =
+  Statement { unStatement :: Map (Case, ColumnIndex) Scalar }
+  deriving (Generic, Show)
+
+newtype Witness =
+  Witness { unWitness :: Map (Case, ColumnIndex) Scalar }
+  deriving (Generic, Show)
+
+data Trace = Trace
+  { statement :: Statement,
+    witness :: Witness,
+    usedCases :: Set Case,
+    subexpressions :: Map (Case, SubexpressionId) SubexpressionTrace
+  }
+  deriving (Generic, Show)
+
+data SubexpressionTrace = SubexpressionTrace
+  { value :: Scalar,
+    stepType :: StepTypeId
   }
   deriving (Generic, Show)
