@@ -127,6 +127,7 @@ library
     Trace.FromLogicCircuit
     Trace.LogicToArithmetic
     Trace.Metrics
+    Trace.Semantics
     Trace.ToArithmeticAIR
     Trace.ToArithmeticCircuit
     Trace.Types
