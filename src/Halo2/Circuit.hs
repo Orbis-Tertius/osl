@@ -9,6 +9,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-imports -Wno-unused-matches #-}
 
@@ -26,12 +27,13 @@ import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Lens ((<&>))
-import Control.Monad.Extra (allM, when, (&&^), (||^))
+import Control.Monad.Extra (allM, when, (&&^), (||^), andM)
 import Data.Either.Extra (mapLeft)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
-import Data.Text (pack)
 import qualified Data.Set as Set
+import Data.Text (pack)
+import Data.Tuple.Extra (uncurry3, second, swap)
 import Debug.Trace (trace)
 import Die (die)
 import Halo2.Polynomial (degree)
@@ -62,7 +64,7 @@ import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
 import OSL.Map (inverseMap)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import Stark.Types.Scalar (Scalar, one, scalarToInteger, toWord64, zero)
+import Stark.Types.Scalar (Scalar, one, scalarToInteger, toWord64, zero, integerToScalar)
 
 class HasPolynomialVariables a where
   getPolynomialVariables :: a -> Set PolynomialVariable
@@ -300,67 +302,54 @@ instance HasEvaluate (RowCount, Polynomial) (Map (RowIndex 'Absolute) Scalar) wh
     foldr (Map.unionWith (Group.+)) mempty
       <$> mapM (evaluate ann arg . (rc,)) (Map.toList monos)
 
-instance HasEvaluate (RowCount, Term) (Map (RowIndex 'Absolute) Scalar) where
-  evaluate ann arg = uncurry $ \rc@(RowCount n) ->
-    let rec = evaluate ann arg . (rc,)
+-- TODO: optimize
+instance HasEvaluate (RowCount, RowIndex 'Absolute, Polynomial) Scalar where
+  evaluate ann arg (rc, ri, p) = do
+    vs <- evaluate ann arg (rc, p)
+    case Map.lookup ri vs of
+      Just v -> pure v
+      Nothing -> Left (ErrorMessage ann "polynomial not defined on given row index")
+
+instance HasEvaluate (RowCount, RowIndex 'Absolute, Term) Scalar where
+  evaluate ann arg = uncurry3 $ \rc ri ->
+    let rec = evaluate ann arg . (rc,ri,)
      in \case
-          Var v -> evaluate ann arg v
-          Const i -> do
-            n' <- case integerToInt (scalarToInteger n) of
-              Just n' -> pure n'
-              Nothing -> Left (ErrorMessage ann "row count outside range of Int")
-            pure $ Map.fromList [(RowIndex x, i) | x <- [0 .. n' - 1]]
-          Plus x y -> Map.unionWith (Group.+) <$> rec x <*> rec y
-          Times x y -> Map.unionWith (Ring.*) <$> rec x <*> rec y
-          Max x y -> Map.unionWith max <$> rec x <*> rec y
-          IndLess x y -> Map.intersectionWith lessIndicator <$> rec x <*> rec y
+          Var v ->
+            evaluate ann arg v
+              >>= maybe (Left (ErrorMessage ann "var row index lookup failed")) pure
+                    . Map.lookup ri
+          Const i -> pure i
+          Plus x y -> (Group.+) <$> rec x <*> rec y
+          Times x y -> (Ring.*) <$> rec x <*> rec y
+          Max x y -> max <$> rec x <*> rec y
+          IndLess x y -> lessIndicator <$> rec x <*> rec y
           l@(Lookup is outCol) ->
             mapLeft
               (\(ErrorMessage ann' msg) ->
                 ErrorMessage ann' ("performLookups " <> pack (show l) <> ": " <> msg))
-              (performLookups ann rc Nothing arg is outCol)
+              (performLookup ann rc ri arg is outCol)
 
--- Get the column vector of outputs corresponding to the given input expressions
--- looked up in the given lookup table. The lookups are performed only on the given
+-- Get the output corresponding to the given input expressions
+-- looked up in the given lookup table. The lookup is performed only on the given
 -- set of rows indices. If no set of row indices is provided, then the lookup is
 -- performed on all rows.
-performLookups ::
-  HasEvaluate (RowCount, a) (Map (RowIndex 'Absolute) Scalar) =>
+performLookup ::
+  HasEvaluate (RowCount, RowIndex 'Absolute, a) Scalar =>
   ann ->
   RowCount ->
-  Maybe (Set (RowIndex 'Absolute)) ->
+  RowIndex 'Absolute ->
   Argument ->
   [(InputExpression a, LookupTableColumn)] ->
   LookupTableOutputColumn ->
-  Either (ErrorMessage ann) (Map (RowIndex 'Absolute) Scalar)
-performLookups ann rc@(RowCount n) mRowSet arg is outCol = do
-  inputTable <- mapM (evaluate ann arg . (rc,) . (^. #getInputExpression) . fst) is
-  results <- getLookupResults ann rc mRowSet (getCellMap arg) (zip inputTable (snd <$> is))
-  n' <- case integerToInt (scalarToInteger n) of
-          Just n' -> pure n'
-          Nothing -> Left (ErrorMessage ann "row count out of range of Int")
-  let rowSet = getRowSet rc mRowSet
-      allRows = Set.fromList (RowIndex <$> [0 .. n'-1])
-      emptyRows = Map.fromList
-        [ (ri, zero)
-         | ri <- Set.toList (allRows `Set.difference` rowSet)
-        ]
-  let results' = (<> emptyRows) . Map.fromList $
-        [ (cell ^. #rowIndex, v)
-          | (cell, v) <- Map.toList results,
-            cell ^. #colIndex == outCol ^. #unLookupTableOutputColumn . #unLookupTableColumn
-        ]
-      coveredRows = Map.keysSet results'
-  if coveredRows == allRows
-    then pure results'
-    else
-      trace ("input table = " <> show inputTable
-        <> "\nresults = " <> show results
-        <> "\nresults' = " <> show results'
-        <> "\ncovered rows = " <> show coveredRows
-        <> "\nmissing rows = " <> show (allRows `Set.difference` coveredRows)
-        <> "\nunexpected rows = " <> show (coveredRows `Set.difference` allRows))
-        $ Left (ErrorMessage ann "results do not cover all expected rows")
+  Either (ErrorMessage ann) Scalar
+performLookup ann rc ri arg is outCol = do
+  inputTable <- mapM (fmap (Map.singleton ri) . evaluate ann arg . (rc,ri,) . (^. #getInputExpression) . fst) is
+  results <- getLookupResults ann rc (Just (Set.singleton ri)) (getCellMap arg) (zip inputTable (snd <$> is))
+  case Map.toList (Map.filterWithKey (\k _ -> k ^. #colIndex == outCol') results) of
+    [] -> Left (ErrorMessage ann "lookup produced no result")
+    ((_, y) : _) -> pure y
+  where
+    outCol' = outCol ^. #unLookupTableOutputColumn . #unLookupTableColumn
 
 -- Succeeds only if each lookup table input row expressed by the provided
 -- column vectors is a member of the lookup table as expressed by the cell map, and
@@ -450,6 +439,15 @@ getCellMapRows rows cellMap =
         ri `Set.member` rows
     ]
 
+getCellMapColumns ::
+  Map CellReference Scalar ->
+  Map ColumnIndex (Map (RowIndex 'Absolute) Scalar)
+getCellMapColumns cellMap =
+  Map.unionsWith (<>)
+    [ Map.singleton ci (Map.singleton ri x)
+     | (CellReference ci ri, x) <- Map.toList cellMap
+    ]
+
 columnListToCellMap ::
   [(Map (RowIndex 'Absolute) Scalar, LookupTableColumn)] ->
   Map CellReference Scalar
@@ -470,36 +468,37 @@ lessIndicator :: Scalar -> Scalar -> Scalar
 lessIndicator x y =
   if x < y then one else zero
 
-instance HasEvaluate (RowCount, AtomicLogicConstraint) Bool where
+instance HasEvaluate (RowCount, RowIndex 'Absolute, AtomicLogicConstraint) Bool where
   evaluate ann arg =
-    uncurry $ \rc ->
+    uncurry3 $ \rc ri ->
       \case
-        Equals x y -> (==) <$> evaluate ann arg (rc, x) <*> evaluate ann arg (rc, y)
+        Equals x y -> (==) <$> evaluate ann arg (rc, ri, x) <*> evaluate ann arg (rc, ri, y)
         LessThan x y ->
-          -- TODO: what should happen if the maps do not have the same keys?
-          and
-            <$> ( Map.intersectionWith (<)
-                    <$> evaluate ann arg (rc, x)
-                    <*> evaluate ann arg (rc, y)
-                )
+          (<)
+            <$> evaluate ann arg (rc, ri, x)
+            <*> evaluate ann arg (rc, ri, y)
 
-instance HasEvaluate (RowCount, LogicConstraint) Bool where
+instance HasEvaluate (RowCount, RowIndex 'Absolute, LogicConstraint) Bool where
   evaluate ann arg =
-    uncurry $ \rc ->
+    uncurry3 $ \rc ri ->
       \case
-        Atom p -> evaluate ann arg (rc, p)
-        Not p -> not <$> evaluate ann arg (rc, p)
+        Atom p -> evaluate ann arg (rc, ri, p)
+        Not p -> not <$> rec (rc, ri, p)
         And p q ->
-          evaluate ann arg (rc, p) &&^
-            evaluate ann arg (rc, q)
+          rec (rc, ri, p) &&^
+            rec (rc, ri, q)
         Or p q ->
-          evaluate ann arg (rc, p) ||^
-            evaluate ann arg (rc, q)
+          rec (rc, ri, p) ||^
+            rec (rc, ri, q)
         Iff p q ->
-          (==) <$> evaluate ann arg (rc, p)
-            <*> evaluate ann arg (rc, q)
+          (==) <$> rec (rc, ri, p)
+            <*> rec (rc, ri, q)
         Top -> pure True
         Bottom -> pure False
+    where
+      rec x = do
+        r <- evaluate ann arg x
+        pure (trace (show (x, r)) r)
 
 instance HasEvaluate (Map ColumnIndex FixedBound) Bool where
   evaluate _ arg bs =
@@ -515,9 +514,16 @@ instance HasEvaluate (Map ColumnIndex FixedBound) Bool where
                 )
         ]
 
+instance HasEvaluate (RowCount, RowIndex 'Absolute, LogicConstraints) Bool where
+  evaluate ann arg (rc, ri, LogicConstraints cs bs) =
+    (&&) <$> evaluate ann arg bs <*> allM (evaluate ann arg . (rc,ri,)) cs
+
 instance HasEvaluate (RowCount, LogicConstraints) Bool where
-  evaluate ann arg (rc, LogicConstraints cs bs) =
-    (&&) <$> evaluate ann arg bs <*> allM (evaluate ann arg . (rc,)) cs
+  evaluate ann arg (rc@(RowCount n), cs) = do
+    n' <- case integerToInt (scalarToInteger n) of
+            Just n' -> pure n'
+            _ -> Left (ErrorMessage ann "row count exceeds max Int")
+    andM [ evaluate ann arg (rc,ri,cs) | ri <- RowIndex @Absolute <$> [0 .. n'-1] ]
 
 instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
   evaluate ann arg (rc, PolynomialConstraints polys degreeBound) = do
@@ -533,16 +539,23 @@ instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
 
 instance
   ( HasColumnVectorToBools a,
-    HasEvaluate (RowCount, a) (Map (RowIndex 'Absolute) Scalar)
+    HasEvaluate (RowCount, RowIndex 'Absolute, a) Scalar
   ) =>
   HasEvaluate (RowCount, LookupArgument a) Bool
   where
   -- This one cannot return false; it can only fail or return true
-  evaluate ann arg (rc, LookupArgument _ gate tableMap) = do
-    gateVals <- columnVectorToBools gate <$> evaluate ann arg (rc, gate)
+  evaluate ann arg (rc@(RowCount n), LookupArgument _ gate tableMap) = do
+    n' <- case integerToInt (scalarToInteger n) of
+            Just n' -> pure n'
+            Nothing -> Left (ErrorMessage ann "row count exceeds max Int")
+    gateVals <- columnVectorToBools gate . Map.fromList <$>
+      mapM (\ri -> (ri,) <$> evaluate ann arg (rc, ri, gate)) (RowIndex <$> [0 .. n'-1])
     let rowSet = Map.keysSet (Map.filter id gateVals)
-    inputTable <- mapM (evaluate ann arg . (rc,) . (^. #getInputExpression) . fst) tableMap
-    True <$ getLookupResults ann rc (Just rowSet) (getCellMap arg) (zip inputTable (snd <$> tableMap))
+    inputTable <- fmap (second LookupTableColumn) . fmap swap . Map.toList . getCellMapColumns . Map.fromList . mconcat <$>
+      mapM (\ri -> mapM (\(InputExpression ie, LookupTableColumn ci) ->
+                            (CellReference ci ri,) <$> evaluate ann arg (rc,ri,ie)) tableMap)
+        (Set.toList rowSet)
+    True <$ getLookupResults ann rc (Just rowSet) (getCellMap arg) inputTable
 
 instance
   HasEvaluate (RowCount, LookupArgument a) Bool =>
