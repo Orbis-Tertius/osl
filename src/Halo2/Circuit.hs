@@ -340,15 +340,27 @@ performLookups ann rc@(RowCount n) mRowSet arg is outCol = do
           Just n' -> pure n'
           Nothing -> Left (ErrorMessage ann "row count out of range of Int")
   let rowSet = getRowSet rc mRowSet
+      allRows = Set.fromList (RowIndex <$> [0 .. n'-1])
       emptyRows = Map.fromList
         [ (ri, zero)
-         | ri <- RowIndex <$> [0 .. n'-1],
-           not (ri `Set.member` rowSet) ]
-  pure . (<> emptyRows) . Map.fromList $
-    [ (cell ^. #rowIndex, v)
-      | (cell, v) <- Map.toList results,
-        cell ^. #colIndex == outCol ^. #unLookupTableOutputColumn . #unLookupTableColumn
-    ]
+         | ri <- Set.toList (allRows `Set.difference` rowSet)
+        ]
+  let results' = (<> emptyRows) . Map.fromList $
+        [ (cell ^. #rowIndex, v)
+          | (cell, v) <- Map.toList results,
+            cell ^. #colIndex == outCol ^. #unLookupTableOutputColumn . #unLookupTableColumn
+        ]
+      coveredRows = Map.keysSet results'
+  if coveredRows == allRows
+    then pure results'
+    else
+      trace ("input table = " <> show inputTable
+        <> "\nresults = " <> show results
+        <> "\nresults' = " <> show results'
+        <> "\ncovered rows = " <> show coveredRows
+        <> "\nmissing rows = " <> show (allRows `Set.difference` coveredRows)
+        <> "\nunexpected rows = " <> show (coveredRows `Set.difference` allRows))
+        $ Left (ErrorMessage ann "results do not cover all expected rows")
 
 -- Succeeds only if each lookup table input row expressed by the provided
 -- column vectors is a member of the lookup table as expressed by the cell map, and
@@ -379,16 +391,23 @@ getLookupResults ann rc mRowSet cellMap table = do
               (Left (ErrorMessage ann "input table row index missing"))
               pure
               (Map.lookup ri tableRows)
-          when (Map.size tableRow /= length table)
-            (Left (ErrorMessage ann ("table row is wrong size; duplicate column index in lookup table, or missing value in input column vectors? " <> pack (show tableRow))))
-          (,tableRow) <$>
+          when (Map.size tableRow /= length table) $ 
+            trace ("table: " <> show table)
+            (Left (ErrorMessage ann ("table row is wrong size; duplicate column index in lookup table, or missing value in input column vectors? " <> pack (show (snd <$> table, tableRow)))))
+          ri' <-
             case Map.lookup tableRow cellMapTableInverse of
               Just ri' -> pure ri'
               Nothing ->
-                trace ("table: " <> show cellMapTableInverse)
-                (Left (ErrorMessage ann
-                  ("input table row not present in lookup table: "
-                     <> pack (show tableRow))))
+                trace ("cellMapTableRows = " <> show cellMapTableRows
+                  <> "\ncellMapTableInverse = " <> show cellMapTableInverse)
+                  $ Left (ErrorMessage ann
+                      ("input table row not present in lookup table: "
+                     <> pack (show tableRow)))
+          case Map.lookup ri' cellMapRows of
+            Just r -> pure (ri, r)
+            Nothing ->
+              Left (ErrorMessage ann
+                ("argument table row lookup failed: " <> pack (show ri')))
         | ri <- Set.toList rowSet
       ]
 
