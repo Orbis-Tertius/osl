@@ -250,8 +250,8 @@ nameMappingArgument ann (RowCount n) nm (Value f) =
       pure $
         Map.fromList
           ( [ (CellReference ci ri, x)
-              | (ri, x) <- zip indices ((snd <$> f') <> repeat defaultOut),
-                let ci = nm ^. #outputMapping . #unOutputMapping
+              | let ci = nm ^. #outputMapping . #unOutputMapping,
+                (ri, x) <- zip indices ((snd <$> f') <> repeat defaultOut)
             ]
           )
           <> Map.fromList
@@ -758,10 +758,11 @@ instanceFunctionTablesDefineFunctionsConstraints ::
   LogicConstraints
 instanceFunctionTablesDefineFunctionsConstraints x layout =
   LogicConstraints
-    [ (Label ("instanceFunctionTablesDefineFunctions(" <> show v <> ")"),
-       Atom (lastRowIndicator `Equals` LC.Const one)
-        `Or` nextRowIsEqualConstraint layout v
-        `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v)
+    [ ( Label ("instanceFunctionTablesDefineFunctions(" <> show v <> ")"),
+        Atom (lastRowIndicator `Equals` LC.Const one)
+          `Or` nextRowIsEqualConstraint layout v
+          `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v
+      )
       | v <- (x ^. #formula . #quantifiers . #instanceQuantifiers) <&> (^. #name)
     ]
     mempty
@@ -817,10 +818,11 @@ existentialFunctionTablesDefineFunctionsConstraints ::
   LogicConstraints
 existentialFunctionTablesDefineFunctionsConstraints x layout =
   LogicConstraints
-    [ (Label ("existentialFunctionTablesDefineFunctions(" <> show v <> ")"),
-       Atom (lastRowIndicator `Equals` LC.Const one)
-        `Or` nextRowIsEqualConstraint layout v
-        `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v)
+    [ ( Label ("existentialFunctionTablesDefineFunctions(" <> show v <> ")"),
+        Atom (lastRowIndicator `Equals` LC.Const one)
+          `Or` nextRowIsEqualConstraint layout v
+          `Or` nextInputRowIsLexicographicallyGreaterConstraint layout v
+      )
       | v <-
           existentialQuantifierName
             <$> x ^. #formula . #quantifiers . #existentialQuantifiers
@@ -909,11 +911,12 @@ quantifierFreeFormulaIsTrueConstraints ::
   LogicConstraints
 quantifierFreeFormulaIsTrueConstraints x layout =
   LogicConstraints
-    [ ("quantifierFreeFormulaIsTrue",
-       Atom (dummyRowIndicator `Equals` LC.Const one)
-        `Or` qfFormulaToLogicConstraint
-          layout
-          (x ^. #formula . #qfFormula))
+    [ ( "quantifierFreeFormulaIsTrue",
+        Atom (dummyRowIndicator `Equals` LC.Const one)
+          `Or` qfFormulaToLogicConstraint
+            layout
+            (x ^. #formula . #qfFormula)
+      )
     ]
     mempty
   where
@@ -927,12 +930,14 @@ dummyRowIndicatorConstraints ::
   LogicConstraints
 dummyRowIndicatorConstraints x layout =
   LogicConstraints
-    [ ("dummyRowIndicatorRangeCheck",
-       Atom (dummyRowIndicator `Equals` LC.Const zero)
-        `Or` Atom (dummyRowIndicator `Equals` LC.Const one)),
-      ("dummyRowIndicatorConstraint",
-       Atom (dummyRowIndicator `Equals` LC.Const zero)
-        `Iff` someUniversalQuantifierBoundIsZeroConstraint x layout)
+    [ ( "dummyRowIndicatorRangeCheck",
+        Atom (dummyRowIndicator `Equals` LC.Const zero)
+          `Or` Atom (dummyRowIndicator `Equals` LC.Const one)
+      ),
+      ( "dummyRowIndicatorConstraint",
+        Atom (dummyRowIndicator `Equals` LC.Const zero)
+          `Iff` someUniversalQuantifierBoundIsZeroConstraint x layout
+      )
     ]
     mempty
   where
@@ -966,16 +971,17 @@ existentialOutputsInBoundsConstraints ::
   LogicConstraints
 existentialOutputsInBoundsConstraints x layout =
   LogicConstraints
-    [ (Label ("existentialOutputsInBounds(" <> show q <> ")"),
-       Atom (LessThan y bp))
+    [ ( Label ("existentialOutputsInBounds(" <> show q <> ")"),
+        Atom (LessThan y bp)
+      )
       | q <-
           x
             ^. #formula . #quantifiers
               . #existentialQuantifiers,
+        let y = mapName $ existentialQuantifierName q,
         bp <- case existentialQuantifierOutputBound q of
           TermBound bp' -> [sigma11TermToLogicConstraintTerm layout bp']
-          FieldMaxBound -> [],
-        let y = mapName $ existentialQuantifierName q
+          FieldMaxBound -> []
     ]
     mempty
   where
@@ -991,17 +997,18 @@ existentialInputsInBoundsConstraints ::
   LogicConstraints
 existentialInputsInBoundsConstraints x layout =
   LogicConstraints
-    [ (Label ("existentialInputsInBounds(" <> show q <> ")"),
-       Atom (LessThan y bp))
+    [ ( Label ("existentialInputsInBounds(" <> show q <> ")"),
+        Atom (LessThan y bp)
+      )
       | q <-
           x
             ^. #formula . #quantifiers
               . #existentialQuantifiers,
         (i, ib) <- zip [0 ..] (existentialQuantifierInputBounds q),
+        let y = name (existentialQuantifierName q) i,
         bp <- case ib ^. #bound of
           TermBound bp' -> [sigma11TermToLogicConstraintTerm layout bp']
-          FieldMaxBound -> [],
-        let y = name (existentialQuantifierName q) i
+          FieldMaxBound -> []
     ]
     mempty
   where
@@ -1026,23 +1033,24 @@ universalTableConstraints ::
   LogicConstraints
 universalTableConstraints x layout =
   LogicConstraints
-    [ ("universalTableConstraint",
-       foldl'
-        Or
-        ( Atom (lastRowIndicator `Equals` LC.Const one)
-            `Or` next lastU
-        )
-        [ foldl'
-            And
-            ( Atom (bound i `Equals` LC.Const zero)
-                `And` next (i - 1)
-            )
-            [ Atom (u j 0 `Equals` LC.Const zero) -- TODO is this needed?
-                `And` Atom (u j 1 `Equals` LC.Const zero)
-              | j <- [i .. lastU]
-            ]
-          | i <- [0 .. lastU]
-        ])
+    [ ( "universalTableConstraint",
+        foldl'
+          Or
+          ( Atom (lastRowIndicator `Equals` LC.Const one)
+              `Or` next lastU
+          )
+          [ foldl'
+              And
+              ( Atom (bound i `Equals` LC.Const zero)
+                  `And` next (i - 1)
+              )
+              [ Atom (u j 0 `Equals` LC.Const zero) -- TODO is this needed?
+                  `And` Atom (u j 1 `Equals` LC.Const zero)
+                | j <- [i .. lastU]
+              ]
+            | i <- [0 .. lastU]
+          ]
+      )
     ]
     mempty
   where

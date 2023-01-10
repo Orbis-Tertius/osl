@@ -9,7 +9,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-imports -Wno-unused-matches #-}
 
@@ -249,8 +248,8 @@ instance HasLookupArguments LogicConstraint Term where
 
 instance HasLookupArguments LogicCircuit Term where
   getLookupArguments c =
-    (c ^. #lookupArguments) <>
-      getLookupArguments (snd <$> (c ^. #gateConstraints . #constraints))
+    (c ^. #lookupArguments)
+      <> getLookupArguments (snd <$> (c ^. #gateConstraints . #constraints))
 
 getLookupTables :: HasLookupArguments a b => Ord b => a -> Set (b, [LookupTableColumn])
 getLookupTables x =
@@ -326,9 +325,7 @@ instance HasEvaluate (RowCount, Term) (Map (RowIndex 'Absolute) (Maybe Scalar)) 
               (performLookups ann rc arg is outCol)
 
 -- Get the output corresponding to the given input expressions
--- looked up in the given lookup table. The lookup is performed only on the given
--- set of rows indices. If no set of row indices is provided, then the lookup is
--- performed on all rows.
+-- looked up in the given lookup table.
 performLookups ::
   HasEvaluate (RowCount, a) (Map (RowIndex 'Absolute) (Maybe Scalar)) =>
   ann ->
@@ -341,13 +338,18 @@ performLookups ann rc arg is outCol = do
   inputTable <-
     fmap (Map.mapMaybe id)
       <$> mapM (evaluate ann arg . (rc,) . (^. #getInputExpression) . fst) is
-  results <- getLookupResults ann rc Nothing (getCellMap arg) (zip inputTable (snd <$> is))
-  let results' =
+  results <-
+    getLookupResults
+      ann
+      rc
+      Nothing
+      (getCellMap arg)
+      (zip inputTable (snd <$> is))
+  let allRows = getRowSet rc Nothing
+      results' =
         fmap Just . Map.mapKeys (^. #rowIndex) $
           Map.filterWithKey (\k _ -> k ^. #colIndex == outCol') results
-  if null results'
-    then Left (ErrorMessage ann "lookup produced no result")
-    else pure results'
+  pure $ results' <> Map.fromList ((,Nothing) <$> Set.toList allRows)
   where
     outCol' = outCol ^. #unLookupTableOutputColumn . #unLookupTableColumn
 
@@ -362,7 +364,7 @@ getLookupResults ann rc mRowSet cellMap table = do
   let rowSet = getRowSet rc mRowSet
       allRows = getRowSet rc Nothing
       cellMapAllRows = getCellMapRows allRows cellMap
-      tableCols = Map.fromList (((,()) . (^. #unLookupTableColumn) . snd) <$> table)
+      tableCols = Map.fromList ((,()) . (^. #unLookupTableColumn) . snd <$> table)
       cellMapTableRows = (`Map.intersection` tableCols) <$> cellMapAllRows
       cellMapTableInverse = inverseMap cellMapTableRows
       tableRows = getColumnListRows rowSet table
@@ -430,6 +432,16 @@ getCellMapRows rows cellMap =
         ri `Set.member` rows
     ]
 
+-- getCellMapColumns ::
+--   Map CellReference Scalar ->
+--   Map ColumnIndex (Map (RowIndex 'Absolute) Scalar)
+-- getCellMapColumns cellMap =
+--   Map.unionsWith
+--     (<>)
+--     [ Map.singleton ci (Map.singleton ri x)
+--       | (CellReference ci ri, x) <- Map.toList cellMap
+--     ]
+
 columnListToCellMap ::
   [(Map (RowIndex 'Absolute) Scalar, LookupTableColumn)] ->
   Map CellReference Scalar
@@ -486,15 +498,16 @@ instance HasEvaluate (RowCount, LogicConstraint) (Map (RowIndex 'Absolute) (Mayb
                 <*> rec (rc, q)
             Top -> do
               n' <- getN
-              pure (Map.fromList (zip (RowIndex <$> [0 .. n' - 1]) (repeat (Just True))))
+              pure (Map.fromList ((,Just True) . RowIndex <$> [0 .. n' - 1]))
             Bottom -> do
               n' <- getN
-              pure (Map.fromList (zip (RowIndex <$> [0 .. n' - 1]) (repeat (Just False))))
+              pure (Map.fromList ((,Just False) . RowIndex <$> [0 .. n' - 1]))
     where
       rec = evaluate ann arg
-      -- rec x = do
-      --   r <- evaluate ann arg x
-      --   pure (trace (show (foldr (liftA2 (&&)) (Just True) r, x)) r)
+
+-- rec x = do
+--   r <- evaluate ann arg x
+--   pure (trace (show (foldr (liftA2 (&&)) (Just True) r, x)) r)
 
 instance HasEvaluate (Map ColumnIndex FixedBound) Bool where
   evaluate _ arg bs =
@@ -511,12 +524,19 @@ instance HasEvaluate (Map ColumnIndex FixedBound) Bool where
         ]
 
 instance HasEvaluate (RowCount, LogicConstraints) Bool where
-  evaluate ann arg (rc, LogicConstraints cs bs) =
-    (&&) <$> evaluate ann arg bs
-      <*> allM (\(lbl, c) -> do
-                 r <- fmap (and . fmap (== Just True)) . evaluate ann arg . (rc,) $ c
-                 pure (trace (show (r, lbl, c)) r))
-          cs
+  evaluate ann arg (rc, LogicConstraints cs bs) = do
+    -- let cols = getCellMapColumns (getCellMap arg)
+    (&&) -- trace ("column sizes: " <> show (Map.size <$> cols)) . (&&)
+      <$> evaluate ann arg bs
+      <*> allM
+        ( \(lbl, c) -> do
+            r <- evaluate ann arg (rc, c)
+            let r' = r == Map.fromList ((,Just True) <$> Set.toList allRows)
+            pure r' -- pure (trace (show (r', lbl, c, r)) r')
+        )
+        cs
+    where
+      allRows = getRowSet rc Nothing
 
 instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
   evaluate ann arg (rc, PolynomialConstraints polys degreeBound) = do

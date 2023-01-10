@@ -7,6 +7,6 @@ module Halo2.Types.Label (Label (Label)) where
 import Data.String (IsString)
 import GHC.Generics (Generic)
 
-newtype Label = Label { unLabel :: String }
+newtype Label = Label {unLabel :: String}
   deriving stock (Generic)
   deriving newtype (Eq, Ord, Show, IsString)

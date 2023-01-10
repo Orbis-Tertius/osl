@@ -270,4 +270,4 @@ evalTranslatedFormula6 c name argumentForm argument = do
           Nothing
           ("evaluate: " <> msg)
     )
-    (evaluate () lcArg logic)
+    (Halo2.Circuit.evaluate () lcArg logic)
