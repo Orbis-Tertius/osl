@@ -21,3 +21,10 @@ data EvaluationContext t =
     lookupTables :: Map (Set LookupTableColumn) (Set (Map LookupTableColumn Scalar))
   }
   deriving Generic
+
+instance Semigroup (EvaluationContext t) where
+  EvaluationContext a b c <> EvaluationContext d e f =
+    EvaluationContext (a <> d) (b <> e) (c <> f)
+
+instance Monoid (EvaluationContext t) where
+  mempty = EvaluationContext mempty mempty mempty
