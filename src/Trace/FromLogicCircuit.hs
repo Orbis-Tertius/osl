@@ -10,6 +10,7 @@
 
 module Trace.FromLogicCircuit
   ( logicCircuitToTraceType,
+    argumentToTrace,
     getMapping,
   )
 where
@@ -28,7 +29,9 @@ import Halo2.ByteDecomposition (countBytes)
 import Halo2.Circuit (getLookupArguments, getLookupTables, getPolynomialVariables, getScalars)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
+import qualified Halo2.Types.Argument as LC
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
+import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice))
@@ -50,8 +53,48 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex)
 import OSL.Types.Arity (Arity (Arity))
+import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero)
-import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType))
+import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), Trace, Case (Case), Statement (Statement), Witness (Witness))
+
+argumentToTrace ::
+  ann ->
+  BitsPerByte ->
+  LogicCircuit ->
+  LC.Argument ->
+  Either (ErrorMessage ann) Trace
+argumentToTrace = todo
+
+logicCircuitStatementToTraceStatement ::
+  ann ->
+  LC.Statement ->
+  Either (ErrorMessage ann) Statement
+logicCircuitStatementToTraceStatement ann stmt =
+  Statement <$> cellMapToCaseAndColMap ann (stmt ^. #unStatement)
+
+logicCircuitWitnessToTraceWitness ::
+  ann ->
+  LC.Witness ->
+  Either (ErrorMessage ann) Witness
+logicCircuitWitnessToTraceWitness ann witness =
+  Witness <$> cellMapToCaseAndColMap ann (witness ^. #unWitness)
+
+cellMapToCaseAndColMap ::
+  ann ->
+  Map CellReference Scalar ->
+  Either (ErrorMessage ann) (Map (Case, ColumnIndex) Scalar)
+cellMapToCaseAndColMap ann cellMap =
+  Map.fromList <$> sequence
+    [ (,)
+        <$> ((,col) . Case <$>
+              maybe (Left (ErrorMessage ann "row index out of range of scalar field"))
+                pure (integerToScalar (intToInteger (row ^. #getRowIndex))))
+        <*> pure x
+      | (CellReference col row, x) <- Map.toList cellMap
+    ]
+
+todo :: a
+todo = todo
 
 logicCircuitToTraceType ::
   BitsPerByte ->
