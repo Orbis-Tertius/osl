@@ -131,6 +131,7 @@ library
     Trace.ToArithmeticAIR
     Trace.ToArithmeticCircuit
     Trace.Types
+    Trace.Types.EvaluationContext
     Trace.Types.Metrics
 
   build-depends:

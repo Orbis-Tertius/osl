@@ -17,6 +17,7 @@ module Trace.Types
     StepIndicatorColumnIndex (StepIndicatorColumnIndex),
     CaseNumberColumnIndex (CaseNumberColumnIndex),
     NumberOfCases (NumberOfCases),
+    Case (Case),
     TraceType (TraceType),
     Trace (Trace),
     SubexpressionTrace (SubexpressionTrace),
@@ -125,7 +126,7 @@ data TraceType = TraceType
   deriving (Generic, Show)
 
 newtype Case = Case { unCase :: Scalar }
-  deriving (Generic, Show)
+  deriving (Eq, Ord, Generic, Show)
 
 newtype Statement =
   Statement { unStatement :: Map (Case, ColumnIndex) Scalar }
