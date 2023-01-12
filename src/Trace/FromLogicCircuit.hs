@@ -54,8 +54,8 @@ import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero)
-import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), Trace, Case (Case), Statement (Statement), Witness (Witness))
+import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero, scalarToInteger)
+import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), Trace (Trace), Case (Case), Statement (Statement), Witness (Witness), SubexpressionTrace)
 
 argumentToTrace ::
   ann ->
@@ -63,7 +63,45 @@ argumentToTrace ::
   LogicCircuit ->
   LC.Argument ->
   Either (ErrorMessage ann) Trace
-argumentToTrace = todo
+argumentToTrace ann bitsPerByte lc arg = do
+  usedCases <- logicCircuitUsedCases ann lc
+  Trace
+    <$> logicCircuitStatementToTraceStatement ann (arg ^. #statement)
+    <*> logicCircuitWitnessToTraceWitness ann (arg ^. #witness)
+    <*> pure usedCases
+    <*> argumentSubexpressionTraces ann bitsPerByte lc arg usedCases
+
+logicCircuitUsedCases ::
+  ann ->
+  LogicCircuit ->
+  Either (ErrorMessage ann) (Set Case)
+logicCircuitUsedCases ann lc =
+  Set.fromList <$> sequence
+    [ maybe (Left (ErrorMessage ann "case index outside of scalar field"))
+        (pure . Case) (integerToScalar i)
+      | i <- [0 .. scalarToInteger (lc ^. #rowCount . #getRowCount)]
+    ]
+
+argumentSubexpressionTraces ::
+  ann ->
+  BitsPerByte ->
+  LogicCircuit ->
+  LC.Argument ->
+  Set Case ->
+  Either (ErrorMessage ann) (Map (Case, SubexpressionId) SubexpressionTrace)
+argumentSubexpressionTraces ann bitsPerByte lc arg cases =
+  mconcat <$>
+    mapM (\c -> Map.mapKeys (c,) <$> caseArgumentSubexpressionTraces ann bitsPerByte lc arg c)
+         (Set.toList cases)
+
+caseArgumentSubexpressionTraces ::
+  ann ->
+  BitsPerByte ->
+  LogicCircuit ->
+  LC.Argument ->
+  Case ->
+  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace)
+caseArgumentSubexpressionTraces = todo
 
 logicCircuitStatementToTraceStatement ::
   ann ->
