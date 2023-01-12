@@ -9,8 +9,12 @@ where
 
 import Halo2.Prelude
 import Halo2.Types.Byte (Byte)
+import Halo2.Types.Sign (Sign)
 
--- Most significant byte first
-newtype ByteDecomposition = ByteDecomposition
-  {unByteDecomposition :: [Byte]}
-  deriving (Semigroup, Monoid, Generic)
+data ByteDecomposition =
+  ByteDecomposition
+  { sign :: Sign,
+    -- Most significant byte first
+    bytes :: [Byte]
+  }
+  deriving (Generic)
