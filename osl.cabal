@@ -62,6 +62,7 @@ library
     Halo2.Types.PowerProduct
     Halo2.Types.RowIndex
     Halo2.Types.RowCount
+    Halo2.Types.Sign
     Halo2.Types.Witness
     Halo2.Types.WitnessColumns
     Halo2.Types.WitnessGenerationContext
