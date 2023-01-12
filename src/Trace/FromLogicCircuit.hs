@@ -28,7 +28,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Die (die)
 import Halo2.ByteDecomposition (countBytes)
-import Halo2.Circuit (getLookupArguments, getLookupTables, getPolynomialVariables, getScalars)
+import Halo2.Circuit (getLookupArguments, getLookupTables, getPolynomialVariables, getScalars, lessIndicator)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import qualified Halo2.Types.Argument as LC
@@ -256,6 +256,13 @@ logicTermSubexpressionTraces ann lc arg mapping c =
       s2 <- getOperationSubexpressionId ann mapping (Max' s0 s1)
       let v = x' `max` y'
           m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #maxT . #unOf) mempty)
+      pure (m0 <> m1 <> m2, s2, v)
+    LC.IndLess x y -> do
+      (m0, s0, x') <- rec x
+      (m1, s1, y') <- rec y
+      s2 <- getOperationSubexpressionId ann mapping (LessThan' s0 s1)
+      let v = x' `lessIndicator` y'
+          m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #lessThan . #unOf) mempty)
       pure (m0 <> m1 <> m2, s2, v)
     LC.Const x -> do
       st <- getConstantStepTypeId ann mapping x

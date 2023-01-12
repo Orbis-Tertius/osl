@@ -18,6 +18,7 @@ module Halo2.Circuit
     HasLookupArguments (getLookupArguments),
     getLookupTables,
     HasEvaluate (evaluate),
+    lessIndicator,
     rowsToCellMap,
   )
 where
