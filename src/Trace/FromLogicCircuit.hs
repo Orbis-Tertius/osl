@@ -19,8 +19,7 @@ import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger)
 import Control.Applicative ((<|>))
-import Control.Arrow (second)
-import Control.Lens ((<&>))
+import Control.Lens ((<&>), _1)
 import Control.Monad (foldM, mzero, replicateM)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.List (foldl')
@@ -110,7 +109,7 @@ caseArgumentSubexpressionTraces ::
 caseArgumentSubexpressionTraces ann bitsPerByte lc arg mapping c =
   (<>)
     <$> (mconcat <$>
-           mapM (fmap fst . logicConstraintSubexpressionTraces ann bitsPerByte lc arg mapping c)
+           mapM (fmap (^. _1) . logicConstraintSubexpressionTraces ann bitsPerByte lc arg mapping c)
              ((lc ^. #gateConstraints . #constraints) <&> snd))
     <*> (mconcat <$> mapM (lookupArgumentSubexpressionTraces ann bitsPerByte lc arg mapping c)
                        (Set.toList (lc ^. #lookupArguments . #getLookupArguments)))
@@ -123,55 +122,103 @@ logicConstraintSubexpressionTraces ::
   Mapping ->
   Case ->
   LogicConstraint ->
-  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, Scalar)
+  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, SubexpressionId, Scalar)
 logicConstraintSubexpressionTraces ann bitsPerByte lc arg mapping c =
    \case
      LC.Atom (LC.Equals x y) -> do
-       (m0, x') <- term x
-       (m1, y') <- term y
-       pure (m0 <> m1, if x' == y' then one else zero)
+       (m0, s0, x') <- term x
+       (m1, s1, y') <- term y
+       s2 <- getOperationSubexpressionId ann mapping (Equals' s0 s1)
+       let v = if x' == y' then one else zero
+           m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #equals . #unOf) mempty)
+       pure (m0 <> m1 <> m2, s2, v)
      LC.Atom (LC.LessThan x y) -> do
-       (m0, x') <- term x
-       (m1, y') <- term y
-       pure (m0 <> m1, if x' < y' then one else zero)
-     LC.Not p -> second (one Group.-) <$> rec p
+       (m0, s0, x') <- term x
+       (m1, s1, y') <- term y
+       s2 <- getOperationSubexpressionId ann mapping (LessThan' s0 s1)
+       let v = if x' < y' then one else zero
+           m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #lessThan . #unOf) mempty)
+       pure (m0 <> m1 <> m2, s2, v)
+     LC.Not p -> do
+       (m0, s0, x') <- rec p
+       s1 <- getOperationSubexpressionId ann mapping (Not' s0)
+       let v = one Group.- x'
+           m1 = Map.singleton s1 (SubexpressionTrace v (mapping ^. #stepTypeIds . #not . #unOf) mempty)
+       pure (m0 <> m1, s1, v)
      LC.And p q -> do
-       (m0, x') <- rec p
-       (m1, y') <- rec q
-       pure (m0 <> m1, x' Ring.* y')
+       (m0, s0, x') <- rec p
+       if x' == zero
+         then do
+           s1 <- getOperationSubexpressionId ann mapping (TimesAndShortCircuit' s0)
+           let m1 = Map.singleton s1 (SubexpressionTrace zero (mapping ^. #stepTypeIds . #timesAndShortCircuit . #unOf) mempty)
+           pure (m0 <> m1, s1, zero)
+         else do
+           (m1, s1, y') <- rec q
+           s2 <- getOperationSubexpressionId ann mapping (TimesAnd' s0 s1)
+           let v = x' Ring.* y'
+               m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #timesAnd . #unOf) mempty)
+           pure (m0 <> m1 <> m2, s2, v)
      LC.Or p q -> do
-       (m0, x') <- rec p
-       (m1, y') <- rec q
-       pure (m0 <> m1, (x' Group.+ y') Group.- (x' Ring.* y'))
+       (m0, s0, x') <- rec p
+       if x' == one
+         then do
+           s1 <- getOperationSubexpressionId ann mapping (OrShortCircuit' s0)
+           let m1 = Map.singleton s1 (SubexpressionTrace one (mapping ^. #stepTypeIds . #orShortCircuit . #unOf) mempty)
+           pure (m0 <> m1, s1, one)
+         else do
+           (m1, s1, y') <- rec q
+           s2 <- getOperationSubexpressionId ann mapping (Or' s0 s1)
+           let v = (x' Group.+ y') Group.- (x' Ring.* y')
+               m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #or . #unOf) mempty)
+           pure (m0 <> m1 <> m2, s2, v)
      LC.Iff p q -> do
-       (m0, x') <- rec p
-       (m1, y') <- rec q
-       pure (m0 <> m1, if x' == y' then one else zero)
+       (m0, s0, x') <- rec p
+       (m1, s1, y') <- rec q
+       s2 <- getOperationSubexpressionId ann mapping (Iff' s0 s1)
+       let v = if x' == y' then one else zero
+           m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #iff . #unOf) mempty)
+       pure (m0 <> m1 <> m2, s2, v)
      LC.Top -> do
        sId <- getConstantSubexpressionId ann mapping one
        stId <- getConstantStepTypeId ann mapping one
-       pure (Map.singleton sId (SubexpressionTrace one stId mempty), one)
+       pure (Map.singleton sId (SubexpressionTrace one stId mempty), sId, one)
      LC.Bottom -> do
        sId <- getConstantSubexpressionId ann mapping zero
        stId <- getConstantStepTypeId ann mapping zero
-       pure (Map.singleton sId (SubexpressionTrace zero stId mempty), zero)
+       pure (Map.singleton sId (SubexpressionTrace zero stId mempty), sId, zero)
   where
     rec = logicConstraintSubexpressionTraces ann bitsPerByte lc arg mapping c
     term = logicTermSubexpressionTraces ann lc arg mapping c
+
+getOperationSubexpressionId ::
+  ann ->
+  Mapping ->
+  Operation ->
+  Either (ErrorMessage ann) SubexpressionId
+getOperationSubexpressionId ann mapping op =
+  case Map.lookup op (mapping ^. #subexpressionIds . #operations) of
+    Just sId -> pure (sId ^. #unOf)
+    Nothing -> Left (ErrorMessage ann "operation subexpression id not found")
 
 getConstantStepTypeId ::
   ann ->
   Mapping ->
   Scalar ->
   Either (ErrorMessage ann) StepTypeId
-getConstantStepTypeId = todo
+getConstantStepTypeId ann mapping x =
+  case Map.lookup x (mapping ^. #stepTypeIds . #constants) of
+    Just sId -> pure sId
+    Nothing -> Left (ErrorMessage ann "constant step type id not found")
 
 getConstantSubexpressionId ::
   ann ->
   Mapping ->
   Scalar ->
   Either (ErrorMessage ann) SubexpressionId
-getConstantSubexpressionId = todo
+getConstantSubexpressionId ann mapping x =
+  case Map.lookup x (mapping ^. #subexpressionIds . #constants) of
+    Just sId -> pure (sId ^. #unOf)
+    Nothing -> Left (ErrorMessage ann "constant subexpression id not found")
 
 logicTermSubexpressionTraces ::
   ann ->
@@ -180,8 +227,18 @@ logicTermSubexpressionTraces ::
   Mapping ->
   Case ->
   LC.Term ->
-  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, Scalar)
-logicTermSubexpressionTraces = todo
+  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, SubexpressionId, Scalar)
+logicTermSubexpressionTraces ann lc arg mapping c =
+  \case
+    LC.Plus x y -> do
+      (m0, s0, x') <- rec x
+      (m1, s1, y') <- rec y
+      s2 <- getOperationSubexpressionId ann mapping (Plus' s0 s1)
+      let v = x' Group.+ y'
+          m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #plus . #unOf) mempty)
+      pure (m0 <> m1 <> m2, s2, v)
+  where
+    rec = logicTermSubexpressionTraces ann lc arg mapping c
 
 lookupArgumentSubexpressionTraces ::
   ann ->
