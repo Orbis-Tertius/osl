@@ -15,8 +15,11 @@ module Trace.FromLogicCircuit
   )
 where
 
+import qualified Algebra.Additive as Group
+import qualified Algebra.Ring as Ring
 import Cast (intToInteger)
 import Control.Applicative ((<|>))
+import Control.Arrow (second)
 import Control.Lens ((<&>))
 import Control.Monad (foldM, mzero, replicateM)
 import Control.Monad.Trans.State (State, evalState, get, put)
@@ -55,7 +58,7 @@ import Halo2.Types.RowIndex (RowIndex)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero, scalarToInteger)
-import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), Trace (Trace), Case (Case), Statement (Statement), Witness (Witness), SubexpressionTrace)
+import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), Trace (Trace), Case (Case), Statement (Statement), Witness (Witness), SubexpressionTrace (SubexpressionTrace))
 
 argumentToTrace ::
   ann ->
@@ -91,21 +94,25 @@ argumentSubexpressionTraces ::
   Either (ErrorMessage ann) (Map (Case, SubexpressionId) SubexpressionTrace)
 argumentSubexpressionTraces ann bitsPerByte lc arg cases =
   mconcat <$>
-    mapM (\c -> Map.mapKeys (c,) <$> caseArgumentSubexpressionTraces ann bitsPerByte lc arg c)
+    mapM (\c -> Map.mapKeys (c,) <$> caseArgumentSubexpressionTraces ann bitsPerByte lc arg mapping c)
          (Set.toList cases)
+  where
+    mapping = getMapping bitsPerByte lc
 
 caseArgumentSubexpressionTraces ::
   ann ->
   BitsPerByte ->
   LogicCircuit ->
   LC.Argument ->
+  Mapping ->
   Case ->
   Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace)
-caseArgumentSubexpressionTraces ann bitsPerByte lc arg c =
+caseArgumentSubexpressionTraces ann bitsPerByte lc arg mapping c =
   (<>)
-    <$> (mconcat <$> mapM (fmap fst . logicConstraintSubexpressionTraces ann bitsPerByte lc arg c)
-                       ((lc ^. #gateConstraints . #constraints) <&> snd))
-    <*> (mconcat <$> mapM (lookupArgumentSubexpressionTraces ann bitsPerByte lc arg c)
+    <$> (mconcat <$>
+           mapM (fmap fst . logicConstraintSubexpressionTraces ann bitsPerByte lc arg mapping c)
+             ((lc ^. #gateConstraints . #constraints) <&> snd))
+    <*> (mconcat <$> mapM (lookupArgumentSubexpressionTraces ann bitsPerByte lc arg mapping c)
                        (Set.toList (lc ^. #lookupArguments . #getLookupArguments)))
 
 logicConstraintSubexpressionTraces ::
@@ -113,16 +120,75 @@ logicConstraintSubexpressionTraces ::
   BitsPerByte ->
   LogicCircuit ->
   LC.Argument ->
+  Mapping ->
   Case ->
   LogicConstraint ->
-  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, SubexpressionId)
-logicConstraintSubexpressionTraces = todo
+  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, Scalar)
+logicConstraintSubexpressionTraces ann bitsPerByte lc arg mapping c =
+   \case
+     LC.Atom (LC.Equals x y) -> do
+       (m0, x') <- term x
+       (m1, y') <- term y
+       pure (m0 <> m1, if x' == y' then one else zero)
+     LC.Atom (LC.LessThan x y) -> do
+       (m0, x') <- term x
+       (m1, y') <- term y
+       pure (m0 <> m1, if x' < y' then one else zero)
+     LC.Not p -> second (one Group.-) <$> rec p
+     LC.And p q -> do
+       (m0, x') <- rec p
+       (m1, y') <- rec q
+       pure (m0 <> m1, x' Ring.* y')
+     LC.Or p q -> do
+       (m0, x') <- rec p
+       (m1, y') <- rec q
+       pure (m0 <> m1, (x' Group.+ y') Group.- (x' Ring.* y'))
+     LC.Iff p q -> do
+       (m0, x') <- rec p
+       (m1, y') <- rec q
+       pure (m0 <> m1, if x' == y' then one else zero)
+     LC.Top -> do
+       sId <- getConstantSubexpressionId ann mapping one
+       stId <- getConstantStepTypeId ann mapping one
+       pure (Map.singleton sId (SubexpressionTrace one stId mempty), one)
+     LC.Bottom -> do
+       sId <- getConstantSubexpressionId ann mapping zero
+       stId <- getConstantStepTypeId ann mapping zero
+       pure (Map.singleton sId (SubexpressionTrace zero stId mempty), zero)
+  where
+    rec = logicConstraintSubexpressionTraces ann bitsPerByte lc arg mapping c
+    term = logicTermSubexpressionTraces ann lc arg mapping c
+
+getConstantStepTypeId ::
+  ann ->
+  Mapping ->
+  Scalar ->
+  Either (ErrorMessage ann) StepTypeId
+getConstantStepTypeId = todo
+
+getConstantSubexpressionId ::
+  ann ->
+  Mapping ->
+  Scalar ->
+  Either (ErrorMessage ann) SubexpressionId
+getConstantSubexpressionId = todo
+
+logicTermSubexpressionTraces ::
+  ann ->
+  LogicCircuit ->
+  LC.Argument ->
+  Mapping ->
+  Case ->
+  LC.Term ->
+  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, Scalar)
+logicTermSubexpressionTraces = todo
 
 lookupArgumentSubexpressionTraces ::
   ann ->
   BitsPerByte ->
   LogicCircuit ->
   LC.Argument ->
+  Mapping ->
   Case ->
   LookupArgument LC.Term ->
   Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace)
