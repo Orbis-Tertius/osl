@@ -101,7 +101,32 @@ caseArgumentSubexpressionTraces ::
   LC.Argument ->
   Case ->
   Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace)
-caseArgumentSubexpressionTraces = todo
+caseArgumentSubexpressionTraces ann bitsPerByte lc arg c =
+  (<>)
+    <$> (mconcat <$> mapM (fmap fst . logicConstraintSubexpressionTraces ann bitsPerByte lc arg c)
+                       ((lc ^. #gateConstraints . #constraints) <&> snd))
+    <*> (mconcat <$> mapM (lookupArgumentSubexpressionTraces ann bitsPerByte lc arg c)
+                       (Set.toList (lc ^. #lookupArguments . #getLookupArguments)))
+
+logicConstraintSubexpressionTraces ::
+  ann ->
+  BitsPerByte ->
+  LogicCircuit ->
+  LC.Argument ->
+  Case ->
+  LogicConstraint ->
+  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, SubexpressionId)
+logicConstraintSubexpressionTraces = todo
+
+lookupArgumentSubexpressionTraces ::
+  ann ->
+  BitsPerByte ->
+  LogicCircuit ->
+  LC.Argument ->
+  Case ->
+  LookupArgument LC.Term ->
+  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace)
+lookupArgumentSubexpressionTraces = todo
 
 logicCircuitStatementToTraceStatement ::
   ann ->

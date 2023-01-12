@@ -298,7 +298,8 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
           caseNumberMapping,
           stepTypeMapping,
           stepIndicatorMapping,
-          globalToLocalMappings
+          globalToLocalMappings,
+          pure (sT ^. #adviceValues)
         ]
 
     inputMappings =

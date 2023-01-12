@@ -146,6 +146,7 @@ data Trace = Trace
 
 data SubexpressionTrace = SubexpressionTrace
   { value :: Scalar,
-    stepType :: StepTypeId
+    stepType :: StepTypeId,
+    adviceValues :: Map ColumnIndex Scalar
   }
   deriving (Generic, Show)
