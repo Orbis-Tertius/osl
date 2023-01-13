@@ -1155,11 +1155,9 @@ bareLookupStepTypes ::
   Map StepTypeId StepType
 bareLookupStepTypes m =
   Map.fromList
-    [ (sId, lookupStepType m (P.one `P.minus` out) t)
+    [ (sId, lookupStepType m P.zero t)
       | (t, sId) <- Map.toList (m ^. #stepTypeIds . #lookupTables)
     ]
-  where
-    out = P.var' $ m ^. #output . #unOutputColumnIndex
 
 lookupStepType ::
   Mapping ->
