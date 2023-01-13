@@ -60,14 +60,11 @@ import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero, scalarToInteger)
 import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), Trace (Trace), Case (Case), Statement (Statement), Witness (Witness), SubexpressionTrace (SubexpressionTrace))
 
-data LookupCaches =
+newtype LookupCaches =
   LookupCaches
     { lookupTermCaches ::
         Map (Set LookupTableColumn, LC.LookupTableOutputColumn)
-          (Map (Map LookupTableColumn Scalar) Scalar),
-      lookupArgumentCaches ::
-        Map (Set LookupTableColumn)
-          (Set (Map LookupTableColumn Scalar))
+          (Map (Map LookupTableColumn Scalar) Scalar)
     }
   deriving Generic
 
@@ -583,7 +580,6 @@ data Operator
   | Max
   | VoidT
   | AssertT
-  | AssertLookupT
   | LoadFromDifferentCase
 
 type StepTypeIdOf :: Operator -> Type
@@ -603,7 +599,6 @@ data StepTypeIdMapping = StepTypeIdMapping
   { loads :: Map PolynomialVariable StepTypeId,
     loadFromDifferentCase :: StepTypeIdOf LoadFromDifferentCase,
     lookupTables :: Map LookupTable StepTypeId,
-    assertLookup :: StepTypeIdOf AssertLookupT,
     constants :: Map Scalar StepTypeId,
     plus :: StepTypeIdOf Plus,
     timesAnd :: StepTypeIdOf TimesAnd,
@@ -655,26 +650,18 @@ data GateSubexpressionIds = GateSubexpressionIds
   }
   deriving (Eq, Ord, Generic)
 
-data LookupAssertion = LookupAssertion
-  { bareLookup :: BareLookupSubexpressionId,
-    gate :: GateSubexpressionIds,
-    output :: OutputSubexpressionId
-  }
-  deriving (Eq, Ord, Generic)
-
 data SubexpressionIdMapping = SubexpressionIdMapping
   { void :: Maybe (SubexpressionIdOf Void),
     assertions :: Set Assertion,
     variables :: Map PolynomialVariable (SubexpressionIdOf PolynomialVariable),
     bareLookups :: Map BareLookupArgument BareLookupSubexpressionId,
-    lookupAssertions :: Set LookupAssertion,
     constants :: Map Scalar (SubexpressionIdOf Scalar),
     operations :: Map Operation (SubexpressionIdOf Operation)
   }
   deriving (Generic)
 
 instance Semigroup SubexpressionIdMapping where
-  (SubexpressionIdMapping b c d e f g h) <> (SubexpressionIdMapping j k l m n o p) =
+  (SubexpressionIdMapping b c d e f g) <> (SubexpressionIdMapping j k l m n o) =
     SubexpressionIdMapping
       (b <|> j)
       (c <> k)
@@ -682,7 +669,6 @@ instance Semigroup SubexpressionIdMapping where
       (e <> m)
       (f <> n)
       (g <> o)
-      (h <> p)
 
 getStepArity :: LogicCircuit -> Arity
 getStepArity c =
@@ -807,7 +793,6 @@ getMapping bitsPerByte c =
                 <*> ( Map.fromList . zip lookupTables'
                         <$> replicateM (length lookupTables') nextSid
                     )
-                <*> (nextSid' :: State S (StepTypeIdOf AssertLookupT))
                 <*> ( Map.fromList . zip scalars'
                         <$> replicateM (length scalars') nextSid
                     )
@@ -837,7 +822,6 @@ getMapping bitsPerByte c =
                               (length bareLookupArguments)
                               (BareLookupSubexpressionId <$> nextEid)
                         )
-                    <*> pure mempty
                     <*> ( Map.fromList . zip scalars'
                             <$> replicateM (length scalars') nextEid'
                         )
@@ -847,22 +831,12 @@ getMapping bitsPerByte c =
             )
 
     traverseLookupArguments :: OutputColumnIndex -> LookupArguments LC.Term -> SubexpressionIdMapping -> State S SubexpressionIdMapping
-    traverseLookupArguments out args m' =
-      foldM (traverseLookupArgument out) m' (args ^. #getLookupArguments)
+    traverseLookupArguments _out args m' =
+      foldM traverseLookupArgument m' (args ^. #getLookupArguments)
 
-    traverseLookupArgument :: OutputColumnIndex -> SubexpressionIdMapping -> LookupArgument LC.Term -> State S SubexpressionIdMapping
-    traverseLookupArgument out m' arg = do
-      (gateId, m'') <- traverseLookupGate out m' (arg ^. #gate)
-      (bareLookupId, m''') <- traverseBareLookupArgument out m'' (BareLookupArgument (arg ^. #tableMap))
-      addLookupAssertion m''' . LookupAssertion bareLookupId gateId
-        . OutputSubexpressionId
-        <$> nextEid
-
-    traverseLookupGate :: OutputColumnIndex -> SubexpressionIdMapping -> LC.Term -> State S (GateSubexpressionIds, SubexpressionIdMapping)
-    traverseLookupGate out m' x = do
-      (inId, m'') <- traverseTerm out m' x
-      (outId, m''') <- addOp m'' (Equals' (zeroEid m'') inId) <$> nextEid'
-      pure (GateSubexpressionIds (InputSubexpressionId inId) (OutputSubexpressionId outId), m''')
+    traverseLookupArgument :: SubexpressionIdMapping -> LookupArgument LC.Term -> State S SubexpressionIdMapping
+    traverseLookupArgument _ _ =
+      die "unsupported: converting a logic circuit containing a lookup argument to a trace type"
 
     traverseBareLookupArgument :: OutputColumnIndex -> SubexpressionIdMapping -> BareLookupArgument -> State S (BareLookupSubexpressionId, SubexpressionIdMapping)
     traverseBareLookupArgument out m' arg = do
@@ -875,7 +849,7 @@ getMapping bitsPerByte c =
         Just bareLookupId -> pure (bareLookupId, m'')
         Nothing -> do
           eid <- BareLookupSubexpressionId <$> nextEid
-          let m''' = m'' <> SubexpressionIdMapping mzero mempty mempty (Map.singleton arg eid) mempty mempty mempty
+          let m''' = m'' <> SubexpressionIdMapping mzero mempty mempty (Map.singleton arg eid) mempty mempty
           pure (eid, m''')
 
     traverseLogicConstraints :: OutputColumnIndex -> SubexpressionIdMapping -> LogicConstraints -> State S SubexpressionIdMapping
@@ -930,21 +904,14 @@ getMapping bitsPerByte c =
     addOp m' op opId =
       case Map.lookup op (m' ^. #operations) of
         Just opId' -> (opId' ^. #unOf, m')
-        Nothing -> (opId ^. #unOf, m' <> SubexpressionIdMapping mzero mempty mempty mempty mempty mempty (Map.singleton op opId))
+        Nothing -> (opId ^. #unOf, m' <> SubexpressionIdMapping mzero mempty mempty mempty mempty (Map.singleton op opId))
 
     addAssertion ::
       SubexpressionIdMapping ->
       Assertion ->
       SubexpressionIdMapping
     addAssertion m' a =
-      m' <> SubexpressionIdMapping mzero (Set.singleton a) mempty mempty mempty mempty mempty
-
-    addLookupAssertion ::
-      SubexpressionIdMapping ->
-      LookupAssertion ->
-      SubexpressionIdMapping
-    addLookupAssertion m' a =
-      m' <> SubexpressionIdMapping mzero mempty mempty mempty (Set.singleton a) mempty mempty
+      m' <> SubexpressionIdMapping mzero (Set.singleton a) mempty mempty mempty mempty
 
     traverseAtom ::
       OutputColumnIndex ->
@@ -1086,8 +1053,7 @@ getStepTypes bitsPerByte c m =
       bareLookupStepTypes m,
       constantStepTypes m,
       operatorStepTypes bitsPerByte c m,
-      assertStepType m,
-      assertLookupStepType m
+      assertStepType m
     ]
 
 loadStepTypes ::
@@ -1564,27 +1530,6 @@ assertStepType m =
     i0 = P.var' $ fst (firstTwoInputs m) ^. #unInputColumnIndex
     out = P.var' $ m ^. #output . #unOutputColumnIndex
 
-assertLookupStepType ::
-  Mapping ->
-  Map StepTypeId StepType
-assertLookupStepType m =
-  Map.singleton
-    (m ^. #stepTypeIds . #assertLookup . #unOf)
-    ( StepType
-        ( PolynomialConstraints
-            [bareLookup' `P.minus` (gate' `P.times` bareLookup')]
-            2
-        )
-        mempty
-        mempty
-    )
-  where
-    (i0, i1) = firstTwoInputs m
-
-    gate', bareLookup' :: Polynomial
-    gate' = P.var' (i0 ^. #unInputColumnIndex)
-    bareLookup' = P.var' (i1 ^. #unInputColumnIndex)
-
 maybeToSet :: Ord a => Maybe a -> Set a
 maybeToSet = maybe mempty Set.singleton
 
@@ -1596,9 +1541,6 @@ getSubexpressionIdSet m =
     [ maybeToSet ((m ^. #void) <&> (^. #unOf)),
       Set.fromList (Map.elems (m ^. #variables) <&> (^. #unOf)),
       Set.fromList (Map.elems (m ^. #bareLookups) <&> (^. #unBareLookupSubexpressionId)),
-      Set.map
-        (^. #output . #unOutputSubexpressionId)
-        (m ^. #lookupAssertions),
       Set.fromList (Map.elems (m ^. #constants) <&> (^. #unOf)),
       Set.fromList (Map.elems (m ^. #operations) <&> (^. #unOf))
     ]
@@ -1607,7 +1549,7 @@ getSubexpressionLinks ::
   Mapping ->
   Set SubexpressionLink
 getSubexpressionLinks m =
-  toVoid <> toVarSameCase <> toVarDifferentCase <> toConst <> toOp <> toAssert <> toAssertLookup
+  toVoid <> toVarSameCase <> toVarDifferentCase <> toConst <> toOp <> toAssert
   where
     voidEid :: SubexpressionIdOf Void
     voidEid =
@@ -1760,34 +1702,13 @@ getSubexpressionLinks m =
           | Assertion inEid outEid <- Set.toList (m ^. #subexpressionIds . #assertions)
         ]
 
-    toAssertLookup =
-      Set.fromList $
-        [ SubexpressionLink
-            (m ^. #stepTypeIds . #assertLookup . #unOf)
-            (padInputs [gateEid', bareLookupEid'])
-            outEid
-          | LookupAssertion bareLookupEid gateEids outEid <-
-              Set.toList (m ^. #subexpressionIds . #lookupAssertions),
-            let gateEid' =
-                  InputSubexpressionId $
-                    gateEids ^. #output . #unOutputSubexpressionId,
-            let bareLookupEid' =
-                  InputSubexpressionId $
-                    bareLookupEid ^. #unBareLookupSubexpressionId
-        ]
-
 getResultExpressionIds ::
   Mapping ->
   Set ResultExpressionId
 getResultExpressionIds m =
-  mconcat
-    [ Set.map
-        (ResultExpressionId . (^. #output . #unOutputSubexpressionId))
-        (m ^. #subexpressionIds . #lookupAssertions),
-      Set.map
-        (ResultExpressionId . (^. #output . #unOutputSubexpressionId))
-        (m ^. #subexpressionIds . #assertions)
-    ]
+  Set.map
+    (ResultExpressionId . (^. #output . #unOutputSubexpressionId))
+    (m ^. #subexpressionIds . #assertions)
 
 maxStepsPerCase ::
   Set SubexpressionId ->
