@@ -425,14 +425,13 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
   inputs' <-
     Map.fromList
       . zip (snd <$> lookupArg)
-      . fmap (^. _3)
       <$> mapM (term . (^. #getInputExpression) . fst) lookupArg
   v <- maybe (Left (ErrorMessage ann "lookup term lookup failed"))
          pure
          (Map.lookup
            (Set.fromList (snd <$> lookupArg), outCol)
            (tables ^. #lookupTermCaches)
-             >>= Map.lookup inputs')
+             >>= Map.lookup (inputs' <&> (^. _3)))
   st <- maybe (Left (ErrorMessage ann "step type lookup failed"))
           pure
           (Map.lookup
@@ -440,9 +439,18 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
               ((snd <$> lookupArg) <>
                 [outCol ^. #unLookupTableOutputColumn]))
             (mapping ^. #stepTypeIds . #lookupTables))
-  todo v st
+  sId <- 
+    maybe (Left (ErrorMessage ann "lookup subexpression id lookup failed"))
+      (pure . (^. #unBareLookupSubexpressionId))
+      (Map.lookup
+        (BareLookupArgument lookupArg)
+        (mapping ^. #subexpressionIds . #bareLookups))
+  let ms = inputs' <&> (^. _1)
+      m' = Map.singleton sId (SubexpressionTrace v st defaultAdvice)
+  pure (mconcat (Map.elems ms) <> m', sId, v)
   where
     term = logicTermSubexpressionTraces ann lc arg mapping tables c
+    defaultAdvice = getDefaultAdvice mapping
 
 lookupArgumentSubexpressionTraces ::
   ann ->
