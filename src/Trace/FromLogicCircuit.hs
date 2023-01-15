@@ -73,7 +73,59 @@ getLookupCaches ::
   LogicCircuit ->
   LC.Argument ->
   Either (ErrorMessage ann) LookupCaches
-getLookupCaches = todo
+getLookupCaches ann lc arg =
+  LookupCaches . Map.fromList <$>
+    mapM
+     (\t -> (t,) <$> getLookupTableCache ann lc arg t)
+     (Set.toList (getLogicCircuitLookupTables lc))
+
+getLogicCircuitLookupTables ::
+  LogicCircuit ->
+  Set (Set LookupTableColumn, LC.LookupTableOutputColumn)
+getLogicCircuitLookupTables lc =
+  mconcat (getConstraintLookupTables . snd <$> lc ^. #gateConstraints . #constraints)
+
+getConstraintLookupTables ::
+  LogicConstraint ->
+  Set (Set LookupTableColumn, LC.LookupTableOutputColumn)
+getConstraintLookupTables =
+  \case
+    LC.Atom (LC.Equals x y) -> term x <> term y
+    LC.Atom (LC.LessThan x y) -> term x <> term y
+    LC.Not p -> rec p
+    LC.And p q -> rec p <> rec q
+    LC.Or p q -> rec p <> rec q
+    LC.Iff p q -> rec p <> rec q
+    LC.Top -> mempty
+    LC.Bottom -> mempty
+  where
+    rec = getConstraintLookupTables
+    term = getTermLookupTables
+
+getTermLookupTables ::
+  LC.Term ->
+  Set (Set LookupTableColumn, LC.LookupTableOutputColumn)
+getTermLookupTables =
+  \case
+    LC.Var {} -> mempty
+    LC.Const {} -> mempty
+    LC.Lookup is o ->
+      Set.singleton (Set.fromList (snd <$> is), o)
+        <> mconcat (rec . (^. #getInputExpression) . fst <$> is)
+    LC.Plus x y -> rec x <> rec y
+    LC.Times x y -> rec x <> rec y
+    LC.Max x y -> rec x <> rec y
+    LC.IndLess x y -> rec x <> rec y
+  where
+    rec = getTermLookupTables
+
+getLookupTableCache ::
+  ann ->
+  LogicCircuit ->
+  LC.Argument ->
+  (Set LookupTableColumn, LC.LookupTableOutputColumn) ->
+  Either (ErrorMessage ann) (Map (Map LookupTableColumn Scalar) Scalar)
+getLookupTableCache = todo
 
 argumentToTrace ::
   ann ->
