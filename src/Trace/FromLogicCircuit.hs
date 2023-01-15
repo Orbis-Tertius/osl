@@ -458,7 +458,8 @@ lookupArgumentSubexpressionTraces ::
   Case ->
   LookupArgument LC.Term ->
   Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace)
-lookupArgumentSubexpressionTraces = todo
+lookupArgumentSubexpressionTraces ann _ _ _ _ _ _ =
+  Left (ErrorMessage ann "unsupported: lookup argument in logic circuit being translated to a trace type")
 
 logicCircuitStatementToTraceStatement ::
   ann ->
