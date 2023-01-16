@@ -28,7 +28,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Die (die)
 import Halo2.ByteDecomposition (countBytes, decomposeBytes)
-import Halo2.Circuit (getLookupArguments, getLookupTables, getPolynomialVariables, getScalars, lessIndicator)
+import Halo2.Circuit (getLookupArguments, getLookupTables, getPolynomialVariables, getScalars, lessIndicator, getCellMapRows, getRowSet, getCellMap)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import qualified Halo2.Types.Argument as LC
@@ -125,7 +125,30 @@ getLookupTableCache ::
   LC.Argument ->
   (Set LookupTableColumn, LC.LookupTableOutputColumn) ->
   Either (ErrorMessage ann) (Map (Map LookupTableColumn Scalar) Scalar)
-getLookupTableCache = todo
+getLookupTableCache ann lc arg (inputCols, outputCol) = do
+  let rows = getCellMapRows (getRowSet (lc ^. #rowCount) Nothing) (getCellMap arg)
+  Map.fromList <$> sequence
+    [ rowToLookupTableRow r
+     | (_, r) <- Map.toList rows
+    ]
+  where
+    rowToLookupTableRow r =
+      (,)
+        <$> (Map.fromList <$>
+              sequence
+                [ maybe
+                    (Left (ErrorMessage ann "input column not defined"))
+                    (pure . (inputCol,))
+                    (Map.lookup (inputCol ^. #unLookupTableColumn) r)
+                  | inputCol <- Set.toList inputCols
+                ])
+        <*> (maybe
+              (Left (ErrorMessage ann "output column not defined"))
+              pure
+              (Map.lookup (outputCol ^. #unLookupTableOutputColumn
+                            . #unLookupTableColumn)
+                r))
+
 
 argumentToTrace ::
   ann ->
@@ -540,9 +563,6 @@ cellMapToCaseAndColMap ann cellMap =
         <*> pure x
       | (CellReference col row, x) <- Map.toList cellMap
     ]
-
-todo :: a
-todo = todo
 
 logicCircuitToTraceType ::
   BitsPerByte ->

@@ -20,6 +20,9 @@ module Halo2.Circuit
     HasEvaluate (evaluate),
     lessIndicator,
     rowsToCellMap,
+    getCellMapRows,
+    getCellMap,
+    getRowSet,
   )
 where
 
