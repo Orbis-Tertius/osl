@@ -719,6 +719,11 @@ data Void
 
 data Operation
   = Or' SubexpressionId SubexpressionId
+  -- The short circuit operations do not actually take the second subexpression
+  -- argument as an input; but it has to be present, because there can be more than
+  -- one subexpression with the same operator and the same left hand side but
+  -- different right hand sides. Those subexpressions need to be mapped to distinct
+  -- ids, and therefore they need to be treated as distinct operations.
   | OrShortCircuit' SubexpressionId SubexpressionId
   | Not' SubexpressionId
   | Iff' SubexpressionId SubexpressionId
@@ -997,6 +1002,9 @@ getMapping bitsPerByte c =
       SubexpressionIdOf Operation ->
       (SubexpressionId, SubexpressionIdMapping)
     addOp m' op opId =
+      -- The same subexpression can occur in multiple places, and we don't want to
+      -- change its id because that would invalidate references to the same subexpression
+      -- in other operations.
       case Map.lookup op (m' ^. #operations) of
         Just opId' -> (opId' ^. #unOf, m')
         Nothing -> (opId ^. #unOf, SubexpressionIdMapping mzero mempty mempty mempty mempty (Map.singleton op opId) <> m')
