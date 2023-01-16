@@ -17,4 +17,4 @@ data ByteDecomposition =
     -- Most significant byte first
     bytes :: [Byte]
   }
-  deriving (Generic)
+  deriving (Show, Generic)

@@ -2,11 +2,14 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Halo2.ByteDecomposition
   ( decomposeBytes,
     composeBytes,
     countBytes,
+    applySign,
   )
 where
 
@@ -20,7 +23,7 @@ import Halo2.Types.Byte (Byte (..))
 import Halo2.Types.ByteDecomposition (ByteDecomposition (..))
 import Halo2.Types.FixedBound (FixedBound (..))
 import Halo2.Types.Sign (Sign (Positive, Negative))
-import Stark.Types.Scalar (Scalar, fromWord64, integerToScalar, scalarToInteger)
+import Stark.Types.Scalar (Scalar, fromWord64, integerToScalar, scalarToInteger, normalize)
 
 -- Splits a scalar its into sign and its unsigned part, based on the idea
 -- that if x > |F|/2, then x is negative.
@@ -32,7 +35,7 @@ getSignAndUnsignedPart x =
         else (Positive, x)
 
 decomposeBytes :: BitsPerByte -> Scalar -> ByteDecomposition
-decomposeBytes bitsPerByte x =
+decomposeBytes bitsPerByte (normalize -> x) =
   let (s, x') = getSignAndUnsignedPart x
    in ByteDecomposition s (decomposeBytesPositive bitsPerByte x')
 

@@ -21,7 +21,7 @@ import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Applicative ((<|>))
 import Control.Lens ((<&>), _1, _3)
-import Control.Monad (foldM, mzero, replicateM, when)
+import Control.Monad (foldM, mzero, replicateM, when, forM_)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.Either.Extra (mapLeft)
 import Data.List (foldl')
@@ -30,12 +30,13 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
-import Halo2.ByteDecomposition (countBytes, decomposeBytes)
+import Halo2.ByteDecomposition (countBytes, decomposeBytes, applySign)
 import Halo2.Circuit (getLookupArguments, getLookupTables, getPolynomialVariables, getScalars, lessIndicator, getCellMapRows, getRowSet, getCellMap)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import qualified Halo2.Types.Argument as LC
 import Halo2.Types.BitsPerByte (BitsPerByte (..))
+import Halo2.Types.Byte (Byte (Byte))
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
@@ -316,17 +317,27 @@ getByteDecomposition ann lc mapping x = do
       signCol = mapping ^. #byteDecomposition . #sign
       byteCols = mapping ^. #byteDecomposition . #bytes
       expectedLength = getByteDecompositionLength bitsPerByte lc
-      bytes' = decomposeBytes bitsPerByte x
+      bytesSigned = decomposeBytes bitsPerByte x
       signScalar =
-        case bytes' ^. #sign of
+        case bytesSigned ^. #sign of
           Positive -> one
           Negative -> zero
+      x' = applySign (bytesSigned ^. #sign) x
+      bytesUnsigned = decomposeBytes bitsPerByte x'
+      numBytes = length (bytesUnsigned ^. #bytes)
+  when (bytesUnsigned ^. #sign /= Positive)
+    (Left (ErrorMessage ann "unsigned byte decomposition is negative (this is a compiler bug)"))
   when (length byteCols /= expectedLength)
     (Left (ErrorMessage ann "unexpected byte decomposition mapping length"))
-  when (length (bytes' ^. #bytes) /= expectedLength)
+  when (numBytes < expectedLength)
     (Left (ErrorMessage ann ("unexpected byte decomposition length: expected " <>
              pack (show expectedLength) <> " but got " <>
-             pack (show (length (bytes' ^. #bytes))))))
+             pack (show numBytes))))
+  forM_ (take (numBytes - expectedLength) (bytesUnsigned ^. #bytes)) $ \b ->
+    when (b /= Byte zero)
+      (Left (ErrorMessage ann
+        ("number is out of bounds and will not fit in byte decomposition columns: "
+          <> pack (show (x, bytesSigned)))))
   pure $ Map.singleton (signCol ^. #unSignColumnIndex) signScalar
     <> mconcat
          [ Map.fromList
@@ -336,7 +347,9 @@ getByteDecomposition ann lc mapping x = do
            | ((bCol, tCol), (b, t)) <-
                zip byteCols
                  [ (b, if b == zero then one else zero)
-                   | b <- (bytes' ^. #bytes) <&> (^. #unByte)
+                   | b <- drop (numBytes - expectedLength)
+                               (bytesUnsigned ^. #bytes)
+                            <&> (^. #unByte)
                  ]
          ]
 
