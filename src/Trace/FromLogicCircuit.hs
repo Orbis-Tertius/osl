@@ -7,6 +7,7 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Trace.FromLogicCircuit
   ( logicCircuitToTraceType,
@@ -22,10 +23,12 @@ import Control.Applicative ((<|>))
 import Control.Lens ((<&>), _1, _3)
 import Control.Monad (foldM, mzero, replicateM, when)
 import Control.Monad.Trans.State (State, evalState, get, put)
+import Data.Either.Extra (mapLeft)
 import Data.List (foldl')
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
+import Data.Text (pack)
 import Die (die)
 import Halo2.ByteDecomposition (countBytes, decomposeBytes)
 import Halo2.Circuit (getLookupArguments, getLookupTables, getPolynomialVariables, getScalars, lessIndicator, getCellMapRows, getRowSet, getCellMap)
@@ -149,7 +152,6 @@ getLookupTableCache ann lc arg (inputCols, outputCol) = do
                             . #unLookupTableColumn)
                 r))
 
-
 argumentToTrace ::
   ann ->
   BitsPerByte ->
@@ -219,7 +221,6 @@ logicConstraintSubexpressionTraces ::
 logicConstraintSubexpressionTraces ann lc arg mapping tables c =
    \case
      LC.Atom (LC.Equals x y) -> do
-       -- TODO: fill byte decomposition advice
        (m0, s0, x') <- term x
        (m1, s1, y') <- term y
        advice <- getByteDecomposition ann lc mapping (x' Group.- y')
@@ -241,29 +242,29 @@ logicConstraintSubexpressionTraces ann lc arg mapping tables c =
        let v = one Group.- x'
            m1 = Map.singleton s1 (SubexpressionTrace v (mapping ^. #stepTypeIds . #not . #unOf) defaultAdvice)
        pure (m0 <> m1, s1, v)
-     LC.And p q -> do
+     t@(LC.And p q) -> do
        (m0, s0, x') <- rec p
+       (m1, s1, y') <- rec q
        if x' == zero
          then do
-           s1 <- getOperationSubexpressionId ann mapping (TimesAndShortCircuit' s0)
-           let m1 = Map.singleton s1 (SubexpressionTrace zero (mapping ^. #stepTypeIds . #timesAndShortCircuit . #unOf) defaultAdvice)
-           pure (m0 <> m1, s1, zero)
+           s2 <- getOperationSubexpressionId ann mapping (TimesAndShortCircuit' s0 s1)
+           let m2 = Map.singleton s2 (SubexpressionTrace zero (mapping ^. #stepTypeIds . #timesAndShortCircuit . #unOf) defaultAdvice)
+           pure (m0 <> m2, s2, zero)
          else do
-           (m1, s1, y') <- rec q
-           s2 <- getOperationSubexpressionId ann mapping (TimesAnd' s0 s1)
+           s2 <- withTrace t $ getOperationSubexpressionId ann mapping (TimesAnd' s0 s1)
            let v = x' Ring.* y'
                m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #timesAnd . #unOf) defaultAdvice)
            pure (m0 <> m1 <> m2, s2, v)
-     LC.Or p q -> do
+     t@(LC.Or p q) -> do
        (m0, s0, x') <- rec p
+       (m1, s1, y') <- rec q
        if x' == one
          then do
-           s1 <- getOperationSubexpressionId ann mapping (OrShortCircuit' s0)
-           let m1 = Map.singleton s1 (SubexpressionTrace one (mapping ^. #stepTypeIds . #orShortCircuit . #unOf) defaultAdvice)
-           pure (m0 <> m1, s1, one)
+           s2 <- getOperationSubexpressionId ann mapping (OrShortCircuit' s0 s1)
+           let m2 = Map.singleton s2 (SubexpressionTrace one (mapping ^. #stepTypeIds . #orShortCircuit . #unOf) defaultAdvice)
+           pure (m0 <> m2, s2, one)
          else do
-           (m1, s1, y') <- rec q
-           s2 <- getOperationSubexpressionId ann mapping (Or' s0 s1)
+           s2 <- withTrace t (getOperationSubexpressionId ann mapping (Or' s0 s1))
            let v = (x' Group.+ y') Group.- (x' Ring.* y')
                m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #or . #unOf) defaultAdvice)
            pure (m0 <> m1 <> m2, s2, v)
@@ -286,6 +287,9 @@ logicConstraintSubexpressionTraces ann lc arg mapping tables c =
     rec = logicConstraintSubexpressionTraces ann lc arg mapping tables c
     term = logicTermSubexpressionTraces ann lc arg mapping tables c
     defaultAdvice = getDefaultAdvice mapping
+
+withTrace :: Show a => a -> Either (ErrorMessage ann) b -> Either (ErrorMessage ann) b
+withTrace x = mapLeft (\(ErrorMessage ann' msg) -> ErrorMessage ann' (pack (show x) <> ": " <> msg))
 
 getDefaultAdvice :: Mapping -> Map ColumnIndex Scalar
 getDefaultAdvice mapping =
@@ -320,7 +324,9 @@ getByteDecomposition ann lc mapping x = do
   when (length byteCols /= expectedLength)
     (Left (ErrorMessage ann "unexpected byte decomposition mapping length"))
   when (length (bytes' ^. #bytes) /= expectedLength)
-    (Left (ErrorMessage ann "unexpected byte decomposition length"))
+    (Left (ErrorMessage ann ("unexpected byte decomposition length: expected " <>
+             pack (show expectedLength) <> " but got " <>
+             pack (show (length (bytes' ^. #bytes))))))
   pure $ Map.singleton (signCol ^. #unSignColumnIndex) signScalar
     <> mconcat
          [ Map.fromList
@@ -342,7 +348,9 @@ getOperationSubexpressionId ::
 getOperationSubexpressionId ann mapping op =
   case Map.lookup op (mapping ^. #subexpressionIds . #operations) of
     Just sId -> pure (sId ^. #unOf)
-    Nothing -> Left (ErrorMessage ann "operation subexpression id not found")
+    Nothing -> Left . ErrorMessage ann
+      $ "operation subexpression id not found: "
+          <> pack (show op)
 
 getConstantStepTypeId ::
   ann ->
@@ -384,13 +392,13 @@ logicTermSubexpressionTraces ann lc arg mapping tables c =
       pure (m0 <> m1 <> m2, s2, v)
     LC.Times x y -> do
       (m0, s0, x') <- rec x
+      (m1, s1, y') <- rec y
       if x' == zero
         then do
-          s1 <- getOperationSubexpressionId ann mapping (TimesAndShortCircuit' s0)
-          let m1 = Map.singleton s1 (SubexpressionTrace zero (mapping ^. #stepTypeIds . #timesAndShortCircuit . #unOf) defaultAdvice)
-          pure (m0 <> m1, s1, zero)
+          s2 <- getOperationSubexpressionId ann mapping (TimesAndShortCircuit' s0 s1)
+          let m2 = Map.singleton s2 (SubexpressionTrace zero (mapping ^. #stepTypeIds . #timesAndShortCircuit . #unOf) defaultAdvice)
+          pure (m0 <> m2, s2, zero)
         else do
-          (m1, s1, y') <- rec y
           s2 <- getOperationSubexpressionId ann mapping (TimesAnd' s0 s1)
           let v = x' Ring.* y'
               m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #timesAnd . #unOf) defaultAdvice)
@@ -607,38 +615,38 @@ data Mapping = Mapping
     stepTypeIds :: StepTypeIdMapping,
     subexpressionIds :: SubexpressionIdMapping
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 data ByteDecompositionMapping = ByteDecompositionMapping
   { bits :: BitsPerByte,
     sign :: SignColumnIndex,
     bytes :: [(ByteColumnIndex, TruthValueColumnIndex)] -- most significant first
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 newtype TruthValueColumnIndex = TruthValueColumnIndex
   {unTruthValueColumnIndex :: ColumnIndex}
-  deriving (Generic)
+  deriving (Generic, Show)
 
 newtype SignColumnIndex = SignColumnIndex {unSignColumnIndex :: ColumnIndex}
-  deriving (Generic)
+  deriving (Generic, Show)
 
 newtype ByteColumnIndex = ByteColumnIndex {unByteColumnIndex :: ColumnIndex}
-  deriving (Generic)
+  deriving (Generic, Show)
 
 newtype ByteRangeColumnIndex = ByteRangeColumnIndex
   {unByteRangeColumnIndex :: ColumnIndex}
-  deriving (Generic)
+  deriving (Generic, Show)
 
 newtype ZeroIndicatorColumnIndex = ZeroIndicatorColumnIndex
   {unZeroIndicatorColumnIndex :: ColumnIndex}
-  deriving (Generic)
+  deriving (Generic, Show)
 
 data TruthTableColumnIndices = TruthTableColumnIndices
   { byteRangeColumnIndex :: ByteRangeColumnIndex,
     zeroIndicatorColumnIndex :: ZeroIndicatorColumnIndex
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 data Operator
   = Plus
@@ -654,19 +662,20 @@ data Operator
   | VoidT
   | AssertT
   | LoadFromDifferentCase
+  deriving Show
 
 type StepTypeIdOf :: Operator -> Type
 newtype StepTypeIdOf a = StepTypeIdOf {unOf :: StepTypeId}
-  deriving (Generic)
+  deriving (Generic, Show)
 
 newtype LookupTable = LookupTable {unLookupTable :: [LookupTableColumn]}
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord, Generic, Show)
 
 newtype BareLookupArgument = BareLookupArgument
   { getBareLookupArgument ::
       [(InputExpression LC.Term, LookupTableColumn)]
   }
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord, Generic, Show)
 
 data StepTypeIdMapping = StepTypeIdMapping
   { loads :: Map PolynomialVariable StepTypeId,
@@ -686,42 +695,42 @@ data StepTypeIdMapping = StepTypeIdMapping
     voidT :: StepTypeIdOf VoidT,
     assertT :: StepTypeIdOf AssertT
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 type SubexpressionIdOf :: Type -> Type
 newtype SubexpressionIdOf a = SubexpressionIdOf {unOf :: SubexpressionId}
-  deriving (Generic)
+  deriving (Generic, Show)
 
 type Void :: Type
 data Void
 
 data Operation
   = Or' SubexpressionId SubexpressionId
-  | OrShortCircuit' SubexpressionId
+  | OrShortCircuit' SubexpressionId SubexpressionId
   | Not' SubexpressionId
   | Iff' SubexpressionId SubexpressionId
   | Plus' SubexpressionId SubexpressionId
   | TimesAnd' SubexpressionId SubexpressionId
-  | TimesAndShortCircuit' SubexpressionId
+  | TimesAndShortCircuit' SubexpressionId SubexpressionId
   | Equals' SubexpressionId SubexpressionId
   | LessThan' SubexpressionId SubexpressionId
   | Max' SubexpressionId SubexpressionId
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 data Assertion = Assertion
   { input :: InputSubexpressionId,
     output :: OutputSubexpressionId
   }
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord, Generic, Show)
 
 newtype BareLookupSubexpressionId = BareLookupSubexpressionId {unBareLookupSubexpressionId :: SubexpressionId}
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord, Generic, Show)
 
 data GateSubexpressionIds = GateSubexpressionIds
   { input :: InputSubexpressionId,
     output :: OutputSubexpressionId
   }
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord, Generic, Show)
 
 data SubexpressionIdMapping = SubexpressionIdMapping
   { void :: Maybe (SubexpressionIdOf Void),
@@ -731,7 +740,7 @@ data SubexpressionIdMapping = SubexpressionIdMapping
     constants :: Map Scalar (SubexpressionIdOf Scalar),
     operations :: Map Operation (SubexpressionIdOf Operation)
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance Semigroup SubexpressionIdMapping where
   (SubexpressionIdMapping b c d e f g) <> (SubexpressionIdMapping j k l m n o) =
@@ -946,12 +955,12 @@ getMapping bitsPerByte c =
           (xId, m'') <- traverseConstraint out m' x
           (yId, m''') <- traverseConstraint out m'' y
           (zId, m'''') <- addOp m''' (TimesAnd' xId yId) <$> nextEid'
-          pure $ addOp m'''' (TimesAndShortCircuit' xId) (SubexpressionIdOf zId)
+          pure $ addOp m'''' (TimesAndShortCircuit' xId yId) (SubexpressionIdOf zId)
         LC.Or x y -> do
           (xId, m'') <- traverseConstraint out m' x
           (yId, m''') <- traverseConstraint out m'' y
           (zId, m'''') <- addOp m''' (Or' xId yId) <$> nextEid'
-          pure $ addOp m'''' (OrShortCircuit' xId) (SubexpressionIdOf zId)
+          pure $ addOp m'''' (OrShortCircuit' xId yId) (SubexpressionIdOf zId)
         LC.Iff x y -> do
           (xId, m'') <- traverseConstraint out m' x
           (yId, m''') <- traverseConstraint out m'' y
@@ -977,7 +986,7 @@ getMapping bitsPerByte c =
     addOp m' op opId =
       case Map.lookup op (m' ^. #operations) of
         Just opId' -> (opId' ^. #unOf, m')
-        Nothing -> (opId ^. #unOf, m' <> SubexpressionIdMapping mzero mempty mempty mempty mempty (Map.singleton op opId))
+        Nothing -> (opId ^. #unOf, SubexpressionIdMapping mzero mempty mempty mempty mempty (Map.singleton op opId) <> m')
 
     addAssertion ::
       SubexpressionIdMapping ->
@@ -1713,7 +1722,7 @@ getSubexpressionLinks m =
             (m ^. #stepTypeIds . #or . #unOf)
             (padInputs (InputSubexpressionId <$> [x, y]))
             (OutputSubexpressionId (z ^. #unOf))
-        OrShortCircuit' x -> \z ->
+        OrShortCircuit' x _ -> \z ->
           SubexpressionLink
             (m ^. #stepTypeIds . #or . #unOf)
             (padInputs (InputSubexpressionId <$> [x]))
@@ -1738,7 +1747,7 @@ getSubexpressionLinks m =
             (m ^. #stepTypeIds . #timesAnd . #unOf)
             (padInputs (InputSubexpressionId <$> [x, y]))
             (OutputSubexpressionId (z ^. #unOf))
-        TimesAndShortCircuit' x -> \z ->
+        TimesAndShortCircuit' x _ -> \z ->
           SubexpressionLink
             (m ^. #stepTypeIds . #timesAndShortCircuit . #unOf)
             (padInputs [InputSubexpressionId x])

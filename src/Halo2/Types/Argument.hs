@@ -17,7 +17,7 @@ data Argument = Argument
   { statement :: Statement,
     witness :: Witness
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance Semigroup Argument where
   Argument s0 w0 <> Argument s1 w1 =
@@ -27,7 +27,7 @@ instance Monoid Argument where
   mempty = Argument mempty mempty
 
 newtype Statement = Statement {unStatement :: Map CellReference Scalar}
-  deriving (Generic, Semigroup, Monoid)
+  deriving (Generic, Semigroup, Monoid, Show)
 
 newtype Witness = Witness {unWitness :: Map CellReference Scalar}
-  deriving (Generic, Semigroup, Monoid)
+  deriving (Generic, Semigroup, Monoid, Show)
