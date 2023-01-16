@@ -221,7 +221,24 @@
         "flake-utils": "flake-utils",
         "horizon-platform": "horizon-platform",
         "lint-utils": "lint-utils_2",
-        "nixpkgs": "nixpkgs_3"
+        "nixpkgs": "nixpkgs_3",
+        "sydtest-src": "sydtest-src"
+      }
+    },
+    "sydtest-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1673882978,
+        "narHash": "sha256-puQp9EyBaBATEevKxoBrc8NEStgLshV6fvio3bkSj/4=",
+        "ref": "refs/heads/master",
+        "rev": "b5d97e0edba251cd00c10992ad1f37d71812868a",
+        "revCount": 529,
+        "type": "git",
+        "url": "https://github.com/NorfairKing/sydtest"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://github.com/NorfairKing/sydtest"
       }
     }
   },

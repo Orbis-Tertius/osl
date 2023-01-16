@@ -14,6 +14,10 @@
     horizon-platform = {
       url = "git+https://gitlab.homotopic.tech/horizon/horizon-platform";
     };
+    sydtest-src = {
+      url = "git+https://github.com/NorfairKing/sydtest";
+      flake = false;
+    };
   };
   outputs =
     inputs@
@@ -23,6 +27,7 @@
     , horizon-platform
     , lint-utils
     , nixpkgs
+    , sydtest-src
     , ...
     }:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
@@ -37,6 +42,7 @@
               horizon-platform.packages.x86_64-linux // {
                 osl = dontCheck (disableLibraryProfiling (hprev.callCabal2nix "osl" ./. { }));
                 osl-spec = disableLibraryProfiling (hprev.callCabal2nix "osl:spec" ./. { });
+                sydtest = hprev.callCabal2nix "sydtest" (sydtest-src + /sydtest) { };
               };
           };
       ormolu-check =
