@@ -32,6 +32,7 @@ import Halo2.Types.ColumnTypes (ColumnTypes)
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
 import Halo2.Types.EqualityConstraints (EqualityConstraints)
 import Halo2.Types.FixedValues (FixedValues)
+import Halo2.Types.Label (Label)
 import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
@@ -51,18 +52,19 @@ newtype OutputColumnIndex = OutputColumnIndex {unOutputColumnIndex :: ColumnInde
 -- The links table entry outputting void has all its inputs set to void.
 -- Void's value can legally be set to anything. Each trace type features void.
 data StepType = StepType
-  { gateConstraints :: PolynomialConstraints,
+  { label :: Label,
+    gateConstraints :: PolynomialConstraints,
     lookupArguments :: LookupArguments Polynomial,
     fixedValues :: FixedValues
   }
   deriving (Generic, Show)
 
 instance Semigroup StepType where
-  (StepType a b c) <> (StepType d e f) =
-    StepType (a <> d) (b <> e) (c <> f)
+  (StepType l a b c) <> (StepType m d e f) =
+    StepType (l <> m) (a <> d) (b <> e) (c <> f)
 
 instance Monoid StepType where
-  mempty = StepType mempty mempty mempty
+  mempty = StepType mempty mempty mempty mempty
 
 newtype StepTypeId = StepTypeId {unStepTypeId :: Scalar}
   deriving stock (Generic)

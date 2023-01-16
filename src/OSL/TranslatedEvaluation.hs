@@ -21,7 +21,6 @@ import Halo2.Types.Circuit (LogicCircuit)
 import qualified Halo2.Types.Argument as C
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Argument (toSigma11Argument)
-import OSL.Debug (showTrace)
 import qualified OSL.Sigma11 as S11
 import OSL.Term (dropTermAnnotations)
 import OSL.Translate (translateToFormulaSimple)
@@ -301,8 +300,12 @@ evalTranslatedFormula7 ::
   Argument ->
   Either (ErrorMessage (Maybe ann)) ()
 evalTranslatedFormula7 bitsPerByte c name argumentForm argument = do
-  (showTrace "logic circuit: " -> logic, lcArg) <- toLogicCircuit c name argumentForm argument
+  (logic, lcArg) <- toLogicCircuit c name argumentForm argument
   let tt = logicCircuitToTraceType bitsPerByte logic
-  t <- mapLeft (\(ErrorMessage ann msg) -> ErrorMessage ann ("argumentToTrace: " <> msg))
-       (argumentToTrace Nothing bitsPerByte logic lcArg)
-  evalTrace Nothing tt t
+  t <-
+    mapLeft
+      (\(ErrorMessage ann msg) -> ErrorMessage ann ("argumentToTrace: " <> msg))
+      (argumentToTrace Nothing bitsPerByte logic lcArg)
+  mapLeft
+    (\(ErrorMessage ann msg) -> ErrorMessage ann ("evalTrace: " <> msg))
+    (evalTrace Nothing tt t)

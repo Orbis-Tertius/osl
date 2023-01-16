@@ -19,6 +19,8 @@ import qualified Data.Map as Map
 import Data.Maybe (maybeToList)
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Text (pack)
+-- import Debug.Trace (trace)
 import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.ColumnIndex (ColumnIndex)
@@ -55,8 +57,13 @@ checkAllResultsArePresentForUsedCases ::
 checkAllResultsArePresentForUsedCases ann tt t =
   forM_ (t ^. #usedCases) $ \c ->
     forM_ (tt ^. #results) $ \(ResultExpressionId sId) ->
-      maybe (Left (ErrorMessage ann "result is not present"))
-        (const (pure ())) (Map.lookup (c, sId) (t ^. #subexpressions))
+      maybe
+        (Left
+          (ErrorMessage ann
+            ("result is not present: "
+              <> pack (show (c, sId)))))
+        (const (pure ()))
+        (Map.lookup (c, sId) (t ^. #subexpressions))
 
 checkAllStepConstraintsAreSatisfied ::
   ann ->
@@ -312,7 +319,9 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
           mconcat <$> sequence
             [ case Map.lookup (c, iId) (t ^. #subexpressions) of
                 Just sT' -> pure (Map.singleton col (sT' ^. #value))
-                Nothing -> Left (ErrorMessage ann "expected input not present")
+                Nothing ->
+                  -- trace (show (t ^. #subexpressions)) $
+                  Left (ErrorMessage ann ("expected input not present: " <> pack (show (c, iId, l ^. #inputs, sT))))
               | (col, iId) <- zip ((tt ^. #inputColumnIndices) <&> (^. #unInputColumnIndex))
                                   ((l ^. #inputs) <&> (^. #unInputSubexpressionId))
             ]
