@@ -57,7 +57,7 @@ import Halo2.Types.PolynomialConstraints (PolynomialConstraints (..))
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (RowCount))
-import Halo2.Types.RowIndex (RowIndex (RowIndex))
+import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Relative))
 import Halo2.Types.Sign (Sign (Positive, Negative))
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
@@ -519,12 +519,23 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
     Map.fromList
       . zip (snd <$> lookupArg)
       <$> mapM (term . (^. #getInputExpression) . fst) lookupArg
-  v <- maybe (Left (ErrorMessage ann "lookup term lookup failed"))
+  let lookupTerm = (Set.fromList (snd <$> lookupArg), outCol)
+      lookupInputs = inputs' <&> (^. _3)
+  lookupCache <-
+    maybe
+      (Left
+        (ErrorMessage ann
+          ("lookup cache lookup failed: " <> pack (show lookupTerm))))
+      pure
+      (Map.lookup
+        lookupTerm
+        (tables ^. #lookupTermCaches))
+  v <- maybe
+         (Left
+           (ErrorMessage ann
+             ("lookup term lookup failed: " <> pack (show (lookupTerm, lookupInputs)))))
          pure
-         (Map.lookup
-           (Set.fromList (snd <$> lookupArg), outCol)
-           (tables ^. #lookupTermCaches)
-             >>= Map.lookup (inputs' <&> (^. _3)))
+         (Map.lookup (inputs' <&> (^. _3)) lookupCache)
   st <- maybe (Left (ErrorMessage ann "step type lookup failed"))
           pure
           (Map.lookup
@@ -533,10 +544,18 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
                 [outCol ^. #unLookupTableOutputColumn]))
             (mapping ^. #stepTypeIds . #lookupTables))
   sId <- 
-    maybe (Left (ErrorMessage ann "lookup subexpression id lookup failed"))
+    maybe
+      (Left (ErrorMessage ann "lookup subexpression id lookup failed"))
       (pure . (^. #unBareLookupSubexpressionId))
       (Map.lookup
-        (BareLookupArgument lookupArg)
+        (BareLookupArgument
+          (lookupArg <>
+            [(InputExpression
+              (LC.Var
+                (PolynomialVariable
+                  (mapping ^. #output . #unOutputColumnIndex)
+                  (0 :: RowIndex 'Relative))),
+              outCol ^. #unLookupTableOutputColumn)]))
         (mapping ^. #subexpressionIds . #bareLookups))
   let ms = inputs' <&> (^. _1)
       m' = Map.singleton sId (SubexpressionTrace v st defaultAdvice)
@@ -1057,7 +1076,8 @@ getMapping bitsPerByte c =
         LC.Times x y -> do
           (xEid, m'') <- traverseTerm out m' x
           (yEid, m''') <- traverseTerm out m'' y
-          addOp m''' (TimesAnd' xEid yEid) <$> nextEid'
+          (zEid, m'''') <- addOp m''' (TimesAnd' xEid yEid) <$> nextEid'
+          pure $ addOp m'''' (TimesAndShortCircuit' xEid yEid) (SubexpressionIdOf zEid)
         LC.Max x y -> do
           (xEid, m'') <- traverseTerm out m' x
           (yEid, m''') <- traverseTerm out m'' y
