@@ -18,6 +18,10 @@
       url = "git+https://github.com/NorfairKing/sydtest";
       flake = false;
     };
+    validity-src = {
+      url = "git+https://github.com/NorfairKing/validity";
+      flake = false;
+    };
   };
   outputs =
     inputs@
@@ -28,6 +32,7 @@
     , lint-utils
     , nixpkgs
     , sydtest-src
+    , validity-src
     , ...
     }:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
@@ -42,7 +47,9 @@
               horizon-platform.packages.x86_64-linux // {
                 osl = dontCheck (disableLibraryProfiling (hprev.callCabal2nix "osl" ./. { }));
                 osl-spec = disableLibraryProfiling (hprev.callCabal2nix "osl:spec" ./. { });
-                sydtest = hprev.callCabal2nix "sydtest" (sydtest-src + /sydtest) { };
+                sydtest = dontCheck (hprev.callCabal2nix "sydtest" (sydtest-src + /sydtest) { });
+                genvalidity-sydtest = dontCheck (hprev.callCabal2nix "genvalidity-sydtest" (validity-src + /genvalidity-sydtest) { });
+                genvalidity-sydtest-aeson = dontCheck (hprev.callCabal2nix "genvalidity-sydtest-aeson" (validity-src + /genvalidity-sydtest-aeson) { });
               };
           };
       ormolu-check =
