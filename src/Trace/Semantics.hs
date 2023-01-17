@@ -325,8 +325,12 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
               | (col, iId) <- zip ((tt ^. #inputColumnIndices) <&> (^. #unInputColumnIndex))
                                   ((l ^. #inputs) <&> (^. #unInputSubexpressionId))
             ]
-        [] -> Left (ErrorMessage ann "no links found for this subexpression's step type and id")
-        _ -> Left (ErrorMessage ann "more than one link found for this subexpression's step type and id; this is a malformed links set")
+        [] -> Left . ErrorMessage ann $
+          "no links found for this subexpression's step type and id: "
+            <> pack (show (c, sId, sT))
+        ls -> Left . ErrorMessage ann $
+          "more than one link found for this subexpression's step type and id; this is a malformed links set: "
+            <> pack (show ls)
 
     outputMapping =
       pure $ Map.singleton (tt ^. #outputColumnIndex . #unOutputColumnIndex) (sT ^. #value)
@@ -354,7 +358,12 @@ getLookupTable ann tt t gc cs =
   fmap Set.fromList $ forM (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
     lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
     Map.fromList <$> sequence
-      [ maybe (Left (ErrorMessage ann "lookup table has a hole"))
-          (pure . (col,)) (Map.lookup (col ^. #unLookupTableColumn) (lc ^. #localMappings))
+      [ maybe
+          (Left
+            (ErrorMessage ann
+              ("lookup table has a hole: "
+                <> pack (show (c, col)))))
+          (pure . (col,))
+          (Map.lookup (col ^. #unLookupTableColumn) (lc ^. #localMappings))
        | col <- Set.toList cs
       ]

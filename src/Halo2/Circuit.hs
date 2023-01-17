@@ -517,7 +517,8 @@ instance HasEvaluate (Map ColumnIndex FixedBound) Bool where
   evaluate _ arg bs =
     pure $
       and
-        [ toWord64 x < b ^. #unFixedBound
+        [ min (toWord64 x) (toWord64 (Group.negate x))
+            < b ^. #unFixedBound
           | (ci, b) <- Map.toList bs,
             x <-
               Map.elems

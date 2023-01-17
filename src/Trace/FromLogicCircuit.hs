@@ -20,7 +20,7 @@ import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Applicative ((<|>))
-import Control.Lens ((<&>), _1, _3)
+import Control.Lens ((<&>), _1, _2, _3)
 import Control.Monad (foldM, mzero, replicateM, when, forM_)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.Either.Extra (mapLeft)
@@ -31,7 +31,7 @@ import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
 import Halo2.ByteDecomposition (countBytes, decomposeBytes, applySign)
-import Halo2.Circuit (getLookupArguments, getLookupTables, getPolynomialVariables, getScalars, lessIndicator, getCellMapRows, getRowSet, getCellMap)
+import Halo2.Circuit (getLookupTables, getPolynomialVariables, getScalars, lessIndicator, getCellMapRows, getRowSet, getCellMap)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import qualified Halo2.Types.Argument as LC
@@ -451,7 +451,7 @@ getVariableSubexpressionId ann mapping x =
 getLookupTermSubexpressionId ::
   ann ->
   Mapping ->
-  ([(InputExpression LC.Term, LookupTableColumn)], LC.LookupTableOutputColumn) ->
+  ([(InputExpression LC.Term, Maybe InputSubexpressionId, LookupTableColumn)], LC.LookupTableOutputColumn) ->
   Either (ErrorMessage ann) SubexpressionId
 getLookupTermSubexpressionId ann mapping (is, o) =
   maybe
@@ -465,8 +465,17 @@ getLookupTermSubexpressionId ann mapping (is, o) =
               (PolynomialVariable
                 (mapping ^. #output . #unOutputColumnIndex)
                 (0 :: RowIndex 'Relative))),
+            Nothing,
             o ^. #unLookupTableOutputColumn)]))
       (mapping ^. #subexpressionIds . #bareLookups))
+
+getInputSubexpressionId ::
+  ann ->
+  Mapping ->
+  InputExpression LC.Term ->
+  Either (ErrorMessage ann) InputSubexpressionId
+getInputSubexpressionId ann mapping (InputExpression x) =
+  InputSubexpressionId <$> getTermSubexpressionId ann mapping x
 
 getTermSubexpressionId ::
   ann ->
@@ -476,7 +485,12 @@ getTermSubexpressionId ::
 getTermSubexpressionId ann mapping =
   \case
     LC.Var x -> getVariableSubexpressionId ann mapping x
-    LC.Lookup is o -> getLookupTermSubexpressionId ann mapping (is, o)
+    LC.Lookup is o -> do
+      is' <-
+        mapM
+          (\(i,c) -> (i,,c) . Just <$> getInputSubexpressionId ann mapping i)
+          is
+      getLookupTermSubexpressionId ann mapping (is', o)
     LC.Plus x y ->
       op =<< (Plus' <$> rec x <*> rec y)
     LC.Times x y ->
@@ -512,6 +526,19 @@ getConstraintSubexpressionId ann mapping =
     op = getOperationSubexpressionId ann mapping
     rec = getConstraintSubexpressionId ann mapping
     const' = getConstantSubexpressionId ann mapping
+
+inputSubexpressionTraces ::
+  ann ->
+  LogicCircuit ->
+  LC.Argument ->
+  Mapping ->
+  LookupCaches ->
+  Case ->
+  InputExpression LC.Term ->
+  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, InputSubexpressionId, Scalar)
+inputSubexpressionTraces ann lc arg mapping tables c (InputExpression x) =
+  (\(m, i, y) -> (m, InputSubexpressionId i, y))
+    <$> logicTermSubexpressionTraces ann lc arg mapping tables c x
 
 logicTermSubexpressionTraces ::
   ann ->
@@ -559,18 +586,35 @@ logicTermSubexpressionTraces ann lc arg mapping tables c =
       let v = x' `lessIndicator` y'
           m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #lessThan . #unOf) defaultAdvice)
       pure (m0 <> m1 <> m2, s2, v)
-    LC.Const x -> do
-      st <- getConstantStepTypeId ann mapping x
-      s <- getConstantSubexpressionId ann mapping x
-      pure (Map.singleton s (SubexpressionTrace x st defaultAdvice), s, x)
+    LC.Const x -> constant x
     LC.Var x -> var x
     LC.Lookup is o -> lkup is o
   where
     rec = logicTermSubexpressionTraces ann lc arg mapping tables c
     var = polyVarSubexpressionTraces ann numCases arg mapping c
-    lkup = lookupTermSubexpressionTraces ann lc arg mapping tables c
+    lkup is o = do
+      is' <-
+        mapM
+          (\(i,col) -> (i,col,) <$>
+            inputSubexpressionTraces ann lc arg mapping tables c i)
+          is
+      let is'' = (\(i,col,(_,iId,_)) -> (i,Just iId,col)) <$> is'
+      lookupTermSubexpressionTraces ann lc arg mapping tables c is'' o
+    constant = constantSubexpressionTraces ann mapping
     defaultAdvice = getDefaultAdvice mapping
     numCases = NumberOfCases (lc ^. #rowCount . #getRowCount)
+
+constantSubexpressionTraces ::
+  ann ->
+  Mapping ->
+  Scalar ->
+  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, SubexpressionId, Scalar)
+constantSubexpressionTraces ann mapping x = do
+  st <- getConstantStepTypeId ann mapping x
+  s <- getConstantSubexpressionId ann mapping x
+  pure (Map.singleton s (SubexpressionTrace x st defaultAdvice), s, x)
+  where
+    defaultAdvice = getDefaultAdvice mapping
 
 polyVarSubexpressionTraces ::
   ann ->
@@ -640,13 +684,32 @@ polyVarDifferentCaseSubexpressionTraces ::
   PolynomialVariable ->
   Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, SubexpressionId, Scalar)
 polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
+  (m0, _, _) <- constant (rowIndexToScalar (x ^. #rowIndex))
+  (m1, _, _) <- constant (polyVarStepTypeId (PolynomialVariable (x ^. #colIndex) 0) ^. #unStepTypeId)
   let st = mapping ^. #stepTypeIds . #loadFromDifferentCase . #unOf
-  sId <- maybe (Left (ErrorMessage ann "variable subexpression id lookup failed"))
-           (pure . (^. #unOf)) (Map.lookup x (mapping ^. #subexpressionIds . #variables))
+  sId <- maybe
+           (Left (ErrorMessage ann "variable subexpression id lookup failed"))
+           (pure . (^. #unOf))
+           (Map.lookup x (mapping ^. #subexpressionIds . #variables))
   v <- polyVarValue ann numCases arg c x
-  pure (Map.singleton sId (SubexpressionTrace v st defaultAdvice), sId, v)
+  pure (m0 <> m1 <> Map.singleton sId (SubexpressionTrace v st defaultAdvice), sId, v)
   where
+    constant = constantSubexpressionTraces ann mapping
+
     defaultAdvice = getDefaultAdvice mapping
+
+    rowIndexToScalar :: RowIndex a -> Scalar
+    rowIndexToScalar =
+      fromMaybe (die "polyVarDifferentCaseSubexpressionTraces: could not convert row index to scalar (this is a compiler bug)")
+        . integerToScalar
+        . intToInteger
+        . (^. #getRowIndex)
+
+    polyVarStepTypeId :: PolynomialVariable -> StepTypeId
+    polyVarStepTypeId x' =
+      case Map.lookup x' (mapping ^. #stepTypeIds . #loads) of
+        Just sid -> sid
+        Nothing -> die "polyVarDifferentCaseSubexpressionTraces: polynomial variable mapping lookup failed (this is a compiler bug)"
 
 lookupTermSubexpressionTraces ::
   ann ->
@@ -655,15 +718,15 @@ lookupTermSubexpressionTraces ::
   Mapping ->
   LookupCaches ->
   Case ->
-  [(InputExpression LC.Term, LookupTableColumn)] ->
+  [(InputExpression LC.Term, Maybe InputSubexpressionId, LookupTableColumn)] ->
   LC.LookupTableOutputColumn ->
   Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, SubexpressionId, Scalar)
 lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
   inputs' <-
     Map.fromList
-      . zip (snd <$> lookupArg)
-      <$> mapM (term . (^. #getInputExpression) . fst) lookupArg
-  let lookupTerm = (Set.fromList (snd <$> lookupArg), outCol)
+      . zip ((^. _3) <$> lookupArg)
+      <$> mapM (term . (^. #getInputExpression) . (^. _1)) lookupArg
+  let lookupTerm = (Set.fromList ((^. _3) <$> lookupArg), outCol)
       lookupInputs = inputs' <&> (^. _3)
   lookupCache <-
     maybe
@@ -684,7 +747,7 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
           pure
           (Map.lookup
             (LookupTable
-              ((snd <$> lookupArg) <>
+              (((^. _3) <$> lookupArg) <>
                 [outCol ^. #unLookupTableOutputColumn]))
             (mapping ^. #stepTypeIds . #lookupTables))
   sId <- 
@@ -695,10 +758,11 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
         (BareLookupArgument
           (lookupArg <>
             [(InputExpression
-              (LC.Var
-                (PolynomialVariable
-                  (mapping ^. #output . #unOutputColumnIndex)
-                  (0 :: RowIndex 'Relative))),
+               (LC.Var
+                 (PolynomialVariable
+                   (mapping ^. #output . #unOutputColumnIndex)
+                   (0 :: RowIndex 'Relative))),
+              Nothing,
               outCol ^. #unLookupTableOutputColumn)]))
         (mapping ^. #subexpressionIds . #bareLookups))
   let ms = inputs' <&> (^. _1)
@@ -849,7 +913,7 @@ newtype LookupTable = LookupTable {unLookupTable :: [LookupTableColumn]}
 
 newtype BareLookupArgument = BareLookupArgument
   { getBareLookupArgument ::
-      [(InputExpression LC.Term, LookupTableColumn)]
+      [(InputExpression LC.Term, Maybe InputSubexpressionId, LookupTableColumn)]
   }
   deriving (Eq, Ord, Generic, Show)
 
@@ -1074,11 +1138,7 @@ getMapping bitsPerByte c =
                     <*> ( Map.fromList . zip polyVars
                             <$> replicateM (length polyVars) nextEid'
                         )
-                    <*> ( Map.fromList . zip bareLookupArguments
-                            <$> replicateM
-                              (length bareLookupArguments)
-                              (BareLookupSubexpressionId <$> nextEid)
-                        )
+                    <*> pure mempty
                     <*> ( Map.fromList . zip scalars'
                             <$> replicateM (length scalars') nextEid'
                         )
@@ -1099,7 +1159,7 @@ getMapping bitsPerByte c =
     traverseBareLookupArgument out m' arg = do
       m'' <-
         foldM
-          (\m'' e -> snd <$> traverseTerm out m'' (fst e ^. #getInputExpression))
+          (\m'' e -> snd <$> traverseTerm out m'' (e ^. _1 . #getInputExpression))
           m'
           (arg ^. #getBareLookupArgument)
       case Map.lookup arg (m' ^. #bareLookups) of
@@ -1198,14 +1258,22 @@ getMapping bitsPerByte c =
       \case
         LC.Var x -> pure (varEid m' x, m')
         LC.Lookup is (LC.LookupTableOutputColumn o) -> do
-          (eid, m'') <-
-            traverseBareLookupArgument out m' . BareLookupArgument $
+          (m'', inIds) <-
+            foldM
+              (\(m'', inIds) (InputExpression e, _col) -> do
+                (eid, m''') <- traverseTerm out m'' e
+                pure (m''', inIds <> [InputSubexpressionId eid]))
+              (m', mempty)
               is
+          (eid, m''') <-
+            traverseBareLookupArgument out m'' . BareLookupArgument $
+              zipWith (\(i,col) inId -> (i, Just inId, col)) is inIds
                 <> [ ( InputExpression (LC.Var (PolynomialVariable (out ^. #unOutputColumnIndex) 0)),
+                       Nothing,
                        o
                      )
                    ]
-          pure (eid ^. #unBareLookupSubexpressionId, m'')
+          pure (eid ^. #unBareLookupSubexpressionId, m''')
         LC.Const x -> pure (constantEid m' x, m')
         LC.Plus x y -> do
           (xEid, m'') <- traverseTerm out m' x
@@ -1252,12 +1320,6 @@ getMapping bitsPerByte c =
     lookupTables' =
       LookupTable . snd
         <$> Set.toList (getLookupTables @LogicCircuit @LC.Term c)
-
-    bareLookupArguments :: [BareLookupArgument]
-    bareLookupArguments =
-      Set.toList . Set.fromList $ -- this appears redundant but is actually there to eliminate redundancy
-        BareLookupArgument . (^. #tableMap)
-          <$> Set.toList (getLookupArguments c ^. #getLookupArguments)
 
     rowIndexToScalar :: RowIndex a -> Scalar
     rowIndexToScalar =
@@ -1310,20 +1372,23 @@ getStepTypes ::
   Map StepTypeId StepType
 getStepTypes bitsPerByte c m =
   mconcat
-    [ loadStepTypes m,
+    [ loadStepTypes numCases m,
       bareLookupStepTypes m,
       constantStepTypes m,
       operatorStepTypes bitsPerByte c m,
       assertStepType m
     ]
+  where
+    numCases = NumberOfCases $ c ^. #rowCount . #getRowCount
 
 loadStepTypes ::
+  NumberOfCases ->
   Mapping ->
   Map StepTypeId StepType
-loadStepTypes m =
+loadStepTypes numCases m =
   Map.fromList $
     [ ( m ^. #stepTypeIds . #loadFromDifferentCase . #unOf,
-        loadFromDifferentCaseStepType m
+        loadFromDifferentCaseStepType numCases m
       )
     ]
       <> catMaybes
@@ -1358,12 +1423,29 @@ loadFromSameCaseStepType m i =
     mempty
 
 loadFromDifferentCaseStepType ::
+  NumberOfCases ->
   Mapping ->
   StepType
-loadFromDifferentCaseStepType m =
+loadFromDifferentCaseStepType numCases m =
   StepType
     "loadFromDifferentCase"
-    mempty
+    ( PolynomialConstraints
+        [ -- Given a < c, |F| > 8n^3, and n > abs(max{r}), then:
+          -- a = b mod c iff ∃d ∈ {-1,0,1}, b = dc + a,
+          -- iff ((b = a) ∨ (b = (a + n)) ∨ (b = (a - n))
+          -- iff P = (b - a))(b - (a + n))(b - (a - n)) = 0.
+          -- The assumption n > abs(max{r}) ensures that
+          -- abs(b) < 2c, which implies abs(P) < 8n^3, which implies
+          -- that if P = 0 then (b - a) = 0 or (b - (a + n)) = 0
+          -- or (b - (a - n)) = 0.
+          (b `P.minus` a)
+            `P.times`
+            ((b `P.minus` (a `P.plus` P.constant n))
+              `P.times`
+              (b `P.minus` (a `P.minus` P.constant n)))
+        ]
+        3
+    )
     ( LookupArguments . Set.singleton $
         LookupArgument
           "loadFromDifferentCase"
@@ -1373,15 +1455,15 @@ loadFromDifferentCaseStepType m =
     mempty
   where
     (i0, i1) = firstTwoInputs m
+    i = P.var' (m ^. #caseNumber . #unCaseNumberColumnIndex)
+    r = P.var' (i1 ^. #unInputColumnIndex)
+    a = P.var' (firstAdviceColumn m)
+    b = i `P.plus` r
+    n = numCases ^. #unNumberOfCases
 
     o, c, t :: InputExpression Polynomial
     o = InputExpression (P.var' (m ^. #output . #unOutputColumnIndex))
-    c =
-      -- TODO: handle the edge cases (when this sum is negative or greater than
-      -- the max case index)
-      InputExpression $
-        P.var' (m ^. #caseNumber . #unCaseNumberColumnIndex)
-          `P.plus` P.var' (i1 ^. #unInputColumnIndex)
+    c = InputExpression a
     t = InputExpression (P.var' (i0 ^. #unInputColumnIndex))
 
     os, cs, ts :: LookupTableColumn
@@ -1459,6 +1541,14 @@ operatorStepTypes bitsPerByte c m =
       maxStepType bitsPerByte c m,
       voidStepType m
     ]
+
+-- Steal an advice column from the byte decomposition mapping
+-- for any other purpose (on steps which do not use byte decomposition).
+firstAdviceColumn ::
+  Mapping ->
+  ColumnIndex
+firstAdviceColumn mapping =
+  mapping ^. #byteDecomposition . #sign . #unSignColumnIndex
 
 firstTwoInputs ::
   Mapping ->
@@ -1828,7 +1918,15 @@ getSubexpressionLinks ::
   Mapping ->
   Set SubexpressionLink
 getSubexpressionLinks m =
-  toVoid <> toVarSameCase <> toVarDifferentCase <> toConst <> toOp <> toAssert
+  mconcat
+    [ toVoid,
+      toVarSameCase,
+      toVarDifferentCase,
+      toConst,
+      toOp,
+      toAssert,
+      toBareLookup
+    ]
   where
     voidEid :: SubexpressionIdOf Void
     voidEid =
@@ -1921,7 +2019,7 @@ getSubexpressionLinks m =
             (OutputSubexpressionId (z ^. #unOf))
         OrShortCircuit' x _ -> \z ->
           SubexpressionLink
-            (m ^. #stepTypeIds . #or . #unOf)
+            (m ^. #stepTypeIds . #orShortCircuit . #unOf)
             (padInputs (InputSubexpressionId <$> [x]))
             (OutputSubexpressionId (z ^. #unOf))
         Not' x -> \z ->
@@ -1980,6 +2078,21 @@ getSubexpressionLinks m =
             outEid
           | (inEid, outEid) <- Map.toList (m ^. #subexpressionIds . #assertions)
         ]
+
+    toBareLookup =
+      Set.fromList $
+        [ SubexpressionLink
+            (getLookupStepTypeId arg)
+            (padInputs (catMaybes ((arg ^. #getBareLookupArgument) <&> (^. _2))))
+            (OutputSubexpressionId (outEid ^. #unBareLookupSubexpressionId))
+          | (arg, outEid) <- Map.toList (m ^. #subexpressionIds . #bareLookups)
+        ]
+
+    getLookupStepTypeId :: BareLookupArgument -> StepTypeId
+    getLookupStepTypeId (BareLookupArgument arg) =
+      fromMaybe 
+        (die "getSubexpressionLinks: lookup step type id not found (this is a compiler bug)")
+        (Map.lookup (LookupTable (arg <&> (^. _3))) (m ^. #stepTypeIds . #lookupTables))
 
 getResultExpressionIds ::
   Mapping ->
