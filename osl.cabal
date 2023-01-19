@@ -204,6 +204,7 @@ test-suite spec
     hedgehog -any,
     lens,
     mtl,
+    numeric-prelude,
     optparse-applicative,
     parsec,
     process,

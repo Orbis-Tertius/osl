@@ -8,6 +8,13 @@ data Problem ≅ Cell →^81 Maybe(Digit).
 data Solution ≅ Cell →^81 Digit.
 data Square ≅ Fin(3) × Fin(3).
 data SquareCell ≅ Fin(3) × Fin(3).
+data SquareEncoded ≅ Fin(9).
+
+def checkSquareDecoding : SquareEncoded → Square → Prop
+  := λe : SquareEncoded ⇨ λc : Square
+  ⇨ let c' : Fin(3) × Fin(3) := from(Square)(c);
+    ((from(SquareEncoded)(e) =
+       cast((3ℕ ×ℕ cast(π1(c'))) +ℕ cast(π2(c'))))).
 
 def getCell : Square → SquareCell → Cell
   := λs : Square ⇨ λc : SquareCell
@@ -16,14 +23,15 @@ def getCell : Square → SquareCell → Cell
     to(Cell)(( to(Row)(cast((3N ×ℕ cast(π1(s')))
                  +ℕ cast(π1(c'))))
              , to(Col)(cast((3N ×ℕ cast(π2(s')))
-                 +ℕ cast(π2(c')))) )).
+                 +ℕ cast(π2(c')))))).
 
 def solutionIsWellFormed : Solution → Prop
   := λs : Solution
   ⇨ let f : Cell →^81 Digit := from(Solution)(s);
      (∀r : Row, ∀v : Digit, ∃c : Col, f(to(Cell)((r,c))) = v)
    ∧ (∀c : Col, ∀v : Digit, ∃r : Row, f(to(Cell)((r,c))) = v)
-   ∧ (∀r : Square, ∀v : Digit, ∃c : SquareCell, f(getCell(r,c)) = v).
+   ∧ (∀r : SquareEncoded, ∀v : Digit, ∃r' : Square, ∃c : SquareCell,
+       (checkSquareDecoding(r, r') ∧ (f(getCell(r',c)) = v))).
 
 def solutionMatchesProblem : Problem → Solution → Prop
   := λp : Problem ⇨ λs : Solution

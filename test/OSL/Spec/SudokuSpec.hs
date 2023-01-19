@@ -464,15 +464,19 @@ complexWitnessType =
             ( F
                 ()
                 Nothing
-                (NamedType () "Square")
+                (NamedType () "SquareEncoded")
                 ( F
                     ()
                     Nothing
                     (NamedType () "Digit")
                     ( Product
                         ()
-                        (NamedType () "SquareCell")
-                        (Fin () 1)
+                        (NamedType () "Square")
+                        (Product
+                          ()
+                          (NamedType () "SquareCell")
+                          (Product () (Fin () 1) (Fin () 1))
+                        )
                     )
                 )
             )
@@ -514,12 +518,15 @@ simpleWitnessType =
         ( F
             ()
             Nothing
-            (NamedType () "Square")
+            (NamedType () "SquareEncoded")
             ( F
                 ()
                 Nothing
                 (NamedType () "Digit")
-                (NamedType () "SquareCell")
+                (Product ()
+                  (NamedType () "Square")
+                  (NamedType () "SquareCell")
+                )
             )
         )
     )
@@ -555,19 +562,29 @@ colPermutationToValue =
 
 squarePermutationsToValue :: Map Square (Map Digit SquareCell) -> Value
 squarePermutationsToValue =
-  Fun . Map.mapKeys squareToValue . fmap squarePermutationToValue
+  Fun . Map.mapKeys squareToEncodedValue . Map.mapWithKey squarePermutationToValue
 
-squarePermutationToValue :: Map Digit SquareCell -> Value
-squarePermutationToValue =
-  Fun . Map.mapKeys digitToValue . fmap squareCellToValue
+squarePermutationToValue :: Square -> Map Digit SquareCell -> Value
+squarePermutationToValue square =
+  Fun . Map.mapKeys digitToValue . fmap (squareCellToValue square)
 
 squareToValue :: Square -> Value
 squareToValue (Square (x, y)) =
   To' "Square" (Pair' (yToValue y) (xToValue x))
 
-squareCellToValue :: SquareCell -> Value
-squareCellToValue (SquareCell (x, y)) =
-  To' "SquareCell" (Pair' (yToValue y) (xToValue x))
+squareToEncodedValue :: Square -> Value
+squareToEncodedValue (Square (X x, Y y)) =
+  To' "SquareEncoded" . Fin' $
+    maybe
+    (die "squareToEncodedValue: out of range of scalar")
+    id
+    (integerToScalar ((3 * x) + y))
+
+squareCellToValue :: Square -> SquareCell -> Value
+squareCellToValue s (SquareCell (x, y)) =
+  Pair'
+    (squareToValue s)
+    (To' "SquareCell" (Pair' (yToValue y) (xToValue x)))
 
 sudokuWitnessToValue :: SudokuWitness -> Value
 sudokuWitnessToValue w =
