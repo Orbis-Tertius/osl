@@ -115,7 +115,7 @@ data TraceType = TraceType
     equalityConstraints :: EqualityConstraints,
     stepTypes :: Map StepTypeId StepType,
     subexpressions :: Set SubexpressionId,
-    links :: Set SubexpressionLink,
+    links :: Map (StepTypeId, OutputSubexpressionId) [InputSubexpressionId],
     results :: Set ResultExpressionId,
     caseNumberColumnIndex :: CaseNumberColumnIndex,
     stepTypeColumnIndex :: StepTypeColumnIndex,

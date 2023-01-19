@@ -180,7 +180,7 @@ argumentToTrace ann bitsPerByte lc arg = do
              zero
              (mapping ^. #stepTypeIds . #voidT . #unOf)
              (getDefaultAdvice mapping))
-         | i <- Set.toList usedCases
+          | i <- Set.toList usedCases
         ]
 
     mapping = getMapping bitsPerByte lc
@@ -193,7 +193,7 @@ logicCircuitUsedCases ann lc =
   Set.fromList <$> sequence
     [ maybe (Left (ErrorMessage ann "case index outside of scalar field"))
         (pure . Case) (integerToScalar i)
-      | i <- [0 .. scalarToInteger (lc ^. #rowCount . #getRowCount)]
+      | i <- [0 .. scalarToInteger (lc ^. #rowCount . #getRowCount) - 1]
     ]
 
 argumentSubexpressionTraces ::
@@ -823,7 +823,7 @@ logicCircuitToTraceType bitsPerByte c =
     (c ^. #equalityConstraints)
     stepTypes
     subexprs
-    (getSubexpressionLinks mapping)
+    (getSubexpressionLinksMap mapping)
     (getResultExpressionIds mapping)
     (mapping ^. #caseNumber)
     (mapping ^. #stepType)
@@ -1912,6 +1912,15 @@ getSubexpressionIdSet m =
       Set.fromList (Map.elems (m ^. #bareLookups) <&> (^. #unBareLookupSubexpressionId)),
       Set.fromList (Map.elems (m ^. #constants) <&> (^. #unOf)),
       Set.fromList (Map.elems (m ^. #operations) <&> (^. #unOf))
+    ]
+
+getSubexpressionLinksMap ::
+  Mapping ->
+  Map (StepTypeId, OutputSubexpressionId) [InputSubexpressionId]
+getSubexpressionLinksMap m =
+  Map.fromList
+    [ ((st, o), is)
+      | SubexpressionLink st is o <- Set.toList (getSubexpressionLinks m)
     ]
 
 getSubexpressionLinks ::

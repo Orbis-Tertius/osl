@@ -13,7 +13,7 @@ getTraceTypeMetrics t =
   TraceTypeMetrics
     (StepTypeCount (Map.size (t ^. #stepTypes)))
     (SubexpressionCount (Set.size (t ^. #subexpressions)))
-    (LinkCount (Set.size (t ^. #links)))
+    (LinkCount (Map.size (t ^. #links)))
     (ResultCount (Set.size (t ^. #results)))
     (InputColumnCount (length (t ^. #inputColumnIndices)))
     (t ^. #numCases)

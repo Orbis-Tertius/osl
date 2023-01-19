@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Trace.Semantics
   ( evalTrace
@@ -20,7 +21,7 @@ import Data.Maybe (maybeToList)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (pack)
--- import Debug.Trace (trace)
+import Debug.Trace (trace)
 import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.ColumnIndex (ColumnIndex)
@@ -36,7 +37,7 @@ import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowIndex (RowIndex (RowIndex))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, scalarToInteger, zero, one, integerToScalar)
-import Trace.Types (TraceType, Trace, Case (Case), SubexpressionId, ResultExpressionId (ResultExpressionId), SubexpressionTrace, StepType)
+import Trace.Types (TraceType, Trace, Case (Case), SubexpressionId, ResultExpressionId (ResultExpressionId), SubexpressionTrace, StepType, OutputSubexpressionId (..))
 import Trace.Types.EvaluationContext (EvaluationContext (EvaluationContext), ContextType (Global, Local))
 
 evalTrace ::
@@ -45,9 +46,9 @@ evalTrace ::
   Trace ->
   Either (ErrorMessage ann) ()
 evalTrace ann tt t = do
-  checkAllResultsArePresentForUsedCases ann tt t
-  checkAllStepConstraintsAreSatisfied ann tt t
-  checkAllEqualityConstraintsAreSatisfied ann tt t
+  checkAllResultsArePresentForUsedCases ann tt (trace "checkAllResultsArePresent" t)
+  checkAllStepConstraintsAreSatisfied ann tt (trace "checkAllStepConstraints" t)
+  checkAllEqualityConstraintsAreSatisfied ann tt (trace "checkAllEqualityConstraints" t)
 
 checkAllResultsArePresentForUsedCases ::
   ann ->
@@ -71,10 +72,10 @@ checkAllStepConstraintsAreSatisfied ::
   Trace ->
   Either (ErrorMessage ann) ()
 checkAllStepConstraintsAreSatisfied ann tt t = do
-  gc <- getGlobalEvaluationContext ann tt t
+  gc <- getGlobalEvaluationContext ann tt (trace "getGlobalEvaluationContext" t)
   forM_ (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
-    lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
-    checkStepConstraintsAreSatisfied ann tt sT lc
+    lc <- getSubexpressionEvaluationContext ann tt t gc (trace "getSubexpressionEvaluationContext" (c, sId, sT))
+    checkStepConstraintsAreSatisfied ann tt (trace "checkStepConstraint" sT) lc
 
 checkStepConstraintsAreSatisfied ::
   ann ->
@@ -242,8 +243,10 @@ getGlobalEvaluationContext ann tt t = do
            (Map.elems (tt ^. #stepTypes) <&> (^. #fixedValues))
   EvaluationContext gms mempty
     <$> (Map.fromList <$> sequence
-          [ (cs,) <$> getLookupTable ann tt t ec cs
-            | cs <- Set.toList (traceTypeLookupTables tt)
+          [ (cs,) . Set.fromList
+              <$> getLookupTable ann tt t ec
+                  (trace ("getLookupTable: " <> show cs) cs)
+            | cs <- traceTypeLookupTables tt
           ])
 
 getGlobalMappings ::
@@ -269,15 +272,15 @@ getCaseNumberColumnMappings tt t =
 
 traceTypeLookupTables ::
   TraceType ->
-  Set (Set LookupTableColumn)
+  [Set LookupTableColumn]
 traceTypeLookupTables tt =
   mconcat (stepTypeLookupTables <$> Map.elems (tt ^. #stepTypes))
 
 stepTypeLookupTables ::
   StepType ->
-  Set (Set LookupTableColumn)
+  [Set LookupTableColumn]
 stepTypeLookupTables st =
-  Set.map lookupArgumentTable (st ^. #lookupArguments . #getLookupArguments)
+  lookupArgumentTable <$> Set.toList (st ^. #lookupArguments . #getLookupArguments)
 
 lookupArgumentTable ::
   LookupArgument Polynomial ->
@@ -310,27 +313,20 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
         ]
 
     inputMappings =
-      case Set.toList
-             (Set.filter
-               (\l -> l ^. #stepType == sT ^. #stepType
-                  && l ^. #output . #unOutputSubexpressionId == sId)
-               (tt ^. #links)) of
-        [l] ->
-          mconcat <$> sequence
+      case Map.lookup (sT ^. #stepType, OutputSubexpressionId sId) (tt ^. #links) of
+        Just is ->
+          Map.fromList <$> sequence
             [ case Map.lookup (c, iId) (t ^. #subexpressions) of
-                Just sT' -> pure (Map.singleton col (sT' ^. #value))
+                Just sT' -> pure (col, sT' ^. #value)
                 Nothing ->
                   -- trace (show (t ^. #subexpressions)) $
-                  Left (ErrorMessage ann ("expected input not present: " <> pack (show (c, iId, l ^. #inputs, sT))))
+                  Left (ErrorMessage ann ("expected input not present: " <> pack (show (c, iId, is, sT))))
               | (col, iId) <- zip ((tt ^. #inputColumnIndices) <&> (^. #unInputColumnIndex))
-                                  ((l ^. #inputs) <&> (^. #unInputSubexpressionId))
+                                  (is <&> (^. #unInputSubexpressionId))
             ]
-        [] -> Left . ErrorMessage ann $
+        Nothing -> Left . ErrorMessage ann $
           "no links found for this subexpression's step type and id: "
             <> pack (show (c, sId, sT))
-        ls -> Left . ErrorMessage ann $
-          "more than one link found for this subexpression's step type and id; this is a malformed links set: "
-            <> pack (show ls)
 
     outputMapping =
       pure $ Map.singleton (tt ^. #outputColumnIndex . #unOutputColumnIndex) (sT ^. #value)
@@ -353,9 +349,9 @@ getLookupTable ::
   Trace ->
   EvaluationContext 'Global ->
   Set LookupTableColumn ->
-  Either (ErrorMessage ann) (Set (Map LookupTableColumn Scalar))
-getLookupTable ann tt t gc cs =
-  fmap Set.fromList $ forM (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
+  Either (ErrorMessage ann) [Map LookupTableColumn Scalar]
+getLookupTable ann tt (trace "getLookupTable" -> t) gc cs =
+  forM (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
     lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
     Map.fromList <$> sequence
       [ maybe
