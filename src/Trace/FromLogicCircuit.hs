@@ -1829,12 +1829,13 @@ byteDecompositionCheck (BitsPerByte bitsPerByte) c m =
         (PolynomialDegreeBound 2)
     )
     (byteRangeAndTruthChecks m)
-    (truthTables m)
+    (truthTables rc m)
   where
     (i0, i1) = firstTwoInputs m
     v0 = P.var' (i0 ^. #unInputColumnIndex)
     v1 = P.var' (i1 ^. #unInputColumnIndex)
     s = P.var' (m ^. #byteDecomposition . #sign . #unSignColumnIndex)
+    rc = c ^. #rowCount
 
     byteCoefs, byteVars :: [Polynomial]
     byteCoefs =
@@ -1864,9 +1865,10 @@ byteRangeAndTruthChecks m =
       ]
 
 truthTables ::
+  RowCount ->
   Mapping ->
   FixedValues
-truthTables m =
+truthTables (RowCount n) m =
   FixedValues . Map.fromList $
     [ ( m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex,
         FixedColumn byteRange
@@ -1876,12 +1878,20 @@ truthTables m =
       )
     ]
   where
+    b, n' :: Int
+    b = 2 ^ (m ^. #byteDecomposition . #bits . #unBitsPerByte)
+    n' =
+      fromMaybe
+        (die "row count out of range of Int")
+        (integerToInt (scalarToInteger n))
+
     byteRange, zeroIndicator :: [Scalar]
     byteRange =
       fromMaybe (die "byte value out of range of scalar (this is a compiler bug)")
-        . integerToScalar
-        <$> [0 .. 2 ^ (m ^. #byteDecomposition . #bits . #unBitsPerByte) - 1]
-    zeroIndicator = one : replicate (length byteRange - 1) zero
+        . integerToScalar . intToInteger
+        <$> ([0 .. b - 1]
+               <> replicate (n' - b) (b - 1))
+    zeroIndicator = one : replicate (n' - 1) 0
 
 assertStepType ::
   Mapping ->
