@@ -14,6 +14,7 @@ module Trace.ToArithmeticAIR
 where
 
 import Cast (intToInteger)
+import Control.Arrow (second)
 import Control.Lens ((<&>))
 import Data.List.Extra (mconcatMap, (!?))
 import qualified Data.Map as Map
@@ -86,7 +87,7 @@ gateConstraints t =
 stepTypeGateConstraints :: StepTypeColumnIndex -> (StepTypeId, StepType) -> PolynomialConstraints
 stepTypeGateConstraints i (tId, t) =
   PolynomialConstraints
-    (gateOnStepType i tId <$> (t ^. #gateConstraints . #constraints))
+    (second (gateOnStepType i tId) <$> (t ^. #gateConstraints . #constraints))
     (t ^. #gateConstraints . #degreeBound)
 
 gateOnStepType :: StepTypeColumnIndex -> StepTypeId -> Polynomial -> Polynomial

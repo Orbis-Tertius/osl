@@ -8,11 +8,12 @@ module Halo2.Types.PolynomialConstraints
 where
 
 import Halo2.Prelude
+import Halo2.Types.Label (Label)
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound)
 
 data PolynomialConstraints = PolynomialConstraints
-  { constraints :: [Polynomial],
+  { constraints :: [(Label, Polynomial)],
     degreeBound :: PolynomialDegreeBound
   }
   deriving (Eq, Ord, Show, Generic)

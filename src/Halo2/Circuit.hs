@@ -78,7 +78,7 @@ instance HasPolynomialVariables PowerProduct where
 
 instance HasPolynomialVariables PolynomialConstraints where
   getPolynomialVariables cs =
-    mconcat $ getPolynomialVariables <$> cs ^. #constraints
+    mconcat $ getPolynomialVariables . snd <$> cs ^. #constraints
 
 instance HasPolynomialVariables Polynomial where
   getPolynomialVariables =
@@ -546,7 +546,7 @@ instance HasEvaluate (RowCount, LogicConstraints) Bool where
 instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
   evaluate ann arg (rc, PolynomialConstraints polys degreeBound) = do
     allM
-      ( \poly ->
+      ( \(_lbl, poly) ->
           ( degree poly <= degreeBound ^. #getPolynomialDegreeBound
               &&
           )

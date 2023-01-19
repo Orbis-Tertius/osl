@@ -1411,16 +1411,19 @@ loadFromSameCaseStepType ::
   StepType
 loadFromSameCaseStepType m i =
   StepType
-    ("loadFromSameCase(" <> Label (show i) <> ")")
+    label
     ( PolynomialConstraints
-        [ P.minus
-            (P.var' i)
-            (P.var' (m ^. #output . #unOutputColumnIndex))
+        [ (label,
+            P.minus
+              (P.var' i)
+              (P.var' (m ^. #output . #unOutputColumnIndex)))
         ]
         1
     )
     mempty
     mempty
+  where
+    label = "loadFromSameCase(" <> Label (show i) <> ")"
 
 loadFromDifferentCaseStepType ::
   NumberOfCases ->
@@ -1438,11 +1441,12 @@ loadFromDifferentCaseStepType numCases m =
           -- abs(b) < 2c, which implies abs(P) < 8n^3, which implies
           -- that if P = 0 then (b - a) = 0 or (b - (a + n)) = 0
           -- or (b - (a - n)) = 0.
-          (b `P.minus` a)
-            `P.times`
-            ((b `P.minus` (a `P.plus` P.constant n))
+          ("loadFromDifferentCase",
+            (b `P.minus` a)
               `P.times`
-              (b `P.minus` (a `P.minus` P.constant n)))
+              ((b `P.minus` (a `P.plus` P.constant n))
+                `P.times`
+                (b `P.minus` (a `P.minus` P.constant n))))
         ]
         3
     )
@@ -1513,9 +1517,10 @@ constantStepType m x =
   StepType
     ("constant(" <> Label (show x) <> ")")
     ( PolynomialConstraints
-        [ P.minus
-            (P.constant x)
-            (P.var' (m ^. #output . #unOutputColumnIndex))
+        [ ("constant",
+             P.minus
+               (P.constant x)
+               (P.var' (m ^. #output . #unOutputColumnIndex)))
         ]
         1
     )
@@ -1574,12 +1579,13 @@ plusStepType m =
     ( StepType
         "plus"
         ( PolynomialConstraints
-            [ P.minus
-                (P.var' (m ^. #output . #unOutputColumnIndex))
-                ( P.plus
-                    (P.var' (i0 ^. #unInputColumnIndex))
-                    (P.var' (i1 ^. #unInputColumnIndex))
-                )
+            [ ("plus",
+                P.minus
+                  (P.var' (m ^. #output . #unOutputColumnIndex))
+                  ( P.plus
+                      (P.var' (i0 ^. #unInputColumnIndex))
+                      (P.var' (i1 ^. #unInputColumnIndex))
+                  ))
             ]
             1
         )
@@ -1594,12 +1600,13 @@ timesStepType m =
     ( StepType
         "timesAnd"
         ( PolynomialConstraints
-            [ P.minus
-                (P.var' (m ^. #output . #unOutputColumnIndex))
-                ( P.times
-                    (P.var' (i0 ^. #unInputColumnIndex))
-                    (P.var' (i1 ^. #unInputColumnIndex))
-                )
+            [ ("timesAnd",
+                P.minus
+                  (P.var' (m ^. #output . #unOutputColumnIndex))
+                  ( P.times
+                      (P.var' (i0 ^. #unInputColumnIndex))
+                      (P.var' (i1 ^. #unInputColumnIndex))
+                  ))
             ]
             2
         )
@@ -1614,8 +1621,8 @@ timesShortCircuitStepType m =
     ( StepType
         "timesAndShortCircuit"
         ( PolynomialConstraints
-            [ P.var' (m ^. #output . #unOutputColumnIndex),
-              P.var' (i0 ^. #unInputColumnIndex)
+            [ ("timesAndShortCircuit1", P.var' (m ^. #output . #unOutputColumnIndex)),
+              ("timesAndShortCircuit2", P.var' (i0 ^. #unInputColumnIndex))
             ]
             2
         )
@@ -1630,9 +1637,10 @@ orStepType m =
     ( StepType
         "or"
         ( PolynomialConstraints
-            [ P.minus
-                (P.var' (m ^. #output . #unOutputColumnIndex))
-                (P.plus v0 (P.minus v1 (P.times v0 v1)))
+            [ ("or",
+                P.minus
+                  (P.var' (m ^. #output . #unOutputColumnIndex))
+                  (P.plus v0 (P.minus v1 (P.times v0 v1))))
             ]
             2
         )
@@ -1649,8 +1657,8 @@ orShortCircuitStepType m =
     ( StepType
         "orShortCircuit"
         ( PolynomialConstraints
-            [ P.minus P.one (P.var' (m ^. #output . #unOutputColumnIndex)),
-              P.minus P.one (P.var' (i0 ^. #unInputColumnIndex))
+            [ ("orShortCircuit1", P.minus P.one (P.var' (m ^. #output . #unOutputColumnIndex))),
+              ("orShortCircuit2", P.minus P.one (P.var' (i0 ^. #unInputColumnIndex)))
             ]
             2
         )
@@ -1665,9 +1673,10 @@ notStepType m =
     ( StepType
         "not"
         ( PolynomialConstraints
-            [ P.minus
-                (P.var' (m ^. #output . #unOutputColumnIndex))
-                (P.minus P.one (P.var' (i0 ^. #unInputColumnIndex)))
+            [ ("not",
+                P.minus
+                  (P.var' (m ^. #output . #unOutputColumnIndex))
+                  (P.minus P.one (P.var' (i0 ^. #unInputColumnIndex))))
             ]
             1
         )
@@ -1682,15 +1691,16 @@ iffStepType m =
     ( StepType
         "iff"
         ( PolynomialConstraints
-            [ P.minus
-                (P.var' (m ^. #output . #unOutputColumnIndex))
-                ( P.minus
-                    P.one
-                    ( P.minus
-                        (P.var' (i0 ^. #unInputColumnIndex))
-                        (P.var' (i1 ^. #unInputColumnIndex))
-                    )
-                )
+            [ ("iff",
+                P.minus
+                  (P.var' (m ^. #output . #unOutputColumnIndex))
+                  ( P.minus
+                      P.one
+                      ( P.minus
+                          (P.var' (i0 ^. #unInputColumnIndex))
+                          (P.var' (i1 ^. #unInputColumnIndex))
+                      )
+                  ))
             ]
             1
         )
@@ -1716,8 +1726,8 @@ equalsStepType bitsPerByte c m =
         [ StepType
             "equals"
             ( PolynomialConstraints
-                [ result `P.times` (result `P.minus` P.one),
-                  result `P.times` foldl' P.plus P.zero ((P.one `P.minus`) <$> truthVars)
+                [ ("equalsResultIsBinary", result `P.times` (result `P.minus` P.one)),
+                  ("equalsResultIsTruthful", result `P.times` foldl' P.plus P.zero ((P.one `P.minus`) <$> truthVars))
                 ]
                 1
             )
@@ -1741,18 +1751,20 @@ lessThanStepType bitsPerByte c m =
         [ StepType
             "lessThan"
             ( PolynomialConstraints
-                [ result `P.times` (result `P.minus` P.one),
-                  (P.one `P.minus` result)
-                    `P.times` ( (P.one `P.minus` sign')
-                                  `P.times` foldl' P.plus P.zero truthVars
-                              ),
-                  result
-                    `P.times` ( P.one
-                                  `P.minus` foldl'
-                                    P.times
-                                    P.one
-                                    [P.one `P.minus` v | v <- truthVars]
-                              )
+                [ ("lessThanResultIsBinary", result `P.times` (result `P.minus` P.one)),
+                  ("lessThanResultTrue",
+                    (P.one `P.minus` result)
+                      `P.times` ( (P.one `P.minus` sign')
+                                    `P.times` foldl' P.plus P.zero truthVars
+                                )),
+                  ("lessThanResultFalse",
+                    result
+                      `P.times` ( P.one
+                                    `P.minus` foldl'
+                                      P.times
+                                      P.one
+                                      [P.one `P.minus` v | v <- truthVars]
+                                ))
                 ]
                 (PolynomialDegreeBound (1 + length truthVars))
             )
@@ -1779,10 +1791,11 @@ maxStepType bitsPerByte c m =
         [ StepType
             "max"
             ( PolynomialConstraints
-                [ P.var' out
-                    `P.minus` ( (P.var' i1 `P.times` lessInd)
-                                  `P.plus` (P.var' i0 `P.times` (P.one `P.minus` lessInd))
-                              )
+                [ ("max",
+                    P.var' out
+                      `P.minus` ( (P.var' i1 `P.times` lessInd)
+                                    `P.plus` (P.var' i0 `P.times` (P.one `P.minus` lessInd))
+                                ))
                 ]
                 (PolynomialDegreeBound 3)
             )
@@ -1817,14 +1830,15 @@ byteDecompositionCheck (BitsPerByte bitsPerByte) c m =
   StepType
     "byteDecompositionCheck"
     ( PolynomialConstraints
-        [ (v0 `P.minus` v1)
-            `P.minus` ( ((P.constant two `P.times` s) `P.minus` P.one)
-                          `P.times` foldl'
-                            P.plus
-                            P.zero
-                            (zipWith P.times byteCoefs byteVars)
-                      ),
-          s `P.times` (s `P.minus` P.one)
+        [ ("byteRecomposition",
+            (v0 `P.minus` v1)
+              `P.minus` ( ((P.constant two `P.times` s) `P.minus` P.one)
+                            `P.times` foldl'
+                              P.plus
+                              P.zero
+                              (zipWith P.times byteCoefs byteVars)
+                        )),
+          ("signIsBinary", s `P.times` (s `P.minus` P.one))
         ]
         (PolynomialDegreeBound 2)
     )
@@ -1901,7 +1915,7 @@ assertStepType m =
     (m ^. #stepTypeIds . #assertT . #unOf)
     ( StepType
         "assert"
-        (PolynomialConstraints [P.minus out i0] 1)
+        (PolynomialConstraints [("assertPassthrough", P.minus out i0)] 1)
         mempty
         mempty
     )

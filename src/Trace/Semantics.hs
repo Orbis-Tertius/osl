@@ -98,8 +98,9 @@ checkPolynomialConstraints ::
 checkPolynomialConstraints ann ec cs =
   void $ sequence
     [ do z <- evalPolynomial ann ec c
-         unless (z == zero) (Left (ErrorMessage ann "polynomial constraint not satisfied"))
-      | c <- cs ^. #constraints
+         unless (z == zero) . Left . ErrorMessage ann
+           $ "polynomial constraint not satisfied: " <> pack (show l)
+      | (l, c) <- cs ^. #constraints
     ]
 
 evalPolynomial ::
@@ -246,7 +247,7 @@ getGlobalEvaluationContext ann tt t = do
           [ (cs,) . Set.fromList
               <$> getLookupTable ann tt t ec
                   (trace ("getLookupTable: " <> show cs) cs)
-            | cs <- traceTypeLookupTables tt
+            | cs <- Set.toList . Set.fromList $ traceTypeLookupTables tt
           ])
 
 getGlobalMappings ::
