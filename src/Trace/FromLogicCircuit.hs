@@ -1924,13 +1924,12 @@ assertStepType m =
     (m ^. #stepTypeIds . #assertT . #unOf)
     ( StepType
         "assert"
-        (PolynomialConstraints [("assertPassthrough", P.minus out i0)] 1)
+        (PolynomialConstraints [("assert", P.minus P.one i0)] 1)
         mempty
         mempty
     )
   where
     i0 = P.var' $ fst (firstTwoInputs m) ^. #unInputColumnIndex
-    out = P.var' $ m ^. #output . #unOutputColumnIndex
 
 maybeToSet :: Ord a => Maybe a -> Set a
 maybeToSet = maybe mempty Set.singleton

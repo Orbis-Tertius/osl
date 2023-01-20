@@ -180,7 +180,7 @@ checkLookupArgument ann c ec arg = do
           (Left
             (ErrorMessage ann
               ("lookup argument is not satisfied: "
-                <> pack (show (arg, is)))))
+                <> pack (show (arg, is, t)))))
       Nothing ->
         Left (ErrorMessage ann "lookup table is not cached in the context")
 
