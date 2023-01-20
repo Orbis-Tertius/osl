@@ -75,71 +75,80 @@ checkAllStepConstraintsAreSatisfied ann tt t = do
   gc <- getGlobalEvaluationContext ann tt (trace "getGlobalEvaluationContext" t)
   forM_ (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
     lc <- getSubexpressionEvaluationContext ann tt t gc (trace "getSubexpressionEvaluationContext" (c, sId, sT))
-    checkStepConstraintsAreSatisfied ann tt (trace "checkStepConstraint" sT) lc
+    checkStepConstraintsAreSatisfied ann tt c (trace "checkStepConstraint" sT) lc
 
 checkStepConstraintsAreSatisfied ::
   ann ->
   TraceType ->
+  Case ->
   SubexpressionTrace ->
   EvaluationContext 'Local ->
   Either (ErrorMessage ann) ()
-checkStepConstraintsAreSatisfied ann tt sT ec =
+checkStepConstraintsAreSatisfied ann tt c sT ec =
   case Map.lookup (sT ^. #stepType) (tt ^. #stepTypes) of
     Just st -> do
-      checkPolynomialConstraints ann ec (st ^. #gateConstraints)
-      checkLookupArguments ann ec (st ^. #lookupArguments)
+      checkPolynomialConstraints ann c ec (st ^. #gateConstraints)
+      checkLookupArguments ann c ec (st ^. #lookupArguments)
     Nothing -> Left (ErrorMessage ann "step type id not defined in trace type")
 
 checkPolynomialConstraints ::
   ann ->
+  Case ->
   EvaluationContext 'Local ->
   PolynomialConstraints ->
   Either (ErrorMessage ann) ()
-checkPolynomialConstraints ann ec cs =
+checkPolynomialConstraints ann c ec cs =
   void $ sequence
-    [ do z <- evalPolynomial ann ec c
+    [ do z <- evalPolynomial ann c ec c'
          unless (z == zero) . Left . ErrorMessage ann
-           $ "polynomial constraint not satisfied: " <> pack (show l)
-      | (l, c) <- cs ^. #constraints
+           $ "polynomial constraint not satisfied: " <> pack (show (l, c', c, ec))
+      | (l, c') <- cs ^. #constraints
     ]
 
 evalPolynomial ::
   ann ->
+  Case ->
   EvaluationContext 'Local ->
   Polynomial ->
   Either (ErrorMessage ann) Scalar
-evalPolynomial ann ec p =
+evalPolynomial ann c ec p =
   foldr (Group.+) zero <$>
-    mapM (evalMonomial ann ec) (Map.toList (p ^. #monos))
+    mapM (evalMonomial ann c ec) (Map.toList (p ^. #monos))
 
 evalMonomial ::
   ann ->
+  Case ->
   EvaluationContext 'Local ->
   (PowerProduct, Coefficient) ->
   Either (ErrorMessage ann) Scalar
-evalMonomial ann ec (pp, c) =
-  (Ring.* (c ^. #getCoefficient)) <$> evalPowerProduct ann ec pp
+evalMonomial ann c ec (pp, c') =
+  (Ring.* (c' ^. #getCoefficient)) <$> evalPowerProduct ann c ec pp
 
 evalPowerProduct ::
   ann ->
+  Case ->
   EvaluationContext 'Local ->
   PowerProduct ->
   Either (ErrorMessage ann) Scalar
-evalPowerProduct ann ec pp =
+evalPowerProduct ann c ec pp =
   foldr (Ring.*) one <$>
-    mapM (\(v, e) -> (^ e) <$> evalPolynomialVariable ann ec v)
+    mapM (\(v, e) -> (^ e) <$> evalPolynomialVariable ann c ec v)
       (Map.toList (pp ^. #getPowerProduct))
 
 evalPolynomialVariable ::
   ann ->
+  Case ->
   EvaluationContext 'Local ->
   PolynomialVariable ->
   Either (ErrorMessage ann) Scalar
-evalPolynomialVariable ann ec v =
+evalPolynomialVariable ann c ec v =
   case v ^. #rowIndex of
     0 ->
       maybe
-        (Left (ErrorMessage ann "variable not defined in local mappings"))
+        (maybe
+          (Left (ErrorMessage ann "variable not defined in global or local mappings"))
+          pure
+          (Map.lookup (c, v ^. #colIndex) (ec ^. #globalMappings)))
         pure
         (Map.lookup (v ^. #colIndex) (ec ^. #localMappings))
     _ ->
@@ -147,21 +156,23 @@ evalPolynomialVariable ann ec v =
 
 checkLookupArguments ::
   ann ->
+  Case ->
   EvaluationContext 'Local ->
   LookupArguments Polynomial ->
   Either (ErrorMessage ann) ()
-checkLookupArguments ann ec args =
-  mapM_ (checkLookupArgument ann ec) (args ^. #getLookupArguments)
+checkLookupArguments ann c ec args =
+  mapM_ (checkLookupArgument ann c ec) (args ^. #getLookupArguments)
 
 checkLookupArgument ::
   ann ->
+  Case ->
   EvaluationContext 'Local ->
   LookupArgument Polynomial ->
   Either (ErrorMessage ann) ()
-checkLookupArgument ann ec arg = do
-  g <- evalPolynomial ann ec (arg ^. #gate)
+checkLookupArgument ann c ec arg = do
+  g <- evalPolynomial ann c ec (arg ^. #gate)
   when (g == zero) $ do
-    is <- evalInputExpressions ann ec (arg ^. #tableMap)
+    is <- evalInputExpressions ann c ec (arg ^. #tableMap)
     case Map.lookup (Set.fromList (snd <$> arg ^. #tableMap))
            (ec ^. #lookupTables) of
       Just t ->
@@ -172,12 +183,13 @@ checkLookupArgument ann ec arg = do
 
 evalInputExpressions ::
   ann ->
+  Case ->
   EvaluationContext 'Local ->
   [(InputExpression Polynomial, LookupTableColumn)] ->
   Either (ErrorMessage ann) (Map LookupTableColumn Scalar)
-evalInputExpressions ann ec is =
+evalInputExpressions ann c ec is =
   Map.fromList <$> sequence
-    [ (col,) <$> evalPolynomial ann ec (e ^. #getInputExpression)
+    [ (col,) <$> evalPolynomial ann c ec (e ^. #getInputExpression)
       | (e, col) <- is
     ]
 
@@ -309,7 +321,6 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
           caseNumberMapping,
           stepTypeMapping,
           stepIndicatorMapping,
-          globalToLocalMappings,
           pure (sT ^. #adviceValues)
         ]
 
@@ -341,9 +352,8 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
     stepIndicatorMapping =
       pure (Map.singleton (tt ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex) zero)
 
-    globalToLocalMappings =
-      pure $ Map.mapKeys snd (Map.filterWithKey (\(c',_) _ -> c' == c) (gc ^. #globalMappings))
-
+-- We could speed this up by doing the full loop over all subexpressions only when
+-- the lookup table columns are not entirely contained by the statement and witness.
 getLookupTable ::
   ann ->
   TraceType ->
@@ -356,10 +366,13 @@ getLookupTable ann tt (trace "getLookupTable" -> t) gc cs =
     lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
     Map.fromList <$> sequence
       [ maybe
-          (Left
-            (ErrorMessage ann
-              ("lookup table has a hole: "
-                <> pack (show (c, col)))))
+          (maybe
+            (Left
+              (ErrorMessage ann
+                ("lookup table has a hole: "
+                  <> pack (show (c, col)))))
+            (pure . (col,))
+            (Map.lookup (c, col ^. #unLookupTableColumn) (lc ^. #globalMappings)))
           (pure . (col,))
           (Map.lookup (col ^. #unLookupTableColumn) (lc ^. #localMappings))
        | col <- Set.toList cs

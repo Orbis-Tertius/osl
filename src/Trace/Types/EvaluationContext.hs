@@ -20,7 +20,7 @@ data EvaluationContext t =
     localMappings :: Map ColumnIndex Scalar,
     lookupTables :: Map (Set LookupTableColumn) (Set (Map LookupTableColumn Scalar))
   }
-  deriving Generic
+  deriving (Generic, Show)
 
 instance Semigroup (EvaluationContext t) where
   EvaluationContext a b c <> EvaluationContext d e f =

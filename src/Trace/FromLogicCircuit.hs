@@ -61,7 +61,8 @@ import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Relative))
 import Halo2.Types.Sign (Sign (Positive, Negative))
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero, scalarToInteger)
+import Safe (headMay)
+import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero, scalarToInteger, inverseScalar)
 import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), Trace (Trace), Case (Case), Statement (Statement), Witness (Witness), SubexpressionTrace (SubexpressionTrace))
 
 newtype LookupCaches =
@@ -692,11 +693,21 @@ polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
            (pure . (^. #unOf))
            (Map.lookup x (mapping ^. #subexpressionIds . #variables))
   v <- polyVarValue ann numCases arg c x
-  pure (m0 <> m1 <> Map.singleton sId (SubexpressionTrace v st defaultAdvice), sId, v)
+  pure (m0 <> m1 <> Map.singleton sId (SubexpressionTrace v st (advice v)), sId, v)
   where
     constant = constantSubexpressionTraces ann mapping
-
     defaultAdvice = getDefaultAdvice mapping
+    ai = firstAdviceColumn mapping
+    di = secondAdviceColumn mapping
+    n = numCases ^. #unNumberOfCases
+    a v =
+      fromMaybe
+        (die "polyVarDifferentCaseSubexpressionTraces: offset row index mod row count out of range of scalar (this is a compiler bug")
+        (integerToScalar (scalarToInteger v `mod` scalarToInteger n))
+    divZero = "polyVarDifferentCaseSubexpressionTraces: division by zero"
+    d v = (v Group.- a v) Ring.* fromMaybe (die divZero) (inverseScalar n)
+    specialAdvice v = Map.fromList [ (ai, a v), (di, d v) ]
+    advice v = specialAdvice v <> defaultAdvice
 
     rowIndexToScalar :: RowIndex a -> Scalar
     rowIndexToScalar =
@@ -1433,20 +1444,10 @@ loadFromDifferentCaseStepType numCases m =
   StepType
     "loadFromDifferentCase"
     ( PolynomialConstraints
-        [ -- Given a < c, |F| > 8n^3, and n > abs(max{r}), then:
-          -- a = b mod c iff ∃d ∈ {-1,0,1}, b = dc + a,
-          -- iff ((b = a) ∨ (b = (a + n)) ∨ (b = (a - n))
-          -- iff P = (b - a))(b - (a + n))(b - (a - n)) = 0.
-          -- The assumption n > abs(max{r}) ensures that
-          -- abs(b) < 2c, which implies abs(P) < 8n^3, which implies
-          -- that if P = 0 then (b - a) = 0 or (b - (a + n)) = 0
-          -- or (b - (a - n)) = 0.
-          ("loadFromDifferentCase",
-            (b `P.minus` a)
-              `P.times`
-              ((b `P.minus` (a `P.plus` P.constant n))
-                `P.times`
-                (b `P.minus` (a `P.minus` P.constant n))))
+        [ ("loadFromDifferentCase1",
+            d `P.times` ((d `P.plus` P.one) `P.times` (d `P.minus` P.one))),
+          ("loadFromDifferentCase2",
+            b `P.minus` (a `P.plus` (d `P.times` P.constant n)))
         ]
         3
     )
@@ -1462,6 +1463,7 @@ loadFromDifferentCaseStepType numCases m =
     i = P.var' (m ^. #caseNumber . #unCaseNumberColumnIndex)
     r = P.var' (i1 ^. #unInputColumnIndex)
     a = P.var' (firstAdviceColumn m)
+    d = P.var' (secondAdviceColumn m)
     b = i `P.plus` r
     n = numCases ^. #unNumberOfCases
 
@@ -1549,11 +1551,16 @@ operatorStepTypes bitsPerByte c m =
 
 -- Steal an advice column from the byte decomposition mapping
 -- for any other purpose (on steps which do not use byte decomposition).
-firstAdviceColumn ::
+firstAdviceColumn, secondAdviceColumn ::
   Mapping ->
   ColumnIndex
 firstAdviceColumn mapping =
   mapping ^. #byteDecomposition . #sign . #unSignColumnIndex
+secondAdviceColumn mapping =
+  maybe
+  (die "no bytes in byte decomposition (this is supposed to be impossible)")
+  (^. _1 . #unByteColumnIndex)
+  (headMay (mapping ^. #byteDecomposition . #bytes))
 
 firstTwoInputs ::
   Mapping ->
