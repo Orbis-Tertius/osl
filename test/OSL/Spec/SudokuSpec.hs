@@ -578,7 +578,7 @@ squareToEncodedValue (Square (X x, Y y)) =
     maybe
     (die "squareToEncodedValue: out of range of scalar")
     id
-    (integerToScalar ((3 * x) + y))
+    (integerToScalar ((3 * y) + x))
 
 squareCellToValue :: Square -> SquareCell -> Value
 squareCellToValue s (SquareCell (x, y)) =

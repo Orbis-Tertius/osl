@@ -184,6 +184,7 @@ test-suite spec
     OSL.Spec.OSLSpec
     OSL.Spec.SimplifyTypeSpec
     OSL.Spec.SudokuSpec
+    Stark.Spec.ScalarSpec
 
   build-tools:
     sydtest-discover

@@ -692,22 +692,23 @@ polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
            (Left (ErrorMessage ann "variable subexpression id lookup failed"))
            (pure . (^. #unOf))
            (Map.lookup x (mapping ^. #subexpressionIds . #variables))
-  v <- polyVarValue ann numCases arg c x
-  pure (m0 <> m1 <> Map.singleton sId (SubexpressionTrace v st (advice v)), sId, v)
+  v <- polyVarValue ann numCases arg (Case a) x
+  pure (m0 <> m1 <> Map.singleton sId (SubexpressionTrace v st advice), sId, v)
   where
     constant = constantSubexpressionTraces ann mapping
     defaultAdvice = getDefaultAdvice mapping
     ai = firstAdviceColumn mapping
     di = secondAdviceColumn mapping
     n = numCases ^. #unNumberOfCases
-    a v =
+    r = rowIndexToScalar (x ^. #rowIndex)
+    a =
       fromMaybe
         (die "polyVarDifferentCaseSubexpressionTraces: offset row index mod row count out of range of scalar (this is a compiler bug")
-        (integerToScalar (scalarToInteger v `mod` scalarToInteger n))
+        (integerToScalar (scalarToInteger ((c ^. #unCase) Group.+ r) `mod` scalarToInteger n))
     divZero = "polyVarDifferentCaseSubexpressionTraces: division by zero"
-    d v = (v Group.- a v) Ring.* fromMaybe (die divZero) (inverseScalar n)
-    specialAdvice v = Map.fromList [ (ai, a v), (di, d v) ]
-    advice v = specialAdvice v <> defaultAdvice
+    d = ((c ^. #unCase) Group.- a) Ring.* fromMaybe (die divZero) (inverseScalar n)
+    specialAdvice = Map.fromList [ (ai, a), (di, d) ]
+    advice = specialAdvice <> defaultAdvice
 
     rowIndexToScalar :: RowIndex a -> Scalar
     rowIndexToScalar =
@@ -1447,7 +1448,7 @@ loadFromDifferentCaseStepType numCases m =
         [ ("loadFromDifferentCase1",
             d `P.times` ((d `P.plus` P.one) `P.times` (d `P.minus` P.one))),
           ("loadFromDifferentCase2",
-            b `P.minus` (a `P.plus` (d `P.times` P.constant n)))
+            a `P.minus` (b `P.plus` (d `P.times` P.constant n)))
         ]
         3
     )
@@ -1462,9 +1463,9 @@ loadFromDifferentCaseStepType numCases m =
     (i0, i1) = firstTwoInputs m
     i = P.var' (m ^. #caseNumber . #unCaseNumberColumnIndex)
     r = P.var' (i1 ^. #unInputColumnIndex)
+    b = i `P.plus` r
     a = P.var' (firstAdviceColumn m)
     d = P.var' (secondAdviceColumn m)
-    b = i `P.plus` r
     n = numCases ^. #unNumberOfCases
 
     o, c, t :: InputExpression Polynomial

@@ -180,10 +180,10 @@ instance Fractional Scalar where
         / fromInteger (denominator (abs x))
 
 instance Eq Scalar where
-  x == y = toWord64 x == toWord64 y
+  x == y = toWord64 (normalize x) == toWord64 (normalize y)
 
 instance Ord Scalar where
-  compare x y = compare (toWord64 x) (toWord64 y)
+  compare x y = compare (toWord64 (normalize x)) (toWord64 (normalize y))
 
 instance Real Scalar where
   toRational = toRational . toWord64

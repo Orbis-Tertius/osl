@@ -101,7 +101,7 @@ checkPolynomialConstraints ann c ec cs =
   void $ sequence
     [ do z <- evalPolynomial ann c ec c'
          unless (z == zero) . Left . ErrorMessage ann
-           $ "polynomial constraint not satisfied: " <> pack (show (l, c', c, ec))
+           $ "polynomial constraint not satisfied: " <> pack (show (l, c', c, ec ^. #localMappings))
       | (l, c') <- cs ^. #constraints
     ]
 

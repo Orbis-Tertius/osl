@@ -26,6 +26,7 @@ module Trace.Types
   )
 where
 
+import qualified Algebra.Additive as Group
 import Halo2.Prelude
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnTypes (ColumnTypes)
@@ -128,7 +129,7 @@ data TraceType = TraceType
   deriving (Generic, Show)
 
 newtype Case = Case { unCase :: Scalar }
-  deriving (Eq, Ord, Generic, Show)
+  deriving (Eq, Ord, Generic, Show, Group.C)
 
 newtype Statement =
   Statement { unStatement :: Map (Case, ColumnIndex) Scalar }
