@@ -692,7 +692,7 @@ polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
            (Left (ErrorMessage ann "variable subexpression id lookup failed"))
            (pure . (^. #unOf))
            (Map.lookup x (mapping ^. #subexpressionIds . #variables))
-  v <- polyVarValue ann numCases arg (Case a) x
+  v <- polyVarValue ann numCases arg c x
   pure (m0 <> m1 <> Map.singleton sId (SubexpressionTrace v st advice), sId, v)
   where
     constant = constantSubexpressionTraces ann mapping
@@ -701,12 +701,13 @@ polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
     di = secondAdviceColumn mapping
     n = numCases ^. #unNumberOfCases
     r = rowIndexToScalar (x ^. #rowIndex)
+    -- TODO: does this calculation of a correctly handle a negative row index?
     a =
       fromMaybe
         (die "polyVarDifferentCaseSubexpressionTraces: offset row index mod row count out of range of scalar (this is a compiler bug")
         (integerToScalar (scalarToInteger ((c ^. #unCase) Group.+ r) `mod` scalarToInteger n))
     divZero = "polyVarDifferentCaseSubexpressionTraces: division by zero"
-    d = ((c ^. #unCase) Group.- a) Ring.* fromMaybe (die divZero) (inverseScalar n)
+    d = (((c ^. #unCase) Group.+ r) Group.- a) Ring.* fromMaybe (die divZero) (inverseScalar n)
     specialAdvice = Map.fromList [ (ai, a), (di, d) ]
     advice = specialAdvice <> defaultAdvice
 
@@ -1462,7 +1463,7 @@ loadFromDifferentCaseStepType numCases m =
   where
     (i0, i1) = firstTwoInputs m
     i = P.var' (m ^. #caseNumber . #unCaseNumberColumnIndex)
-    r = P.var' (i1 ^. #unInputColumnIndex)
+    r = P.var' (i0 ^. #unInputColumnIndex)
     b = i `P.plus` r
     a = P.var' (firstAdviceColumn m)
     d = P.var' (secondAdviceColumn m)
@@ -1471,7 +1472,7 @@ loadFromDifferentCaseStepType numCases m =
     o, c, t :: InputExpression Polynomial
     o = InputExpression (P.var' (m ^. #output . #unOutputColumnIndex))
     c = InputExpression a
-    t = InputExpression (P.var' (i0 ^. #unInputColumnIndex))
+    t = InputExpression (P.var' (i1 ^. #unInputColumnIndex))
 
     os, cs, ts :: LookupTableColumn
     os = LookupTableColumn (m ^. #output . #unOutputColumnIndex)

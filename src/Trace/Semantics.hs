@@ -177,7 +177,10 @@ checkLookupArgument ann c ec arg = do
            (ec ^. #lookupTables) of
       Just t ->
         unless (is `Set.member` t)
-          (Left (ErrorMessage ann "lookup argument is not satisfied"))
+          (Left
+            (ErrorMessage ann
+              ("lookup argument is not satisfied: "
+                <> pack (show (arg, is)))))
       Nothing ->
         Left (ErrorMessage ann "lookup table is not cached in the context")
 
