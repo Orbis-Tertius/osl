@@ -16,6 +16,7 @@ module Trace.FromLogicCircuit
   )
 where
 
+import OSL.Debug (showTrace)
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
@@ -71,7 +72,7 @@ newtype LookupCaches =
         Map (Set LookupTableColumn, LC.LookupTableOutputColumn)
           (Map (Map LookupTableColumn Scalar) Scalar)
     }
-  deriving Generic
+  deriving (Generic, Show)
 
 getLookupCaches ::
   ann ->
@@ -205,7 +206,7 @@ argumentSubexpressionTraces ::
   Set Case ->
   Either (ErrorMessage ann) (Map (Case, SubexpressionId) SubexpressionTrace)
 argumentSubexpressionTraces ann lc arg mapping cases = do
-  tables <- getLookupCaches ann lc arg
+  tables <- showTrace "lookupCaches" <$> getLookupCaches ann lc arg
   mconcat <$>
     mapM (\c -> Map.mapKeys (c,) <$>
            caseArgumentSubexpressionTraces ann lc arg mapping tables c)
@@ -528,19 +529,6 @@ getConstraintSubexpressionId ann mapping =
     rec = getConstraintSubexpressionId ann mapping
     const' = getConstantSubexpressionId ann mapping
 
-inputSubexpressionTraces ::
-  ann ->
-  LogicCircuit ->
-  LC.Argument ->
-  Mapping ->
-  LookupCaches ->
-  Case ->
-  InputExpression LC.Term ->
-  Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, InputSubexpressionId, Scalar)
-inputSubexpressionTraces ann lc arg mapping tables c (InputExpression x) =
-  (\(m, i, y) -> (m, InputSubexpressionId i, y))
-    <$> logicTermSubexpressionTraces ann lc arg mapping tables c x
-
 logicTermSubexpressionTraces ::
   ann ->
   LogicCircuit ->
@@ -593,14 +581,7 @@ logicTermSubexpressionTraces ann lc arg mapping tables c =
   where
     rec = logicTermSubexpressionTraces ann lc arg mapping tables c
     var = polyVarSubexpressionTraces ann numCases arg mapping c
-    lkup is o = do
-      is' <-
-        mapM
-          (\(i,col) -> (i,col,) <$>
-            inputSubexpressionTraces ann lc arg mapping tables c i)
-          is
-      let is'' = (\(i,col,(_,iId,_)) -> (i,Just iId,col)) <$> is'
-      lookupTermSubexpressionTraces ann lc arg mapping tables c is'' o
+    lkup = lookupTermSubexpressionTraces ann lc arg mapping tables c
     constant = constantSubexpressionTraces ann mapping
     defaultAdvice = getDefaultAdvice mapping
     numCases = NumberOfCases (lc ^. #rowCount . #getRowCount)
@@ -731,16 +712,16 @@ lookupTermSubexpressionTraces ::
   Mapping ->
   LookupCaches ->
   Case ->
-  [(InputExpression LC.Term, Maybe InputSubexpressionId, LookupTableColumn)] ->
+  [(InputExpression LC.Term, LookupTableColumn)] ->
   LC.LookupTableOutputColumn ->
   Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, SubexpressionId, Scalar)
 lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
   inputs' <-
     Map.fromList
-      . zip ((^. _3) <$> lookupArg)
+      . zip ((^. _2) <$> lookupArg)
       <$> mapM (term . (^. #getInputExpression) . (^. _1)) lookupArg
-  let lookupTerm = (Set.fromList ((^. _3) <$> lookupArg), outCol)
-      lookupInputs = inputs' <&> (^. _3)
+  let lookupTerm = (Set.fromList ((^. _2) <$> lookupArg), outCol)
+      lookupInputs = inputs' <&> (^. _2)
   lookupCache <-
     maybe
       (Left
@@ -760,7 +741,7 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
           pure
           (Map.lookup
             (LookupTable
-              (((^. _3) <$> lookupArg) <>
+              (((^. _2) <$> lookupArg) <>
                 [outCol ^. #unLookupTableOutputColumn]))
             (mapping ^. #stepTypeIds . #lookupTables))
   sId <- 
@@ -769,7 +750,10 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
       (pure . (^. #unBareLookupSubexpressionId))
       (Map.lookup
         (BareLookupArgument
-          (lookupArg <>
+          ((zipWith
+              (\(ie, col) eid -> (ie, Just eid, col))
+              lookupArg
+              (Map.elems (inputs' <&> InputSubexpressionId . (^. _2)))) <>
             [(InputExpression
                (LC.Var
                  (PolynomialVariable
@@ -780,7 +764,7 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
         (mapping ^. #subexpressionIds . #bareLookups))
   let ms = inputs' <&> (^. _1)
       m' = Map.singleton sId (SubexpressionTrace v st defaultAdvice)
-  pure (mconcat (Map.elems ms) <> m', sId, v)
+  pure (m' <> mconcat (Map.elems ms), sId, v)
   where
     term = logicTermSubexpressionTraces ann lc arg mapping tables c
     defaultAdvice = getDefaultAdvice mapping
