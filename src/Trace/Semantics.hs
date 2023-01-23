@@ -180,7 +180,7 @@ checkLookupArgument ann c ec arg = do
           (Left
             (ErrorMessage ann
               ("lookup argument is not satisfied: "
-                <> pack (show (arg, is, t)))))
+                <> pack (show (arg, is, t, ec ^. #localMappings)))))
       Nothing ->
         Left (ErrorMessage ann "lookup table is not cached in the context")
 
@@ -331,6 +331,12 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
       case Map.lookup (sT ^. #stepType, OutputSubexpressionId sId) (tt ^. #links) of
         Just is ->
           Map.fromList <$> sequence
+            -- Special case to consider: when the input is supposed to be the
+            -- output of a lookup and this is the subexpr of that lookup,
+            -- what happens? Then there is (supposed to be) a subexpression id
+            -- of that lookup, and the trace generation should put the correct
+            -- value in its output, and it should be an input to the bare lookup,
+            -- and its value should be set here.
             [ case Map.lookup (c, iId) (t ^. #subexpressions) of
                 Just sT' -> pure (col, sT' ^. #value)
                 Nothing ->
