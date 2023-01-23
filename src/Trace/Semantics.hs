@@ -336,7 +336,9 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
             -- what happens? Then there is (supposed to be) a subexpression id
             -- of that lookup, and the trace generation should put the correct
             -- value in its output, and it should be an input to the bare lookup,
-            -- and its value should be set here.
+            -- and its value should be set here. Seems like something nonsensical
+            -- is going on here and we should replace the bare lookup step type
+            -- maybe with just a (functional) lookup step type.
             [ case Map.lookup (c, iId) (t ^. #subexpressions) of
                 Just sT' -> pure (col, sT' ^. #value)
                 Nothing ->
