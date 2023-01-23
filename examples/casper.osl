@@ -63,7 +63,7 @@ data ValidatorId ~= PublicKey.
 
 data Equivocators ~= List^18446744073709551616(ValidatorId).
 
-data MoteAmount ~= Fin(18446744073709551616).
+data MoteAmount ~= Fin(64) -> Byte.
 
 data Reward ~= MoteAmount.
 
@@ -73,7 +73,10 @@ data InactiveValidators ~= List^18446744073709551616(ValidatorId).
 
 data EraReport ~= Equivocators * Rewards * InactiveValidators.
 
-data NextEraValidatorWeights ~= Fin(1). -- TODO
+data ValidatorWeight ~= Fin(64) -> Byte.
+
+data NextEraValidatorWeights ~=
+  Map^18446744073709551616(ValidatorId, ValidatorWeight).
 
 data EraEnd ~= EraReport * NextEraValidatorWeights.
 
@@ -165,7 +168,10 @@ data Ed25519Signature ~= Fin(64) -> Byte.
 
 data Secp256k1Signature ~= Fin(128) -> Byte.
 
-data Signature ~= Ed25519Signature + Secp256k1Signature.
+data SystemSignature ~= Ed25519Signature. -- TODO: is this correct?
+
+data Signature ~=
+  SystemSignature + Ed25519Signature + Secp256k1Signature.
 
 data Approval ~= PublicKey * Signature.
 
