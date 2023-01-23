@@ -12,24 +12,24 @@ data Bytes ~= List^18446744073709551616(Byte).
 
 data ProtocolVersion ~= Text.
 
+data ChainSpec ~= Bytes.
+
 data ChainSpecs ~=
   Map^18446744073709551616
     (ProtocolVersion, ChainSpec).
-
-data ChainSpec ~= Bytes.
 
 data NodeVersion ~= List^4096(Char).
 
 data NodeVersions ~=
   Map^18446744073709551616
-    (ProtocolVersion, NodeVersion)
+    (ProtocolVersion, NodeVersion).
+
+data NodeBinary ~=
+  NodeVersion * Bytes.
 
 data NodeBinaries ~=
   Map^18446744073709551616
     (NodeVersion, NodeBinary).
-
-data NodeBinary ~=
-  NodeVersion * Bytes.
 
 data StateKeyType ~= Fin(18446744073709551616).
 
@@ -42,8 +42,6 @@ data StateValue ~= Bytes.
 data GlobalStateSnapshot ~=
   Map^18446744073709551616
     (StateKey, StateValue).
-
-data Block ~= BlockHeader * BlockBody.
 
 data EraId ~= Fin(18446744073709551616).
 
@@ -63,7 +61,7 @@ data AccountHash ~= Blake2b256Hash.
 
 data ValidatorId ~= PublicKey.
 
-data Equivocator ~= List^18446744073709551616(ValidatorId).
+data Equivocators ~= List^18446744073709551616(ValidatorId).
 
 data MoteAmount ~= Fin(18446744073709551616).
 
@@ -74,6 +72,8 @@ data Rewards ~= Map^18446744073709551616(ValidatorId, Reward).
 data InactiveValidators ~= List^18446744073709551616(ValidatorId).
 
 data EraReport ~= Equivocators * Rewards * InactiveValidators.
+
+data NextEraValidatorWeights ~= Fin(1). -- TODO
 
 data EraEnd ~= EraReport * NextEraValidatorWeights.
 
@@ -88,6 +88,8 @@ data DeployHashes ~= List^18446744073709551616(DeployHash).
 data TransferHashes ~= List^18446744073709551616(DeployHash).
  
 data BlockBody ~= Proposer * DeployHashes * TransferHashes.
+
+data Block ~= BlockHeader * BlockBody.
 
 data Protocols ~= NodeVersions * ChainSpecs * NodeBinaries.
 
@@ -152,7 +154,7 @@ data ExecutableDeployItem ~=
   StoredContractByHash +
   StoredContractByName +
   StoredVersionedContractByHash +
-  StoredVersionContractByName +
+  StoredVersionedContractByName +
   Transfer.
 
 data DeployPayment ~= ExecutableDeployItem.
@@ -175,4 +177,6 @@ data Deploys ~=
   Map^18446744073709551616
     (DeployHash, DeployBody).
 
-data Ledger ~= Deploys * BlockList * GlobalStates * Protocols.
+data Ledger ~= Deploys * BlockList * GlobalStateHistory * Protocols.
+
+def entryPoint : Prop := 0N = 0N.
