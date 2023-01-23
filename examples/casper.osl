@@ -1,0 +1,178 @@
+data BlockNumber ~= Fin(18446744073709551616).
+
+data Time ~= Fin(18446744073709551616). -- Unix timestamp (millisecond precision)
+
+data Byte ~= Fin(256).
+
+data Char ~= Byte.
+
+data Text ~= List^18446744073709551616(Char).
+
+data Bytes ~= List^18446744073709551616(Byte).
+
+data ProtocolVersion ~= Text.
+
+data ChainSpecs ~=
+  Map^18446744073709551616
+    (ProtocolVersion, ChainSpec).
+
+data ChainSpec ~= Bytes.
+
+data NodeVersion ~= List^4096(Char).
+
+data NodeVersions ~=
+  Map^18446744073709551616
+    (ProtocolVersion, NodeVersion)
+
+data NodeBinaries ~=
+  Map^18446744073709551616
+    (NodeVersion, NodeBinary).
+
+data NodeBinary ~=
+  NodeVersion * Bytes.
+
+data StateKeyType ~= Fin(18446744073709551616).
+
+data StateKeyValue ~= Fin(512) -> Byte.
+
+data StateKey ~= StateKeyType + StateKeyValue.
+
+data StateValue ~= Bytes.
+
+data GlobalStateSnapshot ~=
+  Map^18446744073709551616
+    (StateKey, StateValue).
+
+data Block ~= BlockHeader * BlockBody.
+
+data EraId ~= Fin(18446744073709551616).
+
+data RandomBit ~= Fin(2).
+
+data SystemPublicKey ~= Fin(1).
+
+data Ed25519Key ~= Fin(32) -> Byte.
+
+data Secp256k1Key ~= Fin(33) -> Byte.
+
+data PublicKey ~= SystemPublicKey + Ed25519Key + Secp256k1Key.
+
+data Blake2b256Hash ~= Fin(32) -> Byte.
+
+data AccountHash ~= Blake2b256Hash.
+
+data ValidatorId ~= PublicKey.
+
+data Equivocator ~= List^18446744073709551616(ValidatorId).
+
+data MoteAmount ~= Fin(18446744073709551616).
+
+data Reward ~= MoteAmount.
+
+data Rewards ~= Map^18446744073709551616(ValidatorId, Reward).
+
+data InactiveValidators ~= List^18446744073709551616(ValidatorId).
+
+data EraReport ~= Equivocators * Rewards * InactiveValidators.
+
+data EraEnd ~= EraReport * NextEraValidatorWeights.
+
+data BlockHeader ~= RandomBit * Maybe(EraEnd) * Time * EraId * ProtocolVersion.
+
+data Proposer ~= ValidatorId.
+
+data DeployHash ~= Blake2b256Hash.
+
+data DeployHashes ~= List^18446744073709551616(DeployHash).
+
+data TransferHashes ~= List^18446744073709551616(DeployHash).
+ 
+data BlockBody ~= Proposer * DeployHashes * TransferHashes.
+
+data Protocols ~= NodeVersions * ChainSpecs * NodeBinaries.
+
+data BlockList ~=
+  Map^18446744073709551616
+    (BlockNumber, Block).
+
+data GenesisSnapshotId ~= Fin(1).
+
+data UpgradeSnapshotId ~= BlockNumber.
+
+data StandardSnapshotId ~= BlockNumber.
+
+data GlobalStateSnapshotId ~=
+  GenesisSnapshotId + UpgradeSnapshotId + StandardSnapshotId.
+
+data GlobalStateHistory ~=
+  Map^18446744073709551616
+    (GlobalStateSnapshotId, GlobalStateSnapshot).
+
+data TimeDiff ~= Fin(18446744073709551616).
+
+data TTL ~= TimeDiff.
+
+data GasPrice ~= Fin(18446744073709551616).
+
+data DeployDependencies ~=
+  List^18446744073709551616(DeployHash).
+
+data DeployChainName ~= Text.
+
+data DeployHeader ~= PublicKey * Time * TTL * GasPrice * DeployDependencies * DeployChainName.
+
+data WASMModule ~= Bytes.
+
+data RuntimeArgs ~= Map^18446744073709551616(Text, Bytes).
+
+data ModuleBytes ~= WASMModule * RuntimeArgs.
+
+data ContractHash ~= Blake2b256Hash.
+
+data EntryPointName ~= Text.
+
+data StoredContractByHash ~= ContractHash * EntryPointName * RuntimeArgs.
+
+data ContractName ~= Text.
+
+data StoredContractByName ~= ContractName * EntryPointName * RuntimeArgs.
+
+data ContractVersion ~= Fin(4294967296).
+
+data StoredVersionedContractByHash ~=
+  ContractHash * Maybe(ContractVersion) * EntryPointName * RuntimeArgs.
+
+data StoredVersionedContractByName ~=
+  ContractName * Maybe(ContractVersion) * EntryPointName * RuntimeArgs.
+
+data Transfer ~= RuntimeArgs.
+
+data ExecutableDeployItem ~=
+  ModuleBytes +
+  StoredContractByHash +
+  StoredContractByName +
+  StoredVersionedContractByHash +
+  StoredVersionContractByName +
+  Transfer.
+
+data DeployPayment ~= ExecutableDeployItem.
+
+data DeploySession ~= ExecutableDeployItem.
+
+data Ed25519Signature ~= Fin(64) -> Byte.
+
+data Secp256k1Signature ~= Fin(128) -> Byte.
+
+data Signature ~= Ed25519Signature + Secp256k1Signature.
+
+data Approval ~= PublicKey * Signature.
+
+data DeployApprovals ~= List^18446744073709551616(Approval).
+
+data DeployBody ~= DeployHeader * DeployPayment * DeploySession * DeployApprovals.
+
+data Deploys ~=
+  Map^18446744073709551616
+    (DeployHash, DeployBody).
+
+data Ledger ~= Deploys * BlockList * GlobalStates * Protocols.
