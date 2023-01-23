@@ -305,13 +305,11 @@ data RuntimeContext ~=
   EngineConfig *
   EntryPointType.
 
-data Cost ~= MoteAmount.
-
-data SuccessfulResult ~= Journal * Transfers * Cost.
+data SuccessfulResult ~= Journal * Transfers * GasPrice.
 
 data ErrorMessage ~= Text.
 
-data FailedResult ~= Journal * Transfers * Cost * ErrorMessage.
+data FailedResult ~= Journal * Transfers * GasPrice * ErrorMessage.
 
 data ExecutionResult ~= SuccessfulResult + FailedResult.
 
