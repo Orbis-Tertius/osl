@@ -134,7 +134,7 @@ data ModuleBytes ~= WASMModule * RuntimeArgs.
 
 data ContractHash ~= Blake2b256Hash.
 
-data ContractPackageHash ~= Black2b256Hash.
+data ContractPackageHash ~= Blake2b256Hash.
 
 data EntryPointName ~= Text.
 
@@ -189,7 +189,7 @@ data Ledger ~= Deploys * BlockList * GlobalStateHistory * Protocols.
 
 data Transform ~= StateValue -> StateValue.
 
-data Journal ~= List(StateKey * Transform).
+data Journal ~= List^18446744073709551616(StateKey * Transform).
 
 -- This could potentially be context dependent, i.e., different program
 -- executions could have different readable state.
@@ -205,7 +205,15 @@ data StoredContractStackFrame ~= ContractHash * ContractPackageHash.
 
 data StackFrame ~= ModuleBytesSessionStackFrame + StoredSessionStackFrame + StoredContractStackFrame.
 
-data CallStack ~= List(StackFrame).
+data CallStack ~= List^256(StackFrame).
+
+data URefAddr ~= Fin(32) -> Byte.
+
+data Readable ~= Fin(2).
+data Writable ~= Fin(2).
+data Addable ~= Fin(2).
+
+data AccessRights ~= Readable * Writable * Addable.
 
 data URef ~= URefAddr * AccessRights.
 
@@ -213,7 +221,7 @@ data MainPurse ~= URef.
 
 data AccountWeight ~= Byte.
 
-data AssociatedKeys ~= List(AccountHash * AccountWeight).
+data AssociatedKeys ~= List^256(AccountHash * AccountWeight).
 
 data DeploymentThreshold ~= Byte.
 
@@ -221,23 +229,25 @@ data KeyManagementThreshold ~= Byte.
 
 data ActionThresholds ~= DeploymentThreshold * KeyManagementThreshold.
 
-data Account ~= AccountHash * Map(StateKey, StateValue) * MainPurse * AssociatedKeys * ActionThresholds.
+data NamedKeys ~=
+  Map^1024(StateKey, StateValue).
 
-data Readable ~= Fin(2).
+data Account ~=
+  AccountHash *
+  NamedKeys *
+  MainPurse *
+  AssociatedKeys *
+  ActionThresholds.
 
-data Writable ~= Fin(2).
+data AccessKey ~= AccountHash + ContractHash.
 
-data Addable ~= Fin(2).
-
-data AccessRights ~= Readable * Writable * Addable.
-
-data URefAddr ~= Fin(32) -> Byte.
-
-data ContextAccessRights ~= AccessKey * Map(URefAddr, AccessRights).
+data ContextAccessRights ~=
+  AccessKey *
+  Map^65536(URefAddr, AccessRights).
 
 data RuntimeApproval ~= AccountHash.
 
-data RuntimeApprovals ~= List(RuntimeApproval).
+data RuntimeApprovals ~= List^65536(RuntimeApproval).
 
 data GasLimit ~= Fin(64) -> Byte.
 
@@ -278,7 +288,7 @@ data EntryPointType ~= SessionEntryPoint + ContractEntryPoint.
 
 data TransferAddr ~= Fin(32) -> Byte.
 
-data Transfers ~= List(TransferAddr).
+data Transfers ~= List^4294967296(TransferAddr).
 
 data RuntimeContext ~=
   RuntimeArgs *
@@ -293,9 +303,22 @@ data RuntimeContext ~=
   ProtocolVersion *
   Phase *
   EngineConfig *
-  EntryPointType *
-  Transfers.
+  EntryPointType.
 
-data Program ~= (RuntimeContext * ReadableGlobalState) -> (Journal * WritableGlobalState).
+data Cost ~= MoteAmount.
+
+data SuccessfulResult ~= Journal * Transfers * Cost.
+
+data ErrorMessage ~= Text.
+
+data FailedResult ~= Journal * Transfers * Cost * ErrorMessage.
+
+data ExecutionResult ~= SuccessfulResult + FailedResult.
+
+data Program ~=
+  (RuntimeContext * ReadableGlobalState)
+    -> ExecutionResult.
+
+-- def commitJournal : GlobalStateSnapshot -> Journal -> GlobalStateSnapshot := todo.
 
 def entryPoint : Prop := 0N = 0N.
