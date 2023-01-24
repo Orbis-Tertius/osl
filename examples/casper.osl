@@ -1,0 +1,322 @@
+data BlockNumber ~= Fin(18446744073709551616).
+
+data Time ~= Fin(18446744073709551616). -- Unix timestamp (millisecond precision)
+
+data Byte ~= Fin(256).
+
+data Char ~= Byte.
+
+data Text ~= List^18446744073709551616(Char).
+
+data Bytes ~= List^18446744073709551616(Byte).
+
+data ProtocolVersion ~= Text.
+
+data ChainSpec ~= Bytes.
+
+data ChainSpecs ~=
+  Map^18446744073709551616
+    (ProtocolVersion, ChainSpec).
+
+data NodeVersion ~= List^4096(Char).
+
+data NodeVersions ~=
+  Map^18446744073709551616
+    (ProtocolVersion, NodeVersion).
+
+data NodeBinary ~=
+  NodeVersion * Bytes.
+
+data NodeBinaries ~=
+  Map^18446744073709551616
+    (NodeVersion, NodeBinary).
+
+data StateKeyType ~= Fin(18446744073709551616).
+
+data StateKeyValue ~= Fin(512) -> Byte.
+
+data StateKey ~= StateKeyType + StateKeyValue.
+
+data StateValue ~= Bytes.
+
+data GlobalStateSnapshot ~=
+  Map^18446744073709551616
+    (StateKey, StateValue).
+
+data EraId ~= Fin(18446744073709551616).
+
+data RandomBit ~= Fin(2).
+
+data SystemPublicKey ~= Fin(1).
+
+data Ed25519Key ~= Fin(32) -> Byte.
+
+data Secp256k1Key ~= Fin(33) -> Byte.
+
+data PublicKey ~= SystemPublicKey + Ed25519Key + Secp256k1Key.
+
+data Blake2b256Hash ~= Fin(32) -> Byte.
+
+data AccountHash ~= Blake2b256Hash.
+
+data ValidatorId ~= PublicKey.
+
+data Equivocators ~= List^18446744073709551616(ValidatorId).
+
+data MoteAmount ~= Fin(64) -> Byte.
+
+data Reward ~= MoteAmount.
+
+data Rewards ~= Map^18446744073709551616(ValidatorId, Reward).
+
+data InactiveValidators ~= List^18446744073709551616(ValidatorId).
+
+data EraReport ~= Equivocators * Rewards * InactiveValidators.
+
+data ValidatorWeight ~= Fin(64) -> Byte.
+
+data NextEraValidatorWeights ~=
+  Map^18446744073709551616(ValidatorId, ValidatorWeight).
+
+data EraEnd ~= EraReport * NextEraValidatorWeights.
+
+data BlockHeader ~= RandomBit * Maybe(EraEnd) * Time * EraId * ProtocolVersion.
+
+data Proposer ~= ValidatorId.
+
+data DeployHash ~= Blake2b256Hash.
+
+data DeployHashes ~= List^18446744073709551616(DeployHash).
+
+data TransferHashes ~= List^18446744073709551616(DeployHash).
+ 
+data BlockBody ~= Proposer * DeployHashes * TransferHashes.
+
+data Block ~= BlockHeader * BlockBody.
+
+data Protocols ~= NodeVersions * ChainSpecs * NodeBinaries.
+
+data BlockList ~=
+  Map^18446744073709551616
+    (BlockNumber, Block).
+
+data GenesisSnapshotId ~= Fin(1).
+
+data UpgradeSnapshotId ~= BlockNumber.
+
+data StandardSnapshotId ~= BlockNumber.
+
+data GlobalStateSnapshotId ~=
+  GenesisSnapshotId + UpgradeSnapshotId + StandardSnapshotId.
+
+data GlobalStateHistory ~=
+  Map^18446744073709551616
+    (GlobalStateSnapshotId, GlobalStateSnapshot).
+
+data TimeDiff ~= Fin(18446744073709551616).
+
+data TTL ~= TimeDiff.
+
+data GasPrice ~= Fin(18446744073709551616).
+
+data DeployDependencies ~=
+  List^18446744073709551616(DeployHash).
+
+data DeployChainName ~= Text.
+
+data DeployHeader ~= PublicKey * Time * TTL * GasPrice * DeployDependencies * DeployChainName.
+
+data WASMModule ~= Bytes.
+
+data RuntimeArgs ~= Map^18446744073709551616(Text, Bytes).
+
+data ModuleBytes ~= WASMModule * RuntimeArgs.
+
+data ContractHash ~= Blake2b256Hash.
+
+data ContractPackageHash ~= Blake2b256Hash.
+
+data EntryPointName ~= Text.
+
+data StoredContractByHash ~= ContractHash * EntryPointName * RuntimeArgs.
+
+data ContractName ~= Text.
+
+data StoredContractByName ~= ContractName * EntryPointName * RuntimeArgs.
+
+data ContractVersion ~= Fin(4294967296).
+
+data StoredVersionedContractByHash ~=
+  ContractPackageHash * Maybe(ContractVersion) * EntryPointName * RuntimeArgs.
+
+data StoredVersionedContractByName ~=
+  ContractName * Maybe(ContractVersion) * EntryPointName * RuntimeArgs.
+
+data Transfer ~= RuntimeArgs.
+
+data ExecutableDeployItem ~=
+  ModuleBytes +
+  StoredContractByHash +
+  StoredContractByName +
+  StoredVersionedContractByHash +
+  StoredVersionedContractByName +
+  Transfer.
+
+data DeployPayment ~= ExecutableDeployItem.
+
+data DeploySession ~= ExecutableDeployItem.
+
+data Ed25519Signature ~= Fin(64) -> Byte.
+
+data Secp256k1Signature ~= Fin(128) -> Byte.
+
+data SystemSignature ~= Ed25519Signature. -- TODO: is this correct?
+
+data Signature ~=
+  SystemSignature + Ed25519Signature + Secp256k1Signature.
+
+data Approval ~= PublicKey * Signature.
+
+data DeployApprovals ~= List^18446744073709551616(Approval).
+
+data DeployBody ~= DeployHeader * DeployPayment * DeploySession * DeployApprovals.
+
+data Deploys ~=
+  Map^18446744073709551616
+    (DeployHash, DeployBody).
+
+data Ledger ~= Deploys * BlockList * GlobalStateHistory * Protocols.
+
+data Transform ~= StateValue -> StateValue.
+
+data Journal ~= List^18446744073709551616(StateKey * Transform).
+
+-- This could potentially be context dependent, i.e., different program
+-- executions could have different readable state.
+data ReadableGlobalState ~= GlobalStateSnapshot.
+
+data WritableGlobalState ~= GlobalStateSnapshot.
+
+data ModuleBytesSessionStackFrame ~= AccountHash * ContractHash.
+
+data StoredSessionStackFrame ~= AccountHash * ContractHash * ContractPackageHash.
+
+data StoredContractStackFrame ~= ContractHash * ContractPackageHash.
+
+data StackFrame ~= ModuleBytesSessionStackFrame + StoredSessionStackFrame + StoredContractStackFrame.
+
+data CallStack ~= List^256(StackFrame).
+
+data URefAddr ~= Fin(32) -> Byte.
+
+data Readable ~= Fin(2).
+data Writable ~= Fin(2).
+data Addable ~= Fin(2).
+
+data AccessRights ~= Readable * Writable * Addable.
+
+data URef ~= URefAddr * AccessRights.
+
+data MainPurse ~= URef.
+
+data AccountWeight ~= Byte.
+
+data AssociatedKeys ~= List^256(AccountHash * AccountWeight).
+
+data DeploymentThreshold ~= Byte.
+
+data KeyManagementThreshold ~= Byte.
+
+data ActionThresholds ~= DeploymentThreshold * KeyManagementThreshold.
+
+data NamedKeys ~=
+  Map^1024(StateKey, StateValue).
+
+data Account ~=
+  AccountHash *
+  NamedKeys *
+  MainPurse *
+  AssociatedKeys *
+  ActionThresholds.
+
+data AccessKey ~= AccountHash + ContractHash.
+
+data ContextAccessRights ~=
+  AccessKey *
+  Map^65536(URefAddr, AccessRights).
+
+data RuntimeApproval ~= AccountHash.
+
+data RuntimeApprovals ~= List^65536(RuntimeApproval).
+
+data GasLimit ~= Fin(64) -> Byte.
+
+data PaymentPhase ~= Fin(1).
+data SessionPhase ~= Fin(1).
+data FinalizePhase ~= Fin(1).
+data SystemPhase ~= Fin(1).
+
+data Phase ~= PaymentPhase + SessionPhase + FinalizePhase + SystemPhase.
+
+data MaxAssociatedKeys ~= Fin(4294967296).
+
+data MaxRuntimeCallStackHeight ~= Fin(4294967296).
+
+data MinimumDelegationAmount ~= MoteAmount.
+
+data StrictArgumentChecking ~= Fin(2).
+
+data VestingSchedulePeriod ~= Fin(1). -- TODO
+
+data WasmConfig ~= Fin(1). -- TODO
+
+data SystemConfig ~= Fin(1). -- TODO
+
+data EngineConfig ~=
+  MaxAssociatedKeys *
+  MaxRuntimeCallStackHeight *
+  MinimumDelegationAmount *
+  StrictArgumentChecking *
+  VestingSchedulePeriod *
+  WasmConfig *
+  SystemConfig.
+
+data SessionEntryPoint ~= Fin(1).
+data ContractEntryPoint ~= Fin(1).
+
+data EntryPointType ~= SessionEntryPoint + ContractEntryPoint.
+
+data TransferAddr ~= Fin(32) -> Byte.
+
+data Transfers ~= List^4294967296(TransferAddr).
+
+data RuntimeContext ~=
+  RuntimeArgs *
+  CallStack *
+  Account *
+  ContextAccessRights *
+  Account *
+  RuntimeApprovals *
+  Time *
+  DeployHash * -- This is used for a pseudo-randomness seed
+  GasLimit *
+  ProtocolVersion *
+  Phase *
+  EngineConfig *
+  EntryPointType.
+
+data SuccessfulResult ~= Journal * Transfers * GasPrice.
+
+data ErrorMessage ~= Text.
+
+data FailedResult ~= Journal * Transfers * GasPrice * ErrorMessage.
+
+data ExecutionResult ~= SuccessfulResult + FailedResult.
+
+data Program ~=
+  (RuntimeContext * ReadableGlobalState)
+    -> ExecutionResult.
+
+-- def commitJournal : GlobalStateSnapshot -> Journal -> GlobalStateSnapshot := todo.
+
+def entryPoint : Prop := 0N = 0N.
