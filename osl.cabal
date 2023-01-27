@@ -73,6 +73,7 @@ library
     OSL.Debug
     OSL.EntryPoint
     OSL.Evaluation
+    OSL.FromHaskell
     OSL.LoadContext
     OSL.Map
     OSL.Parse
