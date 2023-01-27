@@ -217,6 +217,7 @@ test-suite spec
     raw-strings-qq,
     sydtest,
     text -any,
+    time,
     transformers,
     validity,
 
