@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -14,9 +15,11 @@ module OSL.FromHaskell
     ToOSLContext (toOSLContext)
   ) where
 
+import Data.Fixed (Fixed, HasResolution (resolution))
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import GHC.Generics (Rep, U1, (:*:), (:+:), M1, D, C, S, K1, R)
+import GHC.TypeNats (KnownNat)
 import qualified OSL.Types.OSL as OSL
 
 class ToOSLType a where
@@ -57,6 +60,13 @@ instance ( GToOSLType a ra, GToOSLType b rb )
     OSL.Coproduct ()
       (gtoOSLType (Proxy :: Proxy a) (Proxy :: Proxy ra) c)
       (gtoOSLType (Proxy :: Proxy b) (Proxy :: Proxy rb) c)
+
+instance GToOSLType Integer a where
+  gtoOSLType _ _ _ = OSL.Z ()
+
+instance KnownNat n => GToOSLType (Fixed n) a where
+  gtoOSLType (Proxy :: Proxy (Fixed n)) _ _ =
+    OSL.Fin () (resolution (Proxy @n))
 
 instance GToOSLType a (Rep a) => ToOSLType a where
   toOSLType (Proxy :: Proxy a) = gtoOSLType (Proxy @a) (Proxy @(Rep a))
