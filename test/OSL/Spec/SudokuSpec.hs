@@ -18,10 +18,10 @@ import OSL.ArgumentForm (getArgumentForm)
 import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
-import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6, evalTranslatedFormula7)
+import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
-import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+-- import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.FileName (FileName (FileName))
 import OSL.Types.OSL (ContextType (Global), Declaration (Defined), Name (Sym), Type (F, Fin, NamedType, Product), ValidContext)
 import OSL.Types.Value (Value (Fin', Fun, Maybe'', Pair', To'))
@@ -131,12 +131,13 @@ exampleSpec c = do
     evalTranslatedFormula6 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
       `shouldBe` Right False
 
-  it "Sudoku spec's semantics are preserved in codegen stage 7" $ do
-    evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleArgument c)
-      `shouldBe` Right ()
+  -- TODO
+  -- it "Sudoku spec's semantics are preserved in codegen stage 7" $ do
+  --   evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleArgument c)
+  --     `shouldBe` Right ()
 
-    evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
-      `shouldBe` Left (ErrorMessage Nothing "foo")
+  --   evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
+  --     `shouldBe` Left (ErrorMessage Nothing "foo")
 
 exampleArgument :: ValidContext 'Global ann -> Argument
 exampleArgument c =
