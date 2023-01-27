@@ -5,6 +5,7 @@
 module OSL.Spec.Gen
   ( genType,
     genValueOfType,
+    genScalar,
   )
 where
 

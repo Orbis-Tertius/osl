@@ -17,16 +17,23 @@ module Trace.Types
     StepIndicatorColumnIndex (StepIndicatorColumnIndex),
     CaseNumberColumnIndex (CaseNumberColumnIndex),
     NumberOfCases (NumberOfCases),
+    Case (Case),
     TraceType (TraceType),
+    Trace (Trace),
+    SubexpressionTrace (SubexpressionTrace),
+    Statement (Statement),
+    Witness (Witness),
   )
 where
 
+import qualified Algebra.Additive as Group
 import Halo2.Prelude
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.ColumnTypes (ColumnTypes)
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
 import Halo2.Types.EqualityConstraints (EqualityConstraints)
 import Halo2.Types.FixedValues (FixedValues)
+import Halo2.Types.Label (Label)
 import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
@@ -46,18 +53,19 @@ newtype OutputColumnIndex = OutputColumnIndex {unOutputColumnIndex :: ColumnInde
 -- The links table entry outputting void has all its inputs set to void.
 -- Void's value can legally be set to anything. Each trace type features void.
 data StepType = StepType
-  { gateConstraints :: PolynomialConstraints,
+  { label :: Label,
+    gateConstraints :: PolynomialConstraints,
     lookupArguments :: LookupArguments Polynomial,
     fixedValues :: FixedValues
   }
   deriving (Generic, Show)
 
 instance Semigroup StepType where
-  (StepType a b c) <> (StepType d e f) =
-    StepType (a <> d) (b <> e) (c <> f)
+  (StepType l a b c) <> (StepType m d e f) =
+    StepType (l <> m) (a <> d) (b <> e) (c <> f)
 
 instance Monoid StepType where
-  mempty = StepType mempty mempty mempty
+  mempty = StepType mempty mempty mempty mempty
 
 newtype StepTypeId = StepTypeId {unStepTypeId :: Scalar}
   deriving stock (Generic)
@@ -108,7 +116,7 @@ data TraceType = TraceType
     equalityConstraints :: EqualityConstraints,
     stepTypes :: Map StepTypeId StepType,
     subexpressions :: Set SubexpressionId,
-    links :: Set SubexpressionLink,
+    links :: Map (StepTypeId, OutputSubexpressionId) [InputSubexpressionId],
     results :: Set ResultExpressionId,
     caseNumberColumnIndex :: CaseNumberColumnIndex,
     stepTypeColumnIndex :: StepTypeColumnIndex,
@@ -117,5 +125,31 @@ data TraceType = TraceType
     outputColumnIndex :: OutputColumnIndex,
     numCases :: NumberOfCases,
     rowCount :: RowCount
+  }
+  deriving (Generic, Show)
+
+newtype Case = Case { unCase :: Scalar }
+  deriving (Eq, Ord, Generic, Show, Group.C)
+
+newtype Statement =
+  Statement { unStatement :: Map (Case, ColumnIndex) Scalar }
+  deriving (Generic, Show)
+
+newtype Witness =
+  Witness { unWitness :: Map (Case, ColumnIndex) Scalar }
+  deriving (Generic, Show)
+
+data Trace = Trace
+  { statement :: Statement,
+    witness :: Witness,
+    usedCases :: Set Case,
+    subexpressions :: Map (Case, SubexpressionId) SubexpressionTrace
+  }
+  deriving (Generic, Show)
+
+data SubexpressionTrace = SubexpressionTrace
+  { value :: Scalar,
+    stepType :: StepTypeId,
+    adviceValues :: Map ColumnIndex Scalar
   }
   deriving (Generic, Show)

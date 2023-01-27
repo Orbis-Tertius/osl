@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module OSL.TranslatedEvaluation
   ( evalTranslatedFormula1,
@@ -8,12 +9,16 @@ module OSL.TranslatedEvaluation
     evalTranslatedFormula4,
     evalTranslatedFormula5,
     evalTranslatedFormula6,
+    evalTranslatedFormula7,
   )
 where
 
 import Control.Lens ((^.))
 import Data.Either.Extra (mapLeft)
+import Halo2.Types.BitsPerByte (BitsPerByte)
 import Halo2.Circuit (HasEvaluate (evaluate))
+import Halo2.Types.Circuit (LogicCircuit)
+import qualified Halo2.Types.Argument as C
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Argument (toSigma11Argument)
 import qualified OSL.Sigma11 as S11
@@ -28,6 +33,8 @@ import Semicircuit.Gensyms (deBruijnToGensyms, deBruijnToGensymsEvalContext)
 import Semicircuit.PNFFormula (toPNFFormula, toSemicircuit)
 import Semicircuit.PrenexNormalForm (statementToSuperStrongPrenexNormalForm, toPrenexNormalForm, toStrongPrenexNormalForm, toSuperStrongPrenexNormalForm, witnessToPrenexNormalForm, witnessToStrongPrenexNormalForm, witnessToSuperStrongPrenexNormalForm)
 import Semicircuit.ToLogicCircuit (semicircuitArgumentToLogicCircuitArgument, semicircuitToLogicCircuit)
+import Trace.FromLogicCircuit (logicCircuitToTraceType, argumentToTrace)
+import Trace.Semantics (evalTrace)
 
 -- First codegen pass: OSL -> OSL.Sigma11
 evalTranslatedFormula1 ::
@@ -214,15 +221,14 @@ evalTranslatedFormula5 c name argumentForm argument = do
     )
     (S11.evalFormula ec' s11arg' translated''')
 
--- Sixth codegen pass: Semicircuit.Sigma11 -> LogicCircuit
-evalTranslatedFormula6 ::
+toLogicCircuit ::
   Show ann =>
   ValidContext t ann ->
   Name ->
   ArgumentForm ->
   Argument ->
-  Either (ErrorMessage (Maybe ann)) Bool
-evalTranslatedFormula6 c name argumentForm argument = do
+  Either (ErrorMessage (Maybe ann)) (LogicCircuit, C.Argument)
+toLogicCircuit c name argumentForm argument = do
   (def, translated, _aux) <- translateToFormulaSimple c name
   let (translated', _mapping) = deBruijnToGensyms translated
   (qs, qff) <-
@@ -240,7 +246,7 @@ evalTranslatedFormula6 c name argumentForm argument = do
       (\(ErrorMessage _ msg) -> ErrorMessage Nothing ("toPNFFormula: " <> msg))
       (toPNFFormula () translated''')
   let semi = toSemicircuit pnff
-      rowCount = RowCount 2000 -- TODO: calculate or pass this in
+      rowCount = RowCount 600 -- TODO: calculate or pass this in
       (logic, layout) = semicircuitToLogicCircuit rowCount semi
   s11arg <-
     mapLeft
@@ -264,6 +270,18 @@ evalTranslatedFormula6 c name argumentForm argument = do
     mapLeft
       (\(ErrorMessage () msg) -> ErrorMessage Nothing ("semicircuitArgumentToLogicCircuit: " <> msg))
       (semicircuitArgumentToLogicCircuitArgument () rowCount semi layout s11arg')
+  pure (logic, lcArg)
+
+-- Sixth codegen pass: Semicircuit.Sigma11 -> LogicCircuit
+evalTranslatedFormula6 ::
+  Show ann =>
+  ValidContext t ann ->
+  Name ->
+  ArgumentForm ->
+  Argument ->
+  Either (ErrorMessage (Maybe ann)) Bool
+evalTranslatedFormula6 c name argumentForm argument = do
+  (logic, lcArg) <- toLogicCircuit c name argumentForm argument
   mapLeft
     ( \(ErrorMessage () msg) ->
         ErrorMessage
@@ -271,3 +289,23 @@ evalTranslatedFormula6 c name argumentForm argument = do
           ("evaluate: " <> msg)
     )
     (Halo2.Circuit.evaluate () lcArg logic)
+
+-- Seventh codegen pass: LogicCircuit -> TraceType
+evalTranslatedFormula7 ::
+  Show ann =>
+  BitsPerByte ->
+  ValidContext t ann ->
+  Name ->
+  ArgumentForm ->
+  Argument ->
+  Either (ErrorMessage (Maybe ann)) ()
+evalTranslatedFormula7 bitsPerByte c name argumentForm argument = do
+  (logic, lcArg) <- toLogicCircuit c name argumentForm argument
+  let tt = logicCircuitToTraceType bitsPerByte logic
+  t <-
+    mapLeft
+      (\(ErrorMessage ann msg) -> ErrorMessage ann ("argumentToTrace: " <> msg))
+      (argumentToTrace Nothing bitsPerByte logic lcArg)
+  mapLeft
+    (\(ErrorMessage ann msg) -> ErrorMessage ann ("evalTrace: " <> msg))
+    (evalTrace Nothing tt t)

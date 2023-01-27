@@ -18,7 +18,11 @@ module Halo2.Circuit
     HasLookupArguments (getLookupArguments),
     getLookupTables,
     HasEvaluate (evaluate),
+    lessIndicator,
     rowsToCellMap,
+    getCellMapRows,
+    getCellMap,
+    getRowSet,
   )
 where
 
@@ -74,7 +78,7 @@ instance HasPolynomialVariables PowerProduct where
 
 instance HasPolynomialVariables PolynomialConstraints where
   getPolynomialVariables cs =
-    mconcat $ getPolynomialVariables <$> cs ^. #constraints
+    mconcat $ getPolynomialVariables . snd <$> cs ^. #constraints
 
 instance HasPolynomialVariables Polynomial where
   getPolynomialVariables =
@@ -513,7 +517,8 @@ instance HasEvaluate (Map ColumnIndex FixedBound) Bool where
   evaluate _ arg bs =
     pure $
       and
-        [ toWord64 x < b ^. #unFixedBound
+        [ min (toWord64 x) (toWord64 (Group.negate x))
+            < b ^. #unFixedBound
           | (ci, b) <- Map.toList bs,
             x <-
               Map.elems
@@ -541,7 +546,7 @@ instance HasEvaluate (RowCount, LogicConstraints) Bool where
 instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
   evaluate ann arg (rc, PolynomialConstraints polys degreeBound) = do
     allM
-      ( \poly ->
+      ( \(_lbl, poly) ->
           ( degree poly <= degreeBound ^. #getPolynomialDegreeBound
               &&
           )

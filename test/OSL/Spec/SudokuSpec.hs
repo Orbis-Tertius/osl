@@ -18,9 +18,10 @@ import OSL.ArgumentForm (getArgumentForm)
 import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
-import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6)
+import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6, evalTranslatedFormula7)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
+import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import OSL.Types.FileName (FileName (FileName))
 import OSL.Types.OSL (ContextType (Global), Declaration (Defined), Name (Sym), Type (F, Fin, NamedType, Product), ValidContext)
 import OSL.Types.Value (Value (Fin', Fun, Maybe'', Pair', To'))
@@ -129,6 +130,13 @@ exampleSpec c = do
 
     evalTranslatedFormula6 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
       `shouldBe` Right False
+
+  it "Sudoku spec's semantics are preserved in codegen stage 7" $ do
+    evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleArgument c)
+      `shouldBe` Right ()
+
+    evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
+      `shouldBe` Left (ErrorMessage Nothing "foo")
 
 exampleArgument :: ValidContext 'Global ann -> Argument
 exampleArgument c =
@@ -456,15 +464,19 @@ complexWitnessType =
             ( F
                 ()
                 Nothing
-                (NamedType () "Square")
+                (NamedType () "SquareEncoded")
                 ( F
                     ()
                     Nothing
                     (NamedType () "Digit")
                     ( Product
                         ()
-                        (NamedType () "SquareCell")
-                        (Fin () 1)
+                        (NamedType () "Square")
+                        (Product
+                          ()
+                          (NamedType () "SquareCell")
+                          (Product () (Fin () 1) (Fin () 1))
+                        )
                     )
                 )
             )
@@ -506,12 +518,15 @@ simpleWitnessType =
         ( F
             ()
             Nothing
-            (NamedType () "Square")
+            (NamedType () "SquareEncoded")
             ( F
                 ()
                 Nothing
                 (NamedType () "Digit")
-                (NamedType () "SquareCell")
+                (Product ()
+                  (NamedType () "Square")
+                  (NamedType () "SquareCell")
+                )
             )
         )
     )
@@ -547,19 +562,29 @@ colPermutationToValue =
 
 squarePermutationsToValue :: Map Square (Map Digit SquareCell) -> Value
 squarePermutationsToValue =
-  Fun . Map.mapKeys squareToValue . fmap squarePermutationToValue
+  Fun . Map.mapKeys squareToEncodedValue . Map.mapWithKey squarePermutationToValue
 
-squarePermutationToValue :: Map Digit SquareCell -> Value
-squarePermutationToValue =
-  Fun . Map.mapKeys digitToValue . fmap squareCellToValue
+squarePermutationToValue :: Square -> Map Digit SquareCell -> Value
+squarePermutationToValue square =
+  Fun . Map.mapKeys digitToValue . fmap (squareCellToValue square)
 
 squareToValue :: Square -> Value
 squareToValue (Square (x, y)) =
   To' "Square" (Pair' (yToValue y) (xToValue x))
 
-squareCellToValue :: SquareCell -> Value
-squareCellToValue (SquareCell (x, y)) =
-  To' "SquareCell" (Pair' (yToValue y) (xToValue x))
+squareToEncodedValue :: Square -> Value
+squareToEncodedValue (Square (X x, Y y)) =
+  To' "SquareEncoded" . Fin' $
+    maybe
+    (die "squareToEncodedValue: out of range of scalar")
+    id
+    (integerToScalar ((3 * y) + x))
+
+squareCellToValue :: Square -> SquareCell -> Value
+squareCellToValue s (SquareCell (x, y)) =
+  Pair'
+    (squareToValue s)
+    (To' "SquareCell" (Pair' (yToValue y) (xToValue x)))
 
 sudokuWitnessToValue :: SudokuWitness -> Value
 sudokuWitnessToValue w =

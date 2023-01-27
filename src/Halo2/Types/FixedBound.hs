@@ -36,7 +36,7 @@ fixedBoundToInteger = word64ToInteger . unFixedBound
 
 integerToFixedBound :: Integer -> FixedBound
 integerToFixedBound k =
-  case integerToWord64 k of
+  case integerToWord64 (abs k) of
     Just w -> if w < order then FixedBound w else FixedBound order
     Nothing -> FixedBound order
 

@@ -9,4 +9,4 @@ import GHC.Generics (Generic)
 
 newtype Label = Label {unLabel :: String}
   deriving stock (Generic)
-  deriving newtype (Eq, Ord, Show, IsString)
+  deriving newtype (Eq, Ord, Show, IsString, Semigroup, Monoid)

@@ -14,6 +14,7 @@ module Trace.ToArithmeticAIR
 where
 
 import Cast (intToInteger)
+import Control.Arrow (second)
 import Control.Lens ((<&>))
 import Data.List.Extra (mconcatMap, (!?))
 import qualified Data.Map as Map
@@ -31,7 +32,7 @@ import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
 import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero)
-import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink, TraceType)
+import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType)
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -86,7 +87,7 @@ gateConstraints t =
 stepTypeGateConstraints :: StepTypeColumnIndex -> (StepTypeId, StepType) -> PolynomialConstraints
 stepTypeGateConstraints i (tId, t) =
   PolynomialConstraints
-    (gateOnStepType i tId <$> (t ^. #gateConstraints . #constraints))
+    (second (gateOnStepType i tId) <$> (t ^. #gateConstraints . #constraints))
     (t ^. #gateConstraints . #degreeBound)
 
 gateOnStepType :: StepTypeColumnIndex -> StepTypeId -> Polynomial -> Polynomial
@@ -168,7 +169,8 @@ newtype LinksTable = LinksTable
 linksTable ::
   TraceType ->
   LinksTable
-linksTable = LinksTable . Set.toList . (^. #links)
+linksTable =
+  LinksTable . fmap (\((st,o),is) -> SubexpressionLink st is o) . Map.toList . (^. #links)
 
 linksTableFixedColumns ::
   LinksTable ->
