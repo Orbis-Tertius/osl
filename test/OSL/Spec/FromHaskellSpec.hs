@@ -10,7 +10,7 @@ import Data.Fixed (Fixed, Pico)
 import Data.Proxy (Proxy (Proxy))
 import Data.Time (Day, TimeOfDay, LocalTime)
 import GHC.Generics (Generic)
-import OSL.Spec.Sudoku.Types (Digit, Row, Col, Cell, Problem, Solution, X, Y, Square, SquareCell)
+import OSL.Spec.Sudoku.Types (Digit, Row, Col, Cell, Problem, Solution, X, Y, Square, SquareCell, SudokuWitness)
 import OSL.FromHaskell (AddToOSLContext, ToOSLType (toOSLType), addToOSLContextM)
 import qualified OSL.Types.OSL as OSL
 import Test.Syd (Spec, describe, it, shouldBe)
@@ -133,6 +133,7 @@ sudokuTypes =
       add (Proxy @Y)
       add (Proxy @Square)
       add (Proxy @SquareCell)
+      add (Proxy @SudokuWitness)
 
     add :: forall a ann. AddToOSLContext a => Proxy a -> State (OSL.ValidContext 'OSL.Global ann) ()
     add = addToOSLContextM

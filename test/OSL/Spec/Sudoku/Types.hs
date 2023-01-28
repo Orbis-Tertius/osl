@@ -1,5 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module OSL.Spec.Sudoku.Types
   ( Digit (Digit),
@@ -17,34 +20,37 @@ module OSL.Spec.Sudoku.Types
 
 import Data.Map (Map)
 import GHC.Generics (Generic)
+import OSL.FromHaskell (ToOSLType)
 
 newtype Digit = Digit Integer
-  deriving (Eq, Ord, Num, Enum, Show)
+  deriving (Eq, Ord, Num, Enum, Show, Generic, ToOSLType)
 
 newtype Row = Row Integer
-  deriving (Eq, Ord, Num, Enum, Show)
+  deriving (Eq, Ord, Num, Enum, Show, Generic, ToOSLType)
 
 newtype Col = Col Integer
-  deriving (Eq, Ord, Num, Enum, Show)
+  deriving (Eq, Ord, Num, Enum, Show, Generic, ToOSLType)
 
 newtype Cell = Cell (Row, Col)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, ToOSLType)
 
 newtype Problem = Problem {unProblem :: Cell -> Maybe Digit}
+  deriving (Generic, ToOSLType)
 
 newtype Solution = Solution {unSolution :: Cell -> Digit}
+  deriving (Generic, ToOSLType)
 
 newtype X = X Integer
-  deriving (Eq, Ord, Num, Enum)
+  deriving (Eq, Ord, Num, Enum, Generic, ToOSLType)
 
 newtype Y = Y Integer
-  deriving (Eq, Ord, Num, Enum)
+  deriving (Eq, Ord, Num, Enum, Generic, ToOSLType)
 
 newtype Square = Square (X, Y)
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Generic, ToOSLType)
 
 newtype SquareCell = SquareCell (X, Y)
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Generic, ToOSLType)
 
 data SudokuWitness = SudokuWitness
   { solution :: Solution,

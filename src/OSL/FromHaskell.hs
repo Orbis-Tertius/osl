@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -24,6 +25,7 @@ module OSL.FromHaskell
 import Control.Monad.State (State, state)
 import Data.Fixed (Fixed (..), HasResolution (resolution))
 import Data.Kind (Type)
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (pack)
@@ -33,42 +35,50 @@ import GHC.Generics (Generic, Rep, U1, (:*:), (:+:), M1, D, C, S, K1, R, Meta (M
 import GHC.TypeLits (KnownNat, KnownSymbol, symbolVal)
 import qualified OSL.Types.OSL as OSL
 
-deriving instance Generic Day
-deriving instance Generic LocalTime
-deriving instance Generic TimeOfDay
-deriving instance Generic (Fixed n)
-
 class ToOSLType a where
   toOSLType :: Proxy a -> OSL.ValidContext 'OSL.Global () -> OSL.Type ()
 
 class GToOSLType (a :: Type) (ra :: Type -> Type) where
   gtoOSLType :: Proxy a -> Proxy ra -> OSL.ValidContext 'OSL.Global () -> OSL.Type ()
 
+-- Unit types
 instance GToOSLType t U1 where
   gtoOSLType _ _ _ = OSL.Fin () 1
 
+-- Data types
 instance GToOSLType t a => GToOSLType t (M1 D m a) where
   gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy (M1 D m a)) c =
     gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy a) c
 
+-- Constructors
 instance GToOSLType t a => GToOSLType t (M1 C m a) where
   gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy (M1 C m a)) c =
     gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy a) c
 
+-- Selectors
 instance GToOSLType t a => GToOSLType t (M1 S m a) where
   gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy (M1 S m a)) c =
     gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy a) c
 
+-- Constants
 instance GToOSLType t (Rep a) => GToOSLType t (K1 R a) where
   gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy (K1 R a)) c =
     gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy (Rep a)) c
 
+-- Products
 instance ( GToOSLType a ra, GToOSLType b rb )
            => GToOSLType (a, b) (ra :*: rb) where
   gtoOSLType (Proxy :: Proxy (a, b)) (Proxy :: Proxy (ra :*: rb)) c =
     OSL.Product ()
       (gtoOSLType (Proxy :: Proxy a) (Proxy :: Proxy ra) c)
       (gtoOSLType (Proxy :: Proxy b) (Proxy :: Proxy rb) c)
+
+instance ( ToOSLType a, ToOSLType b )
+           => ToOSLType (a, b) where
+  toOSLType (Proxy :: Proxy (a, b)) c =
+    OSL.Product ()
+      (toOSLType (Proxy :: Proxy a) c)
+      (toOSLType (Proxy :: Proxy b) c)
 
 -- Records with two fields
 instance ( GToOSLType a (Rep a), GToOSLType b (Rep b) )
@@ -119,6 +129,7 @@ instance ( GToOSLType a (Rep a),
           (gtoOSLType (Proxy :: Proxy d) (Proxy :: Proxy (Rep d)) c)
           (gtoOSLType (Proxy :: Proxy e) (Proxy :: Proxy (Rep e)) c)))
 
+-- Coproducts
 instance ( GToOSLType a ra, GToOSLType b rb )
            => GToOSLType (Either a b) (ra :+: rb) where
   gtoOSLType (Proxy :: Proxy (Either a b)) (Proxy :: Proxy (ra :+: rb)) c =
@@ -126,14 +137,27 @@ instance ( GToOSLType a ra, GToOSLType b rb )
       (gtoOSLType (Proxy :: Proxy a) (Proxy :: Proxy ra) c)
       (gtoOSLType (Proxy :: Proxy b) (Proxy :: Proxy rb) c)
 
+-- Functions
+instance ( ToOSLType a, ToOSLType b ) => ToOSLType (a -> b) where
+  toOSLType (Proxy :: Proxy (a -> b)) c =
+    OSL.F () Nothing (toOSLType (Proxy @a) c) (toOSLType (Proxy @b) c)
+
+-- Maybe
+instance ToOSLType a => ToOSLType (Maybe a) where
+  toOSLType (Proxy :: Proxy (Maybe a)) c =
+    OSL.Maybe () (toOSLType (Proxy @a) c)
+
+-- Map
+instance ( ToOSLType a, ToOSLType b ) => ToOSLType (Map a b) where
+  toOSLType (Proxy :: Proxy (Map a b)) c =
+    OSL.Map () 1 (toOSLType (Proxy @a) c) (toOSLType (Proxy @b) c)
+
+-- Scalar types
 instance GToOSLType Integer a where
   gtoOSLType _ _ _ = OSL.Z ()
 
 instance GToOSLType Int a where
   gtoOSLType _ _ _ = OSL.Z ()
-
-instance GToOSLType Day a where
-  gtoOSLType _ _ _ = OSL.N ()
 
 instance HasResolution n => GToOSLType (Fixed n) a where
   gtoOSLType (Proxy :: Proxy (Fixed n)) _ _ =
@@ -157,7 +181,7 @@ class GAddToOSLContext (a :: Type) (ra :: Type -> Type) where
 
 -- newtypes
 instance
-  ( KnownSymbol n, GToOSLType t (Rep t) ) =>
+  ( KnownSymbol n, ToOSLType t ) =>
   GAddToOSLContext t (M1 D (MetaData n m p True) a) where
   gAddToOSLContext
     (Proxy :: Proxy t)
@@ -176,3 +200,12 @@ addToOSLContextM ::
   Proxy a ->
   State (OSL.ValidContext 'OSL.Global ()) ()
 addToOSLContextM p = state (((),) . addToOSLContext p)
+
+deriving instance Generic Day
+deriving instance ToOSLType Day
+deriving instance Generic LocalTime
+deriving instance Generic TimeOfDay
+deriving instance Generic (Fixed n)
+
+instance GToOSLType Day a where
+  gtoOSLType _ _ _ = OSL.N ()
