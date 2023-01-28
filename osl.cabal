@@ -186,6 +186,7 @@ test-suite spec
     OSL.Spec.FromHaskellSpec
     OSL.Spec.OSLSpec
     OSL.Spec.SimplifyTypeSpec
+    OSL.Spec.Sudoku.Types
     OSL.Spec.SudokuSpec
     Stark.Spec.ScalarSpec
 

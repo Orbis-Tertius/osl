@@ -13,11 +13,11 @@ import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Die (die)
-import GHC.Generics (Generic)
 import OSL.ArgumentForm (getArgumentForm)
 import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
+import OSL.Spec.Sudoku.Types (Digit (Digit), Row (Row), Col (Col), Cell (Cell), Problem (Problem, unProblem), Solution (Solution, unSolution), X (X), Y (Y), Square (Square), SquareCell (SquareCell), SudokuWitness (SudokuWitness))
 import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
@@ -266,42 +266,6 @@ exampleWitness =
   case createWitness exampleSolution of
     Just w -> w
     Nothing -> die "exampleWitness: failed to create a witness"
-
-newtype Digit = Digit Integer
-  deriving (Eq, Ord, Num, Enum, Show)
-
-newtype Row = Row Integer
-  deriving (Eq, Ord, Num, Enum, Show)
-
-newtype Col = Col Integer
-  deriving (Eq, Ord, Num, Enum, Show)
-
-newtype Cell = Cell (Row, Col)
-  deriving (Eq, Ord, Show)
-
-newtype Problem = Problem {unProblem :: Cell -> Maybe Digit}
-
-newtype Solution = Solution {unSolution :: Cell -> Digit}
-
-newtype X = X Integer
-  deriving (Eq, Ord, Num, Enum)
-
-newtype Y = Y Integer
-  deriving (Eq, Ord, Num, Enum)
-
-newtype Square = Square (X, Y)
-  deriving (Eq, Ord)
-
-newtype SquareCell = SquareCell (X, Y)
-  deriving (Eq, Ord)
-
-data SudokuWitness = SudokuWitness
-  { solution :: Solution,
-    rowPermutations :: Map Row (Map Digit Col),
-    colPermutations :: Map Col (Map Digit Row),
-    squarePermutations :: Map Square (Map Digit SquareCell)
-  }
-  deriving (Generic)
 
 createWitness :: Solution -> Maybe SudokuWitness
 createWitness s =

@@ -10,14 +10,17 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module OSL.FromHaskell
   ( ToOSLType (toOSLType),
-    ToOSLContext (toOSLContext)
+    AddToOSLContext (addToOSLContext),
+    addToOSLContextM
   ) where
 
+import Control.Monad.State (State, state)
 import Data.Fixed (Fixed (..), HasResolution (resolution))
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
@@ -140,8 +143,14 @@ instance KnownNat n => GToOSLType (Fixed n) a where
 instance GToOSLType a (Rep a) => ToOSLType a where
   toOSLType (Proxy :: Proxy a) = gtoOSLType (Proxy @a) (Proxy @(Rep a))
 
-class ToOSLContext a where
-  toOSLContext ::
+class AddToOSLContext a where
+  addToOSLContext ::
     Proxy a ->
     OSL.ValidContext 'OSL.Global ann ->
     OSL.ValidContext 'OSL.Global ann
+
+addToOSLContextM ::
+  AddToOSLContext a =>
+  Proxy a ->
+  State (OSL.ValidContext 'OSL.Global ann) ()
+addToOSLContextM p = state (((),) . addToOSLContext p)

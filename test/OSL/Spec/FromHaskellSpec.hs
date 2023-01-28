@@ -1,14 +1,17 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 
 module OSL.Spec.FromHaskellSpec (spec) where
 
+import Control.Monad.State (State, runState)
 import Data.Fixed (Fixed, Pico)
 import Data.Proxy (Proxy (Proxy))
 import Data.Time (Day, TimeOfDay, LocalTime)
 import GHC.Generics (Generic)
-import OSL.FromHaskell (ToOSLType (toOSLType))
+import OSL.Spec.Sudoku.Types (Digit, Row, Col, Cell, Problem, Solution, X, Y, Square, SquareCell)
+import OSL.FromHaskell (AddToOSLContext, ToOSLType (toOSLType), addToOSLContextM)
 import qualified OSL.Types.OSL as OSL
 import Test.Syd (Spec, describe, it, shouldBe)
 
@@ -27,6 +30,7 @@ spec =
     record4Type
     timeOfDayType
     localTimeType
+    sudokuTypes
 
 unitType :: Spec
 unitType =
@@ -112,3 +116,23 @@ localTimeType =
           (OSL.Product () (OSL.Z ())
             (OSL.Product () (OSL.Z ())
               (OSL.Fin () 1000000000000)))
+
+sudokuTypes :: Spec
+sudokuTypes =
+  it "correctly assembles a sudoku types context" $ do
+    False `shouldBe` False
+  where
+    sudokuTypesContext = fst . flip runState mempty $ do
+      add (Proxy @Digit)
+      add (Proxy @Row)
+      add (Proxy @Col)
+      add (Proxy @Cell)
+      add (Proxy @Problem)
+      add (Proxy @Solution)
+      add (Proxy @X)
+      add (Proxy @Y)
+      add (Proxy @Square)
+      add (Proxy @SquareCell)
+
+    add :: forall a ann. AddToOSLContext a => Proxy a -> State (OSL.ValidContext 'OSL.Global ann) ()
+    add = addToOSLContextM
