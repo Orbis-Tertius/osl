@@ -5,6 +5,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -148,6 +149,12 @@ class AddToOSLContext a where
     Proxy a ->
     OSL.ValidContext 'OSL.Global ann ->
     OSL.ValidContext 'OSL.Global ann
+
+class GAddToOSLContext (a :: Type) (ra :: Type -> Type) where
+  gAddToOSLContext :: Proxy a -> Proxy ra -> OSL.ValidContext 'OSL.Global ann -> OSL.ValidContext 'OSL.Global ann
+
+instance GAddToOSLContext a (Rep a) => AddToOSLContext a where
+  addToOSLContext (Proxy :: Proxy a) = gAddToOSLContext (Proxy @a) (Proxy @(Rep a))
 
 addToOSLContextM ::
   AddToOSLContext a =>
