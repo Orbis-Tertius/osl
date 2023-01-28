@@ -193,7 +193,7 @@ data Declaration ann
   = FreeVariable (Type ann)
   | Data (Type ann)
   | Defined (Type ann) (Term ann)
-  deriving (Show)
+  deriving (Eq, Show)
 
 newtype Context ann = Context {unContext :: [(Name, Declaration ann)]}
 
@@ -201,4 +201,4 @@ data ContextType = Global | Local
   deriving (Show)
 
 newtype ValidContext (t :: ContextType) ann = ValidContext {unValidContext :: Map Name (Declaration ann)}
-  deriving (Generic, Show, Semigroup, Monoid)
+  deriving (Eq, Generic, Show, Semigroup, Monoid)

@@ -8,6 +8,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -22,6 +23,7 @@ module OSL.FromHaskell
     addToOSLContextM
   ) where
 
+import Control.Lens ((^.))
 import Control.Monad.State (State, state)
 import Data.Fixed (Fixed (..), HasResolution (resolution))
 import Data.Kind (Type)
@@ -31,7 +33,7 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Text (pack)
 import Data.Time (Day (..), LocalTime (..))
 import Data.Time.LocalTime (TimeOfDay (..))
-import GHC.Generics (Generic, Rep, U1, (:*:), (:+:), M1, D, C, S, K1, R, Meta (MetaData))
+import GHC.Generics (Generic, Rep, U1, V1, (:*:), (:+:), M1, D, C, S, K1, R, Meta (MetaData))
 import GHC.TypeLits (KnownNat, KnownSymbol, symbolVal)
 import qualified OSL.Types.OSL as OSL
 
@@ -45,10 +47,23 @@ class GToOSLType (a :: Type) (ra :: Type -> Type) where
 instance GToOSLType t U1 where
   gtoOSLType _ _ _ = OSL.Fin () 1
 
+-- Void types
+instance GToOSLType t V1 where
+  gtoOSLType _ _ _ = OSL.Fin () 0
+
 -- Data types
-instance GToOSLType t a => GToOSLType t (M1 D m a) where
-  gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy (M1 D m a)) c =
-    gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy a) c
+instance
+  ( GToOSLType t a, KnownSymbol n ) =>
+  GToOSLType t (M1 D (MetaData n m p f) a) where
+  gtoOSLType
+    (Proxy :: Proxy t)
+    (Proxy :: Proxy (M1 D (MetaData name modName pkgName isNewtype) a))
+    c =
+    case Map.lookup sym (c ^. #unValidContext) of
+      Just _ -> OSL.NamedType () sym
+      _ -> gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy a) c
+    where
+      sym = OSL.Sym (pack (symbolVal (Proxy @name)))
 
 -- Constructors
 instance GToOSLType t a => GToOSLType t (M1 C m a) where
@@ -151,6 +166,11 @@ instance ToOSLType a => ToOSLType (Maybe a) where
 instance ( ToOSLType a, ToOSLType b ) => ToOSLType (Map a b) where
   toOSLType (Proxy :: Proxy (Map a b)) c =
     OSL.Map () 1 (toOSLType (Proxy @a) c) (toOSLType (Proxy @b) c)
+
+-- List
+instance ToOSLType a => ToOSLType [a] where
+  toOSLType (Proxy :: Proxy [a]) c =
+    OSL.List () 1 (toOSLType (Proxy @a) c)
 
 -- Scalar types
 instance GToOSLType Integer a where

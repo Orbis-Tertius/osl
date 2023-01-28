@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -7,10 +9,11 @@ module OSL.Spec.FromHaskellSpec (spec) where
 
 import Control.Monad.State (State, runState)
 import Data.Fixed (Fixed, Pico)
+import qualified Data.Map as Map
 import Data.Proxy (Proxy (Proxy))
 import Data.Time (Day, TimeOfDay, LocalTime)
 import GHC.Generics (Generic)
-import OSL.Spec.Sudoku.Types (Digit, Row, Col, Cell, Problem, Solution, X, Y, Square, SquareCell, SudokuWitness)
+import OSL.Spec.Sudoku.Types (Digit, Row, Col, Cell, Problem, Solution, X, Y, Square, SquareCell)
 import OSL.FromHaskell (AddToOSLContext, ToOSLType (toOSLType), addToOSLContextM)
 import qualified OSL.Types.OSL as OSL
 import Test.Syd (Spec, describe, it, shouldBe)
@@ -66,7 +69,7 @@ dayType :: Spec
 dayType =
   it "Day -> Z" $
     toOSLType (Proxy @Day) mempty
-      `shouldBe` OSL.N ()
+      `shouldBe` OSL.Z ()
 
 picoType :: Spec
 picoType =
@@ -119,10 +122,10 @@ localTimeType =
 
 sudokuTypes :: Spec
 sudokuTypes =
-  it "correctly assembles a sudoku types context" $ do
-    False `shouldBe` False
+  it "correctly assembles a sudoku types context" $
+    sudokuTypesContext `shouldBe` expectedContext
   where
-    sudokuTypesContext = fst . flip runState mempty $ do
+    sudokuTypesContext = snd . flip runState mempty $ do
       add (Proxy @Digit)
       add (Proxy @Row)
       add (Proxy @Col)
@@ -133,7 +136,28 @@ sudokuTypes =
       add (Proxy @Y)
       add (Proxy @Square)
       add (Proxy @SquareCell)
-      add (Proxy @SudokuWitness)
 
-    add :: forall a ann. AddToOSLContext a => Proxy a -> State (OSL.ValidContext 'OSL.Global ann) ()
+    expectedContext =
+      OSL.ValidContext . Map.fromList $
+        [ (OSL.Sym "Digit", OSL.Data (OSL.Z ())),
+          (OSL.Sym "Col", OSL.Data (OSL.Z ())),
+          (OSL.Sym "Row", OSL.Data (OSL.Z ())),
+          (OSL.Sym "Cell",
+            OSL.Data
+              (OSL.Product ()
+                (OSL.NamedType () (OSL.Sym "Row"))
+                (OSL.NamedType () (OSL.Sym "Col")))),
+          (OSL.Sym "Problem",
+            OSL.Data
+              (OSL.F () Nothing
+                (OSL.NamedType () (OSL.Sym "Cell"))
+                (OSL.Maybe () (OSL.NamedType () (OSL.Sym "Digit"))))),
+          (OSL.Sym "Solution",
+            OSL.Data
+              (OSL.F () Nothing
+                (OSL.NamedType () (OSL.Sym "Cell"))
+                (OSL.NamedType () (OSL.Sym "Digit"))))
+        ]
+
+    add :: forall a. AddToOSLContext a => Proxy a -> State (OSL.ValidContext 'OSL.Global ()) ()
     add = addToOSLContextM
