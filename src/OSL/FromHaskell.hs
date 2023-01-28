@@ -24,11 +24,13 @@ module OSL.FromHaskell
 import Control.Monad.State (State, state)
 import Data.Fixed (Fixed (..), HasResolution (resolution))
 import Data.Kind (Type)
+import qualified Data.Map as Map
 import Data.Proxy (Proxy (Proxy))
+import Data.Text (pack)
 import Data.Time (Day (..), LocalTime (..))
 import Data.Time.LocalTime (TimeOfDay (..))
-import GHC.Generics (Generic, Rep, U1, (:*:), (:+:), M1, D, C, S, K1, R)
-import GHC.TypeLits (KnownNat)
+import GHC.Generics (Generic, Rep, U1, (:*:), (:+:), M1, D, C, S, K1, R, Meta (MetaData))
+import GHC.TypeLits (KnownNat, KnownSymbol, symbolVal)
 import qualified OSL.Types.OSL as OSL
 
 deriving instance Generic Day
@@ -37,10 +39,10 @@ deriving instance Generic TimeOfDay
 deriving instance Generic (Fixed n)
 
 class ToOSLType a where
-  toOSLType :: Proxy a -> OSL.ValidContext 'OSL.Global ann -> OSL.Type ()
+  toOSLType :: Proxy a -> OSL.ValidContext 'OSL.Global () -> OSL.Type ()
 
 class GToOSLType (a :: Type) (ra :: Type -> Type) where
-  gtoOSLType :: Proxy a -> Proxy ra -> OSL.ValidContext 'OSL.Global ann -> OSL.Type ()
+  gtoOSLType :: Proxy a -> Proxy ra -> OSL.ValidContext 'OSL.Global () -> OSL.Type ()
 
 instance GToOSLType t U1 where
   gtoOSLType _ _ _ = OSL.Fin () 1
@@ -147,11 +149,24 @@ instance GToOSLType a (Rep a) => ToOSLType a where
 class AddToOSLContext a where
   addToOSLContext ::
     Proxy a ->
-    OSL.ValidContext 'OSL.Global ann ->
-    OSL.ValidContext 'OSL.Global ann
+    OSL.ValidContext 'OSL.Global () ->
+    OSL.ValidContext 'OSL.Global ()
 
 class GAddToOSLContext (a :: Type) (ra :: Type -> Type) where
-  gAddToOSLContext :: Proxy a -> Proxy ra -> OSL.ValidContext 'OSL.Global ann -> OSL.ValidContext 'OSL.Global ann
+  gAddToOSLContext :: Proxy a -> Proxy ra -> OSL.ValidContext 'OSL.Global () -> OSL.ValidContext 'OSL.Global ()
+
+-- newtypes
+instance
+  ( KnownSymbol n, GToOSLType t (Rep t) ) =>
+  GAddToOSLContext t (M1 D (MetaData n m p True) a) where
+  gAddToOSLContext
+    (Proxy :: Proxy t)
+    (Proxy :: Proxy (M1 D (MetaData name moduleName packageName True) a))
+    c =
+    c <> OSL.ValidContext
+           (Map.singleton
+              (OSL.Sym (pack (symbolVal (Proxy @name))))
+              (OSL.Data (toOSLType (Proxy @t) c)))
 
 instance GAddToOSLContext a (Rep a) => AddToOSLContext a where
   addToOSLContext (Proxy :: Proxy a) = gAddToOSLContext (Proxy @a) (Proxy @(Rep a))
@@ -159,5 +174,5 @@ instance GAddToOSLContext a (Rep a) => AddToOSLContext a where
 addToOSLContextM ::
   AddToOSLContext a =>
   Proxy a ->
-  State (OSL.ValidContext 'OSL.Global ann) ()
+  State (OSL.ValidContext 'OSL.Global ()) ()
 addToOSLContextM p = state (((),) . addToOSLContext p)
