@@ -6,7 +6,7 @@ module OSL.Spec.FromHaskellSpec (spec) where
 
 import Data.Fixed (Fixed, Pico)
 import Data.Proxy (Proxy (Proxy))
-import Data.Time (Day, TimeOfDay)
+import Data.Time (Day, TimeOfDay, LocalTime)
 import GHC.Generics (Generic)
 import OSL.FromHaskell (ToOSLType (toOSLType))
 import qualified OSL.Types.OSL as OSL
@@ -26,7 +26,7 @@ spec =
     record3Type
     record4Type
     timeOfDayType
---    localTimeType
+    localTimeType
 
 unitType :: Spec
 unitType =
@@ -103,8 +103,12 @@ timeOfDayType =
     toOSLType (Proxy @TimeOfDay) mempty
       `shouldBe` OSL.Product () (OSL.Z ()) (OSL.Product () (OSL.Z ()) (OSL.Fin () 1000000000000))
 
--- localTimeType :: Spec
--- localTimeType =
---   it "LocalTime -> _" $
---     toOSLType (Proxy @LocalTime) mempty
---       `shouldBe` OSL.Fin () 1
+localTimeType :: Spec
+localTimeType =
+  it "LocalTime -> _" $
+    toOSLType (Proxy @LocalTime) mempty
+      `shouldBe`
+        OSL.Product () (OSL.N ())
+          (OSL.Product () (OSL.Z ())
+            (OSL.Product () (OSL.Z ())
+              (OSL.Fin () 1000000000000)))
