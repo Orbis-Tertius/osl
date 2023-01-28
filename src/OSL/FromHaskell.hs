@@ -88,6 +88,31 @@ instance ( GToOSLType a (Rep a), GToOSLType b (Rep b), GToOSLType c (Rep c) )
         (gtoOSLType (Proxy :: Proxy b) (Proxy :: Proxy (Rep b)) c)
         (gtoOSLType (Proxy :: Proxy d) (Proxy :: Proxy (Rep d)) c))
 
+-- Records with four fields
+instance ( GToOSLType a (Rep a),
+           GToOSLType b (Rep b),
+           GToOSLType d (Rep d),
+           GToOSLType e (Rep e) )
+  => GToOSLType t
+       ((M1 S ma (K1 R a) :*:
+         M1 S mb (K1 R b)) :*:
+        (M1 S md (K1 R d) :*:
+         M1 S me (K1 R e))) where
+  gtoOSLType
+    (Proxy :: Proxy t)
+    (Proxy :: Proxy ((M1 S ma (K1 R a)
+                       :*: M1 S mb (K1 R b))
+                 :*: (M1 S md (K1 R d)
+                       :*: M1 S me (K1 R e))))
+    c =
+    OSL.Product ()
+      (gtoOSLType (Proxy :: Proxy a) (Proxy :: Proxy (Rep a)) c)
+      (OSL.Product ()
+        (gtoOSLType (Proxy :: Proxy b) (Proxy :: Proxy (Rep b)) c)
+        (OSL.Product ()
+          (gtoOSLType (Proxy :: Proxy d) (Proxy :: Proxy (Rep d)) c)
+          (gtoOSLType (Proxy :: Proxy e) (Proxy :: Proxy (Rep e)) c)))
+
 instance ( GToOSLType a ra, GToOSLType b rb )
            => GToOSLType (Either a b) (ra :+: rb) where
   gtoOSLType (Proxy :: Proxy (Either a b)) (Proxy :: Proxy (ra :+: rb)) c =

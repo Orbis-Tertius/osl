@@ -24,6 +24,7 @@ spec =
     picoType
     record2Type
     record3Type
+    record4Type
 --    timeOfDayType
 --    localTimeType
 
@@ -86,6 +87,15 @@ record3Type =
   it "Record3 -> Z * Z * Z" $
     toOSLType (Proxy @Record3) mempty
       `shouldBe` OSL.Product () (OSL.Z ()) (OSL.Product () (OSL.Z ()) (OSL.Z ()))
+
+data Record4 = Record4 Int Int Int Int
+  deriving Generic
+
+record4Type :: Spec
+record4Type =
+  it "Record4 -> Z * Z * Z * Z" $
+    toOSLType (Proxy @Record4) mempty
+      `shouldBe` OSL.Product () (OSL.Z ()) (OSL.Product () (OSL.Z ()) (OSL.Product () (OSL.Z ()) (OSL.Z ())))
 
 -- timeOfDayType :: Spec
 -- timeOfDayType =
