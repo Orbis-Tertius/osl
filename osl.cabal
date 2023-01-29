@@ -12,6 +12,23 @@ data-files:
 
 library
   exposed-modules:
+    Actus.Core
+    Actus.Domain
+    Actus.Domain.BusinessEvents
+    Actus.Domain.ContractState
+    Actus.Domain.ContractTerms
+    Actus.Domain.Schedule
+    Actus.Model
+    Actus.Model.Applicability
+    Actus.Model.Payoff
+    Actus.Model.StateTransition
+    Actus.Model.ContractSchedule
+    Actus.Model.StateInitialization
+    Actus.Utility
+    Actus.Utility.ANN.Annuity
+    Actus.Utility.DateShift
+    Actus.Utility.ScheduleGenerator
+    Actus.Utility.YearFraction
     Cast
     Die
     Halo2.AIR
@@ -164,12 +181,14 @@ library
     QuickCheck,
     random,
     safe,
+    sort,
     sydtest,
     sydtest-discover,
     template-haskell,
     text -any,
     time,
     transformers,
+    validation,
     validity
 
   hs-source-dirs: src
