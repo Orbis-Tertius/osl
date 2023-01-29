@@ -74,6 +74,7 @@ library
     OSL.Debug
     OSL.EntryPoint
     OSL.Evaluation
+    OSL.Format
     OSL.FromHaskell
     OSL.LoadContext
     OSL.Map
