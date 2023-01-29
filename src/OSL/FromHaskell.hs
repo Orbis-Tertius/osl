@@ -12,6 +12,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
@@ -23,13 +24,15 @@
 module OSL.FromHaskell
   ( ToOSLType (toOSLType),
     AddToOSLContext (addToOSLContext),
+    Newtype,
     addToOSLContextM,
     productType,
     coproductType,
-    mkRecordToOSL
+    mkDataToOSL,
+    mkDataToAddOSL
   ) where
 
-import Control.Lens ((^.))
+import Control.Lens ((^.), _3)
 import Control.Monad.State (State, state)
 import Data.Fixed (Fixed (..), HasResolution (resolution))
 import Data.List (foldl')
@@ -42,7 +45,7 @@ import Data.Time (Day (..))
 import Data.Typeable (Typeable, tyConName, typeRepTyCon, typeRep, typeRepArgs)
 import Die (die)
 import GHC.TypeLits (KnownNat)
-import Language.Haskell.TH (Dec, Q, lookupTypeName, reify, Info (TyConI), Dec (DataD), Con (NormalC, RecC), Exp (VarE, ListE), newName, Pat (VarP), Type (ConT))
+import Language.Haskell.TH (Dec, Q, lookupTypeName, reify, Info (TyConI), Dec (DataD), Con (NormalC, RecC), Exp (VarE, LitE, ListE), Lit (StringL), newName, Pat (VarP), Type (ConT, AppT, TupleT), nameBase)
 import qualified OSL.Types.OSL as OSL
 
 class ToOSLType a where
@@ -126,14 +129,16 @@ class AddToOSLContext a where
     OSL.ValidContext 'OSL.Global ()
 
 -- newtypes
+data Newtype a
+
 instance
   ( ToOSLType t, Typeable t ) =>
-    AddToOSLContext t where
-  addToOSLContext pxy c =
+    AddToOSLContext (Newtype t) where
+  addToOSLContext (Proxy :: Proxy (Newtype t)) c =
     c <> OSL.ValidContext
            (Map.singleton
-              (OSL.Sym (pack (tyConName (typeRepTyCon (typeRep pxy)))))
-              (OSL.Data (ntoOSLType pxy c)))
+              (OSL.Sym (pack (tyConName (typeRepTyCon (typeRep (Proxy :: Proxy t))))))
+              (OSL.Data (ntoOSLType (Proxy :: Proxy t) c)))
 
 addToOSLContextM ::
   AddToOSLContext a =>
@@ -151,11 +156,11 @@ coproductType :: [OSL.Type ()] -> OSL.Type ()
 coproductType [] = OSL.Fin () 0
 coproductType (t:ts) = foldl' (OSL.Coproduct ()) t ts
 
-mkRecordToOSL :: String -> Q [Dec]
-mkRecordToOSL nameStr = do
+mkDataToOSL :: String -> Q [Dec]
+mkDataToOSL nameStr = do
   name <-
     fromMaybe
-      (die $ "mkRecordToOSL: expected the name of a type: " <> nameTxt)
+      (die $ "mkDataToOSL: expected the name of a type: " <> nameTxt)
       <$> lookupTypeName nameStr
   info <- reify name
   c <- newName "c"
@@ -166,7 +171,7 @@ mkRecordToOSL nameStr = do
            toOSLType _ $(pure (VarP c)) =
              coproductType $(ctorsToCoproductExp ctors c)
        |]
-    _ -> die $ "mkRecordToOSL: expected an algebraic data type: " <> nameTxt
+    _ -> die $ "mkDataToOSL: expected an algebraic data type: " <> nameTxt
   where
     nameTxt = pack nameStr
 
@@ -192,4 +197,68 @@ mkRecordToOSL nameStr = do
               [ [| toOSLType (Proxy :: Proxy $(pure t)) $(pure (VarE c)) |]
                 | (_, _, t) <- ts
               ]
-        ctor -> die $ "mkRecordToOSL: expected a normal constructor: " <> pack (show ctor)
+        ctor -> die $ "mkDataToOSL: expected a normal constructor: " <> pack (show ctor)
+
+mkDataToAddOSL :: String -> Q [Dec]
+mkDataToAddOSL nameStr = do
+  name <-
+    fromMaybe
+      (die $ "mkDataToAddOSL: expected the name of a type: " <> nameTxt)
+      <$> lookupTypeName nameStr
+  info <- reify name
+  c <- newName "c"
+  case info of
+    TyConI (DataD _cxt _name _binders _kind ctors _deriving) ->
+      [d|
+        instance AddToOSLContext $(pure (ConT name)) where
+          addToOSLContext _ $(pure (VarP c)) =
+            $(pure (VarE c)) <>
+              OSL.ValidContext
+                (Map.fromList $(ctorsContextEntries ctors c)
+                  <> Map.singleton
+                       $(pure (LitE (StringL nameStr)))
+                       (OSL.Data $(ctorsCoproduct ctors)))
+        |]
+    _ -> die $ "mkDataToAddOSL: expected a simple algebraic data type: " <> nameTxt
+  where
+    nameTxt = pack nameStr
+
+    ctorsContextEntries ctors c =
+      ListE <$> sequence
+        [ [| ($(pure (LitE (StringL (nameBase cName)))),
+              OSL.Data
+                (toOSLType
+                  (Proxy :: Proxy $(pure ctorType))
+                  $(pure (VarE c))))
+           |]
+          | ctor <- ctors,
+            let cName = ctorName ctor,
+            let ctorArgs =
+                  case ctor of
+                    NormalC _ ts -> snd <$> ts
+                    RecC _ ts -> (^. _3) <$> ts
+                    _ -> die $ "mkDataToAddOSL: expected a normal constructor: "
+                                 <> pack (show ctor),
+            let ctorType =
+                  case ctorArgs of
+                    (t:ts) ->
+                      foldl'
+                        (\a b -> AppT (AppT (TupleT 2) a) b)
+                        t
+                        ts
+                    [] -> TupleT 0
+        ]
+
+    ctorsCoproduct ctors =
+      [| coproductType
+           $(ListE <$> sequence
+               [ [| OSL.NamedType () $(pure (LitE (StringL (nameBase (ctorName ctor))))) |]
+                 | ctor <- ctors
+               ])
+       |]
+
+    ctorName =
+      \case
+        NormalC n _ -> n
+        RecC n _ -> n
+        ctor -> die $ "mkDataToAddOSL: expected a normal constructor: " <> pack (show ctor)

@@ -18,27 +18,34 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Time (Day, TimeOfDay, LocalTime)
 import GHC.Generics (Generic)
 import OSL.Spec.Sudoku.Types (Digit, Row, Col, Cell, Problem, Solution, X, Y, Square, SquareCell)
-import OSL.FromHaskell (AddToOSLContext, ToOSLType (toOSLType), addToOSLContextM, mkRecordToOSL)
+import OSL.FromHaskell (AddToOSLContext, Newtype, ToOSLType (toOSLType), addToOSLContextM, mkDataToOSL, mkDataToAddOSL)
 import qualified OSL.Types.OSL as OSL
 import Test.Syd (Spec, describe, it, shouldBe)
 
-mkRecordToOSL "TimeOfDay"
-mkRecordToOSL "LocalTime"
+mkDataToOSL "TimeOfDay"
+mkDataToOSL "LocalTime"
 
+-- Deriving Generic is present on these type definitions only to suppress
+-- -Wunused-top-binds
 data Record2 = Record2 Int Int
   deriving Generic
 
-mkRecordToOSL "Record2"
+mkDataToOSL "Record2"
 
 data Record3 = Record3 Int Int Int
   deriving Generic
 
-mkRecordToOSL "Record3"
+mkDataToOSL "Record3"
 
 data Record4 = Record4 Int Int Int Int
   deriving Generic
 
-mkRecordToOSL "Record4"
+mkDataToOSL "Record4"
+
+data Enum3 = A | B | C
+  deriving Generic
+
+mkDataToAddOSL "Enum3"
 
 spec :: Spec
 spec =
@@ -55,6 +62,7 @@ spec =
     record4Type
     timeOfDayType
     localTimeType
+    enumType
     sudokuTypes
 
 unitType :: Spec
@@ -141,22 +149,45 @@ localTimeType =
               (OSL.Z ()))
             (OSL.Fin () 1000000000000))
 
+enumType :: Spec
+enumType =
+  it "correctly assembles an enum type context " $
+    enumTypesContext `shouldBe` expectedContext
+  where
+    enumTypesContext = snd $ runState (add (Proxy @Enum3)) mempty
+
+    add = addToOSLContextM
+
+    expectedContext =
+      OSL.ValidContext . Map.fromList $
+        [ (OSL.Sym "A", OSL.Data (OSL.Fin () 1)),
+          (OSL.Sym "B", OSL.Data (OSL.Fin () 1)),
+          (OSL.Sym "C", OSL.Data (OSL.Fin () 1)),
+          (OSL.Sym "Enum3",
+            OSL.Data
+              (OSL.Coproduct ()
+                (OSL.Coproduct ()
+                  (OSL.NamedType () "A")
+                  (OSL.NamedType () "B"))
+                (OSL.NamedType () "C")))
+        ]
+
 sudokuTypes :: Spec
 sudokuTypes =
   it "correctly assembles a sudoku types context" $
     sudokuTypesContext `shouldBe` expectedContext
   where
     sudokuTypesContext = snd . flip runState mempty $ do
-      add (Proxy @Digit)
-      add (Proxy @Row)
-      add (Proxy @Col)
-      add (Proxy @Cell)
-      add (Proxy @Problem)
-      add (Proxy @Solution)
-      add (Proxy @X)
-      add (Proxy @Y)
-      add (Proxy @Square)
-      add (Proxy @SquareCell)
+      add (Proxy @(Newtype Digit))
+      add (Proxy @(Newtype Row))
+      add (Proxy @(Newtype Col))
+      add (Proxy @(Newtype Cell))
+      add (Proxy @(Newtype Problem))
+      add (Proxy @(Newtype Solution))
+      add (Proxy @(Newtype X))
+      add (Proxy @(Newtype Y))
+      add (Proxy @(Newtype Square))
+      add (Proxy @(Newtype SquareCell))
 
     expectedContext =
       OSL.ValidContext . Map.fromList $
