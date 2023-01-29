@@ -6,14 +6,15 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Trace.Semantics
-  ( evalTrace
-  ) where
+  ( evalTrace,
+  )
+where
 
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (integerToInt)
-import Control.Lens ((^.), (<&>))
-import Control.Monad (forM_, forM, when, unless, void)
+import Control.Lens ((<&>), (^.))
+import Control.Monad (forM, forM_, unless, when)
 import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -22,23 +23,23 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Debug.Trace (trace)
-import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.CellReference (CellReference (CellReference))
+import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.FixedValues (FixedValues)
 import Halo2.Types.InputExpression (InputExpression)
-import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.LookupArgument (LookupArgument)
+import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.LookupTableColumn (LookupTableColumn)
 import Halo2.Types.Polynomial (Polynomial)
-import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
+import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowIndex (RowIndex (RowIndex))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import Stark.Types.Scalar (Scalar, scalarToInteger, zero, one, integerToScalar)
-import Trace.Types (TraceType, Trace, Case (Case), SubexpressionId, ResultExpressionId (ResultExpressionId), SubexpressionTrace, StepType, OutputSubexpressionId (..))
-import Trace.Types.EvaluationContext (EvaluationContext (EvaluationContext), ContextType (Global, Local))
+import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInteger, zero)
+import Trace.Types (Case (Case), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepType, SubexpressionId, SubexpressionTrace, Trace, TraceType)
+import Trace.Types.EvaluationContext (ContextType (Global, Local), EvaluationContext (EvaluationContext))
 
 evalTrace ::
   ann ->
@@ -59,10 +60,14 @@ checkAllResultsArePresentForUsedCases ann tt t =
   forM_ (t ^. #usedCases) $ \c ->
     forM_ (tt ^. #results) $ \(ResultExpressionId sId) ->
       maybe
-        (Left
-          (ErrorMessage ann
-            ("result is not present: "
-              <> pack (show (c, sId)))))
+        ( Left
+            ( ErrorMessage
+                ann
+                ( "result is not present: "
+                    <> pack (show (c, sId))
+                )
+            )
+        )
         (const (pure ()))
         (Map.lookup (c, sId) (t ^. #subexpressions))
 
@@ -98,10 +103,11 @@ checkPolynomialConstraints ::
   PolynomialConstraints ->
   Either (ErrorMessage ann) ()
 checkPolynomialConstraints ann c ec cs =
-  void $ sequence
-    [ do z <- evalPolynomial ann c ec c'
-         unless (z == zero) . Left . ErrorMessage ann
-           $ "polynomial constraint not satisfied: " <> pack (show (l, c', c, ec ^. #localMappings))
+  sequence_
+    [ do
+        z <- evalPolynomial ann c ec c'
+        unless (z == zero) . Left . ErrorMessage ann $
+          "polynomial constraint not satisfied: " <> pack (show (l, c', c, ec ^. #localMappings))
       | (l, c') <- cs ^. #constraints
     ]
 
@@ -112,8 +118,8 @@ evalPolynomial ::
   Polynomial ->
   Either (ErrorMessage ann) Scalar
 evalPolynomial ann c ec p =
-  foldr (Group.+) zero <$>
-    mapM (evalMonomial ann c ec) (Map.toList (p ^. #monos))
+  foldr (Group.+) zero
+    <$> mapM (evalMonomial ann c ec) (Map.toList (p ^. #monos))
 
 evalMonomial ::
   ann ->
@@ -131,8 +137,9 @@ evalPowerProduct ::
   PowerProduct ->
   Either (ErrorMessage ann) Scalar
 evalPowerProduct ann c ec pp =
-  foldr (Ring.*) one <$>
-    mapM (\(v, e) -> (^ e) <$> evalPolynomialVariable ann c ec v)
+  foldr (Ring.*) one
+    <$> mapM
+      (\(v, e) -> (^ e) <$> evalPolynomialVariable ann c ec v)
       (Map.toList (pp ^. #getPowerProduct))
 
 evalPolynomialVariable ::
@@ -145,10 +152,11 @@ evalPolynomialVariable ann c ec v =
   case v ^. #rowIndex of
     0 ->
       maybe
-        (maybe
-          (Left (ErrorMessage ann "variable not defined in global or local mappings"))
-          pure
-          (Map.lookup (c, v ^. #colIndex) (ec ^. #globalMappings)))
+        ( maybe
+            (Left (ErrorMessage ann "variable not defined in global or local mappings"))
+            pure
+            (Map.lookup (c, v ^. #colIndex) (ec ^. #globalMappings))
+        )
         pure
         (Map.lookup (v ^. #colIndex) (ec ^. #localMappings))
     _ ->
@@ -173,14 +181,20 @@ checkLookupArgument ann c ec arg = do
   g <- evalPolynomial ann c ec (arg ^. #gate)
   when (g == zero) $ do
     is <- evalInputExpressions ann c ec (arg ^. #tableMap)
-    case Map.lookup (Set.fromList (snd <$> arg ^. #tableMap))
-           (ec ^. #lookupTables) of
+    case Map.lookup
+      (Set.fromList (snd <$> arg ^. #tableMap))
+      (ec ^. #lookupTables) of
       Just t ->
-        unless (is `Set.member` t)
-          (Left
-            (ErrorMessage ann
-              ("lookup argument is not satisfied: "
-                <> pack (show (arg, is, t, ec ^. #localMappings)))))
+        unless
+          (is `Set.member` t)
+          ( Left
+              ( ErrorMessage
+                  ann
+                  ( "lookup argument is not satisfied: "
+                      <> pack (show (arg, is, t, ec ^. #localMappings))
+                  )
+              )
+          )
       Nothing ->
         Left (ErrorMessage ann "lookup table is not cached in the context")
 
@@ -191,10 +205,11 @@ evalInputExpressions ::
   [(InputExpression Polynomial, LookupTableColumn)] ->
   Either (ErrorMessage ann) (Map LookupTableColumn Scalar)
 evalInputExpressions ann c ec is =
-  Map.fromList <$> sequence
-    [ (col,) <$> evalPolynomial ann c ec (e ^. #getInputExpression)
-      | (e, col) <- is
-    ]
+  Map.fromList
+    <$> sequence
+      [ (col,) <$> evalPolynomial ann c ec (e ^. #getInputExpression)
+        | (e, col) <- is
+      ]
 
 checkAllEqualityConstraintsAreSatisfied ::
   ann ->
@@ -207,7 +222,7 @@ checkAllEqualityConstraintsAreSatisfied ann tt t = do
     vs <- mapM (lookupCellReference ann cellMap) (Set.toList (eq ^. #getEqualityConstraint))
     case vs of
       [] -> pure ()
-      (v:_) -> when (not (all (== v) vs)) (Left (ErrorMessage ann "equality constraint not satisifed"))
+      (v : _) -> unless (all (== v) vs) (Left (ErrorMessage ann "equality constraint not satisifed"))
 
 lookupCellReference ::
   ann ->
@@ -215,8 +230,10 @@ lookupCellReference ::
   CellReference ->
   Either (ErrorMessage ann) Scalar
 lookupCellReference ann m r =
-  maybe (Left (ErrorMessage ann "cell reference lookup failed"))
-    pure (Map.lookup r m)
+  maybe
+    (Left (ErrorMessage ann "cell reference lookup failed"))
+    pure
+    (Map.lookup r m)
 
 getGlobalCellMap ::
   EvaluationContext t ->
@@ -237,12 +254,12 @@ addFixedValuesToEvaluationContext ec vs =
   where
     ec' =
       EvaluationContext
-        (Map.fromList
-          [ ((Case i', col), x)
-            | (col, vs') <- Map.toList (vs ^. #getFixedValues),
-              (i, x) <- zip [0..] (vs' ^. #unFixedColumn),
-              i' <- maybeToList (integerToScalar i)
-          ]
+        ( Map.fromList
+            [ ((Case i', col), x)
+              | (col, vs') <- Map.toList (vs ^. #getFixedValues),
+                (i, x) <- zip [0 ..] (vs' ^. #unFixedColumn),
+                i' <- maybeToList (integerToScalar i)
+            ]
         )
         mempty
         mempty
@@ -254,16 +271,24 @@ getGlobalEvaluationContext ::
   Either (ErrorMessage ann) (EvaluationContext 'Global)
 getGlobalEvaluationContext ann tt t = do
   let gms = getGlobalMappings tt t
-      ec = foldl' addFixedValuesToEvaluationContext
-           (EvaluationContext gms mempty mempty)
-           (Map.elems (tt ^. #stepTypes) <&> (^. #fixedValues))
+      ec =
+        foldl'
+          addFixedValuesToEvaluationContext
+          (EvaluationContext gms mempty mempty)
+          (Map.elems (tt ^. #stepTypes) <&> (^. #fixedValues))
   EvaluationContext gms mempty
-    <$> (Map.fromList <$> sequence
-          [ (cs,) . Set.fromList
-              <$> getLookupTable ann tt t ec
-                  (trace ("getLookupTable: " <> show cs) cs)
-            | cs <- Set.toList . Set.fromList $ traceTypeLookupTables tt
-          ])
+    <$> ( Map.fromList
+            <$> sequence
+              [ (cs,) . Set.fromList
+                  <$> getLookupTable
+                    ann
+                    tt
+                    t
+                    ec
+                    (trace ("getLookupTable: " <> show cs) cs)
+                | cs <- Set.toList . Set.fromList $ traceTypeLookupTables tt
+              ]
+        )
 
 getGlobalMappings ::
   TraceType ->
@@ -282,7 +307,7 @@ getCaseNumberColumnMappings ::
   Map (Case, ColumnIndex) Scalar
 getCaseNumberColumnMappings tt t =
   Map.fromList
-    [ ((i, col), i ^. #unCase) | i <- Set.toList (t ^. #usedCases) ]
+    [((i, col), i ^. #unCase) | i <- Set.toList (t ^. #usedCases)]
   where
     col = tt ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
 
@@ -312,44 +337,49 @@ getSubexpressionEvaluationContext ::
   (Case, SubexpressionId, SubexpressionTrace) ->
   Either (ErrorMessage ann) (EvaluationContext 'Local)
 getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
-    EvaluationContext
-      (gc ^. #globalMappings)
-      <$> localMappings
-      <*> pure (gc ^. #lookupTables)
+  EvaluationContext
+    (gc ^. #globalMappings)
+    <$> localMappings
+    <*> pure (gc ^. #lookupTables)
   where
     localMappings =
-      mconcat <$> sequence
-        [ inputMappings,
-          outputMapping,
-          caseNumberMapping,
-          stepTypeMapping,
-          stepIndicatorMapping,
-          pure (sT ^. #adviceValues)
-        ]
+      mconcat
+        <$> sequence
+          [ inputMappings,
+            outputMapping,
+            caseNumberMapping,
+            stepTypeMapping,
+            stepIndicatorMapping,
+            pure (sT ^. #adviceValues)
+          ]
 
     inputMappings =
       case Map.lookup (sT ^. #stepType, OutputSubexpressionId sId) (tt ^. #links) of
         Just is ->
-          Map.fromList <$> sequence
-            -- Special case to consider: when the input is supposed to be the
-            -- output of a lookup and this is the subexpr of that lookup,
-            -- what happens? Then there is (supposed to be) a subexpression id
-            -- of that lookup, and the trace generation should put the correct
-            -- value in its output, and it should be an input to the bare lookup,
-            -- and its value should be set here. Seems like something nonsensical
-            -- is going on here and we should replace the bare lookup step type
-            -- maybe with just a (functional) lookup step type.
-            [ case Map.lookup (c, iId) (t ^. #subexpressions) of
-                Just sT' -> pure (col, sT' ^. #value)
-                Nothing ->
-                  -- trace (show (t ^. #subexpressions)) $
-                  Left (ErrorMessage ann ("expected input not present: " <> pack (show (c, iId, is, sT))))
-              | (col, iId) <- zip ((tt ^. #inputColumnIndices) <&> (^. #unInputColumnIndex))
-                                  (is <&> (^. #unInputSubexpressionId))
-            ]
-        Nothing -> Left . ErrorMessage ann $
-          "no links found for this subexpression's step type and id: "
-            <> pack (show (c, sId, sT))
+          Map.fromList
+            <$> sequence
+              -- Special case to consider: when the input is supposed to be the
+              -- output of a lookup and this is the subexpr of that lookup,
+              -- what happens? Then there is (supposed to be) a subexpression id
+              -- of that lookup, and the trace generation should put the correct
+              -- value in its output, and it should be an input to the bare lookup,
+              -- and its value should be set here. Seems like something nonsensical
+              -- is going on here and we should replace the bare lookup step type
+              -- maybe with just a (functional) lookup step type.
+              [ case Map.lookup (c, iId) (t ^. #subexpressions) of
+                  Just sT' -> pure (col, sT' ^. #value)
+                  Nothing ->
+                    -- trace (show (t ^. #subexpressions)) $
+                    Left (ErrorMessage ann ("expected input not present: " <> pack (show (c, iId, is, sT))))
+                | (col, iId) <-
+                    zip
+                      ((tt ^. #inputColumnIndices) <&> (^. #unInputColumnIndex))
+                      (is <&> (^. #unInputSubexpressionId))
+              ]
+        Nothing ->
+          Left . ErrorMessage ann $
+            "no links found for this subexpression's step type and id: "
+              <> pack (show (c, sId, sT))
 
     outputMapping =
       pure $ Map.singleton (tt ^. #outputColumnIndex . #unOutputColumnIndex) (sT ^. #value)
@@ -375,16 +405,22 @@ getLookupTable ::
 getLookupTable ann tt (trace "getLookupTable" -> t) gc cs =
   forM (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
     lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
-    Map.fromList <$> sequence
-      [ maybe
-          (maybe
-            (Left
-              (ErrorMessage ann
-                ("lookup table has a hole: "
-                  <> pack (show (c, col)))))
+    Map.fromList
+      <$> sequence
+        [ maybe
+            ( maybe
+                ( Left
+                    ( ErrorMessage
+                        ann
+                        ( "lookup table has a hole: "
+                            <> pack (show (c, col))
+                        )
+                    )
+                )
+                (pure . (col,))
+                (Map.lookup (c, col ^. #unLookupTableColumn) (lc ^. #globalMappings))
+            )
             (pure . (col,))
-            (Map.lookup (c, col ^. #unLookupTableColumn) (lc ^. #globalMappings)))
-          (pure . (col,))
-          (Map.lookup (col ^. #unLookupTableColumn) (lc ^. #localMappings))
-       | col <- Set.toList cs
-      ]
+            (Map.lookup (col ^. #unLookupTableColumn) (lc ^. #localMappings))
+          | col <- Set.toList cs
+        ]

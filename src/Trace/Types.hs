@@ -128,15 +128,13 @@ data TraceType = TraceType
   }
   deriving (Generic, Show)
 
-newtype Case = Case { unCase :: Scalar }
+newtype Case = Case {unCase :: Scalar}
   deriving (Eq, Ord, Generic, Show, Group.C)
 
-newtype Statement =
-  Statement { unStatement :: Map (Case, ColumnIndex) Scalar }
+newtype Statement = Statement {unStatement :: Map (Case, ColumnIndex) Scalar}
   deriving (Generic, Show)
 
-newtype Witness =
-  Witness { unWitness :: Map (Case, ColumnIndex) Scalar }
+newtype Witness = Witness {unWitness :: Map (Case, ColumnIndex) Scalar}
   deriving (Generic, Show)
 
 data Trace = Trace

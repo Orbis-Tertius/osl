@@ -73,6 +73,7 @@ library
     OSL.Debug
     OSL.EntryPoint
     OSL.Evaluation
+    OSL.FromHaskell
     OSL.LoadContext
     OSL.Map
     OSL.Parse
@@ -163,7 +164,9 @@ library
     safe,
     sydtest,
     sydtest-discover,
+    template-haskell,
     text -any,
+    time,
     transformers,
     validity
 
@@ -181,8 +184,10 @@ test-suite spec
 
   other-modules:
     OSL.Spec.Gen
+    OSL.Spec.FromHaskellSpec
     OSL.Spec.OSLSpec
     OSL.Spec.SimplifyTypeSpec
+    OSL.Spec.Sudoku.Types
     OSL.Spec.SudokuSpec
     Stark.Spec.ScalarSpec
 
@@ -214,6 +219,7 @@ test-suite spec
     raw-strings-qq,
     sydtest,
     text -any,
+    time,
     transformers,
     validity,
 
