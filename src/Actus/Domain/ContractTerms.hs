@@ -34,6 +34,7 @@ import Data.Text as T hiding (reverse, takeWhile)
 import Data.Text.Read as T
 import Data.Time (Day, LocalTime)
 import GHC.Generics (Generic)
+import OSL.FromHaskell (mkDataToAddOSL)
 
 -- |ContractType
 data CT = PAM   -- ^ Principal at maturity
@@ -133,13 +134,15 @@ data ScheduleConfig = ScheduleConfig
   deriving anyclass (FromJSON, ToJSON)
 
 -- |ContractPerformance
-data PRF = PRF_PF -- ^ Performant
-         | PRF_DL -- ^ Delayed
-         | PRF_DQ -- ^ Delinquent
-         | PRF_DF -- ^ Default
-         deriving stock (Show, Read, Eq, Generic)
+data PRF' = PRF_PF -- ^ Performant
+          | PRF_DL -- ^ Delayed
+          | PRF_DQ -- ^ Delinquent
+          | PRF_DF -- ^ Default
+          deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''PRF)
+$(mkDataToAddOSL "PRF'")
+
+$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''PRF')
 
 -- |CreditEventTypeCovered
 data CETC = CETC_DL -- ^ Delayed
@@ -418,7 +421,7 @@ data ContractTerms a = ContractTerms
   , marketObjectCodeRef                      :: Maybe String     -- ^ Market Object Code
 
   -- Counterparty
-  , contractPerformance                      :: Maybe PRF        -- ^ Contract Performance
+  , contractPerformance                      :: Maybe PRF'       -- ^ Contract Performance
   , creditEventTypeCovered                   :: Maybe CETC       -- ^ Credit Event Type Covered
   , coverageOfCreditEnhancement              :: Maybe a          -- ^ Coverage Of Credit Enhancement
   , guaranteedExposure                       :: Maybe CEGE       -- ^ Guaranteed Exposure

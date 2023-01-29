@@ -21,9 +21,7 @@ library
     Actus.Model
     Actus.Model.Applicability
     Actus.Model.Payoff
-    Actus.Model.StateTransition
     Actus.Model.ContractSchedule
-    Actus.Model.StateInitialization
     Actus.Utility
     Actus.Utility.ANN.Annuity
     Actus.Utility.DateShift

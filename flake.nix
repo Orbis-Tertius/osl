@@ -45,7 +45,7 @@
           {
             overrides = hfinal: hprev:
               horizon-platform.packages.x86_64-linux // {
-                osl = dontCheck (disableLibraryProfiling (hprev.callCabal2nix "osl" ./. { }));
+                osl = dontHaddock (dontCheck (disableLibraryProfiling (hprev.callCabal2nix "osl" ./. { })));
                 osl-spec = disableLibraryProfiling (hprev.callCabal2nix "osl:spec" ./. { });
                 sydtest = dontCheck (hprev.callCabal2nix "sydtest" (sydtest-src + /sydtest) { });
                 genvalidity-sydtest = dontCheck (hprev.callCabal2nix "genvalidity-sydtest" (validity-src + /genvalidity-sydtest) { });

@@ -1,37 +1,108 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -Wno-missing-export-lists #-}
+{-# OPTIONS_GHC -Wno-missing-export-lists -Wno-orphans #-}
 
 module Actus.Domain.ContractState
   where
 
-import Actus.Domain.ContractTerms (PRF)
+import Actus.Domain.ContractTerms (PRF')
 import Control.Lens
-import Data.Time (LocalTime)
+import Data.Time (LocalTime (..), TimeOfDay (..))
+import OSL.FromHaskell (ToOSLType, mkDataToAddOSL)
+import Prelude hiding (Rational)
+
+newtype Numerator = Numerator Integer
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype Denominator = Denominator Integer
+  deriving newtype (Show, Eq, ToOSLType)
+
+data Rational = Rational Numerator Denominator
+  deriving (Show, Eq)
+
+mkDataToAddOSL "Rational"
+mkDataToAddOSL "TimeOfDay"
+mkDataToAddOSL "LocalTime"
+
+newtype Value = Value Integer
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype Rate = Rate Rational
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype Period = Period Integer
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype MD' = MD' LocalTime
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype NT = NT Value
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype IPNR = IPNR Rate
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype IPAC = IPAC Value
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype IPAC1 = IPAC1 Value
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype IPAC2 = IPAC2 Value
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype IPLA = IPLA Period
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype FEAC = FEAC Value
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype NSC = NSC Rational
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype ISC = ISC Rational
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype SD = SD LocalTime
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype PRNXT = PRNXT Value
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype IPCB = IPCB Rational
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype XD = XD LocalTime
+  deriving newtype (Show, Eq, ToOSLType)
+
+newtype XA = XA Value
+  deriving newtype (Show, Eq, ToOSLType)
 
 {-| ACTUS contract states are defined in
     https://github.com/actusfrf/actus-dictionary/blob/master/actus-dictionary-states.json
 -}
-data ContractState a = ContractState
+data ContractState = ContractState
   {
-    tmd   :: Maybe LocalTime -- ^ Maturity Date (MD): The timestamp as per which the contract matures according to the initial terms or as per unscheduled events
-  , nt    :: a               -- ^ Notional Principal (NT): The outstanding nominal value
-  , ipnr  :: a               -- ^ Nominal Interest Rate (IPNR) : The applicable nominal rate
-  , ipac  :: a               -- ^ Accrued Interest (IPAC): The current value of accrued interest
-  , ipac1 :: Maybe a         -- ^ Accrued Interest (IPAC1): The current value of accrued interest of the first leg
-  , ipac2 :: Maybe a         -- ^ Accrued Interest (IPAC2): The current value of accrued interest of the second leg
-  , ipla  :: Maybe a         -- ^ Last Interst Period
-  , feac  :: a               -- ^ Fee Accrued (FEAC): The current value of accrued fees
-  , nsc   :: a               -- ^ Notional Scaling Multiplier (SCNT): The multiplier being applied to principal cash flows
-  , isc   :: a               -- ^ InterestScalingMultiplier (SCIP): The multiplier being applied to interest cash flows
-  , prf   :: PRF             -- ^ Contract Performance (PRF)
-  , sd    :: LocalTime       -- ^ Status Date (MD): The timestamp as per which the state is captured at any point in time
-  , prnxt :: a               -- ^ Next Principal Redemption Payment (PRNXT): The value at which principal is being repaid
-  , ipcb  :: a               -- ^ Interest Calculation Base (IPCB)
+    tmd   :: Maybe MD'       -- ^ Maturity Date (MD): The timestamp as per which the contract matures according to the initial terms or as per unscheduled events
+  , nt    :: NT              -- ^ Notional Principal (NT): The outstanding nominal value
+  , ipnr  :: IPNR            -- ^ Nominal Interest Rate (IPNR) : The applicable nominal rate
+  , ipac  :: IPAC            -- ^ Accrued Interest (IPAC): The current value of accrued interest
+  , ipac1 :: Maybe IPAC1     -- ^ Accrued Interest (IPAC1): The current value of accrued interest of the first leg
+  , ipac2 :: Maybe IPAC2     -- ^ Accrued Interest (IPAC2): The current value of accrued interest of the second leg
+  , ipla  :: Maybe IPLA      -- ^ Last Interst Period
+  , feac  :: FEAC            -- ^ Fee Accrued (FEAC): The current value of accrued fees
+  , nsc   :: NSC             -- ^ Notional Scaling Multiplier (SCNT): The multiplier being applied to principal cash flows
+  , isc   :: ISC             -- ^ InterestScalingMultiplier (SCIP): The multiplier being applied to interest cash flows
+  , prf   :: PRF'            -- ^ Contract Performance (PRF)
+  , sd    :: SD              -- ^ Status Date (MD): The timestamp as per which the state is captured at any point in time
+  , prnxt :: PRNXT           -- ^ Next Principal Redemption Payment (PRNXT): The value at which principal is being repaid
+  , ipcb  :: IPCB            -- ^ Interest Calculation Base (IPCB)
   , xd    :: Maybe LocalTime -- ^ Exercise Date (XD)
-  , xa    :: Maybe a         -- ^ Exercise Amount (XA)
+  , xa    :: Maybe XA        -- ^ Exercise Amount (XA)
   }
   deriving stock (Show, Eq)
 

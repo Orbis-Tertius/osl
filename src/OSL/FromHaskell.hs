@@ -218,6 +218,10 @@ mkDataToAddOSL nameStr = do
                   <> Map.singleton
                        $(pure (LitE (StringL nameStr)))
                        (OSL.Data $(ctorsCoproduct ctors)))
+
+        instance ToOSLType $(pure (ConT name)) where
+          toOSLType _ _ =
+            OSL.NamedType () $(pure (LitE (StringL nameStr)))
         |]
     _ -> die $ "mkDataToAddOSL: expected a simple algebraic data type: " <> nameTxt
   where
