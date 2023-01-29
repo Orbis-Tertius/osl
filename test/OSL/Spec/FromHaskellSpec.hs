@@ -6,12 +6,11 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module OSL.Spec.FromHaskellSpec (spec) where
 
-import Control.Monad.State (State, runState)
+import Control.Monad.State (State, execState)
 import Data.Fixed (Fixed, Pico)
 import qualified Data.Map as Map
 import Data.Proxy (Proxy (Proxy))
@@ -160,7 +159,7 @@ enumType =
   it "correctly assembles an enum type context " $
     enumTypesContext `shouldBe` expectedContext
   where
-    enumTypesContext = snd $ runState (add (Proxy @Enum3)) mempty
+    enumTypesContext = execState (add (Proxy @Enum3)) mempty
 
     add = addToOSLContextM
 
@@ -188,7 +187,7 @@ sudokuTypes =
   it "correctly assembles a sudoku types context" $
     sudokuTypesContext `shouldBe` expectedContext
   where
-    sudokuTypesContext = snd . flip runState mempty $ do
+    sudokuTypesContext = flip execState mempty $ do
       add (Proxy @(Newtype Digit))
       add (Proxy @(Newtype Row))
       add (Proxy @(Newtype Col))

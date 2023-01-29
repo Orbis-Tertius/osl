@@ -7,7 +7,6 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Trace.FromLogicCircuit
   ( logicCircuitToTraceType,
@@ -140,27 +139,24 @@ getLookupTableCache ann lc arg (inputCols, outputCol) = do
       ]
   where
     rowToLookupTableRow r =
-      (,)
-        <$> ( Map.fromList
-                <$> sequence
-                  [ maybe
-                      (Left (ErrorMessage ann "input column not defined"))
-                      (pure . (inputCol,))
-                      (Map.lookup (inputCol ^. #unLookupTableColumn) r)
-                    | inputCol <- Set.toList inputCols
-                  ]
-            )
-        <*> ( maybe
-                (Left (ErrorMessage ann "output column not defined"))
-                pure
-                ( Map.lookup
-                    ( outputCol
-                        ^. #unLookupTableOutputColumn
-                          . #unLookupTableColumn
-                    )
-                    r
-                )
-            )
+      (,) . Map.fromList
+        <$> sequence
+          [ maybe
+              (Left (ErrorMessage ann "input column not defined"))
+              (pure . (inputCol,))
+              (Map.lookup (inputCol ^. #unLookupTableColumn) r)
+            | inputCol <- Set.toList inputCols
+          ]
+        <*> maybe
+          (Left (ErrorMessage ann "output column not defined"))
+          pure
+          ( Map.lookup
+              ( outputCol
+                  ^. #unLookupTableOutputColumn
+                    . #unLookupTableColumn
+              )
+              r
+          )
 
 argumentToTrace ::
   ann ->
@@ -566,7 +562,7 @@ getConstraintSubexpressionId ann mapping =
       op =<< (Equals' <$> term x <*> term y)
     LC.Atom (LC.LessThan x y) ->
       op =<< (LessThan' <$> term x <*> term y)
-    LC.Not p -> op =<< (Not' <$> rec p)
+    LC.Not p -> op . Not' =<< rec p
     LC.And p q -> op =<< (TimesAnd' <$> rec p <*> rec q)
     LC.Or p q -> op =<< (Or' <$> rec p <*> rec q)
     LC.Iff p q -> op =<< (Equals' <$> rec p <*> rec q)
@@ -830,11 +826,10 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
       (pure . (^. #unBareLookupSubexpressionId))
       ( Map.lookup
           ( BareLookupArgument
-              ( ( zipWith
-                    (\(ie, col) eid -> (ie, Just eid, col))
-                    lookupArg
-                    (Map.elems (inputs' <&> InputSubexpressionId . (^. _2)))
-                )
+              ( zipWith
+                  (\(ie, col) eid -> (ie, Just eid, col))
+                  lookupArg
+                  (Map.elems (inputs' <&> InputSubexpressionId . (^. _2)))
                   <> [ ( InputExpression
                            ( LC.Var
                                ( PolynomialVariable

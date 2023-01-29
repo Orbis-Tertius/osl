@@ -1,6 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
@@ -12,6 +10,7 @@ import Control.Monad (forM_)
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import Die (die)
 import OSL.ArgumentForm (getArgumentForm)
 import OSL.LoadContext (loadContext)
@@ -541,9 +540,8 @@ squareToValue (Square (x, y)) =
 squareToEncodedValue :: Square -> Value
 squareToEncodedValue (Square (X x, Y y)) =
   To' "SquareEncoded" . Fin' $
-    maybe
+    fromMaybe
       (die "squareToEncodedValue: out of range of scalar")
-      id
       (integerToScalar ((3 * y) + x))
 
 squareCellToValue :: Square -> SquareCell -> Value

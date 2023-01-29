@@ -7,7 +7,6 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -261,7 +260,7 @@ mkDataToAddOSL nameStr = do
                     case ctorArgs of
                       (t : ts) ->
                         foldl'
-                          (\a b -> AppT (AppT (TupleT 2) a) b)
+                          (AppT . AppT (TupleT 2))
                           t
                           ts
                       [] -> TupleT 0

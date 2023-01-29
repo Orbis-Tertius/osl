@@ -14,7 +14,7 @@ import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (integerToInt)
 import Control.Lens ((<&>), (^.))
-import Control.Monad (forM, forM_, unless, void, when)
+import Control.Monad (forM, forM_, unless, when)
 import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -103,14 +103,13 @@ checkPolynomialConstraints ::
   PolynomialConstraints ->
   Either (ErrorMessage ann) ()
 checkPolynomialConstraints ann c ec cs =
-  void $
-    sequence
-      [ do
-          z <- evalPolynomial ann c ec c'
-          unless (z == zero) . Left . ErrorMessage ann $
-            "polynomial constraint not satisfied: " <> pack (show (l, c', c, ec ^. #localMappings))
-        | (l, c') <- cs ^. #constraints
-      ]
+  sequence_
+    [ do
+        z <- evalPolynomial ann c ec c'
+        unless (z == zero) . Left . ErrorMessage ann $
+          "polynomial constraint not satisfied: " <> pack (show (l, c', c, ec ^. #localMappings))
+      | (l, c') <- cs ^. #constraints
+    ]
 
 evalPolynomial ::
   ann ->
@@ -223,7 +222,7 @@ checkAllEqualityConstraintsAreSatisfied ann tt t = do
     vs <- mapM (lookupCellReference ann cellMap) (Set.toList (eq ^. #getEqualityConstraint))
     case vs of
       [] -> pure ()
-      (v : _) -> when (not (all (== v) vs)) (Left (ErrorMessage ann "equality constraint not satisifed"))
+      (v : _) -> unless (all (== v) vs) (Left (ErrorMessage ann "equality constraint not satisifed"))
 
 lookupCellReference ::
   ann ->
