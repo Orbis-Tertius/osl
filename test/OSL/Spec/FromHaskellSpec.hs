@@ -7,7 +7,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module OSL.Spec.FromHaskellSpec (spec) where
 
@@ -18,9 +18,12 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Time (Day, TimeOfDay, LocalTime)
 import GHC.Generics (Generic)
 import OSL.Spec.Sudoku.Types (Digit, Row, Col, Cell, Problem, Solution, X, Y, Square, SquareCell)
-import OSL.FromHaskell (AddToOSLContext, ToOSLType (toOSLType), addToOSLContextM, productType, mkRecordToOSL)
+import OSL.FromHaskell (AddToOSLContext, ToOSLType (toOSLType), addToOSLContextM, mkRecordToOSL)
 import qualified OSL.Types.OSL as OSL
 import Test.Syd (Spec, describe, it, shouldBe)
+
+mkRecordToOSL "TimeOfDay"
+mkRecordToOSL "LocalTime"
 
 data Record2 = Record2 Int Int
   deriving Generic
@@ -50,8 +53,8 @@ spec =
     record2Type
     record3Type
     record4Type
---     timeOfDayType
---     localTimeType
+    timeOfDayType
+    localTimeType
     sudokuTypes
 
 unitType :: Spec
@@ -114,21 +117,29 @@ record4Type =
     toOSLType (Proxy @Record4) mempty
       `shouldBe` OSL.Product () (OSL.Product () (OSL.Product () (OSL.Z ()) (OSL.Z ())) (OSL.Z ())) (OSL.Z ())
 
--- timeOfDayType :: Spec
--- timeOfDayType =
---   it "TimeOfDay -> _" $
---     toOSLType (Proxy @TimeOfDay) mempty
---       `shouldBe` OSL.Product () (OSL.Z ()) (OSL.Product () (OSL.Z ()) (OSL.Fin () 1000000000000))
--- 
--- localTimeType :: Spec
--- localTimeType =
---   it "LocalTime -> _" $
---     toOSLType (Proxy @LocalTime) mempty
---       `shouldBe`
---         OSL.Product () (OSL.N ())
---           (OSL.Product () (OSL.Z ())
---             (OSL.Product () (OSL.Z ())
---               (OSL.Fin () 1000000000000)))
+timeOfDayType :: Spec
+timeOfDayType =
+  it "TimeOfDay -> _" $
+    toOSLType (Proxy @TimeOfDay) mempty
+      `shouldBe`
+        OSL.Product ()
+          (OSL.Product ()
+            (OSL.Z ())
+            (OSL.Z ()))
+          (OSL.Fin () 1000000000000)
+
+localTimeType :: Spec
+localTimeType =
+  it "LocalTime -> _" $
+    toOSLType (Proxy @LocalTime) mempty
+      `shouldBe`
+        OSL.Product ()
+          (OSL.Z ())
+          (OSL.Product ()
+            (OSL.Product ()
+              (OSL.Z ())
+              (OSL.Z ()))
+            (OSL.Fin () 1000000000000))
 
 sudokuTypes :: Spec
 sudokuTypes =
