@@ -19,20 +19,21 @@ module OSL.Spec.Sudoku.Types
   ) where
 
 import Data.Map (Map)
+import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
 import OSL.FromHaskell (ToOSLType)
 
 newtype Digit = Digit Integer
-  deriving (Eq, Ord, Num, Enum, Show, Generic, ToOSLType)
+  deriving (Eq, Ord, Num, Enum, Show, Generic, ToOSLType, Typeable)
 
 newtype Row = Row Integer
-  deriving (Eq, Ord, Num, Enum, Show, Generic, ToOSLType)
+  deriving (Eq, Ord, Num, Enum, Show, Generic, ToOSLType, Typeable)
 
 newtype Col = Col Integer
-  deriving (Eq, Ord, Num, Enum, Show, Generic, ToOSLType)
+  deriving (Eq, Ord, Num, Enum, Show, Generic, ToOSLType, Typeable)
 
 newtype Cell = Cell (Row, Col)
-  deriving (Eq, Ord, Show, Generic, ToOSLType)
+  deriving (Eq, Ord, Show, Generic, Typeable, ToOSLType)
 
 newtype Problem = Problem {unProblem :: Cell -> Maybe Digit}
   deriving (Generic, ToOSLType)

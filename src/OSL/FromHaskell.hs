@@ -16,6 +16,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module OSL.FromHaskell
   ( ToOSLType (toOSLType),
@@ -33,6 +34,7 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Text (pack)
 import Data.Time (Day (..), LocalTime (..))
 import Data.Time.LocalTime (TimeOfDay (..))
+import Data.Typeable (Typeable, tyConName, typeRepTyCon, typeRep)
 import GHC.Generics (Generic, Rep, U1, V1, (:*:), (:+:), M1, D, C, S, K1, R, Meta (MetaData))
 import GHC.TypeLits (KnownNat, KnownSymbol, symbolVal)
 import qualified OSL.Types.OSL as OSL
@@ -53,7 +55,7 @@ instance GToOSLType t V1 where
 
 -- Data types
 instance
-  ( GToOSLType t a, KnownSymbol n ) =>
+  ( ToOSLType t, Typeable t, KnownSymbol n ) =>
   GToOSLType t (M1 D (MetaData n m p f) a) where
   gtoOSLType
     (Proxy :: Proxy t)
@@ -61,7 +63,7 @@ instance
     c =
     case Map.lookup sym (c ^. #unValidContext) of
       Just _ -> OSL.NamedType () sym
-      _ -> gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy a) c
+      _ -> ntoOSLType (Proxy :: Proxy t) c
     where
       sym = OSL.Sym (pack (symbolVal (Proxy @name)))
 
@@ -81,29 +83,41 @@ instance GToOSLType t (Rep a) => GToOSLType t (K1 R a) where
     gtoOSLType (Proxy :: Proxy t) (Proxy :: Proxy (Rep a)) c
 
 -- Products
-instance ( GToOSLType a ra, GToOSLType b rb )
-           => GToOSLType (a, b) (ra :*: rb) where
-  gtoOSLType (Proxy :: Proxy (a, b)) (Proxy :: Proxy (ra :*: rb)) c =
-    OSL.Product ()
-      (gtoOSLType (Proxy :: Proxy a) (Proxy :: Proxy ra) c)
-      (gtoOSLType (Proxy :: Proxy b) (Proxy :: Proxy rb) c)
+-- instance ( GToOSLType a ra, GToOSLType b rb )
+--            => GToOSLType (a, b) (ra :*: rb) where
+--   gtoOSLType (Proxy :: Proxy (a, b)) (Proxy :: Proxy (ra :*: rb)) c =
+--     OSL.Product ()
+--       (gtoOSLType (Proxy :: Proxy a) (Proxy :: Proxy ra) c)
+--       (gtoOSLType (Proxy :: Proxy b) (Proxy :: Proxy rb) c)
 
-instance ( ToOSLType a, ToOSLType b )
+instance ( ToOSLType a, ToOSLType b, Typeable a, Typeable b )
            => ToOSLType (a, b) where
   toOSLType (Proxy :: Proxy (a, b)) c =
     OSL.Product ()
-      (toOSLType (Proxy :: Proxy a) c)
-      (toOSLType (Proxy :: Proxy b) c)
+      (ntoOSLType (Proxy :: Proxy a) c)
+      (ntoOSLType (Proxy :: Proxy b) c)
+
+ntoOSLType ::
+  ( ToOSLType a, Typeable a ) =>
+  Proxy a ->
+  OSL.ValidContext 'OSL.Global () ->
+  OSL.Type ()
+ntoOSLType pxy c =
+  case Map.lookup sym (c ^. #unValidContext) of
+    Just (OSL.Data t) -> t
+    _ -> toOSLType pxy c
+  where
+    sym = OSL.Sym (pack (tyConName (typeRepTyCon (typeRep pxy))))
 
 -- Records with two fields
-instance ( GToOSLType a (Rep a), GToOSLType b (Rep b) )
+instance ( ToOSLType a, ToOSLType b, Typeable a, Typeable b )
            => GToOSLType t (M1 S ma (K1 R a) :*: M1 S mb (K1 R b)) where
   gtoOSLType (Proxy :: Proxy t)
              (Proxy :: Proxy (M1 S ma (K1 R a) :*: M1 S mb (K1 R b)))
-              c =
+             c =
     OSL.Product ()
-      (gtoOSLType (Proxy :: Proxy a) (Proxy :: Proxy (Rep a)) c)
-      (gtoOSLType (Proxy :: Proxy b) (Proxy :: Proxy (Rep b)) c)
+      (ntoOSLType (Proxy :: Proxy a) c)
+      (ntoOSLType (Proxy :: Proxy b) c)
 
 -- Records with three fields
 instance ( GToOSLType a (Rep a), GToOSLType b (Rep b), GToOSLType c (Rep c) )
@@ -153,24 +167,24 @@ instance ( GToOSLType a ra, GToOSLType b rb )
       (gtoOSLType (Proxy :: Proxy b) (Proxy :: Proxy rb) c)
 
 -- Functions
-instance ( ToOSLType a, ToOSLType b ) => ToOSLType (a -> b) where
+instance ( ToOSLType a, ToOSLType b, Typeable a, Typeable b ) => ToOSLType (a -> b) where
   toOSLType (Proxy :: Proxy (a -> b)) c =
-    OSL.F () Nothing (toOSLType (Proxy @a) c) (toOSLType (Proxy @b) c)
+    OSL.F () Nothing (ntoOSLType (Proxy @a) c) (ntoOSLType (Proxy @b) c)
 
 -- Maybe
-instance ToOSLType a => ToOSLType (Maybe a) where
+instance ( ToOSLType a, Typeable a ) => ToOSLType (Maybe a) where
   toOSLType (Proxy :: Proxy (Maybe a)) c =
-    OSL.Maybe () (toOSLType (Proxy @a) c)
+    OSL.Maybe () (ntoOSLType (Proxy @a) c)
 
 -- Map
-instance ( ToOSLType a, ToOSLType b ) => ToOSLType (Map a b) where
+instance ( ToOSLType a, ToOSLType b, Typeable a, Typeable b ) => ToOSLType (Map a b) where
   toOSLType (Proxy :: Proxy (Map a b)) c =
-    OSL.Map () 1 (toOSLType (Proxy @a) c) (toOSLType (Proxy @b) c)
+    OSL.Map () 1 (ntoOSLType (Proxy @a) c) (ntoOSLType (Proxy @b) c)
 
 -- List
-instance ToOSLType a => ToOSLType [a] where
+instance ( ToOSLType a, Typeable a ) => ToOSLType [a] where
   toOSLType (Proxy :: Proxy [a]) c =
-    OSL.List () 1 (toOSLType (Proxy @a) c)
+    OSL.List () 1 (ntoOSLType (Proxy @a) c)
 
 -- Scalar types
 instance GToOSLType Integer a where
@@ -201,7 +215,7 @@ class GAddToOSLContext (a :: Type) (ra :: Type -> Type) where
 
 -- newtypes
 instance
-  ( KnownSymbol n, ToOSLType t ) =>
+  ( KnownSymbol n, ToOSLType t, Typeable t ) =>
   GAddToOSLContext t (M1 D (MetaData n m p True) a) where
   gAddToOSLContext
     (Proxy :: Proxy t)
@@ -210,7 +224,7 @@ instance
     c <> OSL.ValidContext
            (Map.singleton
               (OSL.Sym (pack (symbolVal (Proxy @name))))
-              (OSL.Data (toOSLType (Proxy @t) c)))
+              (OSL.Data (ntoOSLType (Proxy @t) c)))
 
 instance GAddToOSLContext a (Rep a) => AddToOSLContext a where
   addToOSLContext (Proxy :: Proxy a) = gAddToOSLContext (Proxy @a) (Proxy @(Rep a))

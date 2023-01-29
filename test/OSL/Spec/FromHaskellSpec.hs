@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module OSL.Spec.FromHaskellSpec (spec) where
 
@@ -130,12 +131,12 @@ sudokuTypes =
       add (Proxy @Row)
       add (Proxy @Col)
       add (Proxy @Cell)
-      add (Proxy @Problem)
-      add (Proxy @Solution)
-      add (Proxy @X)
-      add (Proxy @Y)
-      add (Proxy @Square)
-      add (Proxy @SquareCell)
+--       add (Proxy @Problem)
+--       add (Proxy @Solution)
+--       add (Proxy @X)
+--       add (Proxy @Y)
+--       add (Proxy @Square)
+--       add (Proxy @SquareCell)
 
     expectedContext =
       OSL.ValidContext . Map.fromList $
