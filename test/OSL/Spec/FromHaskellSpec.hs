@@ -131,12 +131,12 @@ sudokuTypes =
       add (Proxy @Row)
       add (Proxy @Col)
       add (Proxy @Cell)
---       add (Proxy @Problem)
---       add (Proxy @Solution)
---       add (Proxy @X)
---       add (Proxy @Y)
---       add (Proxy @Square)
---       add (Proxy @SquareCell)
+      add (Proxy @Problem)
+      add (Proxy @Solution)
+      add (Proxy @X)
+      add (Proxy @Y)
+      add (Proxy @Square)
+      add (Proxy @SquareCell)
 
     expectedContext =
       OSL.ValidContext . Map.fromList $
@@ -157,7 +157,19 @@ sudokuTypes =
             OSL.Data
               (OSL.F () Nothing
                 (OSL.NamedType () (OSL.Sym "Cell"))
-                (OSL.NamedType () (OSL.Sym "Digit"))))
+                (OSL.NamedType () (OSL.Sym "Digit")))),
+          (OSL.Sym "X", OSL.Data (OSL.Z ())),
+          (OSL.Sym "Y", OSL.Data (OSL.Z ())),
+          (OSL.Sym "Square",
+            OSL.Data
+              (OSL.Product ()
+                (OSL.NamedType () "X")
+                (OSL.NamedType () "Y"))),
+          (OSL.Sym "SquareCell",
+            OSL.Data
+              (OSL.Product ()
+                (OSL.NamedType () "X")
+                (OSL.NamedType () "Y")))
         ]
 
     add :: forall a. AddToOSLContext a => Proxy a -> State (OSL.ValidContext 'OSL.Global ()) ()
