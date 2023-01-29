@@ -19,6 +19,7 @@ import Data.Text.Encoding (decodeUtf8')
 import Halo2.CircuitMetrics (getCircuitMetrics)
 import Halo2.Types.BitsPerByte (BitsPerByte (BitsPerByte))
 import Halo2.Types.RowCount (RowCount (RowCount))
+import OSL.ActusDictionary (actusDictionaryFormatted)
 import OSL.BuildTranslationContext (buildTranslationContext)
 import OSL.Parse (parseContext)
 import OSL.Tokenize (tokenize)
@@ -163,7 +164,5 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
     _ -> Left . ErrorMessage $ "please provide the name of a defined term"
 
 genActusDictionary :: IO Output
-genActusDictionary = todo
-
-todo :: a
-todo = todo
+genActusDictionary =
+  pure $ Output actusDictionaryFormatted
