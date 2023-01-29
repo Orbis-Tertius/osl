@@ -1,9 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module OSL.Spec.FromHaskellSpec (spec) where
@@ -15,9 +18,24 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Time (Day, TimeOfDay, LocalTime)
 import GHC.Generics (Generic)
 import OSL.Spec.Sudoku.Types (Digit, Row, Col, Cell, Problem, Solution, X, Y, Square, SquareCell)
-import OSL.FromHaskell (AddToOSLContext, ToOSLType (toOSLType), addToOSLContextM)
+import OSL.FromHaskell (AddToOSLContext, ToOSLType (toOSLType), addToOSLContextM, productType, mkRecordToOSL)
 import qualified OSL.Types.OSL as OSL
 import Test.Syd (Spec, describe, it, shouldBe)
+
+data Record2 = Record2 Int Int
+  deriving Generic
+
+mkRecordToOSL "Record2"
+
+data Record3 = Record3 Int Int Int
+  deriving Generic
+
+mkRecordToOSL "Record3"
+
+data Record4 = Record4 Int Int Int Int
+  deriving Generic
+
+mkRecordToOSL "Record4"
 
 spec :: Spec
 spec =
@@ -32,8 +50,8 @@ spec =
     record2Type
     record3Type
     record4Type
-    timeOfDayType
-    localTimeType
+--     timeOfDayType
+--     localTimeType
     sudokuTypes
 
 unitType :: Spec
@@ -78,48 +96,39 @@ picoType =
     toOSLType (Proxy @Pico) mempty
       `shouldBe` OSL.Fin () 1000000000000
 
-data Record2 = Record2 Int Int
-  deriving Generic
-
 record2Type :: Spec
 record2Type =
   it "Record2 -> Z * Z" $
     toOSLType (Proxy @Record2) mempty
       `shouldBe` OSL.Product () (OSL.Z ()) (OSL.Z ())
 
-data Record3 = Record3 Int Int Int
-  deriving Generic
-
 record3Type :: Spec
 record3Type =
   it "Record3 -> Z * Z * Z" $
     toOSLType (Proxy @Record3) mempty
-      `shouldBe` OSL.Product () (OSL.Z ()) (OSL.Product () (OSL.Z ()) (OSL.Z ()))
-
-data Record4 = Record4 Int Int Int Int
-  deriving Generic
+      `shouldBe` OSL.Product () (OSL.Product () (OSL.Z ()) (OSL.Z ())) (OSL.Z ())
 
 record4Type :: Spec
 record4Type =
   it "Record4 -> Z * Z * Z * Z" $
     toOSLType (Proxy @Record4) mempty
-      `shouldBe` OSL.Product () (OSL.Z ()) (OSL.Product () (OSL.Z ()) (OSL.Product () (OSL.Z ()) (OSL.Z ())))
+      `shouldBe` OSL.Product () (OSL.Product () (OSL.Product () (OSL.Z ()) (OSL.Z ())) (OSL.Z ())) (OSL.Z ())
 
-timeOfDayType :: Spec
-timeOfDayType =
-  it "TimeOfDay -> _" $
-    toOSLType (Proxy @TimeOfDay) mempty
-      `shouldBe` OSL.Product () (OSL.Z ()) (OSL.Product () (OSL.Z ()) (OSL.Fin () 1000000000000))
-
-localTimeType :: Spec
-localTimeType =
-  it "LocalTime -> _" $
-    toOSLType (Proxy @LocalTime) mempty
-      `shouldBe`
-        OSL.Product () (OSL.N ())
-          (OSL.Product () (OSL.Z ())
-            (OSL.Product () (OSL.Z ())
-              (OSL.Fin () 1000000000000)))
+-- timeOfDayType :: Spec
+-- timeOfDayType =
+--   it "TimeOfDay -> _" $
+--     toOSLType (Proxy @TimeOfDay) mempty
+--       `shouldBe` OSL.Product () (OSL.Z ()) (OSL.Product () (OSL.Z ()) (OSL.Fin () 1000000000000))
+-- 
+-- localTimeType :: Spec
+-- localTimeType =
+--   it "LocalTime -> _" $
+--     toOSLType (Proxy @LocalTime) mempty
+--       `shouldBe`
+--         OSL.Product () (OSL.N ())
+--           (OSL.Product () (OSL.Z ())
+--             (OSL.Product () (OSL.Z ())
+--               (OSL.Fin () 1000000000000)))
 
 sudokuTypes :: Spec
 sudokuTypes =

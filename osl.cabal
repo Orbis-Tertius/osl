@@ -164,6 +164,7 @@ library
     safe,
     sydtest,
     sydtest-discover,
+    template-haskell,
     text -any,
     time,
     transformers,
