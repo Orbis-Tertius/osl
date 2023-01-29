@@ -1,9 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Halo2.ByteDecomposition
   ( decomposeBytes,
@@ -22,8 +22,8 @@ import Halo2.Types.BitsPerByte (BitsPerByte (..))
 import Halo2.Types.Byte (Byte (..))
 import Halo2.Types.ByteDecomposition (ByteDecomposition (..))
 import Halo2.Types.FixedBound (FixedBound (..))
-import Halo2.Types.Sign (Sign (Positive, Negative))
-import Stark.Types.Scalar (Scalar, fromWord64, integerToScalar, scalarToInteger, normalize)
+import Halo2.Types.Sign (Sign (Negative, Positive))
+import Stark.Types.Scalar (Scalar, fromWord64, integerToScalar, normalize, scalarToInteger)
 
 -- Splits a scalar its into sign and its unsigned part, based on the idea
 -- that if x > |F|/2, then x is negative.
@@ -64,8 +64,8 @@ composeBytes bitsPerByte (ByteDecomposition s bs) =
 composeBytesPositive :: BitsPerByte -> [Byte] -> Scalar
 composeBytesPositive _ [] = 0
 composeBytesPositive (BitsPerByte b) (Byte x : xs) =
-    (x * (2 ^ intToInteger (b * length xs)))
-      + composeBytesPositive (BitsPerByte b) xs
+  (x * (2 ^ intToInteger (b * length xs)))
+    + composeBytesPositive (BitsPerByte b) xs
 
 applySign :: Sign -> Scalar -> Scalar
 applySign =

@@ -15,8 +15,9 @@ module OSL.Spec.Sudoku.Types
     Y (Y),
     Square (Square),
     SquareCell (SquareCell),
-    SudokuWitness (SudokuWitness, solution, rowPermutations, colPermutations, squarePermutations)
-  ) where
+    SudokuWitness (SudokuWitness, solution, rowPermutations, colPermutations, squarePermutations),
+  )
+where
 
 import Data.Map (Map)
 import Data.Typeable (Typeable)

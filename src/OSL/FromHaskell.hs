@@ -1,23 +1,23 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -29,8 +29,9 @@ module OSL.FromHaskell
     productType,
     coproductType,
     mkDataToOSL,
-    mkDataToAddOSL
-  ) where
+    mkDataToAddOSL,
+  )
+where
 
 import Control.Lens ((^.), _3)
 import Control.Monad.State (State, state)
@@ -42,10 +43,10 @@ import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (pack)
 import Data.Time (Day (..))
-import Data.Typeable (Typeable, tyConName, typeRepTyCon, typeRep, typeRepArgs)
+import Data.Typeable (Typeable, tyConName, typeRep, typeRepArgs, typeRepTyCon)
 import Die (die)
 import GHC.TypeLits (KnownNat)
-import Language.Haskell.TH (Dec, Q, lookupTypeName, reify, Info (TyConI), Dec (DataD), Con (NormalC, RecC), Exp (VarE, LitE, ListE), Lit (StringL), newName, Pat (VarP), Type (ConT, AppT, TupleT), nameBase)
+import Language.Haskell.TH (Con (NormalC, RecC), Dec (DataD), Exp (ListE, LitE, VarE), Info (TyConI), Lit (StringL), Pat (VarP), Q, Type (AppT, ConT, TupleT), lookupTypeName, nameBase, newName, reify)
 import qualified OSL.Types.OSL as OSL
 
 class ToOSLType a where
@@ -56,15 +57,18 @@ instance ToOSLType () where
   toOSLType _ _ = OSL.Fin () 1
 
 -- Products
-instance ( ToOSLType a, ToOSLType b, Typeable a, Typeable b )
-           => ToOSLType (a, b) where
+instance
+  (ToOSLType a, ToOSLType b, Typeable a, Typeable b) =>
+  ToOSLType (a, b)
+  where
   toOSLType (Proxy :: Proxy (a, b)) c =
-    OSL.Product ()
+    OSL.Product
+      ()
       (ntoOSLType (Proxy :: Proxy a) c)
       (ntoOSLType (Proxy :: Proxy b) c)
 
 ntoOSLType ::
-  ( ToOSLType a, Typeable a ) =>
+  (ToOSLType a, Typeable a) =>
   Proxy a ->
   OSL.ValidContext 'OSL.Global () ->
   OSL.Type ()
@@ -80,30 +84,33 @@ ntoOSLType pxy c =
     rep = typeRep pxy
 
 -- Coproducts
-instance ( ToOSLType a, ToOSLType b, Typeable a, Typeable b )
-           => ToOSLType (Either a b) where
+instance
+  (ToOSLType a, ToOSLType b, Typeable a, Typeable b) =>
+  ToOSLType (Either a b)
+  where
   toOSLType (Proxy :: Proxy (Either a b)) c =
-    OSL.Coproduct ()
+    OSL.Coproduct
+      ()
       (ntoOSLType (Proxy :: Proxy a) c)
       (ntoOSLType (Proxy :: Proxy b) c)
 
 -- Functions
-instance ( ToOSLType a, ToOSLType b, Typeable a, Typeable b ) => ToOSLType (a -> b) where
+instance (ToOSLType a, ToOSLType b, Typeable a, Typeable b) => ToOSLType (a -> b) where
   toOSLType (Proxy :: Proxy (a -> b)) c =
     OSL.F () Nothing (ntoOSLType (Proxy @a) c) (ntoOSLType (Proxy @b) c)
 
 -- Maybe
-instance ( ToOSLType a, Typeable a ) => ToOSLType (Maybe a) where
+instance (ToOSLType a, Typeable a) => ToOSLType (Maybe a) where
   toOSLType (Proxy :: Proxy (Maybe a)) c =
     OSL.Maybe () (ntoOSLType (Proxy @a) c)
 
 -- Map
-instance ( ToOSLType a, ToOSLType b, Typeable a, Typeable b ) => ToOSLType (Map a b) where
+instance (ToOSLType a, ToOSLType b, Typeable a, Typeable b) => ToOSLType (Map a b) where
   toOSLType (Proxy :: Proxy (Map a b)) c =
     OSL.Map () 1 (ntoOSLType (Proxy @a) c) (ntoOSLType (Proxy @b) c)
 
 -- List
-instance ( ToOSLType a, Typeable a ) => ToOSLType [a] where
+instance (ToOSLType a, Typeable a) => ToOSLType [a] where
   toOSLType (Proxy :: Proxy [a]) c =
     OSL.List () 1 (ntoOSLType (Proxy @a) c)
 
@@ -132,13 +139,16 @@ class AddToOSLContext a where
 data Newtype a
 
 instance
-  ( ToOSLType t, Typeable t ) =>
-    AddToOSLContext (Newtype t) where
+  (ToOSLType t, Typeable t) =>
+  AddToOSLContext (Newtype t)
+  where
   addToOSLContext (Proxy :: Proxy (Newtype t)) c =
-    c <> OSL.ValidContext
-           (Map.singleton
-              (OSL.Sym (pack (tyConName (typeRepTyCon (typeRep (Proxy :: Proxy t))))))
-              (OSL.Data (ntoOSLType (Proxy :: Proxy t) c)))
+    c
+      <> OSL.ValidContext
+        ( Map.singleton
+            (OSL.Sym (pack (tyConName (typeRepTyCon (typeRep (Proxy :: Proxy t))))))
+            (OSL.Data (ntoOSLType (Proxy :: Proxy t) c))
+        )
 
 addToOSLContextM ::
   AddToOSLContext a =>
@@ -150,11 +160,11 @@ deriving instance ToOSLType Day
 
 productType :: [OSL.Type ()] -> OSL.Type ()
 productType [] = OSL.Fin () 1
-productType (t:ts) = foldl' (OSL.Product ()) t ts
+productType (t : ts) = foldl' (OSL.Product ()) t ts
 
 coproductType :: [OSL.Type ()] -> OSL.Type ()
 coproductType [] = OSL.Fin () 0
-coproductType (t:ts) = foldl' (OSL.Coproduct ()) t ts
+coproductType (t : ts) = foldl' (OSL.Coproduct ()) t ts
 
 mkDataToOSL :: String -> Q [Dec]
 mkDataToOSL nameStr = do
@@ -167,34 +177,35 @@ mkDataToOSL nameStr = do
   case info of
     TyConI (DataD _cxt _name _binders _kind ctors _deriving) ->
       [d|
-         instance ToOSLType $(pure (ConT name)) where
-           toOSLType _ $(pure (VarP c)) =
-             coproductType $(ctorsToCoproductExp ctors c)
-       |]
+        instance ToOSLType $(pure (ConT name)) where
+          toOSLType _ $(pure (VarP c)) =
+            coproductType $(ctorsToCoproductExp ctors c)
+        |]
     _ -> die $ "mkDataToOSL: expected an algebraic data type: " <> nameTxt
   where
     nameTxt = pack nameStr
 
     ctorsToCoproductExp ctors c =
-      ListE <$> sequence
-        [ [|
-            productType $(ctorToProductExp c ctor)
-           |]
-          | ctor <- ctors
-        ]
+      ListE
+        <$> sequence
+          [ [|
+              productType $(ctorToProductExp c ctor)
+              |]
+            | ctor <- ctors
+          ]
 
     ctorToProductExp c =
       \case
         NormalC _ ts ->
-          ListE <$>
-            sequence
-              [ [| toOSLType (Proxy :: Proxy $(pure t)) $(pure (VarE c)) |]
+          ListE
+            <$> sequence
+              [ [|toOSLType (Proxy :: Proxy $(pure t)) $(pure (VarE c))|]
                 | (_, t) <- ts
               ]
         RecC _ ts ->
-          ListE <$>
-            sequence
-              [ [| toOSLType (Proxy :: Proxy $(pure t)) $(pure (VarE c)) |]
+          ListE
+            <$> sequence
+              [ [|toOSLType (Proxy :: Proxy $(pure t)) $(pure (VarE c))|]
                 | (_, _, t) <- ts
               ]
         ctor -> die $ "mkDataToOSL: expected a normal constructor: " <> pack (show ctor)
@@ -212,50 +223,60 @@ mkDataToAddOSL nameStr = do
       [d|
         instance AddToOSLContext $(pure (ConT name)) where
           addToOSLContext _ $(pure (VarP c)) =
-            $(pure (VarE c)) <>
-              OSL.ValidContext
-                (Map.fromList $(ctorsContextEntries ctors c)
-                  <> Map.singleton
-                       $(pure (LitE (StringL nameStr)))
-                       (OSL.Data $(ctorsCoproduct ctors)))
+            $(pure (VarE c))
+              <> OSL.ValidContext
+                ( Map.fromList $(ctorsContextEntries ctors c)
+                    <> Map.singleton
+                      $(pure (LitE (StringL nameStr)))
+                      (OSL.Data $(ctorsCoproduct ctors))
+                )
         |]
     _ -> die $ "mkDataToAddOSL: expected a simple algebraic data type: " <> nameTxt
   where
     nameTxt = pack nameStr
 
     ctorsContextEntries ctors c =
-      ListE <$> sequence
-        [ [| ($(pure (LitE (StringL (nameBase cName)))),
-              OSL.Data
-                (toOSLType
-                  (Proxy :: Proxy $(pure ctorType))
-                  $(pure (VarE c))))
-           |]
-          | ctor <- ctors,
-            let cName = ctorName ctor,
-            let ctorArgs =
-                  case ctor of
-                    NormalC _ ts -> snd <$> ts
-                    RecC _ ts -> (^. _3) <$> ts
-                    _ -> die $ "mkDataToAddOSL: expected a normal constructor: "
-                                 <> pack (show ctor),
-            let ctorType =
-                  case ctorArgs of
-                    (t:ts) ->
-                      foldl'
-                        (\a b -> AppT (AppT (TupleT 2) a) b)
-                        t
-                        ts
-                    [] -> TupleT 0
-        ]
+      ListE
+        <$> sequence
+          [ [|
+              ( $(pure (LitE (StringL (nameBase cName)))),
+                OSL.Data
+                  ( toOSLType
+                      (Proxy :: Proxy $(pure ctorType))
+                      $(pure (VarE c))
+                  )
+              )
+              |]
+            | ctor <- ctors,
+              let cName = ctorName ctor,
+              let ctorArgs =
+                    case ctor of
+                      NormalC _ ts -> snd <$> ts
+                      RecC _ ts -> (^. _3) <$> ts
+                      _ ->
+                        die $
+                          "mkDataToAddOSL: expected a normal constructor: "
+                            <> pack (show ctor),
+              let ctorType =
+                    case ctorArgs of
+                      (t : ts) ->
+                        foldl'
+                          (\a b -> AppT (AppT (TupleT 2) a) b)
+                          t
+                          ts
+                      [] -> TupleT 0
+          ]
 
     ctorsCoproduct ctors =
-      [| coproductType
-           $(ListE <$> sequence
-               [ [| OSL.NamedType () $(pure (LitE (StringL (nameBase (ctorName ctor))))) |]
-                 | ctor <- ctors
-               ])
-       |]
+      [|
+        coproductType
+          $( ListE
+               <$> sequence
+                 [ [|OSL.NamedType () $(pure (LitE (StringL (nameBase (ctorName ctor)))))|]
+                   | ctor <- ctors
+                 ]
+           )
+        |]
 
     ctorName =
       \case

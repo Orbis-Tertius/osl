@@ -170,7 +170,7 @@ linksTable ::
   TraceType ->
   LinksTable
 linksTable =
-  LinksTable . fmap (\((st,o),is) -> SubexpressionLink st is o) . Map.toList . (^. #links)
+  LinksTable . fmap (\((st, o), is) -> SubexpressionLink st is o) . Map.toList . (^. #links)
 
 linksTableFixedColumns ::
   LinksTable ->

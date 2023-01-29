@@ -10,12 +10,11 @@ import GHC.Generics (Generic)
 import Halo2.Types.ColumnIndex (ColumnIndex)
 import Halo2.Types.LookupTableColumn (LookupTableColumn)
 import OSL.Types.OSL (ContextType (Global, Local))
-import Trace.Types (Case)
 import Stark.Types.Scalar (Scalar)
+import Trace.Types (Case)
 
 type EvaluationContext :: ContextType -> Type
-data EvaluationContext t =
-  EvaluationContext
+data EvaluationContext t = EvaluationContext
   { globalMappings :: Map (Case, ColumnIndex) Scalar,
     localMappings :: Map ColumnIndex Scalar,
     lookupTables :: Map (Set LookupTableColumn) (Set (Map LookupTableColumn Scalar))
