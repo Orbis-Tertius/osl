@@ -43,6 +43,9 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
+    ["actus-dictionary"] ->
+      putStrLn . unOutput
+        =<< genActusDictionary
     [fileName, targetName] ->
       putStrLn . unOutput
         =<< runMain (FileName fileName) (TargetName targetName) CompileToCircuit
@@ -158,3 +161,9 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
               <> "\n\nArithmetic circuit:\n"
               <> show circuit
     _ -> Left . ErrorMessage $ "please provide the name of a defined term"
+
+genActusDictionary :: IO Output
+genActusDictionary = todo
+
+todo :: a
+todo = todo
