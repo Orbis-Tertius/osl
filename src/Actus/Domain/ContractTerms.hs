@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -10,6 +11,7 @@
 module Actus.Domain.ContractTerms
   where
 
+import Actus.Domain.Basic (Rational)
 import Control.Applicative ((<|>))
 import Control.Monad (guard, mzero)
 import Data.Aeson.TH (deriveJSON)
@@ -34,7 +36,8 @@ import Data.Text as T hiding (reverse, takeWhile)
 import Data.Text.Read as T
 import Data.Time (Day, LocalTime)
 import GHC.Generics (Generic)
-import OSL.FromHaskell (mkDataToAddOSL)
+import OSL.FromHaskell (ToOSLType, mkDataToAddOSL)
+import Prelude hiding (Rational)
 
 -- |ContractType
 data CT = PAM   -- ^ Principal at maturity
@@ -167,12 +170,12 @@ data FEB = FEB_A -- ^ Absolute value
 $(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''FEB)
 
 -- |InterestCalculationBase
-data IPCB = IPCB_NT    -- ^ Calculation base always equals to NT
-          | IPCB_NTIED -- ^ Notional remains constant amount as per IED
-          | IPCB_NTL   -- ^ Calculation base is notional base laged
+data IPCB' = IPCB_NT    -- ^ Calculation base always equals to NT
+           | IPCB_NTIED -- ^ Notional remains constant amount as per IED
+           | IPCB_NTL   -- ^ Calculation base is notional base laged
           deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''IPCB)
+$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''IPCB')
 
 -- |ScalingEffect
 data SCEF = SE_OOO -- ^ No scaling
@@ -331,9 +334,15 @@ data Assertions = Assertions
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
+newtype RRMOMin = RRMOMin Rational
+  deriving newtype (Show, ToOSLType, FromJSON, ToJSON)
+
+newtype RRMOMax = RRMOMax Rational
+  deriving newtype (Show, ToOSLType, FromJSON, ToJSON)
+
 data AssertionContext = AssertionContext
-  { rrmoMin :: Double
-  , rrmoMax :: Double
+  { rrmoMin :: RRMOMin
+  , rrmoMax :: RRMOMax
   }
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
@@ -440,7 +449,7 @@ data ContractTerms a = ContractTerms
   , capitalizationEndDate                    :: Maybe LocalTime  -- ^ Capitalization End Date
   , cycleAnchorDateOfInterestCalculationBase :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Interest Calculation Base
   , cycleOfInterestCalculationBase           :: Maybe Cycle      -- ^ Cycle Of Interest Calculation Base
-  , interestCalculationBase                  :: Maybe IPCB       -- ^ Interest Calculation Base
+  , interestCalculationBase                  :: Maybe IPCB'      -- ^ Interest Calculation Base
   , interestCalculationBaseA                 :: Maybe a          -- ^ Interest Calculation Base Amount
   , nominalInterestRate                      :: Maybe a          -- ^ Nominal Interest Rate
   , nominalInterestRate2                     :: Maybe a          -- ^ Nominal Interest Rate (Second Leg in Plain Vanilla Swap)

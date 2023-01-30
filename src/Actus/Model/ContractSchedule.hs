@@ -17,7 +17,7 @@ import Actus.Domain
   , Cycle(..)
   , DS(..)
   , EventType(..)
-  , IPCB(..)
+  , IPCB'(..)
   , PPEF(..)
   , PYTP(..)
   , Reference(..)
