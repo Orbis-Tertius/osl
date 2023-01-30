@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module OSL.TranslatedEvaluation
   ( evalTranslatedFormula1,
@@ -15,10 +14,10 @@ where
 
 import Control.Lens ((^.))
 import Data.Either.Extra (mapLeft)
-import Halo2.Types.BitsPerByte (BitsPerByte)
 import Halo2.Circuit (HasEvaluate (evaluate))
-import Halo2.Types.Circuit (LogicCircuit)
 import qualified Halo2.Types.Argument as C
+import Halo2.Types.BitsPerByte (BitsPerByte)
+import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.RowCount (RowCount (RowCount))
 import OSL.Argument (toSigma11Argument)
 import qualified OSL.Sigma11 as S11
@@ -33,7 +32,7 @@ import Semicircuit.Gensyms (deBruijnToGensyms, deBruijnToGensymsEvalContext)
 import Semicircuit.PNFFormula (toPNFFormula, toSemicircuit)
 import Semicircuit.PrenexNormalForm (statementToSuperStrongPrenexNormalForm, toPrenexNormalForm, toStrongPrenexNormalForm, toSuperStrongPrenexNormalForm, witnessToPrenexNormalForm, witnessToStrongPrenexNormalForm, witnessToSuperStrongPrenexNormalForm)
 import Semicircuit.ToLogicCircuit (semicircuitArgumentToLogicCircuitArgument, semicircuitToLogicCircuit)
-import Trace.FromLogicCircuit (logicCircuitToTraceType, argumentToTrace)
+import Trace.FromLogicCircuit (argumentToTrace, logicCircuitToTraceType)
 import Trace.Semantics (evalTrace)
 
 -- First codegen pass: OSL -> OSL.Sigma11

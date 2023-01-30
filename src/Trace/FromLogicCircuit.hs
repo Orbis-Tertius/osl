@@ -7,7 +7,6 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Trace.FromLogicCircuit
   ( logicCircuitToTraceType,
@@ -16,13 +15,12 @@ module Trace.FromLogicCircuit
   )
 where
 
-import OSL.Debug (showTrace)
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Applicative ((<|>))
 import Control.Lens ((<&>), _1, _2, _3)
-import Control.Monad (foldM, mzero, replicateM, when, forM_)
+import Control.Monad (foldM, forM_, mzero, replicateM, when)
 import Control.Monad.Trans.State (State, evalState, get, put)
 import Data.Either.Extra (mapLeft)
 import Data.List (foldl')
@@ -31,8 +29,8 @@ import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Die (die)
-import Halo2.ByteDecomposition (countBytes, decomposeBytes, applySign)
-import Halo2.Circuit (getLookupTables, getPolynomialVariables, getScalars, lessIndicator, getCellMapRows, getRowSet, getCellMap)
+import Halo2.ByteDecomposition (applySign, countBytes, decomposeBytes)
+import Halo2.Circuit (getCellMap, getCellMapRows, getLookupTables, getPolynomialVariables, getRowSet, getScalars, lessIndicator)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import qualified Halo2.Types.Argument as LC
@@ -59,19 +57,20 @@ import Halo2.Types.PolynomialDegreeBound (PolynomialDegreeBound (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Relative))
-import Halo2.Types.Sign (Sign (Positive, Negative))
+import Halo2.Types.Sign (Sign (Negative, Positive))
+import OSL.Debug (showTrace)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Safe (headMay)
-import Stark.Types.Scalar (Scalar, integerToScalar, one, two, zero, scalarToInteger, inverseScalar)
-import Trace.Types (CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), TraceType (TraceType), Trace (Trace), Case (Case), Statement (Statement), Witness (Witness), SubexpressionTrace (SubexpressionTrace))
+import Stark.Types.Scalar (Scalar, integerToScalar, inverseScalar, one, scalarToInteger, two, zero)
+import Trace.Types (Case (Case), CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), Statement (Statement), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), SubexpressionTrace (SubexpressionTrace), Trace (Trace), TraceType (TraceType), Witness (Witness))
 
-newtype LookupCaches =
-  LookupCaches
-    { lookupTermCaches ::
-        Map (Set LookupTableColumn, LC.LookupTableOutputColumn)
-          (Map (Map LookupTableColumn Scalar) Scalar)
-    }
+newtype LookupCaches = LookupCaches
+  { lookupTermCaches ::
+      Map
+        (Set LookupTableColumn, LC.LookupTableOutputColumn)
+        (Map (Map LookupTableColumn Scalar) Scalar)
+  }
   deriving (Generic, Show)
 
 getLookupCaches ::
@@ -80,10 +79,10 @@ getLookupCaches ::
   LC.Argument ->
   Either (ErrorMessage ann) LookupCaches
 getLookupCaches ann lc arg =
-  LookupCaches . Map.fromList <$>
-    mapM
-     (\t -> (t,) <$> getLookupTableCache ann lc arg t)
-     (Set.toList (getLogicCircuitLookupTables lc))
+  LookupCaches . Map.fromList
+    <$> mapM
+      (\t -> (t,) <$> getLookupTableCache ann lc arg t)
+      (Set.toList (getLogicCircuitLookupTables lc))
 
 getLogicCircuitLookupTables ::
   LogicCircuit ->
@@ -133,27 +132,31 @@ getLookupTableCache ::
   Either (ErrorMessage ann) (Map (Map LookupTableColumn Scalar) Scalar)
 getLookupTableCache ann lc arg (inputCols, outputCol) = do
   let rows = getCellMapRows (getRowSet (lc ^. #rowCount) Nothing) (getCellMap arg)
-  Map.fromList <$> sequence
-    [ rowToLookupTableRow r
-     | (_, r) <- Map.toList rows
-    ]
+  Map.fromList
+    <$> sequence
+      [ rowToLookupTableRow r
+        | (_, r) <- Map.toList rows
+      ]
   where
     rowToLookupTableRow r =
-      (,)
-        <$> (Map.fromList <$>
-              sequence
-                [ maybe
-                    (Left (ErrorMessage ann "input column not defined"))
-                    (pure . (inputCol,))
-                    (Map.lookup (inputCol ^. #unLookupTableColumn) r)
-                  | inputCol <- Set.toList inputCols
-                ])
-        <*> (maybe
-              (Left (ErrorMessage ann "output column not defined"))
-              pure
-              (Map.lookup (outputCol ^. #unLookupTableOutputColumn
-                            . #unLookupTableColumn)
-                r))
+      (,) . Map.fromList
+        <$> sequence
+          [ maybe
+              (Left (ErrorMessage ann "input column not defined"))
+              (pure . (inputCol,))
+              (Map.lookup (inputCol ^. #unLookupTableColumn) r)
+            | inputCol <- Set.toList inputCols
+          ]
+        <*> maybe
+          (Left (ErrorMessage ann "output column not defined"))
+          pure
+          ( Map.lookup
+              ( outputCol
+                  ^. #unLookupTableOutputColumn
+                    . #unLookupTableColumn
+              )
+              r
+          )
 
 argumentToTrace ::
   ann ->
@@ -172,16 +175,18 @@ argumentToTrace ann bitsPerByte lc arg = do
     <$> logicCircuitStatementToTraceStatement ann (arg ^. #statement)
     <*> logicCircuitWitnessToTraceWitness ann (arg ^. #witness)
     <*> pure usedCases
-    <*> ((voidCase usedCases voidId <>)
-          <$> argumentSubexpressionTraces ann lc arg mapping usedCases)
+    <*> ( (voidCase usedCases voidId <>)
+            <$> argumentSubexpressionTraces ann lc arg mapping usedCases
+        )
   where
     voidCase usedCases voidId =
       Map.fromList
-        [ ((i, voidId),
-           SubexpressionTrace
-             zero
-             (mapping ^. #stepTypeIds . #voidT . #unOf)
-             (getDefaultAdvice mapping))
+        [ ( (i, voidId),
+            SubexpressionTrace
+              zero
+              (mapping ^. #stepTypeIds . #voidT . #unOf)
+              (getDefaultAdvice mapping)
+          )
           | i <- Set.toList usedCases
         ]
 
@@ -192,11 +197,14 @@ logicCircuitUsedCases ::
   LogicCircuit ->
   Either (ErrorMessage ann) (Set Case)
 logicCircuitUsedCases ann lc =
-  Set.fromList <$> sequence
-    [ maybe (Left (ErrorMessage ann "case index outside of scalar field"))
-        (pure . Case) (integerToScalar i)
-      | i <- [0 .. scalarToInteger (lc ^. #rowCount . #getRowCount) - 1]
-    ]
+  Set.fromList
+    <$> sequence
+      [ maybe
+          (Left (ErrorMessage ann "case index outside of scalar field"))
+          (pure . Case)
+          (integerToScalar i)
+        | i <- [0 .. scalarToInteger (lc ^. #rowCount . #getRowCount) - 1]
+      ]
 
 argumentSubexpressionTraces ::
   ann ->
@@ -207,10 +215,13 @@ argumentSubexpressionTraces ::
   Either (ErrorMessage ann) (Map (Case, SubexpressionId) SubexpressionTrace)
 argumentSubexpressionTraces ann lc arg mapping cases = do
   tables <- showTrace "lookupCaches" <$> getLookupCaches ann lc arg
-  mconcat <$>
-    mapM (\c -> Map.mapKeys (c,) <$>
-           caseArgumentSubexpressionTraces ann lc arg mapping tables c)
-         (Set.toList cases)
+  mconcat
+    <$> mapM
+      ( \c ->
+          Map.mapKeys (c,)
+            <$> caseArgumentSubexpressionTraces ann lc arg mapping tables c
+      )
+      (Set.toList cases)
 
 caseArgumentSubexpressionTraces ::
   ann ->
@@ -222,11 +233,16 @@ caseArgumentSubexpressionTraces ::
   Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace)
 caseArgumentSubexpressionTraces ann lc arg mapping tables c =
   (<>)
-    <$> (mconcat <$>
-           mapM (fmap (^. _1) . topLevelLogicConstraintSubexpressionTraces ann lc arg mapping tables c)
-             ((lc ^. #gateConstraints . #constraints) <&> snd))
-    <*> (mconcat <$> mapM (lookupArgumentSubexpressionTraces ann lc arg mapping tables c)
-                       (Set.toList (lc ^. #lookupArguments . #getLookupArguments)))
+    <$> ( mconcat
+            <$> mapM
+              (fmap (^. _1) . topLevelLogicConstraintSubexpressionTraces ann lc arg mapping tables c)
+              ((lc ^. #gateConstraints . #constraints) <&> snd)
+        )
+    <*> ( mconcat
+            <$> mapM
+              (lookupArgumentSubexpressionTraces ann lc arg mapping tables c)
+              (Set.toList (lc ^. #lookupArguments . #getLookupArguments))
+        )
 
 getAssertionSubexpressionId ::
   ann ->
@@ -252,15 +268,17 @@ topLevelLogicConstraintSubexpressionTraces ann lc arg mapping caches c p = do
   (m, sId, _) <- logicConstraintSubexpressionTraces ann lc arg mapping caches c p
   OutputSubexpressionId sId' <- getAssertionSubexpressionId ann mapping (InputSubexpressionId sId)
   pure
-    (m <>
-      Map.singleton
-      sId'
-      (SubexpressionTrace
-        zero
-        (mapping ^. #stepTypeIds . #assertT . #unOf)
-        (getDefaultAdvice mapping)),
-     sId',
-     zero)
+    ( m
+        <> Map.singleton
+          sId'
+          ( SubexpressionTrace
+              zero
+              (mapping ^. #stepTypeIds . #assertT . #unOf)
+              (getDefaultAdvice mapping)
+          ),
+      sId',
+      zero
+    )
 
 logicConstraintSubexpressionTraces ::
   ann ->
@@ -272,72 +290,72 @@ logicConstraintSubexpressionTraces ::
   LogicConstraint ->
   Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, SubexpressionId, Scalar)
 logicConstraintSubexpressionTraces ann lc arg mapping tables c =
-   \case
-     LC.Atom (LC.Equals x y) -> do
-       (m0, s0, x') <- term x
-       (m1, s1, y') <- term y
-       advice <- getByteDecomposition ann lc mapping (x' Group.- y')
-       s2 <- getOperationSubexpressionId ann mapping (Equals' s0 s1)
-       let v = if x' == y' then one else zero
-           m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #equals . #unOf) advice)
-       pure (m0 <> m1 <> m2, s2, v)
-     LC.Atom (LC.LessThan x y) -> do
-       (m0, s0, x') <- term x
-       (m1, s1, y') <- term y
-       advice <- getByteDecomposition ann lc mapping (x' Group.- y')
-       s2 <- getOperationSubexpressionId ann mapping (LessThan' s0 s1)
-       let v = if x' < y' then one else zero
-           m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #lessThan . #unOf) advice)
-       pure (m0 <> m1 <> m2, s2, v)
-     LC.Not p -> do
-       (m0, s0, x') <- rec p
-       s1 <- getOperationSubexpressionId ann mapping (Not' s0)
-       let v = one Group.- x'
-           m1 = Map.singleton s1 (SubexpressionTrace v (mapping ^. #stepTypeIds . #not . #unOf) defaultAdvice)
-       pure (m0 <> m1, s1, v)
-     t@(LC.And p q) -> do
-       (m0, s0, x') <- rec p
-       if x' == zero
-         then do
-           s1 <- getConstraintSubexpressionId ann mapping q
-           s2 <- getOperationSubexpressionId ann mapping (TimesAndShortCircuit' s0 s1)
-           let m2 = Map.singleton s2 (SubexpressionTrace zero (mapping ^. #stepTypeIds . #timesAndShortCircuit . #unOf) defaultAdvice)
-           pure (m0 <> m2, s2, zero)
-         else do
-           (m1, s1, y') <- rec q
-           s2 <- withTrace t $ getOperationSubexpressionId ann mapping (TimesAnd' s0 s1)
-           let v = x' Ring.* y'
-               m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #timesAnd . #unOf) defaultAdvice)
-           pure (m0 <> m1 <> m2, s2, v)
-     t@(LC.Or p q) -> do
-       (m0, s0, x') <- rec p
-       if x' == one
-         then do
-           s1 <- getConstraintSubexpressionId ann mapping q
-           s2 <- getOperationSubexpressionId ann mapping (OrShortCircuit' s0 s1)
-           let m2 = Map.singleton s2 (SubexpressionTrace one (mapping ^. #stepTypeIds . #orShortCircuit . #unOf) defaultAdvice)
-           pure (m0 <> m2, s2, one)
-         else do
-           (m1, s1, y') <- rec q
-           s2 <- withTrace t (getOperationSubexpressionId ann mapping (Or' s0 s1))
-           let v = (x' Group.+ y') Group.- (x' Ring.* y')
-               m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #or . #unOf) defaultAdvice)
-           pure (m0 <> m1 <> m2, s2, v)
-     LC.Iff p q -> do
-       (m0, s0, x') <- rec p
-       (m1, s1, y') <- rec q
-       s2 <- getOperationSubexpressionId ann mapping (Iff' s0 s1)
-       let v = if x' == y' then one else zero
-           m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #iff . #unOf) defaultAdvice)
-       pure (m0 <> m1 <> m2, s2, v)
-     LC.Top -> do
-       sId <- getConstantSubexpressionId ann mapping one
-       stId <- getConstantStepTypeId ann mapping one
-       pure (Map.singleton sId (SubexpressionTrace one stId defaultAdvice), sId, one)
-     LC.Bottom -> do
-       sId <- getConstantSubexpressionId ann mapping zero
-       stId <- getConstantStepTypeId ann mapping zero
-       pure (Map.singleton sId (SubexpressionTrace zero stId defaultAdvice), sId, zero)
+  \case
+    LC.Atom (LC.Equals x y) -> do
+      (m0, s0, x') <- term x
+      (m1, s1, y') <- term y
+      advice <- getByteDecomposition ann lc mapping (x' Group.- y')
+      s2 <- getOperationSubexpressionId ann mapping (Equals' s0 s1)
+      let v = if x' == y' then one else zero
+          m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #equals . #unOf) advice)
+      pure (m0 <> m1 <> m2, s2, v)
+    LC.Atom (LC.LessThan x y) -> do
+      (m0, s0, x') <- term x
+      (m1, s1, y') <- term y
+      advice <- getByteDecomposition ann lc mapping (x' Group.- y')
+      s2 <- getOperationSubexpressionId ann mapping (LessThan' s0 s1)
+      let v = if x' < y' then one else zero
+          m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #lessThan . #unOf) advice)
+      pure (m0 <> m1 <> m2, s2, v)
+    LC.Not p -> do
+      (m0, s0, x') <- rec p
+      s1 <- getOperationSubexpressionId ann mapping (Not' s0)
+      let v = one Group.- x'
+          m1 = Map.singleton s1 (SubexpressionTrace v (mapping ^. #stepTypeIds . #not . #unOf) defaultAdvice)
+      pure (m0 <> m1, s1, v)
+    t@(LC.And p q) -> do
+      (m0, s0, x') <- rec p
+      if x' == zero
+        then do
+          s1 <- getConstraintSubexpressionId ann mapping q
+          s2 <- getOperationSubexpressionId ann mapping (TimesAndShortCircuit' s0 s1)
+          let m2 = Map.singleton s2 (SubexpressionTrace zero (mapping ^. #stepTypeIds . #timesAndShortCircuit . #unOf) defaultAdvice)
+          pure (m0 <> m2, s2, zero)
+        else do
+          (m1, s1, y') <- rec q
+          s2 <- withTrace t $ getOperationSubexpressionId ann mapping (TimesAnd' s0 s1)
+          let v = x' Ring.* y'
+              m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #timesAnd . #unOf) defaultAdvice)
+          pure (m0 <> m1 <> m2, s2, v)
+    t@(LC.Or p q) -> do
+      (m0, s0, x') <- rec p
+      if x' == one
+        then do
+          s1 <- getConstraintSubexpressionId ann mapping q
+          s2 <- getOperationSubexpressionId ann mapping (OrShortCircuit' s0 s1)
+          let m2 = Map.singleton s2 (SubexpressionTrace one (mapping ^. #stepTypeIds . #orShortCircuit . #unOf) defaultAdvice)
+          pure (m0 <> m2, s2, one)
+        else do
+          (m1, s1, y') <- rec q
+          s2 <- withTrace t (getOperationSubexpressionId ann mapping (Or' s0 s1))
+          let v = (x' Group.+ y') Group.- (x' Ring.* y')
+              m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #or . #unOf) defaultAdvice)
+          pure (m0 <> m1 <> m2, s2, v)
+    LC.Iff p q -> do
+      (m0, s0, x') <- rec p
+      (m1, s1, y') <- rec q
+      s2 <- getOperationSubexpressionId ann mapping (Iff' s0 s1)
+      let v = if x' == y' then one else zero
+          m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #iff . #unOf) defaultAdvice)
+      pure (m0 <> m1 <> m2, s2, v)
+    LC.Top -> do
+      sId <- getConstantSubexpressionId ann mapping one
+      stId <- getConstantStepTypeId ann mapping one
+      pure (Map.singleton sId (SubexpressionTrace one stId defaultAdvice), sId, one)
+    LC.Bottom -> do
+      sId <- getConstantSubexpressionId ann mapping zero
+      stId <- getConstantStepTypeId ann mapping zero
+      pure (Map.singleton sId (SubexpressionTrace zero stId defaultAdvice), sId, zero)
   where
     rec = logicConstraintSubexpressionTraces ann lc arg mapping tables c
     term = logicTermSubexpressionTraces ann lc arg mapping tables c
@@ -351,14 +369,13 @@ getDefaultAdvice mapping =
   Map.singleton
     (mapping ^. #byteDecomposition . #sign . #unSignColumnIndex)
     zero
-  <>
-  mconcat
-    [ Map.fromList
-        [ (bc ^. #unByteColumnIndex, zero),
-          (tc ^. #unTruthValueColumnIndex, zero)
-        ]
-      | (bc, tc) <- mapping ^. #byteDecomposition . #bytes
-    ]
+    <> mconcat
+      [ Map.fromList
+          [ (bc ^. #unByteColumnIndex, zero),
+            (tc ^. #unTruthValueColumnIndex, zero)
+          ]
+        | (bc, tc) <- mapping ^. #byteDecomposition . #bytes
+      ]
 
 getByteDecomposition ::
   ann ->
@@ -379,33 +396,53 @@ getByteDecomposition ann lc mapping x = do
       x' = applySign (bytesSigned ^. #sign) x
       bytesUnsigned = decomposeBytes bitsPerByte x'
       numBytes = length (bytesUnsigned ^. #bytes)
-  when (bytesUnsigned ^. #sign /= Positive)
+  when
+    (bytesUnsigned ^. #sign /= Positive)
     (Left (ErrorMessage ann "unsigned byte decomposition is negative (this is a compiler bug)"))
-  when (length byteCols /= expectedLength)
+  when
+    (length byteCols /= expectedLength)
     (Left (ErrorMessage ann "unexpected byte decomposition mapping length"))
-  when (numBytes < expectedLength)
-    (Left (ErrorMessage ann ("unexpected byte decomposition length: expected " <>
-             pack (show expectedLength) <> " but got " <>
-             pack (show numBytes))))
+  when
+    (numBytes < expectedLength)
+    ( Left
+        ( ErrorMessage
+            ann
+            ( "unexpected byte decomposition length: expected "
+                <> pack (show expectedLength)
+                <> " but got "
+                <> pack (show numBytes)
+            )
+        )
+    )
   forM_ (take (numBytes - expectedLength) (bytesUnsigned ^. #bytes)) $ \b ->
-    when (b /= Byte zero)
-      (Left (ErrorMessage ann
-        ("number is out of bounds and will not fit in byte decomposition columns: "
-          <> pack (show (x, bytesSigned)))))
-  pure $ Map.singleton (signCol ^. #unSignColumnIndex) signScalar
-    <> mconcat
-         [ Map.fromList
-             [ (bCol ^. #unByteColumnIndex, b),
-               (tCol ^. #unTruthValueColumnIndex, t)
-             ]
-           | ((bCol, tCol), (b, t)) <-
-               zip byteCols
-                 [ (b, if b == zero then one else zero)
-                   | b <- drop (numBytes - expectedLength)
-                               (bytesUnsigned ^. #bytes)
-                            <&> (^. #unByte)
-                 ]
-         ]
+    when
+      (b /= Byte zero)
+      ( Left
+          ( ErrorMessage
+              ann
+              ( "number is out of bounds and will not fit in byte decomposition columns: "
+                  <> pack (show (x, bytesSigned))
+              )
+          )
+      )
+  pure $
+    Map.singleton (signCol ^. #unSignColumnIndex) signScalar
+      <> mconcat
+        [ Map.fromList
+            [ (bCol ^. #unByteColumnIndex, b),
+              (tCol ^. #unTruthValueColumnIndex, t)
+            ]
+          | ((bCol, tCol), (b, t)) <-
+              zip
+                byteCols
+                [ (b, if b == zero then one else zero)
+                  | b <-
+                      drop
+                        (numBytes - expectedLength)
+                        (bytesUnsigned ^. #bytes)
+                        <&> (^. #unByte)
+                ]
+        ]
 
 getOperationSubexpressionId ::
   ann ->
@@ -415,8 +452,9 @@ getOperationSubexpressionId ::
 getOperationSubexpressionId ann mapping op =
   case Map.lookup op (mapping ^. #subexpressionIds . #operations) of
     Just sId -> pure (sId ^. #unOf)
-    Nothing -> Left . ErrorMessage ann
-      $ "operation subexpression id not found: "
+    Nothing ->
+      Left . ErrorMessage ann $
+        "operation subexpression id not found: "
           <> pack (show op)
 
 getConstantStepTypeId ::
@@ -459,17 +497,24 @@ getLookupTermSubexpressionId ann mapping (is, o) =
   maybe
     (Left (ErrorMessage ann "lookup term subexpression id not found"))
     (pure . (^. #unBareLookupSubexpressionId))
-    (Map.lookup
-      (BareLookupArgument
-        (is <>
-          [(InputExpression
-            (LC.Var
-              (PolynomialVariable
-                (mapping ^. #output . #unOutputColumnIndex)
-                (0 :: RowIndex 'Relative))),
-            Nothing,
-            o ^. #unLookupTableOutputColumn)]))
-      (mapping ^. #subexpressionIds . #bareLookups))
+    ( Map.lookup
+        ( BareLookupArgument
+            ( is
+                <> [ ( InputExpression
+                         ( LC.Var
+                             ( PolynomialVariable
+                                 (mapping ^. #output . #unOutputColumnIndex)
+                                 (0 :: RowIndex 'Relative)
+                             )
+                         ),
+                       Nothing,
+                       o ^. #unLookupTableOutputColumn
+                     )
+                   ]
+            )
+        )
+        (mapping ^. #subexpressionIds . #bareLookups)
+    )
 
 getInputSubexpressionId ::
   ann ->
@@ -490,7 +535,7 @@ getTermSubexpressionId ann mapping =
     LC.Lookup is o -> do
       is' <-
         mapM
-          (\(i,c) -> (i,,c) . Just <$> getInputSubexpressionId ann mapping i)
+          (\(i, c) -> (i,,c) . Just <$> getInputSubexpressionId ann mapping i)
           is
       getLookupTermSubexpressionId ann mapping (is', o)
     LC.Plus x y ->
@@ -517,7 +562,7 @@ getConstraintSubexpressionId ann mapping =
       op =<< (Equals' <$> term x <*> term y)
     LC.Atom (LC.LessThan x y) ->
       op =<< (LessThan' <$> term x <*> term y)
-    LC.Not p -> op =<< (Not' <$> rec p)
+    LC.Not p -> op . Not' =<< rec p
     LC.And p q -> op =<< (TimesAnd' <$> rec p <*> rec q)
     LC.Or p q -> op =<< (Or' <$> rec p <*> rec q)
     LC.Iff p q -> op =<< (Equals' <$> rec p <*> rec q)
@@ -620,10 +665,16 @@ polyVarSameCaseSubexpressionTraces ::
   PolynomialVariable ->
   Either (ErrorMessage ann) (Map SubexpressionId SubexpressionTrace, SubexpressionId, Scalar)
 polyVarSameCaseSubexpressionTraces ann numCases arg mapping c x = do
-  st <- maybe (Left (ErrorMessage ann "load step type lookup failed"))
-          pure (Map.lookup x (mapping ^. #stepTypeIds . #loads))
-  sId <- maybe (Left (ErrorMessage ann "variable subexpression id lookup failed"))
-           (pure . (^. #unOf)) (Map.lookup x (mapping ^. #subexpressionIds . #variables))
+  st <-
+    maybe
+      (Left (ErrorMessage ann "load step type lookup failed"))
+      pure
+      (Map.lookup x (mapping ^. #stepTypeIds . #loads))
+  sId <-
+    maybe
+      (Left (ErrorMessage ann "variable subexpression id lookup failed"))
+      (pure . (^. #unOf))
+      (Map.lookup x (mapping ^. #subexpressionIds . #variables))
   v <- polyVarValue ann numCases arg c x
   pure (Map.singleton sId (SubexpressionTrace v st defaultAdvice), sId, v)
   where
@@ -642,18 +693,29 @@ polyVarValue ann (NumberOfCases numCases) arg c v = do
       (Left (ErrorMessage ann "number of cases exceeds max Int"))
       pure
       (integerToInt (scalarToInteger numCases))
-  ri <- maybe (Left (ErrorMessage ann "row index exceeds max Int"))
-          pure (integerToInt (scalarToInteger (c ^. #unCase)))
-  let ref = CellReference (v ^. #colIndex)
-              (RowIndex ((ri + (v ^. #rowIndex . #getRowIndex))
-                         `mod` numCases'))
+  ri <-
+    maybe
+      (Left (ErrorMessage ann "row index exceeds max Int"))
+      pure
+      (integerToInt (scalarToInteger (c ^. #unCase)))
+  let ref =
+        CellReference
+          (v ^. #colIndex)
+          ( RowIndex
+              ( (ri + (v ^. #rowIndex . #getRowIndex))
+                  `mod` numCases'
+              )
+          )
   case Map.lookup ref (arg ^. #statement . #unStatement) of
     Just x -> pure x
     Nothing ->
       maybe
-        (Left
-          (ErrorMessage ann
-            ("variable not defined: " <> pack (show (c, v)))))
+        ( Left
+            ( ErrorMessage
+                ann
+                ("variable not defined: " <> pack (show (c, v)))
+            )
+        )
         pure
         (Map.lookup ref (arg ^. #witness . #unWitness))
 
@@ -669,10 +731,11 @@ polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
   (m0, _, _) <- constant (rowIndexToScalar (x ^. #rowIndex))
   (m1, _, _) <- constant (polyVarStepTypeId (PolynomialVariable (x ^. #colIndex) 0) ^. #unStepTypeId)
   let st = mapping ^. #stepTypeIds . #loadFromDifferentCase . #unOf
-  sId <- maybe
-           (Left (ErrorMessage ann "variable subexpression id lookup failed"))
-           (pure . (^. #unOf))
-           (Map.lookup x (mapping ^. #subexpressionIds . #variables))
+  sId <-
+    maybe
+      (Left (ErrorMessage ann "variable subexpression id lookup failed"))
+      (pure . (^. #unOf))
+      (Map.lookup x (mapping ^. #subexpressionIds . #variables))
   v <- polyVarValue ann numCases arg c x
   pure (m0 <> m1 <> Map.singleton sId (SubexpressionTrace v st advice), sId, v)
   where
@@ -689,7 +752,7 @@ polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
         (integerToScalar (scalarToInteger ((c ^. #unCase) Group.+ r) `mod` scalarToInteger n))
     divZero = "polyVarDifferentCaseSubexpressionTraces: division by zero"
     d = (((c ^. #unCase) Group.+ r) Group.- a) Ring.* fromMaybe (die divZero) (inverseScalar n)
-    specialAdvice = Map.fromList [ (ai, a), (di, d) ]
+    specialAdvice = Map.fromList [(ai, a), (di, d)]
     advice = specialAdvice <> defaultAdvice
 
     rowIndexToScalar :: RowIndex a -> Scalar
@@ -724,44 +787,64 @@ lookupTermSubexpressionTraces ann lc arg mapping tables c lookupArg outCol = do
       lookupInputs = inputs' <&> (^. _2)
   lookupCache <-
     maybe
-      (Left
-        (ErrorMessage ann
-          ("lookup cache lookup failed: " <> pack (show lookupTerm))))
+      ( Left
+          ( ErrorMessage
+              ann
+              ("lookup cache lookup failed: " <> pack (show lookupTerm))
+          )
+      )
       pure
-      (Map.lookup
-        lookupTerm
-        (tables ^. #lookupTermCaches))
-  v <- maybe
-         (Left
-           (ErrorMessage ann
-             ("lookup term lookup failed: " <> pack (show (lookupTerm, lookupInputs)))))
-         pure
-         (Map.lookup (inputs' <&> (^. _3)) lookupCache)
-  st <- maybe (Left (ErrorMessage ann "step type lookup failed"))
-          pure
-          (Map.lookup
-            (LookupTable
-              (((^. _2) <$> lookupArg) <>
-                [outCol ^. #unLookupTableOutputColumn]))
-            (mapping ^. #stepTypeIds . #lookupTables))
-  sId <- 
+      ( Map.lookup
+          lookupTerm
+          (tables ^. #lookupTermCaches)
+      )
+  v <-
+    maybe
+      ( Left
+          ( ErrorMessage
+              ann
+              ("lookup term lookup failed: " <> pack (show (lookupTerm, lookupInputs)))
+          )
+      )
+      pure
+      (Map.lookup (inputs' <&> (^. _3)) lookupCache)
+  st <-
+    maybe
+      (Left (ErrorMessage ann "step type lookup failed"))
+      pure
+      ( Map.lookup
+          ( LookupTable
+              ( ((^. _2) <$> lookupArg)
+                  <> [outCol ^. #unLookupTableOutputColumn]
+              )
+          )
+          (mapping ^. #stepTypeIds . #lookupTables)
+      )
+  sId <-
     maybe
       (Left (ErrorMessage ann "lookup subexpression id lookup failed"))
       (pure . (^. #unBareLookupSubexpressionId))
-      (Map.lookup
-        (BareLookupArgument
-          ((zipWith
-              (\(ie, col) eid -> (ie, Just eid, col))
-              lookupArg
-              (Map.elems (inputs' <&> InputSubexpressionId . (^. _2)))) <>
-            [(InputExpression
-               (LC.Var
-                 (PolynomialVariable
-                   (mapping ^. #output . #unOutputColumnIndex)
-                   (0 :: RowIndex 'Relative))),
-              Nothing,
-              outCol ^. #unLookupTableOutputColumn)]))
-        (mapping ^. #subexpressionIds . #bareLookups))
+      ( Map.lookup
+          ( BareLookupArgument
+              ( zipWith
+                  (\(ie, col) eid -> (ie, Just eid, col))
+                  lookupArg
+                  (Map.elems (inputs' <&> InputSubexpressionId . (^. _2)))
+                  <> [ ( InputExpression
+                           ( LC.Var
+                               ( PolynomialVariable
+                                   (mapping ^. #output . #unOutputColumnIndex)
+                                   (0 :: RowIndex 'Relative)
+                               )
+                           ),
+                         Nothing,
+                         outCol ^. #unLookupTableOutputColumn
+                       )
+                     ]
+              )
+          )
+          (mapping ^. #subexpressionIds . #bareLookups)
+      )
   let ms = inputs' <&> (^. _1)
       m' = Map.singleton sId (SubexpressionTrace v st defaultAdvice)
   pure (m' <> mconcat (Map.elems ms), sId, v)
@@ -800,14 +883,18 @@ cellMapToCaseAndColMap ::
   Map CellReference Scalar ->
   Either (ErrorMessage ann) (Map (Case, ColumnIndex) Scalar)
 cellMapToCaseAndColMap ann cellMap =
-  Map.fromList <$> sequence
-    [ (,)
-        <$> ((,col) . Case <$>
-              maybe (Left (ErrorMessage ann "row index out of range of scalar field"))
-                pure (integerToScalar (intToInteger (row ^. #getRowIndex))))
-        <*> pure x
-      | (CellReference col row, x) <- Map.toList cellMap
-    ]
+  Map.fromList
+    <$> sequence
+      [ (,)
+          <$> ( (,col) . Case
+                  <$> maybe
+                    (Left (ErrorMessage ann "row index out of range of scalar field"))
+                    pure
+                    (integerToScalar (intToInteger (row ^. #getRowIndex)))
+              )
+          <*> pure x
+        | (CellReference col row, x) <- Map.toList cellMap
+      ]
 
 logicCircuitToTraceType ::
   BitsPerByte ->
@@ -899,7 +986,7 @@ data Operator
   | VoidT
   | AssertT
   | LoadFromDifferentCase
-  deriving Show
+  deriving (Show)
 
 type StepTypeIdOf :: Operator -> Type
 newtype StepTypeIdOf a = StepTypeIdOf {unOf :: StepTypeId}
@@ -943,12 +1030,12 @@ data Void
 
 data Operation
   = Or' SubexpressionId SubexpressionId
-  -- The short circuit operations do not actually take the second subexpression
-  -- argument as an input; but it has to be present, because there can be more than
-  -- one subexpression with the same operator and the same left hand side but
-  -- different right hand sides. Those subexpressions need to be mapped to distinct
-  -- ids, and therefore they need to be treated as distinct operations.
-  | OrShortCircuit' SubexpressionId SubexpressionId
+  | -- The short circuit operations do not actually take the second subexpression
+    -- argument as an input; but it has to be present, because there can be more than
+    -- one subexpression with the same operator and the same left hand side but
+    -- different right hand sides. Those subexpressions need to be mapped to distinct
+    -- ids, and therefore they need to be treated as distinct operations.
+    OrShortCircuit' SubexpressionId SubexpressionId
   | Not' SubexpressionId
   | Iff' SubexpressionId SubexpressionId
   | Plus' SubexpressionId SubexpressionId
@@ -1257,14 +1344,15 @@ getMapping bitsPerByte c =
         LC.Lookup is (LC.LookupTableOutputColumn o) -> do
           (m'', inIds) <-
             foldM
-              (\(m'', inIds) (InputExpression e, _col) -> do
-                (eid, m''') <- traverseTerm out m'' e
-                pure (m''', inIds <> [InputSubexpressionId eid]))
+              ( \(m'', inIds) (InputExpression e, _col) -> do
+                  (eid, m''') <- traverseTerm out m'' e
+                  pure (m''', inIds <> [InputSubexpressionId eid])
+              )
               (m', mempty)
               is
           (eid, m''') <-
             traverseBareLookupArgument out m'' . BareLookupArgument $
-              zipWith (\(i,col) inId -> (i, Just inId, col)) is inIds
+              zipWith (\(i, col) inId -> (i, Just inId, col)) is inIds
                 <> [ ( InputExpression (LC.Var (PolynomialVariable (out ^. #unOutputColumnIndex) 0)),
                        Nothing,
                        o
@@ -1410,10 +1498,11 @@ loadFromSameCaseStepType m i =
   StepType
     label
     ( PolynomialConstraints
-        [ (label,
+        [ ( label,
             P.minus
               (P.var' i)
-              (P.var' (m ^. #output . #unOutputColumnIndex)))
+              (P.var' (m ^. #output . #unOutputColumnIndex))
+          )
         ]
         1
     )
@@ -1430,10 +1519,12 @@ loadFromDifferentCaseStepType numCases m =
   StepType
     "loadFromDifferentCase"
     ( PolynomialConstraints
-        [ ("loadFromDifferentCase1",
-            d `P.times` ((d `P.plus` P.one) `P.times` (d `P.minus` P.one))),
-          ("loadFromDifferentCase2",
-            a `P.minus` (b `P.plus` (d `P.times` P.constant n)))
+        [ ( "loadFromDifferentCase1",
+            d `P.times` ((d `P.plus` P.one) `P.times` (d `P.minus` P.one))
+          ),
+          ( "loadFromDifferentCase2",
+            a `P.minus` (b `P.plus` (d `P.times` P.constant n))
+          )
         ]
         3
     )
@@ -1505,10 +1596,11 @@ constantStepType m x =
   StepType
     ("constant(" <> Label (show x) <> ")")
     ( PolynomialConstraints
-        [ ("constant",
-             P.minus
-               (P.constant x)
-               (P.var' (m ^. #output . #unOutputColumnIndex)))
+        [ ( "constant",
+            P.minus
+              (P.constant x)
+              (P.var' (m ^. #output . #unOutputColumnIndex))
+          )
         ]
         1
     )
@@ -1537,16 +1629,17 @@ operatorStepTypes bitsPerByte c m =
 
 -- Steal an advice column from the byte decomposition mapping
 -- for any other purpose (on steps which do not use byte decomposition).
-firstAdviceColumn, secondAdviceColumn ::
-  Mapping ->
-  ColumnIndex
+firstAdviceColumn,
+  secondAdviceColumn ::
+    Mapping ->
+    ColumnIndex
 firstAdviceColumn mapping =
   mapping ^. #byteDecomposition . #sign . #unSignColumnIndex
 secondAdviceColumn mapping =
   maybe
-  (die "no bytes in byte decomposition (this is supposed to be impossible)")
-  (^. _1 . #unByteColumnIndex)
-  (headMay (mapping ^. #byteDecomposition . #bytes))
+    (die "no bytes in byte decomposition (this is supposed to be impossible)")
+    (^. _1 . #unByteColumnIndex)
+    (headMay (mapping ^. #byteDecomposition . #bytes))
 
 firstTwoInputs ::
   Mapping ->
@@ -1572,13 +1665,14 @@ plusStepType m =
     ( StepType
         "plus"
         ( PolynomialConstraints
-            [ ("plus",
+            [ ( "plus",
                 P.minus
                   (P.var' (m ^. #output . #unOutputColumnIndex))
                   ( P.plus
                       (P.var' (i0 ^. #unInputColumnIndex))
                       (P.var' (i1 ^. #unInputColumnIndex))
-                  ))
+                  )
+              )
             ]
             1
         )
@@ -1593,13 +1687,14 @@ timesStepType m =
     ( StepType
         "timesAnd"
         ( PolynomialConstraints
-            [ ("timesAnd",
+            [ ( "timesAnd",
                 P.minus
                   (P.var' (m ^. #output . #unOutputColumnIndex))
                   ( P.times
                       (P.var' (i0 ^. #unInputColumnIndex))
                       (P.var' (i1 ^. #unInputColumnIndex))
-                  ))
+                  )
+              )
             ]
             2
         )
@@ -1630,10 +1725,11 @@ orStepType m =
     ( StepType
         "or"
         ( PolynomialConstraints
-            [ ("or",
+            [ ( "or",
                 P.minus
                   (P.var' (m ^. #output . #unOutputColumnIndex))
-                  (P.plus v0 (P.minus v1 (P.times v0 v1))))
+                  (P.plus v0 (P.minus v1 (P.times v0 v1)))
+              )
             ]
             2
         )
@@ -1666,10 +1762,11 @@ notStepType m =
     ( StepType
         "not"
         ( PolynomialConstraints
-            [ ("not",
+            [ ( "not",
                 P.minus
                   (P.var' (m ^. #output . #unOutputColumnIndex))
-                  (P.minus P.one (P.var' (i0 ^. #unInputColumnIndex))))
+                  (P.minus P.one (P.var' (i0 ^. #unInputColumnIndex)))
+              )
             ]
             1
         )
@@ -1684,7 +1781,7 @@ iffStepType m =
     ( StepType
         "iff"
         ( PolynomialConstraints
-            [ ("iff",
+            [ ( "iff",
                 P.minus
                   (P.var' (m ^. #output . #unOutputColumnIndex))
                   ( P.minus
@@ -1693,7 +1790,8 @@ iffStepType m =
                           (P.var' (i0 ^. #unInputColumnIndex))
                           (P.var' (i1 ^. #unInputColumnIndex))
                       )
-                  ))
+                  )
+              )
             ]
             1
         )
@@ -1745,19 +1843,21 @@ lessThanStepType bitsPerByte c m =
             "lessThan"
             ( PolynomialConstraints
                 [ ("lessThanResultIsBinary", result `P.times` (result `P.minus` P.one)),
-                  ("lessThanResultTrue",
+                  ( "lessThanResultTrue",
                     (P.one `P.minus` result)
                       `P.times` ( (P.one `P.minus` sign')
                                     `P.times` foldl' P.plus P.zero truthVars
-                                )),
-                  ("lessThanResultFalse",
+                                )
+                  ),
+                  ( "lessThanResultFalse",
                     result
                       `P.times` ( P.one
                                     `P.minus` foldl'
                                       P.times
                                       P.one
                                       [P.one `P.minus` v | v <- truthVars]
-                                ))
+                                )
+                  )
                 ]
                 (PolynomialDegreeBound (1 + length truthVars))
             )
@@ -1784,11 +1884,12 @@ maxStepType bitsPerByte c m =
         [ StepType
             "max"
             ( PolynomialConstraints
-                [ ("max",
+                [ ( "max",
                     P.var' out
                       `P.minus` ( (P.var' i1 `P.times` lessInd)
                                     `P.plus` (P.var' i0 `P.times` (P.one `P.minus` lessInd))
-                                ))
+                                )
+                  )
                 ]
                 (PolynomialDegreeBound 3)
             )
@@ -1823,14 +1924,15 @@ byteDecompositionCheck (BitsPerByte bitsPerByte) c m =
   StepType
     "byteDecompositionCheck"
     ( PolynomialConstraints
-        [ ("byteRecomposition",
+        [ ( "byteRecomposition",
             (v0 `P.minus` v1)
               `P.minus` ( ((P.constant two `P.times` s) `P.minus` P.one)
                             `P.times` foldl'
                               P.plus
                               P.zero
                               (zipWith P.times byteCoefs byteVars)
-                        )),
+                        )
+          ),
           ("signIsBinary", s `P.times` (s `P.minus` P.one))
         ]
         (PolynomialDegreeBound 2)
@@ -1895,9 +1997,11 @@ truthTables (RowCount n) m =
     byteRange, zeroIndicator :: [Scalar]
     byteRange =
       fromMaybe (die "byte value out of range of scalar (this is a compiler bug)")
-        . integerToScalar . intToInteger
-        <$> ([0 .. b - 1]
-               <> replicate (n' - b) (b - 1))
+        . integerToScalar
+        . intToInteger
+        <$> ( [0 .. b - 1]
+                <> replicate (n' - b) (b - 1)
+            )
     zeroIndicator = one : replicate (n' - 1) 0
 
 assertStepType ::
@@ -2115,7 +2219,7 @@ getSubexpressionLinks m =
 
     getLookupStepTypeId :: BareLookupArgument -> StepTypeId
     getLookupStepTypeId (BareLookupArgument arg) =
-      fromMaybe 
+      fromMaybe
         (die "getSubexpressionLinks: lookup step type id not found (this is a compiler bug)")
         (Map.lookup (LookupTable (arg <&> (^. _3))) (m ^. #stepTypeIds . #lookupTables))
 

@@ -3,9 +3,9 @@ module Stark.Spec.ScalarSpec (spec) where
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import OSL.Spec.Gen (genScalar)
-import Stark.Types.Scalar (zero, one, inverseScalar)
-import Test.Syd (Spec, describe, it, shouldBe)
+import Stark.Types.Scalar (inverseScalar, one, zero)
 import Test.QuickCheck (forAll)
+import Test.Syd (Spec, describe, it, shouldBe)
 
 spec :: Spec
 spec =
@@ -24,7 +24,7 @@ abelianGroupLaws =
   where
     associativity =
       it "is associative" $
-        forAll ((,,) <$> genScalar <*> genScalar <*> genScalar) $ \(x,y,z) ->
+        forAll ((,,) <$> genScalar <*> genScalar <*> genScalar) $ \(x, y, z) ->
           (x Group.+ y) Group.+ z `shouldBe` x Group.+ (y Group.+ z)
 
     commutativity =
@@ -61,7 +61,7 @@ fieldLaws =
   where
     associativity =
       it "is associative" $
-        forAll ((,,) <$> genScalar <*> genScalar <*> genScalar) $ \(x,y,z) ->
+        forAll ((,,) <$> genScalar <*> genScalar <*> genScalar) $ \(x, y, z) ->
           (x Ring.* y) Ring.* z `shouldBe` x Ring.* (y Ring.* z)
 
     commutativity =
@@ -90,8 +90,8 @@ fieldLaws =
 
     leftDistributivity =
       it "is left distributive over addition" $
-        forAll ((,,) <$> genScalar <*> genScalar <*> genScalar) $ \(x,y,z) ->
-           (x Ring.* (y Group.+ z)) `shouldBe` ((x Ring.* y) Group.+ (x Ring.* z))
+        forAll ((,,) <$> genScalar <*> genScalar <*> genScalar) $ \(x, y, z) ->
+          (x Ring.* (y Group.+ z)) `shouldBe` ((x Ring.* y) Group.+ (x Ring.* z))
 
     -- Left distributivity and commutativity together imply right distributivity.
     -- However, we are only doing empirical testing here, and it doesn't
@@ -99,5 +99,5 @@ fieldLaws =
     -- that tests of C will pass.
     rightDistributivity =
       it "is right distributive over addition" $
-        forAll ((,,) <$> genScalar <*> genScalar <*> genScalar) $ \(x,y,z) ->
+        forAll ((,,) <$> genScalar <*> genScalar <*> genScalar) $ \(x, y, z) ->
           ((x Group.+ y) Ring.* z) `shouldBe` ((x Ring.* z) Group.+ (y Ring.* z))

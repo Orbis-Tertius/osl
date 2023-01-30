@@ -6,19 +6,18 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module OSL.Spec.FromHaskellSpec (spec) where
 
-import Control.Monad.State (State, runState)
+import Control.Monad.State (State, execState)
 import Data.Fixed (Fixed, Pico)
 import qualified Data.Map as Map
 import Data.Proxy (Proxy (Proxy))
-import Data.Time (Day, TimeOfDay, LocalTime)
+import Data.Time (Day, LocalTime, TimeOfDay)
 import GHC.Generics (Generic)
-import OSL.Spec.Sudoku.Types (Digit, Row, Col, Cell, Problem, Solution, X, Y, Square, SquareCell)
-import OSL.FromHaskell (AddToOSLContext, Newtype, ToOSLType (toOSLType), addToOSLContextM, mkDataToOSL, mkDataToAddOSL)
+import OSL.FromHaskell (AddToOSLContext, Newtype, ToOSLType (toOSLType), addToOSLContextM, mkDataToAddOSL, mkDataToOSL)
+import OSL.Spec.Sudoku.Types (Cell, Col, Digit, Problem, Row, Solution, Square, SquareCell, X, Y)
 import qualified OSL.Types.OSL as OSL
 import Test.Syd (Spec, describe, it, shouldBe)
 
@@ -28,22 +27,22 @@ mkDataToOSL "LocalTime"
 -- Deriving Generic is present on these type definitions only to suppress
 -- -Wunused-top-binds
 data Record2 = Record2 Int Int
-  deriving Generic
+  deriving (Generic)
 
 mkDataToOSL "Record2"
 
 data Record3 = Record3 Int Int Int
-  deriving Generic
+  deriving (Generic)
 
 mkDataToOSL "Record3"
 
 data Record4 = Record4 Int Int Int Int
-  deriving Generic
+  deriving (Generic)
 
 mkDataToOSL "Record4"
 
 data Enum3 = A | B | C
-  deriving Generic
+  deriving (Generic)
 
 mkDataToAddOSL "Enum3"
 
@@ -129,32 +128,38 @@ timeOfDayType :: Spec
 timeOfDayType =
   it "TimeOfDay -> _" $
     toOSLType (Proxy @TimeOfDay) mempty
-      `shouldBe`
-        OSL.Product ()
-          (OSL.Product ()
+      `shouldBe` OSL.Product
+        ()
+        ( OSL.Product
+            ()
             (OSL.Z ())
-            (OSL.Z ()))
-          (OSL.Fin () 1000000000000)
+            (OSL.Z ())
+        )
+        (OSL.Fin () 1000000000000)
 
 localTimeType :: Spec
 localTimeType =
   it "LocalTime -> _" $
     toOSLType (Proxy @LocalTime) mempty
-      `shouldBe`
-        OSL.Product ()
-          (OSL.Z ())
-          (OSL.Product ()
-            (OSL.Product ()
-              (OSL.Z ())
-              (OSL.Z ()))
-            (OSL.Fin () 1000000000000))
+      `shouldBe` OSL.Product
+        ()
+        (OSL.Z ())
+        ( OSL.Product
+            ()
+            ( OSL.Product
+                ()
+                (OSL.Z ())
+                (OSL.Z ())
+            )
+            (OSL.Fin () 1000000000000)
+        )
 
 enumType :: Spec
 enumType =
   it "correctly assembles an enum type context " $
     enumTypesContext `shouldBe` expectedContext
   where
-    enumTypesContext = snd $ runState (add (Proxy @Enum3)) mempty
+    enumTypesContext = execState (add (Proxy @Enum3)) mempty
 
     add = addToOSLContextM
 
@@ -163,13 +168,18 @@ enumType =
         [ (OSL.Sym "A", OSL.Data (OSL.Fin () 1)),
           (OSL.Sym "B", OSL.Data (OSL.Fin () 1)),
           (OSL.Sym "C", OSL.Data (OSL.Fin () 1)),
-          (OSL.Sym "Enum3",
+          ( OSL.Sym "Enum3",
             OSL.Data
-              (OSL.Coproduct ()
-                (OSL.Coproduct ()
-                  (OSL.NamedType () "A")
-                  (OSL.NamedType () "B"))
-                (OSL.NamedType () "C")))
+              ( OSL.Coproduct
+                  ()
+                  ( OSL.Coproduct
+                      ()
+                      (OSL.NamedType () "A")
+                      (OSL.NamedType () "B")
+                  )
+                  (OSL.NamedType () "C")
+              )
+          )
         ]
 
 sudokuTypes :: Spec
@@ -177,7 +187,7 @@ sudokuTypes =
   it "correctly assembles a sudoku types context" $
     sudokuTypesContext `shouldBe` expectedContext
   where
-    sudokuTypesContext = snd . flip runState mempty $ do
+    sudokuTypesContext = flip execState mempty $ do
       add (Proxy @(Newtype Digit))
       add (Proxy @(Newtype Row))
       add (Proxy @(Newtype Col))
@@ -194,33 +204,50 @@ sudokuTypes =
         [ (OSL.Sym "Digit", OSL.Data (OSL.Z ())),
           (OSL.Sym "Col", OSL.Data (OSL.Z ())),
           (OSL.Sym "Row", OSL.Data (OSL.Z ())),
-          (OSL.Sym "Cell",
+          ( OSL.Sym "Cell",
             OSL.Data
-              (OSL.Product ()
-                (OSL.NamedType () (OSL.Sym "Row"))
-                (OSL.NamedType () (OSL.Sym "Col")))),
-          (OSL.Sym "Problem",
+              ( OSL.Product
+                  ()
+                  (OSL.NamedType () (OSL.Sym "Row"))
+                  (OSL.NamedType () (OSL.Sym "Col"))
+              )
+          ),
+          ( OSL.Sym "Problem",
             OSL.Data
-              (OSL.F () Nothing
-                (OSL.NamedType () (OSL.Sym "Cell"))
-                (OSL.Maybe () (OSL.NamedType () (OSL.Sym "Digit"))))),
-          (OSL.Sym "Solution",
+              ( OSL.F
+                  ()
+                  Nothing
+                  (OSL.NamedType () (OSL.Sym "Cell"))
+                  (OSL.Maybe () (OSL.NamedType () (OSL.Sym "Digit")))
+              )
+          ),
+          ( OSL.Sym "Solution",
             OSL.Data
-              (OSL.F () Nothing
-                (OSL.NamedType () (OSL.Sym "Cell"))
-                (OSL.NamedType () (OSL.Sym "Digit")))),
+              ( OSL.F
+                  ()
+                  Nothing
+                  (OSL.NamedType () (OSL.Sym "Cell"))
+                  (OSL.NamedType () (OSL.Sym "Digit"))
+              )
+          ),
           (OSL.Sym "X", OSL.Data (OSL.Z ())),
           (OSL.Sym "Y", OSL.Data (OSL.Z ())),
-          (OSL.Sym "Square",
+          ( OSL.Sym "Square",
             OSL.Data
-              (OSL.Product ()
-                (OSL.NamedType () "X")
-                (OSL.NamedType () "Y"))),
-          (OSL.Sym "SquareCell",
+              ( OSL.Product
+                  ()
+                  (OSL.NamedType () "X")
+                  (OSL.NamedType () "Y")
+              )
+          ),
+          ( OSL.Sym "SquareCell",
             OSL.Data
-              (OSL.Product ()
-                (OSL.NamedType () "X")
-                (OSL.NamedType () "Y")))
+              ( OSL.Product
+                  ()
+                  (OSL.NamedType () "X")
+                  (OSL.NamedType () "Y")
+              )
+          )
         ]
 
     add :: forall a. AddToOSLContext a => Proxy a -> State (OSL.ValidContext 'OSL.Global ()) ()

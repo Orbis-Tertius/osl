@@ -1,6 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
@@ -12,12 +10,13 @@ import Control.Monad (forM_)
 import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import Die (die)
 import OSL.ArgumentForm (getArgumentForm)
 import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
-import OSL.Spec.Sudoku.Types (Digit (Digit), Row (Row), Col (Col), Cell (Cell), Problem (Problem, unProblem), Solution (Solution, unSolution), X (X), Y (Y), Square (Square), SquareCell (SquareCell), SudokuWitness (SudokuWitness))
+import OSL.Spec.Sudoku.Types (Cell (Cell), Col (Col), Digit (Digit), Problem (Problem, unProblem), Row (Row), Solution (Solution, unSolution), Square (Square), SquareCell (SquareCell), SudokuWitness (SudokuWitness), X (X), Y (Y))
 import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
@@ -131,13 +130,13 @@ exampleSpec c = do
     evalTranslatedFormula6 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
       `shouldBe` Right False
 
-  -- TODO
-  -- it "Sudoku spec's semantics are preserved in codegen stage 7" $ do
-  --   evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleArgument c)
-  --     `shouldBe` Right ()
+-- TODO
+-- it "Sudoku spec's semantics are preserved in codegen stage 7" $ do
+--   evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleArgument c)
+--     `shouldBe` Right ()
 
-  --   evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
-  --     `shouldBe` Left (ErrorMessage Nothing "foo")
+--   evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
+--     `shouldBe` Left (ErrorMessage Nothing "foo")
 
 exampleArgument :: ValidContext 'Global ann -> Argument
 exampleArgument c =
@@ -437,10 +436,10 @@ complexWitnessType =
                     ( Product
                         ()
                         (NamedType () "Square")
-                        (Product
-                          ()
-                          (NamedType () "SquareCell")
-                          (Product () (Fin () 1) (Fin () 1))
+                        ( Product
+                            ()
+                            (NamedType () "SquareCell")
+                            (Product () (Fin () 1) (Fin () 1))
                         )
                     )
                 )
@@ -488,9 +487,10 @@ simpleWitnessType =
                 ()
                 Nothing
                 (NamedType () "Digit")
-                (Product ()
-                  (NamedType () "Square")
-                  (NamedType () "SquareCell")
+                ( Product
+                    ()
+                    (NamedType () "Square")
+                    (NamedType () "SquareCell")
                 )
             )
         )
@@ -540,10 +540,9 @@ squareToValue (Square (x, y)) =
 squareToEncodedValue :: Square -> Value
 squareToEncodedValue (Square (X x, Y y)) =
   To' "SquareEncoded" . Fin' $
-    maybe
-    (die "squareToEncodedValue: out of range of scalar")
-    id
-    (integerToScalar ((3 * y) + x))
+    fromMaybe
+      (die "squareToEncodedValue: out of range of scalar")
+      (integerToScalar ((3 * y) + x))
 
 squareCellToValue :: Square -> SquareCell -> Value
 squareCellToValue s (SquareCell (x, y)) =
