@@ -114,6 +114,9 @@ instance ToOSLType Integer where
 instance ToOSLType Int where
   toOSLType _ _ = OSL.Z ()
 
+instance ToOSLType Char where
+  toOSLType _ _ = OSL.N ()
+
 instance HasResolution n => ToOSLType (Fixed n) where
   toOSLType (Proxy :: Proxy (Fixed n)) _ =
     OSL.Fin () (resolution (Proxy @n))

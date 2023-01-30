@@ -9,10 +9,10 @@
 
 module OSL.ActusDictionary (actusDictionary, actusNameList, actusDictionaryFormatted) where
 
-import Actus.Domain.Basic (Numerator, Denominator, Rational, Value, Rate)
+import Actus.Domain.Basic (Numerator, Denominator, Rational, Value, Rate, FEAC)
 import Actus.Domain.BusinessEvents (EventType (..))
-import Actus.Domain.ContractState (ContractState, DayCount, MD', NT, IPNR, IPAC, IPAC1, IPAC2, IPLA, FEAC, NSC, ISC, SD, PRNXT, IPCB, XD, XA)
-import Actus.Domain.ContractTerms (PRF' (..), CT (..), CR (..), DCC (..), EOMC (..), BDC (..), Calendar (..), ScheduleConfig (..), CETC (..), CEGE (..), FEB (..), IPCB' (..), SCEF (..), PYTP (..), OPTP (..), OPXT (..), DS (..), PPEF (..), CalendarType (..), Period (..), Stub (..), Cycle (..), RRMOMin (..), RRMOMax (..), AssertionContext, Assertion (..), ReferenceType (..), ZeroRiskInterest (..), ExpectedNPV (..))
+import Actus.Domain.ContractState (ContractState, DayCount, MD', NT, IPNR, IPAC, IPAC1, IPAC2, IPLA, NSC, ISC, SD, PRNXT, IPCB, XD, XA)
+import Actus.Domain.ContractTerms (PRF' (..), CT (..), CR (..), DCC (..), EOMC (..), BDC (..), Calendar (..), ScheduleConfig (..), CETC (..), CEGE (..), FEB (..), IPCB' (..), SCEF (..), PYTP (..), OPTP (..), OPXT (..), DS (..), PPEF (..), CalendarType (..), Period (..), Stub (..), Cycle (..), RRMOMin (..), RRMOMax (..), AssertionContext, Assertion (..), ReferenceType (..), ZeroRiskInterest (..), ExpectedNPV (..), ReferenceRole (..), MarketObjectCode (..), ContractIdentifier (..), Identifier (..), Reference (..), ContractTerms (..), Assertions (..), ContractStructure (..), COCE (..), FeeRate (..), InterestAccrued (..), IPCBA (..), NominalRate (..), NominalRate2 (..), ISM (..), NotionalPrincipal (..), PremiumDiscountAtIED (..), NextPrincipalRedemptionPayment (..), PriceAtPurchaseDate (..), PriceAtTerminationDate (..), ScalingIndexAtStatusDate (..), NotionalScalingMultiplier (..), Quantity (..), OptionStrike1 (..), ExerciseAmount (..), FuturesPrice (..), PenaltyRate (..), NextResetRate (..), RateSpread (..), RateMultiplier (..), PeriodFloor (..), PeriodCap (..), LifeCap (..), LifeFloor (..), MarketObjectCodeOfRateReset (..), NextDividendPaymentAmount (..))
 import Control.Monad.State (State, execState)
 import Data.Proxy (Proxy (Proxy))
 import Data.Time (LocalTime (..), TimeOfDay (..))
@@ -47,7 +47,13 @@ mkDataToAddOSL "Stub"
 mkDataToAddOSL "Cycle"
 mkDataToAddOSL "AssertionContext"
 mkDataToAddOSL "Assertion"
+mkDataToAddOSL "Assertions"
 mkDataToAddOSL "ReferenceType"
+mkDataToAddOSL "ReferenceRole"
+mkDataToAddOSL "Identifier"
+mkDataToAddOSL "ContractTerms"
+mkDataToAddOSL "Reference"
+mkDataToAddOSL "ContractStructure"
 
 actusDictionaryFormatted :: String
 actusDictionaryFormatted = formatContext actusDictionary actusNameList
@@ -109,6 +115,41 @@ actusDictionary = flip execState mempty $ do
   add (Proxy @AssertionContext)
   add (Proxy @Assertion)
   add (Proxy @ReferenceType)
+  add (Proxy @ReferenceRole)
+  add (Proxy @(Newtype MarketObjectCode))
+  add (Proxy @(Newtype ContractIdentifier))
+  add (Proxy @(Newtype COCE))
+  add (Proxy @(Newtype FeeRate))
+  add (Proxy @(Newtype InterestAccrued))
+  add (Proxy @(Newtype IPCBA))
+  add (Proxy @(Newtype NominalRate))
+  add (Proxy @(Newtype NominalRate2))
+  add (Proxy @(Newtype ISM))
+  add (Proxy @(Newtype NotionalPrincipal))
+  add (Proxy @(Newtype PremiumDiscountAtIED))
+  add (Proxy @(Newtype NextPrincipalRedemptionPayment))
+  add (Proxy @(Newtype PriceAtPurchaseDate))
+  add (Proxy @(Newtype PriceAtTerminationDate))
+  add (Proxy @(Newtype ScalingIndexAtStatusDate))
+  add (Proxy @(Newtype NotionalScalingMultiplier))
+  add (Proxy @(Newtype Quantity))
+  add (Proxy @(Newtype OptionStrike1))
+  add (Proxy @(Newtype ExerciseAmount))
+  add (Proxy @(Newtype FuturesPrice))
+  add (Proxy @(Newtype PenaltyRate))
+  add (Proxy @(Newtype NextResetRate))
+  add (Proxy @(Newtype RateSpread))
+  add (Proxy @(Newtype RateMultiplier))
+  add (Proxy @(Newtype PeriodFloor))
+  add (Proxy @(Newtype PeriodCap))
+  add (Proxy @(Newtype LifeCap))
+  add (Proxy @(Newtype LifeFloor))
+  add (Proxy @(Newtype MarketObjectCodeOfRateReset))
+  add (Proxy @(Newtype NextDividendPaymentAmount))
+  add (Proxy @Identifier)
+  add (Proxy @ContractTerms)
+  add (Proxy @Reference)
+  add (Proxy @ContractStructure)
   where
     add :: forall a. AddToOSLContext a => Proxy a -> State (ValidContext Global ()) ()
     add = addToOSLContextM
@@ -315,4 +356,15 @@ actusNameList =
   , "EID"
   , "CST"
   , "ReferenceType"
+  -- reference roles
+  , "UDL"
+  , "FIL"
+  , "SEL"
+  , "COVE"
+  , "COVI"
+  , "ReferenceRole"
+  , "MarketObjectCode"
+  , "ContractIdentifier"
+  , "Identifier"
+  , "Reference"
   ]

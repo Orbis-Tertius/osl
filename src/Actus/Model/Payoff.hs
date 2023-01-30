@@ -14,16 +14,17 @@ import Actus.Domain
   , RiskFactors(..)
   , ShiftedDay(..)
   )
+import Actus.Domain.Basic (Value)
 import Data.Time.LocalTime (LocalTime)
 
 -- |The context for payoff functions
-data CtxPOF a = CtxPOF
+data CtxPOF = CtxPOF
   { -- | Contract terms
-    contractTerms   :: ContractTerms a,
+    contractTerms   :: ContractTerms,
     -- | Risk factors as a function of event type and time
-    riskFactors     :: String -> EventType -> LocalTime -> RiskFactors a,
+    riskFactors     :: String -> EventType -> LocalTime -> RiskFactors Double,
     -- | Cash flows from underlying contracts
-    referenceStates :: [[((String, EventType, ShiftedDay), ContractState, a)]]
+    referenceStates :: [[((String, EventType, ShiftedDay), ContractState, Value)]]
   }
 
 -- -- | The payoff function

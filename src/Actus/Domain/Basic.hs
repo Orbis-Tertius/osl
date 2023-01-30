@@ -14,13 +14,13 @@ import OSL.FromHaskell (ToOSLType (..), mkDataToAddOSL)
 import Prelude hiding (Rational)
 
 newtype Numerator = Numerator Integer
-  deriving newtype (Show, Eq, ToOSLType, FromJSON, ToJSON)
+  deriving newtype (Read, Show, Eq, ToOSLType, FromJSON, ToJSON)
 
 newtype Denominator = Denominator Integer
-  deriving newtype (Show, Eq, ToOSLType, FromJSON, ToJSON)
+  deriving newtype (Read, Show, Eq, ToOSLType, FromJSON, ToJSON)
 
 data Rational = Rational Numerator Denominator
-  deriving (Show, Eq, Generic)
+  deriving (Read, Show, Eq, Generic)
 
 instance FromJSON Rational
 instance ToJSON Rational
@@ -30,7 +30,11 @@ mkDataToAddOSL "TimeOfDay"
 mkDataToAddOSL "LocalTime"
 
 newtype Value = Value Integer
-  deriving newtype (Show, Eq, ToOSLType, FromJSON, ToJSON)
+  deriving newtype (Read, Show, Eq, ToOSLType, FromJSON, ToJSON)
 
 newtype Rate = Rate Rational
-  deriving newtype (Show, Eq, ToOSLType, FromJSON, ToJSON)
+  deriving newtype (Read, Show, Eq, ToOSLType, FromJSON, ToJSON)
+
+-- Fee accrued
+newtype FEAC = FEAC Value
+  deriving newtype (Read, Show, Eq, ToOSLType, FromJSON, ToJSON)

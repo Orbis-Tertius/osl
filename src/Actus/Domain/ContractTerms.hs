@@ -6,12 +6,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
 module Actus.Domain.ContractTerms
   where
 
-import Actus.Domain.Basic (Rational, Value, Rate)
+import Actus.Domain.Basic (Rational, Value, Rate, FEAC)
 import Control.Applicative ((<|>))
 import Control.Monad (guard, mzero)
 import Data.Aeson.TH (deriveJSON)
@@ -378,28 +379,34 @@ data ReferenceRole = UDL  -- ^ Underlying
   deriving stock (Eq, Read, Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
+newtype MarketObjectCode = MarketObjectCode String
+  deriving newtype (Show, FromJSON, ToJSON, ToOSLType)
+
+newtype ContractIdentifier = ContractIdentifier String
+  deriving newtype (Show, FromJSON, ToJSON, ToOSLType)
+
 -- |Reference object
 data Identifier = Identifier
-  { marketObjectCode   :: Maybe String
-  , contractIdentifier :: Maybe String
+  { marketObjectCode   :: Maybe MarketObjectCode
+  , contractIdentifier :: Maybe ContractIdentifier
   }
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
-data Reference a = ReferenceTerms (ContractTerms a)
-                 | ReferenceId Identifier
+data Reference = ReferenceTerms ContractTerms
+               | ReferenceId Identifier
   deriving stock (Show, Generic)
   deriving anyclass (ToJSON)
 
 -- |Contract structure
-data ContractStructure a = ContractStructure
-  { reference     :: Reference a
+data ContractStructure = ContractStructure
+  { reference     :: Reference
   , referenceType :: ReferenceType
   , referenceRole :: ReferenceRole
   }
   deriving stock (Show, Generic)
 
-instance ToJSON a => ToJSON (ContractStructure a) where
+instance ToJSON ContractStructure where
   toJSON ContractStructure{..} =
     object
       [ "object"        .= toJSON reference
@@ -407,22 +414,111 @@ instance ToJSON a => ToJSON (ContractStructure a) where
       , "referenceRole" .= toJSON referenceRole
       ]
 
-getMarketObjectCode :: Reference a -> Maybe String
+getMarketObjectCode :: Reference -> Maybe MarketObjectCode
 getMarketObjectCode (ReferenceId i)    = marketObjectCode i
 getMarketObjectCode (ReferenceTerms t) = marketObjectCodeRef t
 
-getContractIdentifier :: Reference a -> Maybe String
+getContractIdentifier :: Reference -> Maybe ContractIdentifier
 getContractIdentifier (ReferenceId i)                     = contractIdentifier i
 getContractIdentifier (ReferenceTerms ContractTerms {..}) = Just contractId
+
+newtype COCE = COCE Actus.Domain.Basic.Value
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype FeeRate = FeeRate Rate
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype InterestAccrued = InterestAccrued Actus.Domain.Basic.Value
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype IPCBA = IPBCA Actus.Domain.Basic.Value -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype NominalRate = NominalRate Rate
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype NominalRate2 = NominalRate2 Rate
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype ISM = ISM Rate
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype NotionalPrincipal = NotionalPrincipal Actus.Domain.Basic.Value
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype PremiumDiscountAtIED = PremiumDiscountAtIED Actus.Domain.Basic.Value -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype NextPrincipalRedemptionPayment = NextPrincipalRedemptionPayment Actus.Domain.Basic.Value -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype PriceAtPurchaseDate = PriceAtPurchaseDate Actus.Domain.Basic.Value
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype PriceAtTerminationDate = PriceAtTerminationDate Actus.Domain.Basic.Value
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype ScalingIndexAtContractDealDate = ScalingIndexAtContractDealDate Rational -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype ScalingIndexAtStatusDate = ScalingIndexAtStatusDate Rational -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype NotionalScalingMultiplier = NotionalScalingMultiplier Rate
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype Quantity = Quantity Rational -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype OptionStrike1 = OptionStrike1 Actus.Domain.Basic.Value
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype ExerciseAmount = ExerciseAmount Quantity
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype FuturesPrice = FuturesPrice Actus.Domain.Basic.Value
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype PenaltyRate = PenaltyRate Actus.Domain.Basic.Value
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype NextResetRate = NextResetRate Rate
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype RateSpread = RateSpread Rational -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype RateMultiplier = RateMultiplier Rational
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype PeriodFloor = PeriodFloor Actus.Domain.Basic.Value -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype PeriodCap = PeriodCap Actus.Domain.Basic.Value -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype LifeCap = LifeCap Actus.Domain.Basic.Value -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype LifeFloor = LifeFloor Actus.Domain.Basic.Value -- TODO: is this right?
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype MarketObjectCodeOfRateReset = MarketObjectCodeOfRateReset String
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
+
+newtype NextDividendPaymentAmount = NextDividendPaymentAmount Actus.Domain.Basic.Value
+  deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
 
 {-| ACTUS contract terms and attributes are defined in
     https://github.com/actusfrf/actus-dictionary/blob/master/actus-dictionary-terms.json
 -}
-data ContractTerms a = ContractTerms
+data ContractTerms = ContractTerms
   { -- General
-    contractId                               :: String
+    contractId                               :: ContractIdentifier
   , contractType                             :: CT
-  , contractStructure                        :: [ContractStructure a]
+  -- TODO: contractStructure cannot be here because OSL can't
+  -- (straightforwardly) handle mutually recursive data types
+  -- , contractStructure                        :: [ContractStructure]
   , contractRole                             :: CR
   , settlementCurrency                       :: Maybe String
 
@@ -433,33 +529,33 @@ data ContractTerms a = ContractTerms
 
   -- Contract Identification
   , statusDate                               :: LocalTime        -- ^ Status Date
-  , marketObjectCodeRef                      :: Maybe String     -- ^ Market Object Code
+  , marketObjectCodeRef                      :: Maybe MarketObjectCode -- ^ Market Object Code
 
   -- Counterparty
   , contractPerformance                      :: Maybe PRF'       -- ^ Contract Performance
   , creditEventTypeCovered                   :: Maybe CETC       -- ^ Credit Event Type Covered
-  , coverageOfCreditEnhancement              :: Maybe a          -- ^ Coverage Of Credit Enhancement
+  , coverageOfCreditEnhancement              :: Maybe COCE       -- ^ Coverage Of Credit Enhancement
   , guaranteedExposure                       :: Maybe CEGE       -- ^ Guaranteed Exposure
 
   -- Fees
   , cycleOfFee                               :: Maybe Cycle      -- ^ Cycle Of Fee
   , cycleAnchorDateOfFee                     :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Fee
-  , feeAccrued                               :: Maybe a          -- ^ Fee Accrued
+  , feeAccrued                               :: Maybe FEAC       -- ^ Fee Accrued
   , feeBasis                                 :: Maybe FEB        -- ^ Fee Basis
-  , feeRate                                  :: Maybe a          -- ^ Fee Rate
+  , feeRate                                  :: Maybe FeeRate    -- ^ Fee Rate
 
   -- Interest
   , cycleAnchorDateOfInterestPayment         :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Interest Payment
   , cycleOfInterestPayment                   :: Maybe Cycle      -- ^ Cycle Of Interest Payment
-  , accruedInterest                          :: Maybe a          -- ^ Accrued Interest
+  , accruedInterest                          :: Maybe InterestAccrued   -- ^ Accrued Interest
   , capitalizationEndDate                    :: Maybe LocalTime  -- ^ Capitalization End Date
   , cycleAnchorDateOfInterestCalculationBase :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Interest Calculation Base
   , cycleOfInterestCalculationBase           :: Maybe Cycle      -- ^ Cycle Of Interest Calculation Base
   , interestCalculationBase                  :: Maybe IPCB'      -- ^ Interest Calculation Base
-  , interestCalculationBaseA                 :: Maybe a          -- ^ Interest Calculation Base Amount
-  , nominalInterestRate                      :: Maybe a          -- ^ Nominal Interest Rate
-  , nominalInterestRate2                     :: Maybe a          -- ^ Nominal Interest Rate (Second Leg in Plain Vanilla Swap)
-  , interestScalingMultiplier                :: Maybe a          -- ^ Interest Scaling Multiplier
+  , interestCalculationBaseA                 :: Maybe IPCBA      -- ^ Interest Calculation Base Amount
+  , nominalInterestRate                      :: Maybe NominalRate -- ^ Nominal Interest Rate
+  , nominalInterestRate2                     :: Maybe NominalRate2 -- ^ Nominal Interest Rate (Second Leg in Plain Vanilla Swap)
+  , interestScalingMultiplier                :: Maybe ISM        -- ^ Interest Scaling Multiplier
 
   -- Dates
   , maturityDate                             :: Maybe LocalTime  -- ^ Maturity Date
@@ -467,62 +563,62 @@ data ContractTerms a = ContractTerms
   , exerciseDate                             :: Maybe LocalTime  -- ^ Exercise Date
 
   -- Notional Principal
-  , notionalPrincipal                        :: Maybe a          -- ^ Notional Principal
-  , premiumDiscountAtIED                     :: Maybe a          -- ^ Premium Discount At IED
+  , notionalPrincipal                        :: Maybe NotionalPrincipal   -- ^ Notional Principal
+  , premiumDiscountAtIED                     :: Maybe PremiumDiscountAtIED  -- ^ Premium Discount At IED
   , cycleAnchorDateOfPrincipalRedemption     :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Principal Redemption
   , cycleOfPrincipalRedemption               :: Maybe Cycle      -- ^ Cycle Of Principal Redemption
-  , nextPrincipalRedemptionPayment           :: Maybe a          -- ^ Next Principal Redemption Payment
+  , nextPrincipalRedemptionPayment           :: Maybe NextPrincipalRedemptionPayment          -- ^ Next Principal Redemption Payment
   , purchaseDate                             :: Maybe LocalTime  -- ^ Purchase Date
-  , priceAtPurchaseDate                      :: Maybe a          -- ^ Price At Purchase Date
+  , priceAtPurchaseDate                      :: Maybe PriceAtPurchaseDate          -- ^ Price At Purchase Date
   , terminationDate                          :: Maybe LocalTime  -- ^ Termination Date
-  , priceAtTerminationDate                   :: Maybe a          -- ^ Price At Termination Date
-  , quantity                                 :: Maybe a          -- ^ Quantity
+  , priceAtTerminationDate                   :: Maybe PriceAtTerminationDate          -- ^ Price At Termination Date
+  , quantity                                 :: Maybe Quantity      -- ^ Quantity
   , currency                                 :: Maybe String     -- ^ The currency of the cash flows
   , currency2                                :: Maybe String     -- ^ The currency of the cash flows of the second leg
 
   -- Scaling Index
-  , scalingIndexAtStatusDate                 :: Maybe a          -- ^ Scaling Index At Status Date
+  , scalingIndexAtStatusDate                 :: Maybe ScalingIndexAtStatusDate  -- ^ Scaling Index At Status Date
   , cycleAnchorDateOfScalingIndex            :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Scaling Index
   , cycleOfScalingIndex                      :: Maybe Cycle      -- ^ Cycle Of Scaling Index
   , scalingEffect                            :: Maybe SCEF       -- ^ Scaling Effect
-  , scalingIndexAtContractDealDate           :: Maybe a          -- ^ Scaling Index At Contract Deal Date
+  , scalingIndexAtContractDealDate           :: Maybe ScalingIndexAtContractDealDate    -- ^ Scaling Index At Contract Deal Date
   , marketObjectCodeOfScalingIndex           :: Maybe String     -- ^ Market Object Code Of Scaling Index
-  , notionalScalingMultiplier                :: Maybe a          -- ^ Notional Scaling Multiplier
+  , notionalScalingMultiplier                :: Maybe NotionalScalingMultiplier   -- ^ Notional Scaling Multiplier
 
   -- Optionality
   , cycleOfOptionality                       :: Maybe Cycle      -- ^ Cycle Of Optionality
   , cycleAnchorDateOfOptionality             :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Optionality
   , optionType                               :: Maybe OPTP       -- ^ Option Type
-  , optionStrike1                            :: Maybe a          -- ^ Option Strike 1
+  , optionStrike1                            :: Maybe OptionStrike1  -- ^ Option Strike 1
   , optionExerciseType                       :: Maybe OPXT       -- ^ Option Exercise Type
 
   -- Settlement
   , settlementPeriod                         :: Maybe Cycle      -- ^ Settlement Period
   , deliverySettlement                       :: Maybe DS         -- ^ Delivery Settlement
-  , exerciseAmount                           :: Maybe a          -- ^ Exercise Amount
-  , futuresPrice                             :: Maybe a          -- ^ Futures Price
+  , exerciseAmount                           :: Maybe ExerciseAmount   -- ^ Exercise Amount
+  , futuresPrice                             :: Maybe FuturesPrice    -- ^ Futures Price
 
   -- Penalty
-  , penaltyRate                              :: Maybe a          -- ^ Penalty Rate
+  , penaltyRate                              :: Maybe PenaltyRate -- ^ Penalty Rate
   , penaltyType                              :: Maybe PYTP       -- ^ Penalty Type
   , prepaymentEffect                         :: Maybe PPEF       -- ^ Prepayment Effect
 
   -- Rate Reset
   , cycleOfRateReset                         :: Maybe Cycle      -- ^ Cycle Of Rate Reset
   , cycleAnchorDateOfRateReset               :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Rate Reset
-  , nextResetRate                            :: Maybe a          -- ^ Next Reset Rate
-  , rateSpread                               :: Maybe a          -- ^ Rate Spread
-  , rateMultiplier                           :: Maybe a          -- ^ Rate Multiplier
-  , periodFloor                              :: Maybe a          -- ^ Period Floor
-  , periodCap                                :: Maybe a          -- ^ Period Cap
-  , lifeCap                                  :: Maybe a          -- ^ Life Cap
-  , lifeFloor                                :: Maybe a          -- ^ Life Floor
-  , marketObjectCodeOfRateReset              :: Maybe String     -- ^ Market Object Code Of Rate Reset
+  , nextResetRate                            :: Maybe NextResetRate  -- ^ Next Reset Rate
+  , rateSpread                               :: Maybe RateSpread -- ^ Rate Spread
+  , rateMultiplier                           :: Maybe RateMultiplier  -- ^ Rate Multiplier
+  , periodFloor                              :: Maybe PeriodFloor -- ^ Period Floor
+  , periodCap                                :: Maybe PeriodCap  -- ^ Period Cap
+  , lifeCap                                  :: Maybe LifeCap    -- ^ Life Cap
+  , lifeFloor                                :: Maybe LifeFloor  -- ^ Life Floor
+  , marketObjectCodeOfRateReset              :: Maybe MarketObjectCodeOfRateReset   -- ^ Market Object Code Of Rate Reset
 
   -- Dividend
   , cycleOfDividend                          :: Maybe Cycle      -- ^ Cycle Of Dividend
   , cycleAnchorDateOfDividend                :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Dividend
-  , nextDividendPaymentAmount                :: Maybe a          -- ^ Next Dividend Payment Amount
+  , nextDividendPaymentAmount                :: Maybe NextDividendPaymentAmount -- ^ Next Dividend Payment Amount
 
   , enableSettlement                         :: Bool             -- ^ Enable settlement currency
   , constraints                              :: Maybe Assertions -- ^ Assertions
@@ -530,10 +626,10 @@ data ContractTerms a = ContractTerms
   deriving stock (Show, Generic)
   deriving anyclass (ToJSON)
 
-instance FromJSON (Reference Double) where
+instance FromJSON Reference where
   parseJSON = genericParseJSON defaultOptions { sumEncoding = UntaggedValue }
 
-instance FromJSON (ContractStructure Double) where
+instance FromJSON ContractStructure where
   parseJSON (Object v) =
     ContractStructure
       <$> v .: "object"
@@ -541,12 +637,12 @@ instance FromJSON (ContractStructure Double) where
       <*> v .: "referenceRole"
   parseJSON _ = mzero
 
-instance FromJSON (ContractTerms Double) where
+instance FromJSON ContractTerms where
   parseJSON (Object v) =
     ContractTerms
       <$> (v .:  "contractID" <|> v .: "contractId")
       <*> v .:  "contractType"
-      <*> (v .: "contractStructure" <|> return [])
+      -- <*> (v .: "contractStructure" <|> return [])
       <*> (v .:  "contractRole" <|> return CR_RPA) -- SWAPS tests miss contractRole in contract terms
       <*> v .:? "settlementCurrency"
       <*> v .:? "initialExchangeDate"

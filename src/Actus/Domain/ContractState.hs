@@ -9,7 +9,7 @@
 module Actus.Domain.ContractState
   where
 
-import Actus.Domain.Basic (Rational, Value, Rate)
+import Actus.Domain.Basic (Rational, Value, Rate, FEAC)
 import Actus.Domain.ContractTerms (PRF')
 import Control.Lens
 import Data.Time (LocalTime (..))
@@ -38,9 +38,6 @@ newtype IPAC2 = IPAC2 Value
   deriving newtype (Show, Eq, ToOSLType)
 
 newtype IPLA = IPLA DayCount
-  deriving newtype (Show, Eq, ToOSLType)
-
-newtype FEAC = FEAC Value
   deriving newtype (Show, Eq, ToOSLType)
 
 newtype NSC = NSC Rational
