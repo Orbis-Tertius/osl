@@ -11,7 +11,7 @@
 module Actus.Domain.ContractTerms
   where
 
-import Actus.Domain.Basic (Rational)
+import Actus.Domain.Basic (Rational, Value, Rate)
 import Control.Applicative ((<|>))
 import Control.Monad (guard, mzero)
 import Data.Aeson.TH (deriveJSON)
@@ -347,9 +347,15 @@ data AssertionContext = AssertionContext
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
+newtype ZeroRiskInterest = ZeroRiskInterest Rate
+  deriving newtype (Show, FromJSON, ToJSON, ToOSLType)
+
+newtype ExpectedNPV = ExpectedNPV Actus.Domain.Basic.Value
+  deriving newtype (Show, FromJSON, ToJSON, ToOSLType)
+
 data Assertion = NpvAssertionAgainstZeroRiskBond
-  { zeroRiskInterest :: Double
-  , expectedNpv      :: Double
+  { zeroRiskInterest :: ZeroRiskInterest
+  , expectedNpv      :: ExpectedNPV
   }
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)

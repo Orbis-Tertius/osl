@@ -9,21 +9,12 @@
 module Actus.Domain.ContractState
   where
 
-import Actus.Domain.Basic (Rational)
+import Actus.Domain.Basic (Rational, Value, Rate)
 import Actus.Domain.ContractTerms (PRF')
 import Control.Lens
-import Data.Time (LocalTime (..), TimeOfDay (..))
-import OSL.FromHaskell (ToOSLType, mkDataToAddOSL)
+import Data.Time (LocalTime (..))
+import OSL.FromHaskell (ToOSLType)
 import Prelude hiding (Rational)
-
-mkDataToAddOSL "TimeOfDay"
-mkDataToAddOSL "LocalTime"
-
-newtype Value = Value Integer
-  deriving newtype (Show, Eq, ToOSLType)
-
-newtype Rate = Rate Rational
-  deriving newtype (Show, Eq, ToOSLType)
 
 newtype DayCount = DayCount Rational
   deriving newtype (Show, Eq, ToOSLType)

@@ -3,11 +3,12 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -Wno-missing-export-lists #-}
+{-# OPTIONS_GHC -Wno-missing-export-lists -Wno-orphans #-}
 
 module Actus.Domain.Basic where
 
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Time (TimeOfDay, LocalTime)
 import GHC.Generics (Generic)
 import OSL.FromHaskell (ToOSLType (..), mkDataToAddOSL)
 import Prelude hiding (Rational)
@@ -25,3 +26,11 @@ instance FromJSON Rational
 instance ToJSON Rational
 
 mkDataToAddOSL "Rational"
+mkDataToAddOSL "TimeOfDay"
+mkDataToAddOSL "LocalTime"
+
+newtype Value = Value Integer
+  deriving newtype (Show, Eq, ToOSLType, FromJSON, ToJSON)
+
+newtype Rate = Rate Rational
+  deriving newtype (Show, Eq, ToOSLType, FromJSON, ToJSON)

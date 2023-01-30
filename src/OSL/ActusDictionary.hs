@@ -9,10 +9,10 @@
 
 module OSL.ActusDictionary (actusDictionary, actusNameList, actusDictionaryFormatted) where
 
-import Actus.Domain.Basic (Numerator, Denominator, Rational)
+import Actus.Domain.Basic (Numerator, Denominator, Rational, Value, Rate)
 import Actus.Domain.BusinessEvents (EventType (..))
-import Actus.Domain.ContractState (ContractState, Value, Rate, DayCount, MD', NT, IPNR, IPAC, IPAC1, IPAC2, IPLA, FEAC, NSC, ISC, SD, PRNXT, IPCB, XD, XA)
-import Actus.Domain.ContractTerms (PRF' (..), CT (..), CR (..), DCC (..), EOMC (..), BDC (..), Calendar (..), ScheduleConfig (..), CETC (..), CEGE (..), FEB (..), IPCB' (..), SCEF (..), PYTP (..), OPTP (..), OPXT (..), DS (..), PPEF (..), CalendarType (..), Period (..), Stub (..), Cycle (..), RRMOMin (..), RRMOMax (..), AssertionContext)
+import Actus.Domain.ContractState (ContractState, DayCount, MD', NT, IPNR, IPAC, IPAC1, IPAC2, IPLA, FEAC, NSC, ISC, SD, PRNXT, IPCB, XD, XA)
+import Actus.Domain.ContractTerms (PRF' (..), CT (..), CR (..), DCC (..), EOMC (..), BDC (..), Calendar (..), ScheduleConfig (..), CETC (..), CEGE (..), FEB (..), IPCB' (..), SCEF (..), PYTP (..), OPTP (..), OPXT (..), DS (..), PPEF (..), CalendarType (..), Period (..), Stub (..), Cycle (..), RRMOMin (..), RRMOMax (..), AssertionContext, Assertion (..), ReferenceType (..), ZeroRiskInterest (..), ExpectedNPV (..))
 import Control.Monad.State (State, execState)
 import Data.Proxy (Proxy (Proxy))
 import Data.Time (LocalTime (..), TimeOfDay (..))
@@ -46,6 +46,8 @@ mkDataToAddOSL "Period"
 mkDataToAddOSL "Stub"
 mkDataToAddOSL "Cycle"
 mkDataToAddOSL "AssertionContext"
+mkDataToAddOSL "Assertion"
+mkDataToAddOSL "ReferenceType"
 
 actusDictionaryFormatted :: String
 actusDictionaryFormatted = formatContext actusDictionary actusNameList
@@ -102,7 +104,11 @@ actusDictionary = flip execState mempty $ do
   add (Proxy @Cycle)
   add (Proxy @(Newtype RRMOMax))
   add (Proxy @(Newtype RRMOMin))
+  add (Proxy @(Newtype ZeroRiskInterest))
+  add (Proxy @(Newtype ExpectedNPV))
   add (Proxy @AssertionContext)
+  add (Proxy @Assertion)
+  add (Proxy @ReferenceType)
   where
     add :: forall a. AddToOSLContext a => Proxy a -> State (ValidContext Global ()) ()
     add = addToOSLContextM
@@ -296,8 +302,17 @@ actusNameList =
   , "LongStub"
   , "Stub"
   , "Cycle"
-  -- assertion contexts
+  -- assertion contexts & assertions
   , "RRMOMin"
   , "RRMOMax"
   , "AssertionContext"
+  , "NpvAssertionAgainstZeroRiskBond"
+  , "Assertion"
+  -- reference types
+  , "CNT"
+  , "CID"
+  , "MOC"
+  , "EID"
+  , "CST"
+  , "ReferenceType"
   ]
