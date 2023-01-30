@@ -1,17 +1,17 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
+-- {-# LANGUAGE BangPatterns #-}
+-- {-# LANGUAGE FlexibleContexts #-}
+-- {-# LANGUAGE RecordWildCards #-}
+-- {-# LANGUAGE TupleSections #-}
 
-{-| = ACTUS
-
-Given ACTUS contract terms, cashflows are projected based on risk factors.
-
--}
-
+-- | = ACTUS
+--
+-- Given ACTUS contract terms, cashflows are projected based on risk factors.
 module Actus.Core
-  ( -- genProjectedCashflows
-  ) where
+  (
+  )
+where
+
+-- genProjectedCashflows
 
 -- import Actus.Domain
 --   ( ActusFrac
@@ -36,7 +36,7 @@ module Actus.Core
 -- import Data.Maybe (fromMaybe, isNothing)
 -- import Data.Sort (sortOn)
 -- import Data.Time (LocalTime)
--- 
+--
 -- -- |'genProjectedCashflows' generates a list of projected cashflows for
 -- -- given contract terms and provided risk factors. The function returns
 -- -- an empty list, if building the initial state given the contract terms
@@ -58,7 +58,7 @@ module Actus.Core
 --     check :: ActusFrac a => ContractTerms a -> [CashFlow a] -> [CashFlow a]
 --     check ContractTerms {deliverySettlement = Just DS_S} = netCashflows
 --     check _                                              = id
--- 
+--
 --     netCashflows :: ActusFrac a => [CashFlow a] -> [CashFlow a]
 --     netCashflows cf = fmap (foldl1 plus) $ groupBy f cf
 --       where
@@ -73,7 +73,7 @@ module Actus.Core
 --             { amount = amount a + amount b,
 --               notional = notional a + notional b
 --             }
--- 
+--
 -- -- | Bulid the context allowing to perform state transitions
 -- buildCtx ::
 --   ActusFrac a =>
@@ -107,7 +107,7 @@ module Actus.Core
 --             monitorEvent (_, _, sd) = (contractId rt, AD, sd)
 --          in runReader (genProjectedPayoffs unscheduledEvents) $ buildCtx rf ut unscheduledEvents
 --       ReferenceId _ -> []
--- 
+--
 -- -- |Generate cash flows
 -- genCashflow ::
 --   -- | Contract terms
@@ -129,7 +129,7 @@ module Actus.Core
 --       notional = nt,
 --       cashCurrency = fromMaybe "unknown" (currency ct)
 --     }
--- 
+--
 -- -- |Generate projected cash flows
 -- genProjectedPayoffs ::
 --   ActusFrac a =>
@@ -140,7 +140,7 @@ module Actus.Core
 --   do
 --     ct <- contractTerms <$> ask
 --     genProjectedPayoffs' $ genSchedule ct us
--- 
+--
 -- -- |Generate projected cash flows
 -- genProjectedPayoffs' ::
 --   ActusFrac a =>
@@ -152,15 +152,15 @@ module Actus.Core
 --   do
 --     st0 <- initializeState
 --     states <- genStates events st0
--- 
+--
 --     let (x, y) = unzip states
 --     payoffs <- trans $ genPayoffs x y
--- 
+--
 --     pure $ zip3 x y payoffs
 --   where
 --     trans :: Reader (CtxPOF a) b -> Reader (CtxSTF a) b
 --     trans = withReader (\c -> CtxPOF (contractTerms c) (riskFactors c) (referenceStates c))
--- 
+--
 -- -- |Generate schedules
 -- genSchedule ::
 --   ActusFrac a =>
@@ -172,7 +172,7 @@ module Actus.Core
 --   [Event]
 -- genSchedule ct us =
 --   sortOn (\(_, ev, d) -> (paymentDay d, ev)) $ genFixedSchedule ct <> us
--- 
+--
 -- genFixedSchedule ::
 --   ActusFrac a =>
 --   -- | Contract terms
@@ -185,22 +185,22 @@ module Actus.Core
 --   where
 --     eventTypes = enumFrom (toEnum 0)
 --     scheduleEvent ev = map (\(cid, d) -> (cid, ev, d)) $ schedule ev ct
--- 
+--
 --     filtersSchedules :: Event -> Bool
 --     filtersSchedules (_, _, ShiftedDay {..}) | contractType == OPTNS = calculationDay > statusDate
 --     filtersSchedules (_, _, ShiftedDay {..}) | contractType == FUTUR = calculationDay > statusDate
 --     filtersSchedules (_, _, ShiftedDay {..}) | contractType == CLM = calculationDay > statusDate
 --     filtersSchedules (_, _, ShiftedDay {..}) = isNothing terminationDate || Just calculationDay <= terminationDate
--- 
+--
 --     postProcessSchedules :: [Event] -> [Event]
 --     postProcessSchedules =
 --       let trim = dropWhile (\(_, _, d) -> calculationDay d < statusDate)
 --           regroup = groupBy (\(_, _, l) (_, _, r) -> calculationDay l == calculationDay r)
 --           overwrite = map (sortOn (\(_, ev, _) -> fromEnum ev)) . regroup
 --        in concat . overwrite . trim
--- 
+--
 -- type Event = (String, EventType, ShiftedDay)
--- 
+--
 -- mapAccumLM' :: Monad m => (acc -> x -> m (acc, y)) -> acc -> [x] -> m (acc, [y])
 -- mapAccumLM' f = go
 --   where
@@ -209,7 +209,7 @@ module Actus.Core
 --       (s2, xs') <- go s1 xs
 --       return (s2, x' : xs')
 --     go s [] = return (s, [])
--- 
+--
 -- -- |Generate states
 -- genStates ::
 --   ActusFrac a =>
@@ -226,7 +226,7 @@ module Actus.Core
 --         newState <- stateTransition ev calculationDay st
 --         return (((cid, ev', t'), newState), ((cid, ev', t'), newState))
 --     st0 = (("", AD, ShiftedDay (sd stn) (sd stn)), stn)
--- 
+--
 -- filtersStates ::
 --   ActusFrac a =>
 --   ((String, EventType, ShiftedDay), ContractState a) ->
@@ -246,7 +246,7 @@ module Actus.Core
 --       SWAPS -> isNothing purchaseDate || ev == PRD || Just calculationDay > purchaseDate
 --       CLM -> isNothing purchaseDate || ev == PRD || Just calculationDay > purchaseDate
 --       _ -> True
--- 
+--
 -- -- |Generate payoffs
 -- genPayoffs ::
 --   ActusFrac a =>

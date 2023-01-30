@@ -2,23 +2,23 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+
 module Actus.Domain
-  ( module Actus.Domain.BusinessEvents
-  , module Actus.Domain.ContractState
-  , module Actus.Domain.ContractTerms
-  , module Actus.Domain.Schedule
-  , ActusFrac(..)
-  , ActusOps(..)
-  , CashFlow(..)
-  , RiskFactors(..)
-  -- , setDefaultContractTermValues
-  -- , sign
-  ) where
+  ( module Actus.Domain.BusinessEvents,
+    module Actus.Domain.ContractState,
+    module Actus.Domain.ContractTerms,
+    module Actus.Domain.Schedule,
+    ActusFrac (..),
+    ActusOps (..),
+    CashFlow (..),
+    RiskFactors (..),
+    -- , setDefaultContractTermValues
+    -- , sign
+  )
+where
 
 import Actus.Domain.BusinessEvents
-import Actus.Domain.ContractState (ContractState(..))
+import Actus.Domain.ContractState (ContractState (..))
 import Actus.Domain.ContractTerms
 import Actus.Domain.Schedule
 import Data.Aeson.Types (FromJSON, ToJSON)
@@ -39,32 +39,30 @@ instance ActusOps Double where
 instance ActusFrac Double where
   _ceiling = ceiling
 
-{-| Risk factor observer
--}
+-- | Risk factor observer
 data RiskFactors a = RiskFactors
-    { o_rf_CURS :: a
-    , o_rf_RRMO :: a
-    , o_rf_SCMO :: a
-    , pp_payoff :: a
-    , xd_payoff :: a
-    , dv_payoff :: a
-    }
-    deriving stock (Show, Generic)
-    deriving anyclass (FromJSON, ToJSON)
+  { o_rf_CURS :: a,
+    o_rf_RRMO :: a,
+    o_rf_SCMO :: a,
+    pp_payoff :: a,
+    xd_payoff :: a,
+    dv_payoff :: a
+  }
+  deriving stock (Show, Generic)
+  deriving anyclass (FromJSON, ToJSON)
 
-{-| Cash flows
--}
+-- | Cash flows
 data CashFlow a = CashFlow
-  { tick               :: Integer,
-    cashContractId     :: String,
-    cashParty          :: String,
-    cashCounterParty   :: String,
-    cashPaymentDay     :: LocalTime,
+  { tick :: Integer,
+    cashContractId :: String,
+    cashParty :: String,
+    cashCounterParty :: String,
+    cashPaymentDay :: LocalTime,
     cashCalculationDay :: LocalTime,
-    cashEvent          :: EventType,
-    amount             :: a,
-    notional           :: a,
-    cashCurrency       :: String
+    cashEvent :: EventType,
+    amount :: a,
+    notional :: a,
+    cashCurrency :: String
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON, ToJSON)
@@ -83,14 +81,14 @@ data CashFlow a = CashFlow
 -- sign CR_PFL = negate 1
 -- sign CR_RF  = 1
 -- sign CR_PF  = negate 1
--- 
+--
 -- -- == Default instance (Double)
--- 
+--
 -- applyDefaults :: ContractStructure -> ContractStructure
 -- applyDefaults cs = case reference cs of
 --   ReferenceTerms rt -> cs { reference = ReferenceTerms $ setDefaultContractTermValues rt }
 --   ReferenceId _     -> cs
--- 
+--
 -- setDefaultContractTermValues :: ContractTerms -> ContractTerms
 -- setDefaultContractTermValues ct@ContractTerms {..} =
 --   ct
@@ -122,13 +120,13 @@ data CashFlow a = CashFlow
 --       lifeCap                        = applyDefault infinity lifeCap,
 --       lifeFloor                      = applyDefault (- infinity) lifeFloor,
 --       interestCalculationBaseA       = applyDefault 0.0 interestCalculationBaseA,
--- 
+--
 --       -- see ContractModel.java
 --       cycleAnchorDateOfInterestPayment = cycleAnchorDateOfInterestPayment <|> ((guard $ contractType == CLM) >> initialExchangeDate)
 --     }
 --   where
 --     infinity :: Double
 --     infinity = 1 / 0 :: Double
--- 
+--
 --     applyDefault :: a -> Maybe a -> Maybe a
 --     applyDefault v o = o <|> Just v

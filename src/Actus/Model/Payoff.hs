@@ -1,28 +1,29 @@
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RecordWildCards #-}
+-- {-# LANGUAGE NamedFieldPuns #-}
+-- {-# LANGUAGE RecordWildCards #-}
 
-{-| = ACTUS payoff functions -}
+-- | = ACTUS payoff functions
 module Actus.Model.Payoff
-  ( CtxPOF(..)
+  ( CtxPOF (..),
   -- , payoff
-  ) where
+  )
+where
 
 import Actus.Domain
-  ( ContractState(..)
-  , ContractTerms(..)
-  , EventType(..)
-  , RiskFactors(..)
-  , ShiftedDay(..)
+  ( ContractState (..),
+    ContractTerms (..),
+    EventType (..),
+    RiskFactors (..),
+    ShiftedDay (..),
   )
 import Actus.Domain.Basic (Value)
 import Data.Time.LocalTime (LocalTime)
 
--- |The context for payoff functions
+-- | The context for payoff functions
 data CtxPOF = CtxPOF
   { -- | Contract terms
-    contractTerms   :: ContractTerms,
+    contractTerms :: ContractTerms,
     -- | Risk factors as a function of event type and time
-    riskFactors     :: String -> EventType -> LocalTime -> RiskFactors Double,
+    riskFactors :: String -> EventType -> LocalTime -> RiskFactors Double,
     -- | Cash flows from underlying contracts
     referenceStates :: [[((String, EventType, ShiftedDay), ContractState, Value)]]
   }

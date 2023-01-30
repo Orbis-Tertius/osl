@@ -9,16 +9,16 @@
 
 module OSL.ActusDictionary (actusDictionary, actusNameList, actusDictionaryFormatted) where
 
-import Actus.Domain.Basic (Numerator, Denominator, Rational, Value, Rate, FEAC)
+import Actus.Domain.Basic (Denominator, FEAC, Numerator, Rate, Rational, Value)
 import Actus.Domain.BusinessEvents (EventType (..))
-import Actus.Domain.ContractState (ContractState, DayCount, MD', NT, IPNR, IPAC, IPAC1, IPAC2, IPLA, NSC, ISC, SD, PRNXT, IPCB, XD, XA)
-import Actus.Domain.ContractTerms (PRF' (..), CT (..), CR (..), DCC (..), EOMC (..), BDC (..), Calendar (..), ScheduleConfig (..), CETC (..), CEGE (..), FEB (..), IPCB' (..), SCEF (..), PYTP (..), OPTP (..), OPXT (..), DS (..), PPEF (..), CalendarType (..), Period (..), Stub (..), Cycle (..), RRMOMin (..), RRMOMax (..), AssertionContext, Assertion (..), ReferenceType (..), ZeroRiskInterest (..), ExpectedNPV (..), ReferenceRole (..), MarketObjectCode (..), ContractIdentifier (..), Identifier (..), Reference (..), ContractTerms (..), Assertions (..), ContractStructure (..), COCE (..), FeeRate (..), InterestAccrued (..), IPCBA (..), NominalRate (..), NominalRate2 (..), ISM (..), NotionalPrincipal (..), PremiumDiscountAtIED (..), NextPrincipalRedemptionPayment (..), PriceAtPurchaseDate (..), PriceAtTerminationDate (..), ScalingIndexAtStatusDate (..), NotionalScalingMultiplier (..), Quantity (..), OptionStrike1 (..), ExerciseAmount (..), FuturesPrice (..), PenaltyRate (..), NextResetRate (..), RateSpread (..), RateMultiplier (..), PeriodFloor (..), PeriodCap (..), LifeCap (..), LifeFloor (..), MarketObjectCodeOfRateReset (..), NextDividendPaymentAmount (..))
+import Actus.Domain.ContractState (ContractState, DayCount, IPAC, IPAC1, IPAC2, IPCB, IPLA, IPNR, ISC, MD', NSC, NT, PRNXT, SD, XA, XD)
+import Actus.Domain.ContractTerms (Assertion (..), AssertionContext, Assertions (..), BDC (..), CEGE (..), CETC (..), COCE (..), CR (..), CT (..), Calendar (..), CalendarType (..), ContractIdentifier (..), ContractStructure (..), ContractTerms (..), Cycle (..), DCC (..), DS (..), EOMC (..), ExerciseAmount (..), ExpectedNPV (..), FEB (..), FeeRate (..), FuturesPrice (..), IPCB' (..), IPCBA (..), ISM (..), Identifier (..), InterestAccrued (..), LifeCap (..), LifeFloor (..), MarketObjectCode (..), MarketObjectCodeOfRateReset (..), NextDividendPaymentAmount (..), NextPrincipalRedemptionPayment (..), NextResetRate (..), NominalRate (..), NominalRate2 (..), NotionalPrincipal (..), NotionalScalingMultiplier (..), OPTP (..), OPXT (..), OptionStrike1 (..), PPEF (..), PRF' (..), PYTP (..), PenaltyRate (..), Period (..), PeriodCap (..), PeriodFloor (..), PremiumDiscountAtIED (..), PriceAtPurchaseDate (..), PriceAtTerminationDate (..), Quantity (..), RRMOMax (..), RRMOMin (..), RateMultiplier (..), RateSpread (..), Reference (..), ReferenceRole (..), ReferenceType (..), SCEF (..), ScalingIndexAtStatusDate (..), ScheduleConfig (..), Stub (..), ZeroRiskInterest (..))
 import Control.Monad.State (State, execState)
 import Data.Proxy (Proxy (Proxy))
 import Data.Time (LocalTime (..), TimeOfDay (..))
 import OSL.Format (formatContext)
-import OSL.FromHaskell (AddToOSLContext, addToOSLContextM, mkDataToAddOSL, Newtype)
-import OSL.Types.OSL (ValidContext, ContextType (Global), Name)
+import OSL.FromHaskell (AddToOSLContext, Newtype, addToOSLContextM, mkDataToAddOSL)
+import OSL.Types.OSL (ContextType (Global), Name, ValidContext)
 import Prelude hiding (Rational)
 
 mkDataToAddOSL "Bool"
@@ -156,245 +156,245 @@ actusDictionary = flip execState mempty $ do
 
 actusNameList :: [Name]
 actusNameList =
-  [ "TimeOfDay"
-  , "LocalTime"
-  -- contract performance
-  , "PRF_PF"
-  , "PRF_DL"
-  , "PRF_DQ"
-  , "PRF_DF"
-  , "PRF'"
-  -- event types
-  , "IED"
-  , "FP"
-  , "PR" 
-  , "PD" 
-  , "PY" 
-  , "PP" 
-  , "IP" 
-  , "IPFX"
-  , "IPFL"
-  , "IPCI"
-  , "CE"
-  , "RRF" 
-  , "RR"
-  , "PRF"
-  , "DV"
-  , "PRD"
-  , "MR"
-  , "TD"
-  , "SC"
-  , "IPCB"
-  , "MD"
-  , "XD"
-  , "STD"
-  , "PI"
-  , "AD"
-  , "EventType"
-  , "Numerator"
-  , "Denominator"
-  , "Rational"
-  , "Value"
-  , "Rate"
-  , "Period"
-  , "MD'"
-  , "NT"
-  , "IPNR"
-  , "IPAC"
-  , "IPAC1"
-  , "IPAC2"
-  , "IPLA"
-  , "FEAC"
-  , "NSC"
-  , "ISC"
-  , "SD"
-  , "PRNXT"
-  , "IPCB"
-  , "XD"
-  , "XA"
-  , "ContractState"
-  -- contract types
-  , "PAM"
-  , "LAM"
-  , "NAM"
-  , "ANN"
-  , "STK"
-  , "OPTNS"
-  , "FUTUR"
-  , "COM"
-  , "CSH"
-  , "CLM"
-  , "SWPPV"
-  , "SWAPS"
-  , "CEG"
-  , "CEC"
-  , "CT"
-  -- contract roles
-  , "CR_RPA"
-  , "CR_RPL"
-  , "CR_CLO"
-  , "CR_CNO"
-  , "CR_COL"
-  , "CR_LG"
-  , "CR_ST"
-  , "CR_BUY"
-  , "CR_SEL"
-  , "CR_RFL"
-  , "CR_PFL"
-  , "CR_RF"
-  , "CR_PF"
-  , "CR"
-  -- day count conventions
-  , "DCC_A_AISDA"
-  , "DCC_A_360"
-  , "DCC_A_365"
-  , "DCC_E30_360ISDA"
-  , "DCC_E30_360"
-  , "DCC_B_252"
-  , "DCC"
-  -- end of month conventions
-  , "EOMC_EOM"
-  , "EOMC_SD"
-  , "EOMC"
-  -- business day conventions
-  , "BDC_NULL"
-  , "BDC_SCF"
-  , "BDC_SCMF"
-  , "BDC_CSF"
-  , "BDC_CSMF"
-  , "BDC_SCP"
-  , "BDC_SCMP"
-  , "BDC_CSP"
-  , "BDC_CSMP"
-  , "BDC"
-  -- calendar
-  , "CLDR_MF"
-  , "CLDR_NC"
-  , "Calendar"
-  , "ScheduleConfig"
-  -- credit event type covered
-  , "CETC_DL"
-  , "CETC_DQ"
-  , "CETC_DF"
-  , "CETC"
-  -- guaranteed exposure
-  , "CEGE_NO"
-  , "CEGE_NI"
-  , "CEGE"
-  -- fee basis
-  , "FEB_A"
-  , "FEB_N"
-  , "FEB"
-  -- interest calculation base
-  , "IPCB_NT"
-  , "IPCB_NTIED"
-  , "IPCB_NTL"
-  , "IPCB'"
-  -- scaling effects
-  , "SE_OOO"
-  , "SE_IOO"
-  , "SE_IOO"
-  , "SE_ONO"
-  , "SE_OOM"
-  , "SE_INO"
-  , "SE_ONM"
-  , "SE_IOM"
-  , "SE_INM"
-  , "SCEF"
-  -- penalty types
-  , "PYTP_A"
-  , "PYTP_N"
-  , "PYTP_I"
-  , "PYTP_O"
-  , "PYTP"
-  -- option types
-  , "OPTP_C"
-  , "OPTP_P"
-  , "OPTP_CP"
-  , "OPTP"
-  -- option exercise types
-  , "OPXT_E"
-  , "OPXT_B"
-  , "OPXT_A"
-  -- settlement
-  , "DS_S"
-  , "DS_D"
-  , "DS"
-  -- prepayment effects
-  , "PPEF_N"
-  , "PPEF_A"
-  , "PPEF_M"
-  , "PPEF"
-  -- calendar type
-  , "NoCalendar"
-  , "MondayToFriday"
-  , "CustomCalendar"
-  , "CalendarType"
-  -- cycle period
-  , "P_D"
-  , "P_W"
-  , "P_M"
-  , "P_Q"
-  , "P_H"
-  , "P_Y"
-  , "Period"
-  -- cycle stubs
-  , "ShortStub"
-  , "LongStub"
-  , "Stub"
-  , "Cycle"
-  -- assertion contexts & assertions
-  , "RRMOMin"
-  , "RRMOMax"
-  , "AssertionContext"
-  , "NpvAssertionAgainstZeroRiskBond"
-  , "Assertion"
-  -- reference types
-  , "CNT"
-  , "CID"
-  , "MOC"
-  , "EID"
-  , "CST"
-  , "ReferenceType"
-  -- reference roles
-  , "UDL"
-  , "FIL"
-  , "SEL"
-  , "COVE"
-  , "COVI"
-  , "ReferenceRole"
-  , "MarketObjectCode"
-  , "ContractIdentifier"
-  , "COCE"
-  , "FeeRate"
-  , "InterestAccrued"
-  , "IPCBA"
-  , "NominalRate"
-  , "NominalRate2"
-  , "ISM"
-  , "NotionalPrincipal"
-  , "PremiumDiscountAtIED"
-  , "NextPrincipalRedemptionPayment"
-  , "PriceAtPurchaseDate"
-  , "PriceAtTerminationDate"
-  , "ScalingIndexAtStatusDate"
-  , "NotionalScalingMultiplier"
-  , "Quantity"
-  , "OptionStrike1"
-  , "ExerciseAmount"
-  , "FuturesPrice"
-  , "PenaltyRate"
-  , "NextResetRate"
-  , "RateSpread"
-  , "RateMultiplier"
-  , "PeriodFloor"
-  , "PeriodCap"
-  , "LifeCap"
-  , "LifeFloor"
-  , "MarketObjectCodeOfRateReset"
-  , "NextDividendPaymentAmount"
-  , "Identifier"
-  , "ContractTerms"
-  , "Reference"
-  , "ContractStructure"
+  [ "TimeOfDay",
+    "LocalTime",
+    -- contract performance
+    "PRF_PF",
+    "PRF_DL",
+    "PRF_DQ",
+    "PRF_DF",
+    "PRF'",
+    -- event types
+    "IED",
+    "FP",
+    "PR",
+    "PD",
+    "PY",
+    "PP",
+    "IP",
+    "IPFX",
+    "IPFL",
+    "IPCI",
+    "CE",
+    "RRF",
+    "RR",
+    "PRF",
+    "DV",
+    "PRD",
+    "MR",
+    "TD",
+    "SC",
+    "IPCB",
+    "MD",
+    "XD",
+    "STD",
+    "PI",
+    "AD",
+    "EventType",
+    "Numerator",
+    "Denominator",
+    "Rational",
+    "Value",
+    "Rate",
+    "Period",
+    "MD'",
+    "NT",
+    "IPNR",
+    "IPAC",
+    "IPAC1",
+    "IPAC2",
+    "IPLA",
+    "FEAC",
+    "NSC",
+    "ISC",
+    "SD",
+    "PRNXT",
+    "IPCB",
+    "XD",
+    "XA",
+    "ContractState",
+    -- contract types
+    "PAM",
+    "LAM",
+    "NAM",
+    "ANN",
+    "STK",
+    "OPTNS",
+    "FUTUR",
+    "COM",
+    "CSH",
+    "CLM",
+    "SWPPV",
+    "SWAPS",
+    "CEG",
+    "CEC",
+    "CT",
+    -- contract roles
+    "CR_RPA",
+    "CR_RPL",
+    "CR_CLO",
+    "CR_CNO",
+    "CR_COL",
+    "CR_LG",
+    "CR_ST",
+    "CR_BUY",
+    "CR_SEL",
+    "CR_RFL",
+    "CR_PFL",
+    "CR_RF",
+    "CR_PF",
+    "CR",
+    -- day count conventions
+    "DCC_A_AISDA",
+    "DCC_A_360",
+    "DCC_A_365",
+    "DCC_E30_360ISDA",
+    "DCC_E30_360",
+    "DCC_B_252",
+    "DCC",
+    -- end of month conventions
+    "EOMC_EOM",
+    "EOMC_SD",
+    "EOMC",
+    -- business day conventions
+    "BDC_NULL",
+    "BDC_SCF",
+    "BDC_SCMF",
+    "BDC_CSF",
+    "BDC_CSMF",
+    "BDC_SCP",
+    "BDC_SCMP",
+    "BDC_CSP",
+    "BDC_CSMP",
+    "BDC",
+    -- calendar
+    "CLDR_MF",
+    "CLDR_NC",
+    "Calendar",
+    "ScheduleConfig",
+    -- credit event type covered
+    "CETC_DL",
+    "CETC_DQ",
+    "CETC_DF",
+    "CETC",
+    -- guaranteed exposure
+    "CEGE_NO",
+    "CEGE_NI",
+    "CEGE",
+    -- fee basis
+    "FEB_A",
+    "FEB_N",
+    "FEB",
+    -- interest calculation base
+    "IPCB_NT",
+    "IPCB_NTIED",
+    "IPCB_NTL",
+    "IPCB'",
+    -- scaling effects
+    "SE_OOO",
+    "SE_IOO",
+    "SE_IOO",
+    "SE_ONO",
+    "SE_OOM",
+    "SE_INO",
+    "SE_ONM",
+    "SE_IOM",
+    "SE_INM",
+    "SCEF",
+    -- penalty types
+    "PYTP_A",
+    "PYTP_N",
+    "PYTP_I",
+    "PYTP_O",
+    "PYTP",
+    -- option types
+    "OPTP_C",
+    "OPTP_P",
+    "OPTP_CP",
+    "OPTP",
+    -- option exercise types
+    "OPXT_E",
+    "OPXT_B",
+    "OPXT_A",
+    -- settlement
+    "DS_S",
+    "DS_D",
+    "DS",
+    -- prepayment effects
+    "PPEF_N",
+    "PPEF_A",
+    "PPEF_M",
+    "PPEF",
+    -- calendar type
+    "NoCalendar",
+    "MondayToFriday",
+    "CustomCalendar",
+    "CalendarType",
+    -- cycle period
+    "P_D",
+    "P_W",
+    "P_M",
+    "P_Q",
+    "P_H",
+    "P_Y",
+    "Period",
+    -- cycle stubs
+    "ShortStub",
+    "LongStub",
+    "Stub",
+    "Cycle",
+    -- assertion contexts & assertions
+    "RRMOMin",
+    "RRMOMax",
+    "AssertionContext",
+    "NpvAssertionAgainstZeroRiskBond",
+    "Assertion",
+    -- reference types
+    "CNT",
+    "CID",
+    "MOC",
+    "EID",
+    "CST",
+    "ReferenceType",
+    -- reference roles
+    "UDL",
+    "FIL",
+    "SEL",
+    "COVE",
+    "COVI",
+    "ReferenceRole",
+    "MarketObjectCode",
+    "ContractIdentifier",
+    "COCE",
+    "FeeRate",
+    "InterestAccrued",
+    "IPCBA",
+    "NominalRate",
+    "NominalRate2",
+    "ISM",
+    "NotionalPrincipal",
+    "PremiumDiscountAtIED",
+    "NextPrincipalRedemptionPayment",
+    "PriceAtPurchaseDate",
+    "PriceAtTerminationDate",
+    "ScalingIndexAtStatusDate",
+    "NotionalScalingMultiplier",
+    "Quantity",
+    "OptionStrike1",
+    "ExerciseAmount",
+    "FuturesPrice",
+    "PenaltyRate",
+    "NextResetRate",
+    "RateSpread",
+    "RateMultiplier",
+    "PeriodFloor",
+    "PeriodCap",
+    "LifeCap",
+    "LifeFloor",
+    "MarketObjectCodeOfRateReset",
+    "NextDividendPaymentAmount",
+    "Identifier",
+    "ContractTerms",
+    "Reference",
+    "ContractStructure"
   ]

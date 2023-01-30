@@ -9,28 +9,27 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
-module Actus.Domain.ContractTerms
-  where
+module Actus.Domain.ContractTerms where
 
-import Actus.Domain.Basic (Rational, Value, Rate, FEAC)
+import Actus.Domain.Basic (FEAC, Rate, Rational, Value)
 import Control.Applicative ((<|>))
 import Control.Monad (guard, mzero)
 import Data.Aeson.TH (deriveJSON)
 import Data.Aeson.Types
-  ( FromJSON
-  , Options(..)
-  , Parser
-  , SumEncoding(..)
-  , ToJSON
-  , Value(..)
-  , defaultOptions
-  , genericParseJSON
-  , object
-  , parseJSON
-  , toJSON
-  , (.:)
-  , (.:?)
-  , (.=)
+  ( FromJSON,
+    Options (..),
+    Parser,
+    SumEncoding (..),
+    ToJSON,
+    Value (..),
+    defaultOptions,
+    genericParseJSON,
+    object,
+    parseJSON,
+    toJSON,
+    (.:),
+    (.:?),
+    (.=),
   )
 import Data.Maybe (fromMaybe)
 import Data.Text as T hiding (reverse, takeWhile)
@@ -40,234 +39,345 @@ import GHC.Generics (Generic)
 import OSL.FromHaskell (ToOSLType, mkDataToAddOSL)
 import Prelude hiding (Rational)
 
--- |ContractType
-data CT = PAM   -- ^ Principal at maturity
-        | LAM   -- ^ Linear amortizer
-        | NAM   -- ^ Negative amortizer
-        | ANN   -- ^ Annuity
-        | STK   -- ^ Stock
-        | OPTNS -- ^ Option
-        | FUTUR -- ^ Future
-        | COM   -- ^ Commodity
-        | CSH   -- ^ Cash
-        | CLM   -- ^ Call Money
-        | SWPPV -- ^ Plain Vanilla Swap
-        | SWAPS -- ^ Swap
-        | CEG   -- ^ Guarantee
-        | CEC   -- ^ Collateral
-        deriving stock (Show, Read, Eq, Generic)
-        deriving anyclass (FromJSON, ToJSON)
+-- | ContractType
+data CT
+  = -- | Principal at maturity
+    PAM
+  | -- | Linear amortizer
+    LAM
+  | -- | Negative amortizer
+    NAM
+  | -- | Annuity
+    ANN
+  | -- | Stock
+    STK
+  | -- | Option
+    OPTNS
+  | -- | Future
+    FUTUR
+  | -- | Commodity
+    COM
+  | -- | Cash
+    CSH
+  | -- | Call Money
+    CLM
+  | -- | Plain Vanilla Swap
+    SWPPV
+  | -- | Swap
+    SWAPS
+  | -- | Guarantee
+    CEG
+  | -- | Collateral
+    CEC
+  deriving stock (Show, Read, Eq, Generic)
+  deriving anyclass (FromJSON, ToJSON)
 
--- |ContractRole
-data CR = CR_RPA -- ^ Real position asset
-        | CR_RPL -- ^ Real position liability
-        | CR_CLO -- ^ Role of a collateral
-        | CR_CNO -- ^ Role of a close-out-netting
-        | CR_COL -- ^ Role of an underlying to a collateral
-        | CR_LG  -- ^ Long position
-        | CR_ST  -- ^ Short position
-        | CR_BUY -- ^ Protection buyer
-        | CR_SEL -- ^ Protection seller
-        | CR_RFL -- ^ Receive first leg
-        | CR_PFL -- ^ Pay first leg
-        | CR_RF  -- ^ Receive fix leg
-        | CR_PF  -- ^ Pay fix leg
-        deriving stock (Show, Read, Eq, Generic)
+-- | ContractRole
+data CR
+  = -- | Real position asset
+    CR_RPA
+  | -- | Real position liability
+    CR_RPL
+  | -- | Role of a collateral
+    CR_CLO
+  | -- | Role of a close-out-netting
+    CR_CNO
+  | -- | Role of an underlying to a collateral
+    CR_COL
+  | -- | Long position
+    CR_LG
+  | -- | Short position
+    CR_ST
+  | -- | Protection buyer
+    CR_BUY
+  | -- | Protection seller
+    CR_SEL
+  | -- | Receive first leg
+    CR_RFL
+  | -- | Pay first leg
+    CR_PFL
+  | -- | Receive fix leg
+    CR_RF
+  | -- | Pay fix leg
+    CR_PF
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''CR)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''CR)
 
--- |DayCountConvention
-data DCC = DCC_A_AISDA     -- ^ Actual/Actual ISDA
-         | DCC_A_360       -- ^ Actual/360
-         | DCC_A_365       -- ^ Actual/365
-         | DCC_E30_360ISDA -- ^ 30E/360 ISDA
-         | DCC_E30_360     -- ^ 30E/360
-         | DCC_B_252       -- ^ Business / 252
-         deriving stock (Show, Read, Eq, Generic)
+-- | DayCountConvention
+data DCC
+  = -- | Actual/Actual ISDA
+    DCC_A_AISDA
+  | -- | Actual/360
+    DCC_A_360
+  | -- | Actual/365
+    DCC_A_365
+  | -- | 30E/360 ISDA
+    DCC_E30_360ISDA
+  | -- | 30E/360
+    DCC_E30_360
+  | -- | Business / 252
+    DCC_B_252
+  deriving stock (Show, Read, Eq, Generic)
 
 instance ToJSON DCC where
-  toJSON DCC_A_AISDA     = String "AA"
-  toJSON DCC_A_360       = String "A360"
-  toJSON DCC_A_365       = String "A365"
+  toJSON DCC_A_AISDA = String "AA"
+  toJSON DCC_A_360 = String "A360"
+  toJSON DCC_A_365 = String "A365"
   toJSON DCC_E30_360ISDA = String "30E360ISDA"
-  toJSON DCC_E30_360     = String "30E360"
-  toJSON DCC_B_252       = String "B252"
+  toJSON DCC_E30_360 = String "30E360"
+  toJSON DCC_B_252 = String "B252"
 
 instance FromJSON DCC where
-  parseJSON (String "AA")         = return DCC_A_AISDA
-  parseJSON (String "A360")       = return DCC_A_360
-  parseJSON (String "A365")       = return DCC_A_365
-  parseJSON (String "30E360ISDA") = return DCC_E30_360ISDA
-  parseJSON (String "30E360")     = return DCC_E30_360
-  parseJSON (String "B252")       = return DCC_B_252
-  parseJSON _                     = mzero
+  parseJSON (String "AA") = pure DCC_A_AISDA
+  parseJSON (String "A360") = pure DCC_A_360
+  parseJSON (String "A365") = pure DCC_A_365
+  parseJSON (String "30E360ISDA") = pure DCC_E30_360ISDA
+  parseJSON (String "30E360") = pure DCC_E30_360
+  parseJSON (String "B252") = pure DCC_B_252
+  parseJSON _ = mzero
 
--- |EndOfMonthConvention
-data EOMC = EOMC_EOM -- ^ End of month
-          | EOMC_SD  -- ^ Same day
-          deriving stock (Show, Read, Eq, Generic)
+-- | EndOfMonthConvention
+data EOMC
+  = -- | End of month
+    EOMC_EOM
+  | -- | Same day
+    EOMC_SD
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''EOMC)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''EOMC)
 
--- |BusinessDayConvention
-data BDC = BDC_NULL -- ^ No shift
-         | BDC_SCF  -- ^ Shift/calculate following
-         | BDC_SCMF -- ^ Shift/calculate modified following
-         | BDC_CSF  -- ^ Calculate/shift following
-         | BDC_CSMF -- ^ Calculate/shift modified following
-         | BDC_SCP  -- ^ Shift/calculate preceding
-         | BDC_SCMP -- ^ Shift/calculate modified preceding
-         | BDC_CSP  -- ^ Calculate/shift preceding
-         | BDC_CSMP -- ^ Calculate/shift modified preceding
-         deriving stock (Show, Read, Eq, Generic)
+-- | BusinessDayConvention
+data BDC
+  = -- | No shift
+    BDC_NULL
+  | -- | Shift/calculate following
+    BDC_SCF
+  | -- | Shift/calculate modified following
+    BDC_SCMF
+  | -- | Calculate/shift following
+    BDC_CSF
+  | -- | Calculate/shift modified following
+    BDC_CSMF
+  | -- | Shift/calculate preceding
+    BDC_SCP
+  | -- | Shift/calculate modified preceding
+    BDC_SCMP
+  | -- | Calculate/shift preceding
+    BDC_CSP
+  | -- | Calculate/shift modified preceding
+    BDC_CSMP
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''BDC)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''BDC)
 
-data Calendar = CLDR_MF -- ^ Monday to Friday
-              | CLDR_NC -- ^ No calendar
-              deriving stock (Show, Read, Eq, Generic)
+data Calendar
+  = -- | Monday to Friday
+    CLDR_MF
+  | -- | No calendar
+    CLDR_NC
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''Calendar)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''Calendar)
 
 data ScheduleConfig = ScheduleConfig
-  { calendar              :: Maybe Calendar
-  , endOfMonthConvention  :: Maybe EOMC
-  , businessDayConvention :: Maybe BDC
+  { calendar :: Maybe Calendar,
+    endOfMonthConvention :: Maybe EOMC,
+    businessDayConvention :: Maybe BDC
   }
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
--- |ContractPerformance
-data PRF' = PRF_PF -- ^ Performant
-          | PRF_DL -- ^ Delayed
-          | PRF_DQ -- ^ Delinquent
-          | PRF_DF -- ^ Default
-          deriving stock (Show, Read, Eq, Generic)
+-- | ContractPerformance
+data PRF'
+  = -- | Performant
+    PRF_PF
+  | -- | Delayed
+    PRF_DL
+  | -- | Delinquent
+    PRF_DQ
+  | -- | Default
+    PRF_DF
+  deriving stock (Show, Read, Eq, Generic)
 
 $(mkDataToAddOSL "PRF'")
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''PRF')
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''PRF')
 
--- |CreditEventTypeCovered
-data CETC = CETC_DL -- ^ Delayed
-          | CETC_DQ -- ^ Delinquent
-          | CETC_DF -- ^ Default
-         deriving stock (Show, Read, Eq, Generic)
+-- | CreditEventTypeCovered
+data CETC
+  = -- | Delayed
+    CETC_DL
+  | -- | Delinquent
+    CETC_DQ
+  | -- | Default
+    CETC_DF
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''CETC)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''CETC)
 
--- |GuaranteedExposure
-data CEGE = CEGE_NO -- ^ Nominal value
-          | CEGE_NI -- ^ Nominal value plus interest
-         deriving stock (Show, Read, Eq, Generic)
+-- | GuaranteedExposure
+data CEGE
+  = -- | Nominal value
+    CEGE_NO
+  | -- | Nominal value plus interest
+    CEGE_NI
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''CEGE)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''CEGE)
 
--- |FeeBasis
-data FEB = FEB_A -- ^ Absolute value
-         | FEB_N -- ^ Notional of underlying
-         deriving stock (Show, Read, Eq, Generic)
+-- | FeeBasis
+data FEB
+  = -- | Absolute value
+    FEB_A
+  | -- | Notional of underlying
+    FEB_N
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''FEB)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''FEB)
 
--- |InterestCalculationBase
-data IPCB' = IPCB_NT    -- ^ Calculation base always equals to NT
-           | IPCB_NTIED -- ^ Notional remains constant amount as per IED
-           | IPCB_NTL   -- ^ Calculation base is notional base laged
-          deriving stock (Show, Read, Eq, Generic)
+-- | InterestCalculationBase
+data IPCB'
+  = -- | Calculation base always equals to NT
+    IPCB_NT
+  | -- | Notional remains constant amount as per IED
+    IPCB_NTIED
+  | -- | Calculation base is notional base laged
+    IPCB_NTL
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''IPCB')
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''IPCB')
 
--- |ScalingEffect
-data SCEF = SE_OOO -- ^ No scaling
-          | SE_IOO -- ^ Only interest payments scaled
-          | SE_ONO -- ^ Only nominal payments scaled
-          | SE_OOM -- ^ Only maximum deferred amount scaled
-          | SE_INO -- ^ Interest and nominal payments scaled
-          | SE_ONM -- ^ Nominal and maximum deferred amount scaled
-          | SE_IOM -- ^ Interest and maximum deferred amount scaled
-          | SE_INM -- ^ Interest, nominal and maximum deferred amount scaled
-          deriving stock (Show, Read, Eq, Generic)
+-- | ScalingEffect
+data SCEF
+  = -- | No scaling
+    SE_OOO
+  | -- | Only interest payments scaled
+    SE_IOO
+  | -- | Only nominal payments scaled
+    SE_ONO
+  | -- | Only maximum deferred amount scaled
+    SE_OOM
+  | -- | Interest and nominal payments scaled
+    SE_INO
+  | -- | Nominal and maximum deferred amount scaled
+    SE_ONM
+  | -- | Interest and maximum deferred amount scaled
+    SE_IOM
+  | -- | Interest, nominal and maximum deferred amount scaled
+    SE_INM
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''SCEF)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''SCEF)
 
--- |PenaltyType
-data PYTP = PYTP_A -- ^ Absolute
-          | PYTP_N -- ^ Nominal rate
-          | PYTP_I -- ^ Current interest rate differential
-          | PYTP_O -- ^ No penalty
-          deriving stock (Show, Read, Eq, Generic)
+-- | PenaltyType
+data PYTP
+  = -- | Absolute
+    PYTP_A
+  | -- | Nominal rate
+    PYTP_N
+  | -- | Current interest rate differential
+    PYTP_I
+  | -- | No penalty
+    PYTP_O
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''PYTP)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''PYTP)
 
--- |Option Type
-data OPTP = OPTP_C  -- ^ Call Option
-          | OPTP_P  -- ^ Put Option
-          | OPTP_CP -- ^ Call-Put Option
-          deriving stock (Show, Read, Eq, Generic)
+-- | Option Type
+data OPTP
+  = -- | Call Option
+    OPTP_C
+  | -- | Put Option
+    OPTP_P
+  | -- | Call-Put Option
+    OPTP_CP
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''OPTP)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''OPTP)
 
--- |Option Exercise Type
-data OPXT = OPXT_E -- ^ European
-          | OPXT_B -- ^ Bermudan
-          | OPXT_A -- ^ American
-          deriving stock (Show, Read, Eq, Generic)
+-- | Option Exercise Type
+data OPXT
+  = -- | European
+    OPXT_E
+  | -- | Bermudan
+    OPXT_B
+  | -- | American
+    OPXT_A
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''OPXT)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''OPXT)
 
--- |Settlement
-data DS = DS_S -- ^ Cash Settlement
-        | DS_D -- ^ Physical Settlement
-          deriving stock (Show, Read, Eq, Generic)
+-- | Settlement
+data DS
+  = -- | Cash Settlement
+    DS_S
+  | -- | Physical Settlement
+    DS_D
+  deriving stock (Show, Read, Eq, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''DS)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''DS)
 
--- |PrepaymentEffect
-data PPEF = PPEF_N -- ^ No prepayment
-          | PPEF_A -- ^ Prepayment allowed, prepayment results in reduction of PRNXT while MD remains
-          | PPEF_M -- ^ Prepayment allowed, prepayment results in reduction of MD while PRNXT remains
-          deriving stock (Show, Read, Eq, Ord, Generic)
+-- | PrepaymentEffect
+data PPEF
+  = -- | No prepayment
+    PPEF_N
+  | -- | Prepayment allowed, prepayment results in reduction of PRNXT while MD remains
+    PPEF_A
+  | -- | Prepayment allowed, prepayment results in reduction of MD while PRNXT remains
+    PPEF_M
+  deriving stock (Show, Read, Eq, Ord, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''PPEF)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''PPEF)
 
-data CalendarType = NoCalendar
-                  | MondayToFriday
-                  | CustomCalendar {holidays :: [Day]}
-                  deriving stock (Show, Generic)
-                  deriving anyclass (FromJSON, ToJSON)
+data CalendarType
+  = NoCalendar
+  | MondayToFriday
+  | CustomCalendar {holidays :: [Day]}
+  deriving stock (Show, Generic)
+  deriving anyclass (FromJSON, ToJSON)
 
--- |CyclePeriod
-data Period = P_D -- ^ Day
-            | P_W -- ^ Week
-            | P_M -- ^ Month
-            | P_Q -- ^ Quarter
-            | P_H -- ^ Half year
-            | P_Y -- ^ Year
-            deriving stock (Show, Read, Eq, Ord, Generic)
+-- | CyclePeriod
+data Period
+  = -- | Day
+    P_D
+  | -- | Week
+    P_W
+  | -- | Month
+    P_M
+  | -- | Quarter
+    P_Q
+  | -- | Half year
+    P_H
+  | -- | Year
+    P_Y
+  deriving stock (Show, Read, Eq, Ord, Generic)
 
-$(deriveJSON defaultOptions { constructorTagModifier = reverse . takeWhile (/= '_') . reverse } ''Period)
+$(deriveJSON defaultOptions {constructorTagModifier = reverse . takeWhile (/= '_') . reverse} ''Period)
 
--- |CycleStub
-data Stub = ShortStub -- ^ Short last stub
-          | LongStub  -- ^ Long last stub
-          deriving stock (Show, Eq, Ord, Generic)
+-- | CycleStub
+data Stub
+  = -- | Short last stub
+    ShortStub
+  | -- | Long last stub
+    LongStub
+  deriving stock (Show, Eq, Ord, Generic)
 
 instance ToJSON Stub where
   toJSON ShortStub = String "1"
-  toJSON LongStub  = String "0"
+  toJSON LongStub = String "0"
 
 instance FromJSON Stub where
-  parseJSON (String "1") = return ShortStub
-  parseJSON (String "0") = return LongStub
-  parseJSON _            = mzero
+  parseJSON (String "1") = pure ShortStub
+  parseJSON (String "0") = pure LongStub
+  parseJSON _ = mzero
 
--- |Cycle
+-- | Cycle
 data Cycle = Cycle
-  { n             :: Integer
-  , p             :: Period
-  , stub          :: Stub
-  , includeEndDay :: Bool
+  { n :: Integer,
+    p :: Period,
+    stub :: Stub,
+    includeEndDay :: Bool
   }
   deriving stock (Show, Eq, Ord, Generic)
 
@@ -297,40 +407,41 @@ instance FromJSON Cycle where
         if T.null r2
           then
             Just $
-              return (Cycle n)
+              pure (Cycle n)
                 <*> parseJSON (String $ singleton p)
-                <*> return LongStub
-                <*> return False
+                <*> pure LongStub
+                <*> pure False
           else do
             r3 <- unconsConstant 'L' r2
             Just $
-              return (Cycle n)
+              pure (Cycle n)
                 <*> parseJSON (String $ singleton p)
                 <*> parseJSON (String r3)
-                <*> return False
+                <*> pure False
 
       unconsConstant :: Char -> Text -> Maybe Text
-      unconsConstant c t = do (ht, tt) <- uncons t
-                              guard (ht == c)
-                              return tt
+      unconsConstant c t = do
+        (ht, tt) <- uncons t
+        guard (ht == c)
+        pure tt
 
       hush :: Either a b -> Maybe b
       hush = either (const Nothing) Just
-
   parseJSON _ = mzero
 
 -- For applicability failures
-data TermValidationError =
-    Required String
-    | NotApplicable String
-    deriving stock (Eq)
+data TermValidationError
+  = Required String
+  | NotApplicable String
+  deriving stock (Eq)
+
 instance Show TermValidationError where
-    show (Required s)      = "Missing required term: " ++ s
-    show (NotApplicable s) = "Term not applicable to contract: " ++ s
+  show (Required s) = "Missing required term: " ++ s
+  show (NotApplicable s) = "Term not applicable to contract: " ++ s
 
 data Assertions = Assertions
-  { context    :: AssertionContext
-  , assertions :: [Assertion]
+  { context :: AssertionContext,
+    assertions :: [Assertion]
   }
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
@@ -342,8 +453,8 @@ newtype RRMOMax = RRMOMax Rational
   deriving newtype (Show, ToOSLType, FromJSON, ToJSON)
 
 data AssertionContext = AssertionContext
-  { rrmoMin :: RRMOMin
-  , rrmoMax :: RRMOMax
+  { rrmoMin :: RRMOMin,
+    rrmoMax :: RRMOMax
   }
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
@@ -355,27 +466,39 @@ newtype ExpectedNPV = ExpectedNPV Actus.Domain.Basic.Value
   deriving newtype (Show, FromJSON, ToJSON, ToOSLType)
 
 data Assertion = NpvAssertionAgainstZeroRiskBond
-  { zeroRiskInterest :: ZeroRiskInterest
-  , expectedNpv      :: ExpectedNPV
+  { zeroRiskInterest :: ZeroRiskInterest,
+    expectedNpv :: ExpectedNPV
   }
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
--- |Reference type
-data ReferenceType = CNT -- ^ Contract
-                   | CID -- ^ Contract Identifier
-                   | MOC -- ^ Market Object Identifier
-                   | EID -- ^ Legal Entity Identifier
-                   | CST -- ^ Contract Structure
+-- | Reference type
+data ReferenceType
+  = -- | Contract
+    CNT
+  | -- | Contract Identifier
+    CID
+  | -- | Market Object Identifier
+    MOC
+  | -- | Legal Entity Identifier
+    EID
+  | -- | Contract Structure
+    CST
   deriving stock (Eq, Show, Read, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
--- |Reference role
-data ReferenceRole = UDL  -- ^ Underlying
-                   | FIL  -- ^ First Leg
-                   | SEL  -- ^ Second Leg
-                   | COVE -- ^ Convered Contract
-                   | COVI -- ^ Covering Contract
+-- | Reference role
+data ReferenceRole
+  = -- | Underlying
+    UDL
+  | -- | First Leg
+    FIL
+  | -- | Second Leg
+    SEL
+  | -- | Convered Contract
+    COVE
+  | -- | Covering Contract
+    COVI
   deriving stock (Eq, Read, Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
@@ -385,41 +508,42 @@ newtype MarketObjectCode = MarketObjectCode String
 newtype ContractIdentifier = ContractIdentifier String
   deriving newtype (Show, FromJSON, ToJSON, ToOSLType)
 
--- |Reference object
+-- | Reference object
 data Identifier = Identifier
-  { marketObjectCode   :: Maybe MarketObjectCode
-  , contractIdentifier :: Maybe ContractIdentifier
+  { marketObjectCode :: Maybe MarketObjectCode,
+    contractIdentifier :: Maybe ContractIdentifier
   }
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
-data Reference = ReferenceTerms ContractTerms
-               | ReferenceId Identifier
+data Reference
+  = ReferenceTerms ContractTerms
+  | ReferenceId Identifier
   deriving stock (Show, Generic)
   deriving anyclass (ToJSON)
 
--- |Contract structure
+-- | Contract structure
 data ContractStructure = ContractStructure
-  { reference     :: Reference
-  , referenceType :: ReferenceType
-  , referenceRole :: ReferenceRole
+  { reference :: Reference,
+    referenceType :: ReferenceType,
+    referenceRole :: ReferenceRole
   }
   deriving stock (Show, Generic)
 
 instance ToJSON ContractStructure where
-  toJSON ContractStructure{..} =
+  toJSON ContractStructure {..} =
     object
-      [ "object"        .= toJSON reference
-      , "referenceType" .= toJSON referenceType
-      , "referenceRole" .= toJSON referenceRole
+      [ "object" .= toJSON reference,
+        "referenceType" .= toJSON referenceType,
+        "referenceRole" .= toJSON referenceRole
       ]
 
 getMarketObjectCode :: Reference -> Maybe MarketObjectCode
-getMarketObjectCode (ReferenceId i)    = marketObjectCode i
+getMarketObjectCode (ReferenceId i) = marketObjectCode i
 getMarketObjectCode (ReferenceTerms t) = marketObjectCodeRef t
 
 getContractIdentifier :: Reference -> Maybe ContractIdentifier
-getContractIdentifier (ReferenceId i)                     = contractIdentifier i
+getContractIdentifier (ReferenceId i) = contractIdentifier i
 getContractIdentifier (ReferenceTerms ContractTerms {..}) = Just contractId
 
 newtype COCE = COCE Actus.Domain.Basic.Value
@@ -509,125 +633,196 @@ newtype MarketObjectCodeOfRateReset = MarketObjectCodeOfRateReset String
 newtype NextDividendPaymentAmount = NextDividendPaymentAmount Actus.Domain.Basic.Value
   deriving newtype (Read, Show, FromJSON, ToJSON, ToOSLType)
 
-{-| ACTUS contract terms and attributes are defined in
-    https://github.com/actusfrf/actus-dictionary/blob/master/actus-dictionary-terms.json
--}
+-- | ACTUS contract terms and attributes are defined in
+--    https://github.com/actusfrf/actus-dictionary/blob/master/actus-dictionary-terms.json
 data ContractTerms = ContractTerms
   { -- General
-    contractId                               :: ContractIdentifier
-  , contractType                             :: CT
-  -- TODO: contractStructure cannot be here because OSL can't
-  -- (straightforwardly) handle mutually recursive data types
-  -- , contractStructure                        :: [ContractStructure]
-  , contractRole                             :: CR
-  , settlementCurrency                       :: Maybe String
+    contractId :: ContractIdentifier,
+    contractType :: CT,
+    -- TODO: contractStructure cannot be here because OSL can't
+    -- (straightforwardly) handle mutually recursive data types
+    -- , contractStructure                        :: [ContractStructure]
+    contractRole :: CR,
+    settlementCurrency :: Maybe String,
+    -- Calendar
 
-  -- Calendar
-  , initialExchangeDate                      :: Maybe LocalTime  -- ^ Initial Exchange Date
-  , dayCountConvention                       :: Maybe DCC        -- ^ Day Count Convention
-  , scheduleConfig                           :: ScheduleConfig
+    -- | Initial Exchange Date
+    initialExchangeDate :: Maybe LocalTime,
+    -- | Day Count Convention
+    dayCountConvention :: Maybe DCC,
+    scheduleConfig :: ScheduleConfig,
+    -- Contract Identification
 
-  -- Contract Identification
-  , statusDate                               :: LocalTime        -- ^ Status Date
-  , marketObjectCodeRef                      :: Maybe MarketObjectCode -- ^ Market Object Code
+    -- | Status Date
+    statusDate :: LocalTime,
+    -- | Market Object Code
+    marketObjectCodeRef :: Maybe MarketObjectCode,
+    -- Counterparty
 
-  -- Counterparty
-  , contractPerformance                      :: Maybe PRF'       -- ^ Contract Performance
-  , creditEventTypeCovered                   :: Maybe CETC       -- ^ Credit Event Type Covered
-  , coverageOfCreditEnhancement              :: Maybe COCE       -- ^ Coverage Of Credit Enhancement
-  , guaranteedExposure                       :: Maybe CEGE       -- ^ Guaranteed Exposure
+    -- | Contract Performance
+    contractPerformance :: Maybe PRF',
+    -- | Credit Event Type Covered
+    creditEventTypeCovered :: Maybe CETC,
+    -- | Coverage Of Credit Enhancement
+    coverageOfCreditEnhancement :: Maybe COCE,
+    -- | Guaranteed Exposure
+    guaranteedExposure :: Maybe CEGE,
+    -- Fees
 
-  -- Fees
-  , cycleOfFee                               :: Maybe Cycle      -- ^ Cycle Of Fee
-  , cycleAnchorDateOfFee                     :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Fee
-  , feeAccrued                               :: Maybe FEAC       -- ^ Fee Accrued
-  , feeBasis                                 :: Maybe FEB        -- ^ Fee Basis
-  , feeRate                                  :: Maybe FeeRate    -- ^ Fee Rate
+    -- | Cycle Of Fee
+    cycleOfFee :: Maybe Cycle,
+    -- | Cycle Anchor Date Of Fee
+    cycleAnchorDateOfFee :: Maybe LocalTime,
+    -- | Fee Accrued
+    feeAccrued :: Maybe FEAC,
+    -- | Fee Basis
+    feeBasis :: Maybe FEB,
+    -- | Fee Rate
+    feeRate :: Maybe FeeRate,
+    -- Interest
 
-  -- Interest
-  , cycleAnchorDateOfInterestPayment         :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Interest Payment
-  , cycleOfInterestPayment                   :: Maybe Cycle      -- ^ Cycle Of Interest Payment
-  , accruedInterest                          :: Maybe InterestAccrued   -- ^ Accrued Interest
-  , capitalizationEndDate                    :: Maybe LocalTime  -- ^ Capitalization End Date
-  , cycleAnchorDateOfInterestCalculationBase :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Interest Calculation Base
-  , cycleOfInterestCalculationBase           :: Maybe Cycle      -- ^ Cycle Of Interest Calculation Base
-  , interestCalculationBase                  :: Maybe IPCB'      -- ^ Interest Calculation Base
-  , interestCalculationBaseA                 :: Maybe IPCBA      -- ^ Interest Calculation Base Amount
-  , nominalInterestRate                      :: Maybe NominalRate -- ^ Nominal Interest Rate
-  , nominalInterestRate2                     :: Maybe NominalRate2 -- ^ Nominal Interest Rate (Second Leg in Plain Vanilla Swap)
-  , interestScalingMultiplier                :: Maybe ISM        -- ^ Interest Scaling Multiplier
+    -- | Cycle Anchor Date Of Interest Payment
+    cycleAnchorDateOfInterestPayment :: Maybe LocalTime,
+    -- | Cycle Of Interest Payment
+    cycleOfInterestPayment :: Maybe Cycle,
+    -- | Accrued Interest
+    accruedInterest :: Maybe InterestAccrued,
+    -- | Capitalization End Date
+    capitalizationEndDate :: Maybe LocalTime,
+    -- | Cycle Anchor Date Of Interest Calculation Base
+    cycleAnchorDateOfInterestCalculationBase :: Maybe LocalTime,
+    -- | Cycle Of Interest Calculation Base
+    cycleOfInterestCalculationBase :: Maybe Cycle,
+    -- | Interest Calculation Base
+    interestCalculationBase :: Maybe IPCB',
+    -- | Interest Calculation Base Amount
+    interestCalculationBaseA :: Maybe IPCBA,
+    -- | Nominal Interest Rate
+    nominalInterestRate :: Maybe NominalRate,
+    -- | Nominal Interest Rate (Second Leg in Plain Vanilla Swap)
+    nominalInterestRate2 :: Maybe NominalRate2,
+    -- | Interest Scaling Multiplier
+    interestScalingMultiplier :: Maybe ISM,
+    -- Dates
 
-  -- Dates
-  , maturityDate                             :: Maybe LocalTime  -- ^ Maturity Date
-  , amortizationDate                         :: Maybe LocalTime  -- ^ Amortization Date
-  , exerciseDate                             :: Maybe LocalTime  -- ^ Exercise Date
+    -- | Maturity Date
+    maturityDate :: Maybe LocalTime,
+    -- | Amortization Date
+    amortizationDate :: Maybe LocalTime,
+    -- | Exercise Date
+    exerciseDate :: Maybe LocalTime,
+    -- Notional Principal
 
-  -- Notional Principal
-  , notionalPrincipal                        :: Maybe NotionalPrincipal   -- ^ Notional Principal
-  , premiumDiscountAtIED                     :: Maybe PremiumDiscountAtIED  -- ^ Premium Discount At IED
-  , cycleAnchorDateOfPrincipalRedemption     :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Principal Redemption
-  , cycleOfPrincipalRedemption               :: Maybe Cycle      -- ^ Cycle Of Principal Redemption
-  , nextPrincipalRedemptionPayment           :: Maybe NextPrincipalRedemptionPayment          -- ^ Next Principal Redemption Payment
-  , purchaseDate                             :: Maybe LocalTime  -- ^ Purchase Date
-  , priceAtPurchaseDate                      :: Maybe PriceAtPurchaseDate          -- ^ Price At Purchase Date
-  , terminationDate                          :: Maybe LocalTime  -- ^ Termination Date
-  , priceAtTerminationDate                   :: Maybe PriceAtTerminationDate          -- ^ Price At Termination Date
-  , quantity                                 :: Maybe Quantity      -- ^ Quantity
-  , currency                                 :: Maybe String     -- ^ The currency of the cash flows
-  , currency2                                :: Maybe String     -- ^ The currency of the cash flows of the second leg
+    -- | Notional Principal
+    notionalPrincipal :: Maybe NotionalPrincipal,
+    -- | Premium Discount At IED
+    premiumDiscountAtIED :: Maybe PremiumDiscountAtIED,
+    -- | Cycle Anchor Date Of Principal Redemption
+    cycleAnchorDateOfPrincipalRedemption :: Maybe LocalTime,
+    -- | Cycle Of Principal Redemption
+    cycleOfPrincipalRedemption :: Maybe Cycle,
+    -- | Next Principal Redemption Payment
+    nextPrincipalRedemptionPayment :: Maybe NextPrincipalRedemptionPayment,
+    -- | Purchase Date
+    purchaseDate :: Maybe LocalTime,
+    -- | Price At Purchase Date
+    priceAtPurchaseDate :: Maybe PriceAtPurchaseDate,
+    -- | Termination Date
+    terminationDate :: Maybe LocalTime,
+    -- | Price At Termination Date
+    priceAtTerminationDate :: Maybe PriceAtTerminationDate,
+    -- | Quantity
+    quantity :: Maybe Quantity,
+    -- | The currency of the cash flows
+    currency :: Maybe String,
+    -- | The currency of the cash flows of the second leg
+    currency2 :: Maybe String,
+    -- Scaling Index
 
-  -- Scaling Index
-  , scalingIndexAtStatusDate                 :: Maybe ScalingIndexAtStatusDate  -- ^ Scaling Index At Status Date
-  , cycleAnchorDateOfScalingIndex            :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Scaling Index
-  , cycleOfScalingIndex                      :: Maybe Cycle      -- ^ Cycle Of Scaling Index
-  , scalingEffect                            :: Maybe SCEF       -- ^ Scaling Effect
-  , scalingIndexAtContractDealDate           :: Maybe ScalingIndexAtContractDealDate    -- ^ Scaling Index At Contract Deal Date
-  , marketObjectCodeOfScalingIndex           :: Maybe String     -- ^ Market Object Code Of Scaling Index
-  , notionalScalingMultiplier                :: Maybe NotionalScalingMultiplier   -- ^ Notional Scaling Multiplier
+    -- | Scaling Index At Status Date
+    scalingIndexAtStatusDate :: Maybe ScalingIndexAtStatusDate,
+    -- | Cycle Anchor Date Of Scaling Index
+    cycleAnchorDateOfScalingIndex :: Maybe LocalTime,
+    -- | Cycle Of Scaling Index
+    cycleOfScalingIndex :: Maybe Cycle,
+    -- | Scaling Effect
+    scalingEffect :: Maybe SCEF,
+    -- | Scaling Index At Contract Deal Date
+    scalingIndexAtContractDealDate :: Maybe ScalingIndexAtContractDealDate,
+    -- | Market Object Code Of Scaling Index
+    marketObjectCodeOfScalingIndex :: Maybe String,
+    -- | Notional Scaling Multiplier
+    notionalScalingMultiplier :: Maybe NotionalScalingMultiplier,
+    -- Optionality
 
-  -- Optionality
-  , cycleOfOptionality                       :: Maybe Cycle      -- ^ Cycle Of Optionality
-  , cycleAnchorDateOfOptionality             :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Optionality
-  , optionType                               :: Maybe OPTP       -- ^ Option Type
-  , optionStrike1                            :: Maybe OptionStrike1  -- ^ Option Strike 1
-  , optionExerciseType                       :: Maybe OPXT       -- ^ Option Exercise Type
+    -- | Cycle Of Optionality
+    cycleOfOptionality :: Maybe Cycle,
+    -- | Cycle Anchor Date Of Optionality
+    cycleAnchorDateOfOptionality :: Maybe LocalTime,
+    -- | Option Type
+    optionType :: Maybe OPTP,
+    -- | Option Strike 1
+    optionStrike1 :: Maybe OptionStrike1,
+    -- | Option Exercise Type
+    optionExerciseType :: Maybe OPXT,
+    -- Settlement
 
-  -- Settlement
-  , settlementPeriod                         :: Maybe Cycle      -- ^ Settlement Period
-  , deliverySettlement                       :: Maybe DS         -- ^ Delivery Settlement
-  , exerciseAmount                           :: Maybe ExerciseAmount   -- ^ Exercise Amount
-  , futuresPrice                             :: Maybe FuturesPrice    -- ^ Futures Price
+    -- | Settlement Period
+    settlementPeriod :: Maybe Cycle,
+    -- | Delivery Settlement
+    deliverySettlement :: Maybe DS,
+    -- | Exercise Amount
+    exerciseAmount :: Maybe ExerciseAmount,
+    -- | Futures Price
+    futuresPrice :: Maybe FuturesPrice,
+    -- Penalty
 
-  -- Penalty
-  , penaltyRate                              :: Maybe PenaltyRate -- ^ Penalty Rate
-  , penaltyType                              :: Maybe PYTP       -- ^ Penalty Type
-  , prepaymentEffect                         :: Maybe PPEF       -- ^ Prepayment Effect
+    -- | Penalty Rate
+    penaltyRate :: Maybe PenaltyRate,
+    -- | Penalty Type
+    penaltyType :: Maybe PYTP,
+    -- | Prepayment Effect
+    prepaymentEffect :: Maybe PPEF,
+    -- Rate Reset
 
-  -- Rate Reset
-  , cycleOfRateReset                         :: Maybe Cycle      -- ^ Cycle Of Rate Reset
-  , cycleAnchorDateOfRateReset               :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Rate Reset
-  , nextResetRate                            :: Maybe NextResetRate  -- ^ Next Reset Rate
-  , rateSpread                               :: Maybe RateSpread -- ^ Rate Spread
-  , rateMultiplier                           :: Maybe RateMultiplier  -- ^ Rate Multiplier
-  , periodFloor                              :: Maybe PeriodFloor -- ^ Period Floor
-  , periodCap                                :: Maybe PeriodCap  -- ^ Period Cap
-  , lifeCap                                  :: Maybe LifeCap    -- ^ Life Cap
-  , lifeFloor                                :: Maybe LifeFloor  -- ^ Life Floor
-  , marketObjectCodeOfRateReset              :: Maybe MarketObjectCodeOfRateReset   -- ^ Market Object Code Of Rate Reset
+    -- | Cycle Of Rate Reset
+    cycleOfRateReset :: Maybe Cycle,
+    -- | Cycle Anchor Date Of Rate Reset
+    cycleAnchorDateOfRateReset :: Maybe LocalTime,
+    -- | Next Reset Rate
+    nextResetRate :: Maybe NextResetRate,
+    -- | Rate Spread
+    rateSpread :: Maybe RateSpread,
+    -- | Rate Multiplier
+    rateMultiplier :: Maybe RateMultiplier,
+    -- | Period Floor
+    periodFloor :: Maybe PeriodFloor,
+    -- | Period Cap
+    periodCap :: Maybe PeriodCap,
+    -- | Life Cap
+    lifeCap :: Maybe LifeCap,
+    -- | Life Floor
+    lifeFloor :: Maybe LifeFloor,
+    -- | Market Object Code Of Rate Reset
+    marketObjectCodeOfRateReset :: Maybe MarketObjectCodeOfRateReset,
+    -- Dividend
 
-  -- Dividend
-  , cycleOfDividend                          :: Maybe Cycle      -- ^ Cycle Of Dividend
-  , cycleAnchorDateOfDividend                :: Maybe LocalTime  -- ^ Cycle Anchor Date Of Dividend
-  , nextDividendPaymentAmount                :: Maybe NextDividendPaymentAmount -- ^ Next Dividend Payment Amount
-
-  , enableSettlement                         :: Bool             -- ^ Enable settlement currency
-  , constraints                              :: Maybe Assertions -- ^ Assertions
+    -- | Cycle Of Dividend
+    cycleOfDividend :: Maybe Cycle,
+    -- | Cycle Anchor Date Of Dividend
+    cycleAnchorDateOfDividend :: Maybe LocalTime,
+    -- | Next Dividend Payment Amount
+    nextDividendPaymentAmount :: Maybe NextDividendPaymentAmount,
+    -- | Enable settlement currency
+    enableSettlement :: Bool,
+    -- | Assertions
+    constraints :: Maybe Assertions
   }
   deriving stock (Show, Generic)
   deriving anyclass (ToJSON)
 
 instance FromJSON Reference where
-  parseJSON = genericParseJSON defaultOptions { sumEncoding = UntaggedValue }
+  parseJSON = genericParseJSON defaultOptions {sumEncoding = UntaggedValue}
 
 instance FromJSON ContractStructure where
   parseJSON (Object v) =
@@ -640,20 +835,20 @@ instance FromJSON ContractStructure where
 instance FromJSON ContractTerms where
   parseJSON (Object v) =
     ContractTerms
-      <$> (v .:  "contractID" <|> v .: "contractId")
-      <*> v .:  "contractType"
-      -- <*> (v .: "contractStructure" <|> return [])
-      <*> (v .:  "contractRole" <|> return CR_RPA) -- SWAPS tests miss contractRole in contract terms
+      <$> (v .: "contractID" <|> v .: "contractId")
+      <*> v .: "contractType"
+      -- <*> (v .: "contractStructure" <|> pure [])
+      <*> (v .: "contractRole" <|> pure CR_RPA) -- SWAPS tests miss contractRole in contract terms
       <*> v .:? "settlementCurrency"
       <*> v .:? "initialExchangeDate"
       <*> v .:? "dayCountConvention"
-      <*> (v .: "scheduleConfig"
-           <|> ScheduleConfig
-               <$> (v .: "calendar" <|> return (Just CLDR_NC))
-               <*> (v .: "endOfMonthConvention" <|> return (Just EOMC_SD))
-               <*> (v .: "businessDayConvention" <|> return (Just BDC_NULL))
-           )
-      <*> v .:  "statusDate"
+      <*> ( v .: "scheduleConfig"
+              <|> ScheduleConfig
+                <$> (v .: "calendar" <|> pure (Just CLDR_NC))
+                <*> (v .: "endOfMonthConvention" <|> pure (Just EOMC_SD))
+                <*> (v .: "businessDayConvention" <|> pure (Just BDC_NULL))
+          )
+      <*> v .: "statusDate"
       <*> v .:? "marketObjectCode"
       <*> v .:? "contractPerformance"
       <*> v .:? "creditEventTypeCovered"

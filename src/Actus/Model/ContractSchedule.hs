@@ -2,11 +2,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
-{-| = ACTUS contract schedules -}
+-- | = ACTUS contract schedules
 module Actus.Model.ContractSchedule
-  ( -- maturity
-  -- , schedule
-  ) where
+  (
+  )
+where
+
+-- maturity
+-- , schedule
 
 -- import Actus.Domain
 --   ( ActusFrac(..)
@@ -151,20 +154,20 @@ module Actus.Model.ContractSchedule
 --         ++ maybe [] (schedule ev) (setRoleSel contractRole <$> termsFromStructure sel)
 --    in s
 -- schedule _ _                                           = []
--- 
+--
 -- setRoleFil :: CR -> ContractTerms a -> ContractTerms a
 -- setRoleFil CR_RFL ct = ct {contractRole = CR_RPA}
 -- setRoleFil _ ct      = ct {contractRole = CR_RPL}
--- 
+--
 -- setRoleSel :: CR -> ContractTerms a -> ContractTerms a
 -- setRoleSel CR_RFL ct = ct {contractRole = CR_RPL}
 -- setRoleSel _ ct      = ct {contractRole = CR_RPA}
--- 
+--
 -- termsFromStructure :: ContractStructure a -> Maybe (ContractTerms a)
 -- termsFromStructure cs = case reference cs of
 --   ReferenceTerms rt -> Just rt
 --   ReferenceId _     -> Nothing
--- 
+--
 -- -- |Determine the maturity of a contract
 -- maturity ::
 --   ActusFrac a =>
@@ -219,7 +222,7 @@ module Actus.Model.ContractSchedule
 --                 f = (\ShiftedDay {..} -> calculationDay == statusDate)
 --                 ShiftedDay {calculationDay = lastEventCalcDay} = head . filter f $ previousEvents
 --              in lastEventCalcDay
--- 
+--
 --         yLastEventPlusPRCL = yearFraction dcc lastEvent (lastEvent <+> prcl) Nothing
 --         redemptionPerCycle = prnxt - (yLastEventPlusPRCL * ipnr * nt)
 --         remainingPeriods = _ceiling $ (nt / redemptionPerCycle) - 1
@@ -263,9 +266,9 @@ module Actus.Model.ContractSchedule
 --       maturityDate = md@(Just _)
 --     } = md
 -- maturity _ = Nothing
--- 
+--
 -- -- Principal at Maturity (PAM)
--- 
+--
 -- _SCHED_IED_PAM :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_IED_PAM
 --   ContractTerms
@@ -273,7 +276,7 @@ module Actus.Model.ContractSchedule
 --       initialExchangeDate = Just ied
 --     } = [applyBDCWithCfg scheduleConfig ied]
 -- _SCHED_IED_PAM _ = []
--- 
+--
 -- _SCHED_MD_PAM :: ActusFrac a => ContractTerms a -> [ShiftedDay]
 -- _SCHED_MD_PAM
 --   ct@ContractTerms
@@ -282,7 +285,7 @@ module Actus.Model.ContractSchedule
 --     } = case maturityDate <|> maturity ct of
 --     Just m  -> [let d = applyBDCWithCfg scheduleConfig m in d {paymentDay = m}]
 --     Nothing -> []
--- 
+--
 -- _SCHED_PP_PAM :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_PP_PAM
 --   ContractTerms
@@ -304,14 +307,14 @@ module Actus.Model.ContractSchedule
 --       scheduleConfig
 --     } = generateRecurrentSchedule (ied <+> opcl) opcl md scheduleConfig
 -- _SCHED_PP_PAM _ = []
--- 
+--
 -- _SCHED_PY_PAM :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_PY_PAM
 --   ContractTerms
 --     { penaltyType = Just PYTP_O
 --     } = []
 -- _SCHED_PY_PAM ct = _SCHED_PP_PAM ct
--- 
+--
 -- _SCHED_FP_PAM :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_FP_PAM
@@ -338,7 +341,7 @@ module Actus.Model.ContractSchedule
 --     Just m  -> generateRecurrentSchedule (ied <+> fecl) fecl {includeEndDay = True} m scheduleConfig
 --     Nothing -> []
 -- _SCHED_FP_PAM _ = []
--- 
+--
 -- _SCHED_PRD_PAM :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_PRD_PAM
 --   ContractTerms
@@ -346,7 +349,7 @@ module Actus.Model.ContractSchedule
 --       purchaseDate = Just prd
 --     } = [applyBDCWithCfg scheduleConfig prd]
 -- _SCHED_PRD_PAM _ = []
--- 
+--
 -- _SCHED_TD_PAM :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_TD_PAM
 --   ContractTerms
@@ -354,7 +357,7 @@ module Actus.Model.ContractSchedule
 --       terminationDate = Just td
 --     } = [applyBDCWithCfg scheduleConfig td]
 -- _SCHED_TD_PAM _ = []
--- 
+--
 -- _SCHED_IP_PAM ::
 --   ActusFrac a =>
 --   ContractTerms a ->
@@ -385,7 +388,7 @@ module Actus.Model.ContractSchedule
 --        in filter (\d -> Just (calculationDay d) > ipced) s
 --     Nothing -> []
 -- _SCHED_IP_PAM _ = []
--- 
+--
 -- _SCHED_IPCI_PAM :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_IPCI_PAM
@@ -414,7 +417,7 @@ module Actus.Model.ContractSchedule
 --        in filter (\d -> calculationDay d < ipced) s ++ [applyBDCWithCfg scheduleConfig ipced]
 --     Nothing -> []
 -- _SCHED_IPCI_PAM _ = []
--- 
+--
 -- _SCHED_RR_PAM :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_RR_PAM
@@ -472,7 +475,7 @@ module Actus.Model.ContractSchedule
 --       scheduleConfig
 --     } = [applyBDCWithCfg scheduleConfig rranx] -- if no cycle then only start (if specified) and end dates (see ScheduleFactory.java)
 -- _SCHED_RR_PAM _ = []
--- 
+--
 -- _SCHED_RRF_PAM :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_RRF_PAM
@@ -503,7 +506,7 @@ module Actus.Model.ContractSchedule
 --        in maybeToList (L.find (\ShiftedDay {..} -> calculationDay > statusDate) tt)
 --     Nothing -> []
 -- _SCHED_RRF_PAM _ = []
--- 
+--
 -- _SCHED_SC_PAM :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_SC_PAM ContractTerms {scalingEffect = Just SE_OOO} = []
@@ -527,9 +530,9 @@ module Actus.Model.ContractSchedule
 --     Just m  -> generateRecurrentSchedule (ied <+> sccl) sccl {includeEndDay = False} m scheduleConfig
 --     Nothing -> []
 -- _SCHED_SC_PAM _ = []
--- 
+--
 -- -- Linear Amortizer (LAM)
--- 
+--
 -- _SCHED_PR_LAM :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_PR_LAM
@@ -552,7 +555,7 @@ module Actus.Model.ContractSchedule
 --     Just m  -> generateRecurrentSchedule (ied <+> prcl) prcl {includeEndDay = False} m scheduleConfig
 --     Nothing -> []
 -- _SCHED_PR_LAM _ = []
--- 
+--
 -- _SCHED_MD_LAM :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_MD_LAM
@@ -562,7 +565,7 @@ module Actus.Model.ContractSchedule
 --     } = case maturity ct <|> maturityDate of
 --     Just m  -> [applyBDCWithCfg scheduleConfig m]
 --     Nothing -> []
--- 
+--
 -- _SCHED_IPCB_LAM :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_IPCB_LAM ContractTerms {..} | interestCalculationBase /= Just IPCB_NTL = []
@@ -586,9 +589,9 @@ module Actus.Model.ContractSchedule
 --     Just m  -> generateRecurrentSchedule (ied <+> ipcbcl) ipcbcl {includeEndDay = False} m scheduleConfig
 --     Nothing -> []
 -- _SCHED_IPCB_LAM _ = []
--- 
+--
 -- -- Negative Amortizer (NAM)
--- 
+--
 -- _SCHED_IP_NAM :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_IP_NAM ct@ContractTerms {..} =
@@ -596,28 +599,28 @@ module Actus.Model.ContractSchedule
 --       s
 --         | isNothing cycleAnchorDateOfPrincipalRedemption = liftM2 (<+>) initialExchangeDate cycleOfPrincipalRedemption
 --         | otherwise = cycleAnchorDateOfPrincipalRedemption
--- 
+--
 --       v = liftM4 generateRecurrentSchedule s cycleOfPrincipalRedemption m (Just scheduleConfig)
--- 
+--
 --       r
 --         | isJust cycleAnchorDateOfInterestPayment = cycleAnchorDateOfInterestPayment
 --         | isJust cycleOfInterestPayment = liftM2 (<+>) initialExchangeDate cycleOfInterestPayment
 --         | otherwise = Nothing
--- 
+--
 --       _T = liftM2 (<->) s cycleOfPrincipalRedemption
--- 
+--
 --       u
 --         | isNothing cycleAnchorDateOfInterestPayment && isNothing cycleOfInterestPayment = Nothing
 --         | isJust capitalizationEndDate && Just True == liftM2 (>) capitalizationEndDate _T = Nothing
 --         | otherwise = liftM4 generateRecurrentSchedule r ((\c -> c {includeEndDay = True}) <$> cycleOfInterestPayment) m (Just scheduleConfig)
--- 
+--
 --       result = nub <$> liftM2 (++) u v
--- 
+--
 --       result'
 --         | isJust result && isJust capitalizationEndDate = filter (\ShiftedDay {..} -> Just calculationDay > capitalizationEndDate) <$> result
 --         | otherwise = result
 --    in fromMaybe [] result'
--- 
+--
 -- _SCHED_IPCI_NAM :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_IPCI_NAM ct@ContractTerms {..} =
@@ -625,31 +628,31 @@ module Actus.Model.ContractSchedule
 --       s
 --         | isNothing cycleAnchorDateOfPrincipalRedemption = liftM2 (<+>) initialExchangeDate cycleOfPrincipalRedemption
 --         | otherwise = cycleAnchorDateOfPrincipalRedemption
--- 
+--
 --       v = liftM4 generateRecurrentSchedule s cycleOfPrincipalRedemption m (Just scheduleConfig)
--- 
+--
 --       r
 --         | isJust capitalizationEndDate = capitalizationEndDate
 --         | isJust cycleAnchorDateOfInterestPayment = cycleAnchorDateOfInterestPayment
 --         | isJust cycleOfInterestPayment = liftM2 (<+>) initialExchangeDate cycleOfInterestPayment
 --         | otherwise = Nothing
--- 
+--
 --       _T = liftM2 (<->) s cycleOfPrincipalRedemption
--- 
+--
 --       u
 --         | isNothing cycleAnchorDateOfInterestPayment && isNothing cycleOfInterestPayment = Nothing
 --         | isJust capitalizationEndDate && Just True == liftM2 (>) capitalizationEndDate _T = Nothing
 --         | otherwise = liftM4 generateRecurrentSchedule r ((\c -> c {includeEndDay = True}) <$> cycleOfInterestPayment) m (Just scheduleConfig)
--- 
+--
 --       result = Just $ nub (fromMaybe [] u ++ fromMaybe [] v)
--- 
+--
 --       result'
 --         | isJust result && isJust capitalizationEndDate = filter (\ShiftedDay {..} -> Just calculationDay <= capitalizationEndDate) <$> result
 --         | otherwise = Nothing
 --    in fromMaybe [] result'
--- 
+--
 -- -- Annuity (ANN)
--- 
+--
 -- _SCHED_PRF_ANN :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_PRF_ANN
@@ -665,9 +668,9 @@ module Actus.Model.ContractSchedule
 --         rrf = _SCHED_RRF_PAM ct
 --      in prf ++ rr ++ rrf
 -- _SCHED_PRF_ANN _ = []
--- 
+--
 -- -- Stock (STK)
--- 
+--
 -- _SCHED_DV_STK :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_DV_STK
 --   ContractTerms
@@ -685,9 +688,9 @@ module Actus.Model.ContractSchedule
 --     } = let tMax = LocalTime (addDays (10 * 365) $ localDay dvanx) (localTimeOfDay dvanx)
 --           in generateRecurrentSchedule (dvanx <+> dvcl) dvcl tMax scheduleConfig
 -- _SCHED_DV_STK _ = []
--- 
+--
 -- -- Options (OPTNS)
--- 
+--
 -- _SCHED_XD_OPTNS :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_XD_OPTNS
@@ -706,7 +709,7 @@ module Actus.Model.ContractSchedule
 --     } = case maturity ct of
 --           Just m  -> [applyBDCWithCfg scheduleConfig m]
 --           Nothing -> []
--- 
+--
 -- _SCHED_STD_OPTNS :: ActusFrac a =>
 --   ContractTerms a -> [ShiftedDay]
 -- _SCHED_STD_OPTNS
@@ -737,7 +740,7 @@ module Actus.Model.ContractSchedule
 --     } = case maturity ct of
 --           Just m  -> [applyBDCWithCfg scheduleConfig m]
 --           Nothing -> []
--- 
+--
 -- _SCHED_IP_SWPPV :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_IP_SWPPV
 --   ContractTerms
@@ -765,7 +768,7 @@ module Actus.Model.ContractSchedule
 --       scheduleConfig
 --     } = generateRecurrentSchedule (ied <+> ipcl) ipcl {includeEndDay = True} md scheduleConfig
 -- _SCHED_IP_SWPPV _ = []
--- 
+--
 -- _SCHED_IPFX_SWPPV :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_IPFX_SWPPV
 --   ContractTerms
@@ -793,7 +796,7 @@ module Actus.Model.ContractSchedule
 --       scheduleConfig
 --     } = generateRecurrentSchedule (ied <+> ipcl) ipcl {includeEndDay = True} md scheduleConfig
 -- _SCHED_IPFX_SWPPV _ = []
--- 
+--
 -- _SCHED_IPFL_SWPPV :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_IPFL_SWPPV
 --   ContractTerms
@@ -821,7 +824,7 @@ module Actus.Model.ContractSchedule
 --       scheduleConfig
 --     } = generateRecurrentSchedule (ied <+> ipcl) ipcl {includeEndDay = True} md scheduleConfig
 -- _SCHED_IPFL_SWPPV _ = []
--- 
+--
 -- _SCHED_RR_SWPPV :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_RR_SWPPV
 --   ContractTerms
@@ -844,10 +847,10 @@ module Actus.Model.ContractSchedule
 --       scheduleConfig
 --     } = [applyBDCWithCfg scheduleConfig rranx]
 -- _SCHED_RR_SWPPV _ = []
--- 
+--
 -- _SCHED_XD_CEG :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_XD_CEG _ = []
--- 
+--
 -- _SCHED_MD_CEG :: ActusFrac a => ContractTerms a -> [ShiftedDay]
 -- _SCHED_MD_CEG
 --   ct@ContractTerms
@@ -857,7 +860,7 @@ module Actus.Model.ContractSchedule
 --      in case md <|> maturity ct <|> refs of
 --           Just m  -> [mkShiftedDay m]
 --           Nothing -> []
--- 
+--
 -- _SCHED_FP_CEG ::
 --   ActusFrac a =>
 --   ContractTerms a ->
@@ -874,7 +877,7 @@ module Actus.Model.ContractSchedule
 --           Just m  -> generateRecurrentSchedule feanx fecl {includeEndDay = True} m scheduleConfig
 --           Nothing -> []
 -- _SCHED_FP_CEG _ = []
--- 
+--
 -- _SCHED_MD_CEC :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_MD_CEC
 --   ct@ContractTerms
@@ -882,7 +885,7 @@ module Actus.Model.ContractSchedule
 --     } = case mapM maturityDate $ mapMaybe termsFromStructure (filter (\cs -> referenceRole cs == COVE) $ contractStructure ct) of
 --     Just m  -> [mkShiftedDay $ maximum m]
 --     Nothing -> []
--- 
+--
 -- _SCHED_IP_CLM :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_IP_CLM
 --   ContractTerms
@@ -890,7 +893,7 @@ module Actus.Model.ContractSchedule
 --       scheduleConfig
 --     } = [let d = applyBDCWithCfg scheduleConfig md in d { paymentDay = md }]
 -- _SCHED_IP_CLM _ = []
--- 
+--
 -- _SCHED_IPCI_CLM :: ContractTerms a -> [ShiftedDay]
 -- _SCHED_IPCI_CLM
 --   ContractTerms

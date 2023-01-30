@@ -3,15 +3,14 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
-module Actus.Domain.Schedule
-  where
+module Actus.Domain.Schedule where
 
 import Data.Aeson.Types (FromJSON, ToJSON)
 import Data.Time (LocalTime)
 import GHC.Generics (Generic)
 
 data ShiftedDay = ShiftedDay
-  { paymentDay     :: LocalTime,
+  { paymentDay :: LocalTime,
     calculationDay :: LocalTime
   }
   deriving stock (Eq, Ord, Show, Generic)

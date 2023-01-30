@@ -225,12 +225,13 @@ mkDataToAddOSL nameStr = do
       [d|
         instance AddToOSLContext $(pure (ConT name)) where
           addToOSLContext _ $(pure (VarP c)) =
-            $(pure (VarE c)) <>
-              OSL.ValidContext
-                (Map.fromList $(ctorsContextEntries ctors c)
-                  <> Map.singleton
-                       $(pure (LitE (StringL nameStr)))
-                       (OSL.Data $(ctorsCoproduct ctors)))
+            $(pure (VarE c))
+              <> OSL.ValidContext
+                ( Map.fromList $(ctorsContextEntries ctors c)
+                    <> Map.singleton
+                      $(pure (LitE (StringL nameStr)))
+                      (OSL.Data $(ctorsCoproduct ctors))
+                )
 
         instance ToOSLType $(pure (ConT name)) where
           toOSLType _ _ =

@@ -1,5 +1,5 @@
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -8,7 +8,7 @@
 module Actus.Domain.Basic where
 
 import Data.Aeson (FromJSON, ToJSON)
-import Data.Time (TimeOfDay, LocalTime)
+import Data.Time (LocalTime, TimeOfDay)
 import GHC.Generics (Generic)
 import OSL.FromHaskell (ToOSLType (..), mkDataToAddOSL)
 import Prelude hiding (Rational)
@@ -23,6 +23,7 @@ data Rational = Rational Numerator Denominator
   deriving (Read, Show, Eq, Generic)
 
 instance FromJSON Rational
+
 instance ToJSON Rational
 
 mkDataToAddOSL "Rational"

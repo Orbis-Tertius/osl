@@ -1,23 +1,30 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Actus.Utility.ScheduleGenerator
-  ( generateRecurrentSchedule
-  , inf
-  , sup
-  , (<+>)
-  , (<->)
-  ) where
+  ( generateRecurrentSchedule,
+    inf,
+    sup,
+    (<+>),
+    (<->),
+  )
+where
 
-import Actus.Domain (Cycle(..), ScheduleConfig(..), ShiftedSchedule, Stub(..), mkShiftedDay)
+import Actus.Domain (Cycle (..), ScheduleConfig (..), ShiftedSchedule, Stub (..), mkShiftedDay)
 import Actus.Utility.DateShift (applyBDC, applyEOMC, shiftDate)
 import qualified Data.List as L (delete, init, last, length)
-import Data.Time (LocalTime(..))
+import Data.Maybe (fromMaybe)
+import Data.Time (LocalTime (..))
+import Die (die)
+import Safe (atMay)
 
+{-# ANN maximumMaybe ("HLint: ignore No maximum" :: String) #-}
 maximumMaybe :: Ord a => [a] -> Maybe a
 maximumMaybe [] = Nothing
 maximumMaybe xs = Just $ maximum xs
 
+{-# ANN minimumMaybe ("HLint: ignore No minimum" :: String) #-}
 minimumMaybe :: Ord a => [a] -> Maybe a
 minimumMaybe [] = Nothing
 minimumMaybe xs = Just $ minimum xs
@@ -60,8 +67,10 @@ correction
       let s = L.init schedule
           l = L.length s
        in if l > 2
-            then L.delete (s !! (l - 1)) s
+            then L.delete (fromMaybe (die msg) (s `atMay` (l - 1))) s
             else s
+    where
+      msg = "Actus.Utility.ScheduleGenerator.correction: something impossible happened"
 correction
   Cycle
     { stub = LongStub,
@@ -83,8 +92,10 @@ correction
       let s = L.delete anchorDate $ L.init schedule
           l = L.length s
        in if l > 2
-            then L.delete (s !! (l - 1)) s
+            then L.delete (fromMaybe (die msg) (s `atMay` (l - 1))) s
             else s
+    where
+      msg = "Actus.Utility.ScheduleGenerator.correction: something impossible happened"
 correction
   Cycle
     { stub = LongStub,
@@ -97,8 +108,10 @@ correction
       let s = L.delete anchorDate $ L.init schedule
           l = L.length s
        in if l > 2
-            then L.delete (s !! (l - 1)) s
+            then L.delete (fromMaybe (die msg) (s `atMay` (l - 1))) s
             else s
+    where
+      msg = "Actus.Utility.ScheduleGenerator.correction: something impossible happened"
 correction
   Cycle
     { stub = LongStub,
@@ -111,8 +124,10 @@ correction
       let s = L.init schedule
           l = L.length s
        in if l > 2
-            then L.delete (s !! (l - 1)) s
+            then L.delete (fromMaybe (die msg) (s `atMay` (l - 1))) s
             else s
+    where
+      msg = "Actus.Utility.ScheduleGenerator.correction: something impossible happened"
 correction
   Cycle
     { stub = LongStub,
@@ -124,7 +139,7 @@ correction
 
 addEndDay :: Bool -> LocalTime -> ShiftedSchedule -> ShiftedSchedule
 addEndDay True endDate schedule = schedule ++ [mkShiftedDay endDate]
-addEndDay _ _ schedule          = schedule
+addEndDay _ _ schedule = schedule
 
 generateRecurrentSchedule' :: Cycle -> LocalTime -> LocalTime -> [LocalTime]
 generateRecurrentSchedule' Cycle {..} anchorDate endDate =
@@ -138,20 +153,29 @@ generateRecurrentSchedule' Cycle {..} anchorDate endDate =
    in go anchorDate 1 []
 
 generateRecurrentSchedule ::
-  LocalTime          -- ^ Anchor date
-  -> Cycle           -- ^ Cycle
-  -> LocalTime       -- ^ End date
-  -> ScheduleConfig  -- ^ Schedule config
-  -> ShiftedSchedule -- ^ New schedule
-generateRecurrentSchedule a c e
+  -- | Anchor date
+  LocalTime ->
+  -- | Cycle
+  Cycle ->
+  -- | End date
+  LocalTime ->
+  -- | Schedule config
+  ScheduleConfig ->
+  -- | New schedule
+  ShiftedSchedule
+generateRecurrentSchedule
+  a
+  c
+  e
   ScheduleConfig
     { endOfMonthConvention = Just eomc,
       calendar = Just cal,
       businessDayConvention = Just bdc
     } =
-    addEndDay (includeEndDay c) e .
-      fmap (applyBDC bdc cal . applyEOMC a c eomc) .
-        correction c a e $ generateRecurrentSchedule' c a e
+    addEndDay (includeEndDay c) e
+      . fmap (applyBDC bdc cal . applyEOMC a c eomc)
+      . correction c a e
+      $ generateRecurrentSchedule' c a e
 generateRecurrentSchedule _ _ _ _ = []
 
 (<+>) :: LocalTime -> Cycle -> LocalTime
