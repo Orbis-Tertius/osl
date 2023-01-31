@@ -12,6 +12,22 @@ data-files:
 
 library
   exposed-modules:
+    Actus.Core
+    Actus.Domain
+    Actus.Domain.Basic
+    Actus.Domain.BusinessEvents
+    Actus.Domain.ContractState
+    Actus.Domain.ContractTerms
+    Actus.Domain.Schedule
+    Actus.Model
+    Actus.Model.Applicability
+    Actus.Model.Payoff
+    Actus.Model.ContractSchedule
+    Actus.Utility
+    Actus.Utility.ANN.Annuity
+    Actus.Utility.DateShift
+    Actus.Utility.ScheduleGenerator
+    Actus.Utility.YearFraction
     Cast
     Die
     Halo2.AIR
@@ -66,6 +82,7 @@ library
     Halo2.Types.Witness
     Halo2.Types.WitnessColumns
     Halo2.Types.WitnessGenerationContext
+    OSL.ActusDictionary
     OSL.Argument
     OSL.ArgumentForm
     OSL.Bound
@@ -73,6 +90,7 @@ library
     OSL.Debug
     OSL.EntryPoint
     OSL.Evaluation
+    OSL.Format
     OSL.FromHaskell
     OSL.LoadContext
     OSL.Map
@@ -162,12 +180,14 @@ library
     QuickCheck,
     random,
     safe,
+    sort,
     sydtest,
     sydtest-discover,
     template-haskell,
     text -any,
     time,
     transformers,
+    validation,
     validity
 
   hs-source-dirs: src

@@ -120,6 +120,9 @@ instance ToOSLType Integer where
 instance ToOSLType Int where
   toOSLType _ _ = OSL.Z ()
 
+instance ToOSLType Char where
+  toOSLType _ _ = OSL.N ()
+
 instance HasResolution n => ToOSLType (Fixed n) where
   toOSLType (Proxy :: Proxy (Fixed n)) _ =
     OSL.Fin () (resolution (Proxy @n))
@@ -229,6 +232,10 @@ mkDataToAddOSL nameStr = do
                       $(pure (LitE (StringL nameStr)))
                       (OSL.Data $(ctorsCoproduct ctors))
                 )
+
+        instance ToOSLType $(pure (ConT name)) where
+          toOSLType _ _ =
+            OSL.NamedType () $(pure (LitE (StringL nameStr)))
         |]
     _ -> die $ "mkDataToAddOSL: expected a simple algebraic data type: " <> nameTxt
   where

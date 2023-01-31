@@ -3,6 +3,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE LambdaCase #-}
 
 module OSL.Types.OSL
   ( Name (..),
@@ -34,7 +35,13 @@ import OSL.Types.Cardinality (Cardinality (..))
 data Name
   = Sym Text
   | GenSym Int
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Generic)
+
+instance Show Name where
+  show =
+    \case
+      Sym x -> unpack x
+      GenSym i -> "g%" <> show i
 
 instance IsString Name where
   fromString = Sym . pack

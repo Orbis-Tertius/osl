@@ -19,6 +19,7 @@ import Data.Text.Encoding (decodeUtf8')
 import Halo2.CircuitMetrics (getCircuitMetrics)
 import Halo2.Types.BitsPerByte (BitsPerByte (BitsPerByte))
 import Halo2.Types.RowCount (RowCount (RowCount))
+import OSL.ActusDictionary (actusDictionaryFormatted)
 import OSL.BuildTranslationContext (buildTranslationContext)
 import OSL.Parse (parseContext)
 import OSL.Tokenize (tokenize)
@@ -43,6 +44,9 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
+    ["actus-dictionary"] ->
+      putStrLn . unOutput
+        =<< genActusDictionary
     [fileName, targetName] ->
       putStrLn . unOutput
         =<< runMain (FileName fileName) (TargetName targetName) CompileToCircuit
@@ -158,3 +162,7 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
               <> "\n\nArithmetic circuit:\n"
               <> show circuit
     _ -> Left . ErrorMessage $ "please provide the name of a defined term"
+
+genActusDictionary :: IO Output
+genActusDictionary =
+  pure $ Output actusDictionaryFormatted
