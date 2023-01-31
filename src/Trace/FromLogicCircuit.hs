@@ -2212,9 +2212,12 @@ getSubexpressionLinks m =
       Set.fromList $
         [ SubexpressionLink
             (getLookupStepTypeId arg)
-            (padInputs (catMaybes ((arg ^. #getBareLookupArgument) <&> (^. _2))))
-            (OutputSubexpressionId (outEid ^. #unBareLookupSubexpressionId))
-          | (arg, outEid) <- Map.toList (m ^. #subexpressionIds . #bareLookups)
+            (padInputs
+              (catMaybes ((arg ^. #getBareLookupArgument) <&> (^. _2))
+                <> [InputSubexpressionId outEid]))
+            (OutputSubexpressionId outEid)
+          | (arg, BareLookupSubexpressionId outEid) <-
+              Map.toList (m ^. #subexpressionIds . #bareLookups)
         ]
 
     getLookupStepTypeId :: BareLookupArgument -> StepTypeId
