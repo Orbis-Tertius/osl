@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
 -- | = ACTUS contract schedules

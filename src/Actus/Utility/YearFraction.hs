@@ -8,6 +8,7 @@ where
 
 import Actus.Domain (ActusFrac (..))
 import Actus.Domain.ContractTerms (DCC (..))
+import Data.Text (pack)
 import Data.Time
   ( Day,
     LocalTime (..),
@@ -90,7 +91,7 @@ yearFraction' DCC_E30_360 startDay endDay _
   | otherwise =
     0.0
 yearFraction' dcc _ _ _ =
-  error $ "Unsupported day count convention: " ++ show dcc
+  die . pack $ "Unsupported day count convention: " ++ show dcc
 
 isLastDayOfMonth :: Integer -> Int -> Int -> Bool
 isLastDayOfMonth year month day = day == gregorianMonthLength year month
