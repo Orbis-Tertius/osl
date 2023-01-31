@@ -80,19 +80,20 @@ checkAllStepConstraintsAreSatisfied ann tt t = do
   gc <- getGlobalEvaluationContext ann tt (trace "getGlobalEvaluationContext" t)
   forM_ (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
     lc <- getSubexpressionEvaluationContext ann tt t gc (trace "getSubexpressionEvaluationContext" (c, sId, sT))
-    checkStepConstraintsAreSatisfied ann tt c (trace "checkStepConstraint" sT) lc
+    checkStepConstraintsAreSatisfied ann tt c sT sId lc
 
 checkStepConstraintsAreSatisfied ::
   ann ->
   TraceType ->
   Case ->
   SubexpressionTrace ->
+  SubexpressionId ->
   EvaluationContext 'Local ->
   Either (ErrorMessage ann) ()
-checkStepConstraintsAreSatisfied ann tt c sT ec =
+checkStepConstraintsAreSatisfied ann tt c sT sId ec =
   case Map.lookup (sT ^. #stepType) (tt ^. #stepTypes) of
     Just st -> do
-      checkPolynomialConstraints ann c ec (st ^. #gateConstraints)
+      checkPolynomialConstraints ann c ec (st ^. #gateConstraints) sT sId
       checkLookupArguments ann c ec (st ^. #lookupArguments)
     Nothing -> Left (ErrorMessage ann "step type id not defined in trace type")
 
@@ -101,13 +102,15 @@ checkPolynomialConstraints ::
   Case ->
   EvaluationContext 'Local ->
   PolynomialConstraints ->
+  SubexpressionTrace ->
+  SubexpressionId ->
   Either (ErrorMessage ann) ()
-checkPolynomialConstraints ann c ec cs =
+checkPolynomialConstraints ann c ec cs sT sId =
   sequence_
     [ do
         z <- evalPolynomial ann c ec c'
         unless (z == zero) . Left . ErrorMessage ann $
-          "polynomial constraint not satisfied: " <> pack (show (l, c', c, ec ^. #localMappings))
+          "polynomial constraint not satisfied: " <> pack (show (l, c', c, sT, sId, ec ^. #localMappings))
       | (l, c') <- cs ^. #constraints
     ]
 

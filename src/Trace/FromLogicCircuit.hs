@@ -610,15 +610,17 @@ logicTermSubexpressionTraces ann lc arg mapping tables c =
       (m0, s0, x') <- rec x
       (m1, s1, y') <- rec y
       s2 <- getOperationSubexpressionId ann mapping (Max' s0 s1)
+      advice <- getByteDecomposition ann lc mapping (x' Group.- y')
       let v = x' `max` y'
-          m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #maxT . #unOf) defaultAdvice)
+          m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #maxT . #unOf) advice)
       pure (m0 <> m1 <> m2, s2, v)
     LC.IndLess x y -> do
       (m0, s0, x') <- rec x
       (m1, s1, y') <- rec y
       s2 <- getOperationSubexpressionId ann mapping (LessThan' s0 s1)
+      advice <- getByteDecomposition ann lc mapping (x' Group.- y')
       let v = x' `lessIndicator` y'
-          m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #lessThan . #unOf) defaultAdvice)
+          m2 = Map.singleton s2 (SubexpressionTrace v (mapping ^. #stepTypeIds . #lessThan . #unOf) advice)
       pure (m0 <> m1 <> m2, s2, v)
     LC.Const x -> constant x
     LC.Var x -> var x
