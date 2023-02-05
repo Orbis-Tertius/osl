@@ -66,6 +66,7 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (PowerProduct, getPowerProduct))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
+import OSL.Debug (showTrace)
 import OSL.Map (inverseMap)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInteger, toWord64, zero)
@@ -276,12 +277,14 @@ instance HasColumnVectorToBools Term where
 class HasEvaluate a b | a -> b where
   evaluate :: ann -> Argument -> a -> Either (ErrorMessage ann) b
 
-instance HasEvaluate PolynomialVariable (Map (RowIndex 'Absolute) Scalar) where
-  evaluate _ arg v =
-    pure . Map.mapKeys (^. #rowIndex) $
+instance HasEvaluate (RowCount, PolynomialVariable) (Map (RowIndex 'Absolute) Scalar) where
+  evaluate _ arg (RowCount n, v) =
+    pure . showTrace (show v <> " = ")
+      . Map.mapKeys ((`mod` n') . (subtract (RowIndex $ v ^. #rowIndex . #getRowIndex)) . (^. #rowIndex)) $
       Map.filterWithKey
         (\k _ -> (k ^. #colIndex) == v ^. #colIndex)
         (getCellMap arg)
+    where n' = RowIndex (fromMaybe (die "evaluate PolynomialVariable: row count out of range of Int") (integerToInt (scalarToInteger n)))
 
 instance
   HasEvaluate
@@ -298,7 +301,7 @@ instance
       else
         fmap (Ring.* c) . foldr (Map.unionWith (Ring.*)) mempty
           <$> sequence
-            [ evaluate ann arg v <&> fmap (Ring.^ intToInteger (e ^. #getExponent))
+            [ evaluate ann arg (RowCount n, v) <&> fmap (Ring.^ intToInteger (e ^. #getExponent))
               | (v, e) <- Map.toList m
             ]
 
@@ -311,7 +314,7 @@ instance HasEvaluate (RowCount, Term) (Map (RowIndex 'Absolute) (Maybe Scalar)) 
   evaluate ann arg = uncurry $ \rc@(RowCount n) ->
     let rec = evaluate ann arg . (rc,)
      in \case
-          Var v -> fmap Just <$> evaluate ann arg v
+          Var v -> fmap Just <$> evaluate ann arg (rc, v)
           Const i -> do
             n' <- case integerToInt (scalarToInteger n) of
               Just n' -> pure n'
@@ -537,7 +540,7 @@ instance HasEvaluate (RowCount, LogicConstraints) Bool where
         ( \(lbl, c) -> do
             r <- evaluate ann arg (rc, c)
             let r' = r == Map.fromList ((,Just True) <$> Set.toList allRows)
-            pure r' -- pure (trace (show (r', lbl, c, r)) r')
+            pure (trace (show (r', lbl, c, Map.filter (== Just False) r)) r')
         )
         cs
     where
