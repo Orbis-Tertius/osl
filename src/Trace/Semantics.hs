@@ -22,7 +22,6 @@ import Data.Maybe (maybeToList)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (pack)
-import Debug.Trace (trace)
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.ColumnIndex (ColumnIndex)
@@ -47,9 +46,9 @@ evalTrace ::
   Trace ->
   Either (ErrorMessage ann) ()
 evalTrace ann tt t = do
-  checkAllResultsArePresentForUsedCases ann tt (trace "checkAllResultsArePresent" t)
-  checkAllStepConstraintsAreSatisfied ann tt (trace "checkAllStepConstraints" t)
-  checkAllEqualityConstraintsAreSatisfied ann tt (trace "checkAllEqualityConstraints" t)
+  checkAllResultsArePresentForUsedCases ann tt t
+  checkAllStepConstraintsAreSatisfied ann tt t
+  checkAllEqualityConstraintsAreSatisfied ann tt t
 
 checkAllResultsArePresentForUsedCases ::
   ann ->
@@ -77,9 +76,9 @@ checkAllStepConstraintsAreSatisfied ::
   Trace ->
   Either (ErrorMessage ann) ()
 checkAllStepConstraintsAreSatisfied ann tt t = do
-  gc <- getGlobalEvaluationContext ann tt (trace "getGlobalEvaluationContext" t)
+  gc <- getGlobalEvaluationContext ann tt t
   forM_ (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
-    lc <- getSubexpressionEvaluationContext ann tt t gc (trace "getSubexpressionEvaluationContext" (c, sId, sT))
+    lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
     checkStepConstraintsAreSatisfied ann tt c sT sId lc
 
 checkStepConstraintsAreSatisfied ::
@@ -288,7 +287,7 @@ getGlobalEvaluationContext ann tt t = do
                     tt
                     t
                     ec
-                    (trace ("getLookupTable: " <> show cs) cs)
+                    cs -- (trace ("getLookupTable: " <> show cs) cs)
                 | cs <- Set.toList . Set.fromList $ traceTypeLookupTables tt
               ]
         )
@@ -405,7 +404,7 @@ getLookupTable ::
   EvaluationContext 'Global ->
   Set LookupTableColumn ->
   Either (ErrorMessage ann) [Map LookupTableColumn Scalar]
-getLookupTable ann tt (trace "getLookupTable" -> t) gc cs =
+getLookupTable ann tt t gc cs =
   forM (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
     lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
     Map.fromList

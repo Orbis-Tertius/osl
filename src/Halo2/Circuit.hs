@@ -540,7 +540,7 @@ instance HasEvaluate (RowCount, LogicConstraints) Bool where
         ( \(lbl, c) -> do
             r <- evaluate ann arg (rc, c)
             let r' = r == Map.fromList ((,Just True) <$> Set.toList allRows)
-            pure (trace (show (r', lbl, c, Map.filter (== Just False) r)) r')
+            pure r' -- (trace (show (r', lbl, c, Map.filter (== Just False) r)) r')
         )
         cs
     where

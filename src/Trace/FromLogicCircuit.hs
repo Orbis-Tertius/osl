@@ -58,7 +58,6 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Relative))
 import Halo2.Types.Sign (Sign (Negative, Positive))
-import OSL.Debug (showTrace)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Safe (headMay)
@@ -214,7 +213,7 @@ argumentSubexpressionTraces ::
   Set Case ->
   Either (ErrorMessage ann) (Map (Case, SubexpressionId) SubexpressionTrace)
 argumentSubexpressionTraces ann lc arg mapping cases = do
-  tables <- showTrace "lookupCaches" <$> getLookupCaches ann lc arg
+  tables <- getLookupCaches ann lc arg
   mconcat
     <$> mapM
       ( \c ->

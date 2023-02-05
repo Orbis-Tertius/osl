@@ -60,7 +60,6 @@ import Halo2.Types.LookupTableColumn (LookupTableColumn (..))
 import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Halo2.Types.RowIndex (RowIndex (..), RowIndexType (Absolute, Relative))
-import OSL.Debug (showTrace)
 import qualified OSL.Sigma11 as S11
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import qualified OSL.Types.Sigma11.Argument as S11
@@ -118,11 +117,11 @@ getUniversalTableArgument ::
   Map Name Value ->
   Either (ErrorMessage ann) Halo2.Argument
 getUniversalTableArgument ann (RowCount n) f layout vs = do
-  t <- showTrace "table = " <$> getUniversalTable ann (f ^. #formula . #quantifiers . #universalQuantifiers) layout vs
+  t <- getUniversalTable ann (f ^. #formula . #quantifiers . #universalQuantifiers) layout vs
   if intToInteger (Map.size t) > n'
     then Left (ErrorMessage ann "universal table size exceeds row count")
     else
-      showTrace "uni table argument = " . Halo2.Argument mempty . Halo2.Witness . rowsToCellMap . Map.fromList
+      Halo2.Argument mempty . Halo2.Witness . rowsToCellMap . Map.fromList
         <$> pad n' (Map.toList t)
   where
     n' = scalarToInteger n
@@ -1076,7 +1075,7 @@ universalTableConstraints x layout =
   where
     lastU :: UniQIndex
     lastU =
-      UniQIndex . showTrace "lastU = " $
+      UniQIndex $
         length
           ( x
               ^. #formula . #quantifiers
@@ -1096,7 +1095,7 @@ universalTableConstraints x layout =
             (q ^. #name)
             (layout ^. #nameMappings) of
             Just nm ->
-              LC.Var . showTrace ("u " <> show i <> " " <> show j <> " = ") $
+              LC.Var $
                 PolynomialVariable
                   (nm ^. #outputMapping . #unOutputMapping)
                   j
