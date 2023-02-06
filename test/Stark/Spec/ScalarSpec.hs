@@ -1,9 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Stark.Spec.ScalarSpec (spec) where
 
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
+import Data.Maybe (fromMaybe)
+import Die (die)
 import OSL.Spec.Gen (genScalar)
-import Stark.Types.Scalar (inverseScalar, one, zero)
+import Stark.Types.Scalar (integerToScalar, inverseScalar, one, zero)
 import Test.QuickCheck (forAll)
 import Test.Syd (Spec, describe, it, shouldBe)
 
@@ -21,6 +25,9 @@ abelianGroupLaws =
     leftCancellation
     rightCancellation
     inverseCancellation
+    describe "subtraction" $ do
+      subtractCancellationProp
+      subtractCancellationConst
   where
     associativity =
       it "is associative" $
@@ -47,6 +54,20 @@ abelianGroupLaws =
         forAll genScalar $ \x -> do
           (Group.negate x Group.+ x) `shouldBe` zero
           (x Group.+ Group.negate x) `shouldBe` zero
+
+    subtractCancellationConst =
+      it "cancels" $ do
+        let f x =
+              fromMaybe
+                (die "subtractCancellationConst: x out of range of scalar field")
+                (integerToScalar x)
+        (f 9 Group.- f 9) `shouldBe` zero
+        (f 8 Group.- f 8) `shouldBe` zero
+
+    subtractCancellationProp =
+      it "cancels" $ do
+        forAll genScalar $ \x ->
+          (x Group.- x) `shouldBe` zero
 
 fieldLaws :: Spec
 fieldLaws =

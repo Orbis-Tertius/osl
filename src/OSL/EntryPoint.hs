@@ -35,7 +35,7 @@ import Semicircuit.PrenexNormalForm (toPrenexNormalForm, toStrongPrenexNormalFor
 import Semicircuit.Sigma11 (prependQuantifiers)
 import Semicircuit.ToLogicCircuit (semicircuitToLogicCircuit)
 import System.Environment (getArgs)
-import Trace.FromLogicCircuit (logicCircuitToTraceType)
+import Trace.FromLogicCircuit (getMapping, logicCircuitToTraceType)
 import Trace.Metrics (getTraceTypeMetrics)
 import Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit)
 import Prelude hiding (readFile)
@@ -133,6 +133,7 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
               toPNFFormula () (uncurry prependQuantifiers sspnf)
           let semi = toSemicircuit pnff
               (logic, layout) = semicircuitToLogicCircuit rowCount semi
+              traceLayout = getMapping 8 logic
               traceType = logicCircuitToTraceType bitsPerByte logic
               circuit = traceTypeToArithmeticCircuit traceType
               circuitMetrics = getCircuitMetrics circuit
@@ -157,6 +158,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
               <> show layout
               <> "\n\nLogic circuit: "
               <> show logic
+              <> "\n\nTrace type layout: "
+              <> show traceLayout
               <> "\n\nTrace type: "
               <> show traceType
               <> "\n\nArithmetic circuit:\n"

@@ -3,7 +3,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Trace.Semantics
   ( evalTrace,
@@ -22,7 +21,6 @@ import Data.Maybe (maybeToList)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (pack)
-import Debug.Trace (trace)
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Coefficient (Coefficient)
 import Halo2.Types.ColumnIndex (ColumnIndex)
@@ -47,9 +45,9 @@ evalTrace ::
   Trace ->
   Either (ErrorMessage ann) ()
 evalTrace ann tt t = do
-  checkAllResultsArePresentForUsedCases ann tt (trace "checkAllResultsArePresent" t)
-  checkAllStepConstraintsAreSatisfied ann tt (trace "checkAllStepConstraints" t)
-  checkAllEqualityConstraintsAreSatisfied ann tt (trace "checkAllEqualityConstraints" t)
+  checkAllResultsArePresentForUsedCases ann tt t
+  checkAllStepConstraintsAreSatisfied ann tt t
+  checkAllEqualityConstraintsAreSatisfied ann tt t
 
 checkAllResultsArePresentForUsedCases ::
   ann ->
@@ -77,22 +75,23 @@ checkAllStepConstraintsAreSatisfied ::
   Trace ->
   Either (ErrorMessage ann) ()
 checkAllStepConstraintsAreSatisfied ann tt t = do
-  gc <- getGlobalEvaluationContext ann tt (trace "getGlobalEvaluationContext" t)
+  gc <- getGlobalEvaluationContext ann tt t
   forM_ (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
-    lc <- getSubexpressionEvaluationContext ann tt t gc (trace "getSubexpressionEvaluationContext" (c, sId, sT))
-    checkStepConstraintsAreSatisfied ann tt c (trace "checkStepConstraint" sT) lc
+    lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
+    checkStepConstraintsAreSatisfied ann tt c sT sId lc
 
 checkStepConstraintsAreSatisfied ::
   ann ->
   TraceType ->
   Case ->
   SubexpressionTrace ->
+  SubexpressionId ->
   EvaluationContext 'Local ->
   Either (ErrorMessage ann) ()
-checkStepConstraintsAreSatisfied ann tt c sT ec =
+checkStepConstraintsAreSatisfied ann tt c sT sId ec =
   case Map.lookup (sT ^. #stepType) (tt ^. #stepTypes) of
     Just st -> do
-      checkPolynomialConstraints ann c ec (st ^. #gateConstraints)
+      checkPolynomialConstraints ann c ec (st ^. #gateConstraints) sT sId
       checkLookupArguments ann c ec (st ^. #lookupArguments)
     Nothing -> Left (ErrorMessage ann "step type id not defined in trace type")
 
@@ -101,13 +100,15 @@ checkPolynomialConstraints ::
   Case ->
   EvaluationContext 'Local ->
   PolynomialConstraints ->
+  SubexpressionTrace ->
+  SubexpressionId ->
   Either (ErrorMessage ann) ()
-checkPolynomialConstraints ann c ec cs =
+checkPolynomialConstraints ann c ec cs sT sId =
   sequence_
     [ do
         z <- evalPolynomial ann c ec c'
         unless (z == zero) . Left . ErrorMessage ann $
-          "polynomial constraint not satisfied: " <> pack (show (l, c', c, ec ^. #localMappings))
+          "polynomial constraint not satisfied: " <> pack (show (l, c', c, sT, sId, ec ^. #localMappings))
       | (l, c') <- cs ^. #constraints
     ]
 
@@ -191,7 +192,7 @@ checkLookupArgument ann c ec arg = do
               ( ErrorMessage
                   ann
                   ( "lookup argument is not satisfied: "
-                      <> pack (show (arg, is, t, ec ^. #localMappings))
+                      <> pack (show (arg, is, ec ^. #localMappings, t))
                   )
               )
           )
@@ -285,7 +286,7 @@ getGlobalEvaluationContext ann tt t = do
                     tt
                     t
                     ec
-                    (trace ("getLookupTable: " <> show cs) cs)
+                    cs -- (trace ("getLookupTable: " <> show cs) cs)
                 | cs <- Set.toList . Set.fromList $ traceTypeLookupTables tt
               ]
         )
@@ -402,7 +403,7 @@ getLookupTable ::
   EvaluationContext 'Global ->
   Set LookupTableColumn ->
   Either (ErrorMessage ann) [Map LookupTableColumn Scalar]
-getLookupTable ann tt (trace "getLookupTable" -> t) gc cs =
+getLookupTable ann tt t gc cs =
   forM (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
     lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
     Map.fromList

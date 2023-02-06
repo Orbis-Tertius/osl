@@ -24,11 +24,11 @@ import Halo2.Types.FixedBound (FixedBound (..))
 import Halo2.Types.Sign (Sign (Negative, Positive))
 import Stark.Types.Scalar (Scalar, fromWord64, integerToScalar, normalize, scalarToInteger)
 
--- Splits a scalar its into sign and its unsigned part, based on the idea
+-- Splits a scalar into its sign and its unsigned part, based on the idea
 -- that if x > |F|/2, then x is negative.
 getSignAndUnsignedPart :: Scalar -> (Sign, Scalar)
-getSignAndUnsignedPart x =
-  let x' = Group.negate x
+getSignAndUnsignedPart (normalize -> x) =
+  let x' = normalize (Group.negate x)
    in if x' < x
         then (Negative, x')
         else (Positive, x)

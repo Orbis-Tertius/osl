@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
@@ -244,7 +245,7 @@ nameMappingArgument ann (RowCount n) nm (Value f) =
       indices <- mapM sToI [0 .. n' - 1]
       let f' = Map.toList f
       (defaultIns, defaultOut) <-
-        case f' of
+        case reverse f' of
           ((xs, y) : _) -> pure (xs, y)
           _ -> Left (ErrorMessage ann "empty value")
       pure $
@@ -1025,7 +1026,7 @@ existentialInputsInBoundsConstraints x layout =
         Nothing -> die "existentialInputsInBoundsConstraints: failed name lookup (this is a compiler bug)"
 
 newtype UniQIndex = UniQIndex {unUniQIndex :: Int}
-  deriving (Eq, Ord, Num, Enum)
+  deriving newtype (Eq, Ord, Num, Enum, Show)
 
 universalTableConstraints ::
   Semicircuit ->
@@ -1036,13 +1037,32 @@ universalTableConstraints x layout =
     [ ( "universalTableConstraint",
         foldl'
           Or
-          ( Atom (lastRowIndicator `Equals` LC.Const one)
-              `Or` next lastU
+          ( -- this is the last row
+            Atom (lastRowIndicator `Equals` LC.Const one)
+              `Or` foldl'
+                Or
+                -- all variables are maxed out and the next row looks the same
+                ( foldl'
+                    And
+                    ( Atom ((u lastU 0 `LC.Plus` LC.Const one) `Equals` bound lastU)
+                        `And` Atom (u lastU 0 `Equals` u lastU 1)
+                    )
+                    [ Atom ((u j 0 `LC.Plus` LC.Const one) `Equals` bound j)
+                        `And` Atom (u j 1 `Equals` u j 0)
+                      | j <- [0 .. lastU - 1]
+                    ]
+                )
+                -- the next row is lexicographically next, by incrementing var j,
+                -- for some j
+                [next j | j <- [0 .. lastU]]
           )
-          [ foldl'
+          [ -- this is a dummy row
+            foldl'
               And
-              ( Atom (bound i `Equals` LC.Const zero)
-                  `And` next (i - 1)
+              ( foldl'
+                  And
+                  (Atom (bound i `Equals` LC.Const zero))
+                  [next j | j <- [0 .. i - 1]]
               )
               [ Atom (u j 0 `Equals` LC.Const zero) -- TODO is this needed?
                   `And` Atom (u j 1 `Equals` LC.Const zero)
@@ -1085,21 +1105,23 @@ universalTableConstraints x layout =
         Nothing ->
           die "universalTableConstraints: quantifier index out of range (this is a compiler bug)"
 
+    -- the two rows are lexicographically consecutive and the result is obtained
+    -- by incrementing index j
     next :: UniQIndex -> LogicConstraint
-    next (-1) = Top
-    next 0 = Atom (u 1 0 `Equals` u 1 1)
     next j =
-      ( foldl'
-          And
-          (Atom ((u j 0 `LC.Plus` LC.Const zero) `Equals` u j 1))
-          [ Atom (u i 0 `Equals` u i 1)
-            | i <- [0 .. j - 2]
+      foldl'
+        And
+        ( Atom ((u j 0 `LC.Plus` LC.Const one) `Equals` u j 1)
+            `And` Atom (u j 1 `LessThan` bound j)
+        )
+        ( [ Atom (u i 0 `Equals` u i 1)
+            | i <- [0 .. j - 1]
           ]
-      )
-        `Or` ( Atom ((u j 0 `LC.Plus` LC.Const one) `Equals` bound j)
-                 `And` Atom (u j 1 `Equals` LC.Const zero)
-                 `And` next (j - 1)
-             )
+            <> [ Atom (u i 1 `Equals` LC.Const zero)
+                   `And` Atom ((u i 0 `LC.Plus` LC.Const one) `Equals` bound i)
+                 | i <- [j + 1 .. lastU]
+               ]
+        )
 
     bound :: UniQIndex -> LC.Term
     bound i =
