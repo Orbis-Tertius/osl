@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedLabels #-}
@@ -10,6 +11,7 @@ module Trace.ToArithmeticAIR
     Mappings (Mappings),
     FixedMappings (FixedMappings),
     mappings,
+    traceToArgument,
   )
 where
 
@@ -21,9 +23,11 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Die (die)
+import Halo2.Circuit (fixedValuesToCellMap)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.AIR (AIR (AIR), ArithmeticAIR)
+import Halo2.Types.Argument (Argument (Argument), Witness (Witness))
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice, Fixed))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
@@ -31,8 +35,11 @@ import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
+import OSL.Types.ErrorMessage (ErrorMessage)
 import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero)
-import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType)
+import Trace.Semantics (getGlobalEvaluationContext, getSubexpressionEvaluationContext)
+import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case, SubexpressionTrace)
+import Trace.Types.EvaluationContext (EvaluationContext, ContextType (Global))
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -223,3 +230,41 @@ caseAndResultFixedColumns t m =
       case integerToScalar (intToInteger x) of
         Just y -> y
         Nothing -> die "caseFixedCoumn: case number out of range of scalar (this is a compiler bug)"
+
+traceToArgument ::
+  ann ->
+  TraceType ->
+  Trace ->
+  Either (ErrorMessage ann) Argument
+traceToArgument ann tt t = do
+  gc <- getGlobalEvaluationContext ann tt t
+  (fixedValuesArgument fvs <>) . mconcat <$> sequence
+    [ subexpressionArgument ann tt t m gc s
+      | s <- Map.toList (t ^. #subexpressions)
+    ]
+  where
+    m = mappings tt
+    air = traceTypeToArithmeticAIR tt
+    fvs = air ^. #fixedValues
+
+fixedValuesArgument ::
+  FixedValues ->
+  Argument
+fixedValuesArgument =
+  Argument mempty . Witness . fixedValuesToCellMap
+
+subexpressionArgument ::
+  ann ->
+  TraceType ->
+  Trace ->
+  Mappings ->
+  EvaluationContext 'Global ->
+  ((Case, SubexpressionId), SubexpressionTrace) ->
+  Either (ErrorMessage ann) Argument
+subexpressionArgument ann tt t m gc ((c, sId), sT) = do
+  lc <- getSubexpressionEvaluationContext ann tt t gc
+          (c, sId, sT)
+  todo lc m
+
+todo :: a
+todo = todo

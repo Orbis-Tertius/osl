@@ -16,6 +16,7 @@ module Halo2.Circuit
   ( HasPolynomialVariables (getPolynomialVariables),
     HasScalars (getScalars),
     HasLookupArguments (getLookupArguments),
+    fixedValuesToCellMap,
     getLookupTables,
     HasEvaluate (evaluate),
     lessIndicator,

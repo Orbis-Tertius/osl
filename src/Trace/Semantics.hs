@@ -6,6 +6,8 @@
 
 module Trace.Semantics
   ( evalTrace,
+    getGlobalEvaluationContext,
+    getSubexpressionEvaluationContext,
   )
 where
 
