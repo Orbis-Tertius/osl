@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module OSL.Map (mapKeysMaybe, inverseMap) where
+module OSL.Map (mapKeysMaybe, inverseMap, uncurryMap) where
 
 import Data.Map (Map, fromList, toList)
 import Data.Maybe (catMaybes)
@@ -13,3 +13,11 @@ mapKeysMaybe f m =
 
 inverseMap :: Ord b => Map a b -> Map b a
 inverseMap = fromList . fmap swap . toList
+
+uncurryMap :: (Ord a, Ord b) => Map a (Map b c) -> Map (a, b) c
+uncurryMap m =
+  fromList
+    [ ((a,b),c)
+      | (a, m') <- toList m,
+        (b,c) <- toList m'
+    ]

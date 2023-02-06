@@ -193,7 +193,7 @@ checkLookupArgument ann c ec arg = do
               ( ErrorMessage
                   ann
                   ( "lookup argument is not satisfied: "
-                      <> pack (show (arg, is, t, ec ^. #localMappings))
+                      <> pack (show (arg, is, ec ^. #localMappings, t))
                   )
               )
           )
