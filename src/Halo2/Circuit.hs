@@ -280,7 +280,7 @@ class HasEvaluate a b | a -> b where
 instance HasEvaluate (RowCount, PolynomialVariable) (Map (RowIndex 'Absolute) Scalar) where
   evaluate _ arg (RowCount n, v) =
     pure . showTrace (show v <> " = ")
-      . Map.mapKeys ((`mod` n') . (subtract (RowIndex $ v ^. #rowIndex . #getRowIndex)) . (^. #rowIndex))
+      . Map.mapKeys ((`mod` n') . subtract (RowIndex $ v ^. #rowIndex . #getRowIndex) . (^. #rowIndex))
       $ Map.filterWithKey
         (\k _ -> (k ^. #colIndex) == v ^. #colIndex)
         (getCellMap arg)

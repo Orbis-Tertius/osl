@@ -7,7 +7,6 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Trace.FromLogicCircuit
   ( logicCircuitToTraceType,
@@ -750,8 +749,7 @@ polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
       (Case a)
       (PolynomialVariable (x ^. #colIndex) 0)
   let m3 = Map.singleton c $ Map.singleton sId (SubexpressionTrace v st advice)
-  pure $
-    (Map.unionsWith (<>) [m0, m1, m2, m3], sId, v)
+  pure (Map.unionsWith (<>) [m0, m1, m2, m3], sId, v)
   where
     constant = constantSubexpressionTraces ann mapping
     defaultAdvice = getDefaultAdvice mapping
