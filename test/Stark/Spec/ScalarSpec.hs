@@ -7,7 +7,7 @@ import qualified Algebra.Ring as Ring
 import Data.Maybe (fromMaybe)
 import Die (die)
 import OSL.Spec.Gen (genScalar)
-import Stark.Types.Scalar (inverseScalar, integerToScalar, one, zero)
+import Stark.Types.Scalar (integerToScalar, inverseScalar, one, zero)
 import Test.QuickCheck (forAll)
 import Test.Syd (Spec, describe, it, shouldBe)
 
@@ -57,8 +57,10 @@ abelianGroupLaws =
 
     subtractCancellationConst =
       it "cancels" $ do
-        let f x = fromMaybe (die "subtractCancellationConst: x out of range of scalar field")
-                    (integerToScalar x)
+        let f x =
+              fromMaybe
+                (die "subtractCancellationConst: x out of range of scalar field")
+                (integerToScalar x)
         (f 9 Group.- f 9) `shouldBe` zero
         (f 8 Group.- f 8) `shouldBe` zero
 

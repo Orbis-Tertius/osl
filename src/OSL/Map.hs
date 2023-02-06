@@ -17,7 +17,7 @@ inverseMap = fromList . fmap swap . toList
 uncurryMap :: (Ord a, Ord b) => Map a (Map b c) -> Map (a, b) c
 uncurryMap m =
   fromList
-    [ ((a,b),c)
+    [ ((a, b), c)
       | (a, m') <- toList m,
-        (b,c) <- toList m'
+        (b, c) <- toList m'
     ]

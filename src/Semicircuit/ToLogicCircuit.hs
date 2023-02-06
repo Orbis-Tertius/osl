@@ -1039,21 +1039,22 @@ universalTableConstraints x layout =
           Or
           ( -- this is the last row
             Atom (lastRowIndicator `Equals` LC.Const one)
-              `Or`
-                 foldl'
-                   Or
-                   -- all variables are maxed out and the next row looks the same
-                   (foldl'
-                     And
-                     (Atom ((u lastU 0 `LC.Plus` LC.Const one) `Equals` bound lastU)
-                       `And` Atom (u lastU 0 `Equals` u lastU 1))
-                     [ Atom ((u j 0 `LC.Plus` LC.Const one) `Equals` bound j)
+              `Or` foldl'
+                Or
+                -- all variables are maxed out and the next row looks the same
+                ( foldl'
+                    And
+                    ( Atom ((u lastU 0 `LC.Plus` LC.Const one) `Equals` bound lastU)
+                        `And` Atom (u lastU 0 `Equals` u lastU 1)
+                    )
+                    [ Atom ((u j 0 `LC.Plus` LC.Const one) `Equals` bound j)
                         `And` Atom (u j 1 `Equals` u j 0)
-                       | j <- [0 .. lastU - 1]
-                     ])
-                   -- the next row is lexicographically next, by incrementing var j,
-                   -- for some j
-                   [next j | j <- [0 .. lastU]]
+                      | j <- [0 .. lastU - 1]
+                    ]
+                )
+                -- the next row is lexicographically next, by incrementing var j,
+                -- for some j
+                [next j | j <- [0 .. lastU]]
           )
           [ -- this is a dummy row
             foldl'
@@ -1110,16 +1111,16 @@ universalTableConstraints x layout =
     next j =
       foldl'
         And
-        (Atom ((u j 0 `LC.Plus` LC.Const one) `Equals` u j 1)
-          `And` Atom (u j 1 `LessThan` bound j))
-        ([ Atom (u i 0 `Equals` u i 1)
-           | i <- [0 .. j - 1]
-         ]
-         <>
-         [ Atom (u i 1 `Equals` LC.Const zero)
-             `And` Atom ((u i 0 `LC.Plus` LC.Const one) `Equals` bound i)
-           | i <- [j + 1 .. lastU]
-         ]
+        ( Atom ((u j 0 `LC.Plus` LC.Const one) `Equals` u j 1)
+            `And` Atom (u j 1 `LessThan` bound j)
+        )
+        ( [ Atom (u i 0 `Equals` u i 1)
+            | i <- [0 .. j - 1]
+          ]
+            <> [ Atom (u i 1 `Equals` LC.Const zero)
+                   `And` Atom ((u i 0 `LC.Plus` LC.Const one) `Equals` bound i)
+                 | i <- [j + 1 .. lastU]
+               ]
         )
 
     bound :: UniQIndex -> LC.Term

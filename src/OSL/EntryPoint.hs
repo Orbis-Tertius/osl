@@ -35,7 +35,7 @@ import Semicircuit.PrenexNormalForm (toPrenexNormalForm, toStrongPrenexNormalFor
 import Semicircuit.Sigma11 (prependQuantifiers)
 import Semicircuit.ToLogicCircuit (semicircuitToLogicCircuit)
 import System.Environment (getArgs)
-import Trace.FromLogicCircuit (logicCircuitToTraceType, getMapping)
+import Trace.FromLogicCircuit (getMapping, logicCircuitToTraceType)
 import Trace.Metrics (getTraceTypeMetrics)
 import Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit)
 import Prelude hiding (readFile)

@@ -63,7 +63,7 @@ import OSL.Map (uncurryMap)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Safe (headMay)
-import Stark.Types.Scalar (Scalar, integerToScalar, inverseScalar, one, scalarToInteger, two, zero, normalize)
+import Stark.Types.Scalar (Scalar, integerToScalar, inverseScalar, normalize, one, scalarToInteger, two, zero)
 import Trace.Types (Case (Case), CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), Statement (Statement), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), SubexpressionTrace (SubexpressionTrace), Trace (Trace), TraceType (TraceType), Witness (Witness))
 
 newtype LookupCaches = LookupCaches
@@ -266,15 +266,17 @@ topLevelLogicConstraintSubexpressionTraces ann lc arg mapping caches c p = do
   (m, sId, _) <- logicConstraintSubexpressionTraces ann lc arg mapping caches c p
   OutputSubexpressionId sId' <- getAssertionSubexpressionId ann mapping (InputSubexpressionId sId)
   pure
-    ( Map.unionWith (<>) m
-        $ Map.singleton c
-           (Map.singleton
-             sId'
-             ( SubexpressionTrace
-                 zero
-                 (mapping ^. #stepTypeIds . #assertT . #unOf)
-                 (getDefaultAdvice mapping)
-             )),
+    ( Map.unionWith (<>) m $
+        Map.singleton
+          c
+          ( Map.singleton
+              sId'
+              ( SubexpressionTrace
+                  zero
+                  (mapping ^. #stepTypeIds . #assertT . #unOf)
+                  (getDefaultAdvice mapping)
+              )
+          ),
       sId',
       zero
     )
@@ -740,8 +742,13 @@ polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
       (Map.lookup x (mapping ^. #subexpressionIds . #variables))
   v <- polyVarValue ann numCases arg c x
   (m2, _, _) <-
-   polyVarSameCaseSubexpressionTraces ann numCases arg mapping (Case a)
-     (PolynomialVariable (x ^. #colIndex) 0)
+    polyVarSameCaseSubexpressionTraces
+      ann
+      numCases
+      arg
+      mapping
+      (Case a)
+      (PolynomialVariable (x ^. #colIndex) 0)
   let m3 = Map.singleton c $ Map.singleton sId (SubexpressionTrace v st advice)
   pure $
     (Map.unionsWith (<>) [m0, m1, m2, m3], sId, v)
@@ -752,10 +759,11 @@ polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
     di = secondAdviceColumn mapping
     n = numCases ^. #unNumberOfCases
     r = rowIndexToScalar (x ^. #rowIndex)
-    a = normalize $
-      fromMaybe
-        (die "polyVarDifferentCaseSubexpressionTraces: offset row index mod row count out of range of scalar (this is a compiler bug")
-        (integerToScalar (scalarToInteger (normalize ((c ^. #unCase) Group.+ r)) `mod` scalarToInteger n))
+    a =
+      normalize $
+        fromMaybe
+          (die "polyVarDifferentCaseSubexpressionTraces: offset row index mod row count out of range of scalar (this is a compiler bug")
+          (integerToScalar (scalarToInteger (normalize ((c ^. #unCase) Group.+ r)) `mod` scalarToInteger n))
     divZero = "polyVarDifferentCaseSubexpressionTraces: division by zero"
     d = normalize $ normalize (((c ^. #unCase) Group.+ r) Group.- a) Ring.* fromMaybe (die divZero) (inverseScalar n)
     specialAdvice = Map.fromList [(ai, a), (di, d)]
@@ -2218,9 +2226,11 @@ getSubexpressionLinks m =
       Set.fromList $
         [ SubexpressionLink
             (getLookupStepTypeId arg)
-            (padInputs
-              (catMaybes ((arg ^. #getBareLookupArgument) <&> (^. _2))
-                <> [InputSubexpressionId outEid]))
+            ( padInputs
+                ( catMaybes ((arg ^. #getBareLookupArgument) <&> (^. _2))
+                    <> [InputSubexpressionId outEid]
+                )
+            )
             (OutputSubexpressionId outEid)
           | (arg, BareLookupSubexpressionId outEid) <-
               Map.toList (m ^. #subexpressionIds . #bareLookups)

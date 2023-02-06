@@ -280,11 +280,12 @@ class HasEvaluate a b | a -> b where
 instance HasEvaluate (RowCount, PolynomialVariable) (Map (RowIndex 'Absolute) Scalar) where
   evaluate _ arg (RowCount n, v) =
     pure . showTrace (show v <> " = ")
-      . Map.mapKeys ((`mod` n') . (subtract (RowIndex $ v ^. #rowIndex . #getRowIndex)) . (^. #rowIndex)) $
-      Map.filterWithKey
+      . Map.mapKeys ((`mod` n') . (subtract (RowIndex $ v ^. #rowIndex . #getRowIndex)) . (^. #rowIndex))
+      $ Map.filterWithKey
         (\k _ -> (k ^. #colIndex) == v ^. #colIndex)
         (getCellMap arg)
-    where n' = RowIndex (fromMaybe (die "evaluate PolynomialVariable: row count out of range of Int") (integerToInt (scalarToInteger n)))
+    where
+      n' = RowIndex (fromMaybe (die "evaluate PolynomialVariable: row count out of range of Int") (integerToInt (scalarToInteger n)))
 
 instance
   HasEvaluate
