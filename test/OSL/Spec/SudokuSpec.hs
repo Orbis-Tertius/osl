@@ -135,7 +135,7 @@ exampleSpec c = do
       `shouldBe` Right ()
 
     evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
-      `shouldBe` Left (ErrorMessage Nothing "evalTrace: polynomial constraint not satisfied: (\"assert\",1 + 18446744069414584320x17,0^1,Case {unCase = 77},SubexpressionTrace {value = 0, stepType = 44, adviceValues = fromList [(22,0),(23,0),(24,0)]},132,fromList [(14,77),(15,44),(16,0),(17,0),(18,0),(19,0),(20,0),(21,0),(22,0),(23,0),(24,0)])")
+      `shouldBe` Left (ErrorMessage Nothing "evalTrace: polynomial constraint not satisfied: (\"assert\",1 + 18446744069414584320x17,0^1,Case {unCase = 77},SubexpressionTrace {value = 0, stepType = 45, adviceValues = fromList [(22,0),(23,0),(24,0)]},133,fromList [(14,77),(15,45),(16,0),(17,0),(18,0),(19,0),(20,0),(21,0),(22,0),(23,0),(24,0)])")
 
 exampleArgument :: ValidContext 'Global ann -> Argument
 exampleArgument c =

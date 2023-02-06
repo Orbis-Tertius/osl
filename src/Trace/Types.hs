@@ -140,8 +140,7 @@ newtype Witness = Witness {unWitness :: Map (Case, ColumnIndex) Scalar}
 data Trace = Trace
   { statement :: Statement,
     witness :: Witness,
-    usedCases :: Set Case,
-    subexpressions :: Map (Case, SubexpressionId) SubexpressionTrace
+    subexpressions :: Map Case (Map SubexpressionId SubexpressionTrace)
   }
   deriving (Generic, Show)
 

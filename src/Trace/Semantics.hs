@@ -51,13 +51,16 @@ evalTrace ann tt t = do
   checkAllStepConstraintsAreSatisfied ann tt t
   checkAllEqualityConstraintsAreSatisfied ann tt t
 
+getUsedCases :: Trace -> Set Case
+getUsedCases = Map.keysSet . (^. #subexpressions)
+
 checkAllResultsArePresentForUsedCases ::
   ann ->
   TraceType ->
   Trace ->
   Either (ErrorMessage ann) ()
 checkAllResultsArePresentForUsedCases ann tt t =
-  forM_ (t ^. #usedCases) $ \c ->
+  forM_ (getUsedCases t) $ \c ->
     forM_ (tt ^. #results) $ \(ResultExpressionId sId) ->
       maybe
         ( Left
@@ -69,7 +72,7 @@ checkAllResultsArePresentForUsedCases ann tt t =
             )
         )
         (const (pure ()))
-        (Map.lookup (c, sId) (t ^. #subexpressions))
+        (Map.lookup sId =<< Map.lookup c (t ^. #subexpressions))
 
 checkAllStepConstraintsAreSatisfied ::
   ann ->
@@ -78,9 +81,12 @@ checkAllStepConstraintsAreSatisfied ::
   Either (ErrorMessage ann) ()
 checkAllStepConstraintsAreSatisfied ann tt t = do
   gc <- getGlobalEvaluationContext ann tt t
-  forM_ (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
-    lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
-    checkStepConstraintsAreSatisfied ann tt c sT sId lc
+  forM_ (Map.toList (t ^. #subexpressions))
+    $ \(c, ss) ->
+      forM_ (Map.toList ss)
+        $ \(sId, sT) -> do
+          lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
+          checkStepConstraintsAreSatisfied ann tt c sT sId lc
 
 checkStepConstraintsAreSatisfied ::
   ann ->
@@ -310,7 +316,7 @@ getCaseNumberColumnMappings ::
   Map (Case, ColumnIndex) Scalar
 getCaseNumberColumnMappings tt t =
   Map.fromList
-    [((i, col), i ^. #unCase) | i <- Set.toList (t ^. #usedCases)]
+    [((i, col), i ^. #unCase) | i <- Set.toList (getUsedCases t)]
   where
     col = tt ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
 
@@ -369,7 +375,7 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
               -- and its value should be set here. Seems like something nonsensical
               -- is going on here and we should replace the bare lookup step type
               -- maybe with just a (functional) lookup step type.
-              [ case Map.lookup (c, iId) (t ^. #subexpressions) of
+              [ case Map.lookup iId =<< Map.lookup c (t ^. #subexpressions) of
                   Just sT' -> pure (col, sT' ^. #value)
                   Nothing ->
                     -- trace (show (t ^. #subexpressions)) $
@@ -406,24 +412,25 @@ getLookupTable ::
   Set LookupTableColumn ->
   Either (ErrorMessage ann) [Map LookupTableColumn Scalar]
 getLookupTable ann tt t gc cs =
-  forM (Map.toList (t ^. #subexpressions)) $ \((c, sId), sT) -> do
-    lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
-    Map.fromList
-      <$> sequence
-        [ maybe
-            ( maybe
-                ( Left
-                    ( ErrorMessage
-                        ann
-                        ( "lookup table has a hole: "
-                            <> pack (show (c, col))
-                        )
-                    )
-                )
-                (pure . (col,))
-                (Map.lookup (c, col ^. #unLookupTableColumn) (lc ^. #globalMappings))
-            )
-            (pure . (col,))
-            (Map.lookup (col ^. #unLookupTableColumn) (lc ^. #localMappings))
-          | col <- Set.toList cs
-        ]
+  fmap mconcat . forM (Map.toList (t ^. #subexpressions)) $ \(c, ss) ->
+    forM (Map.toList ss) $ \(sId, sT) -> do
+      lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
+      Map.fromList
+        <$> sequence
+          [ maybe
+              ( maybe
+                  ( Left
+                      ( ErrorMessage
+                          ann
+                          ( "lookup table has a hole: "
+                              <> pack (show (c, col))
+                          )
+                      )
+                  )
+                  (pure . (col,))
+                  (Map.lookup (c, col ^. #unLookupTableColumn) (lc ^. #globalMappings))
+              )
+              (pure . (col,))
+              (Map.lookup (col ^. #unLookupTableColumn) (lc ^. #localMappings))
+            | col <- Set.toList cs
+          ]

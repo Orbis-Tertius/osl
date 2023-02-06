@@ -3,6 +3,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Trace.ToArithmeticAIR
   ( traceTypeToArithmeticAIR,
@@ -15,7 +17,7 @@ module Trace.ToArithmeticAIR
   )
 where
 
-import Cast (intToInteger)
+import Cast (intToInteger, integerToInt)
 import Control.Arrow (second)
 import Control.Lens ((<&>))
 import Data.List.Extra (mconcatMap, (!?))
@@ -26,19 +28,22 @@ import Die (die)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.AIR (AIR (AIR), ArithmeticAIR)
-import Halo2.Types.Argument (Argument)
+import Halo2.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
+import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
-import Halo2.Types.ColumnType (ColumnType (Advice, Fixed))
+import Halo2.Types.ColumnType (ColumnType (Advice, Fixed, Instance))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
-import OSL.Types.ErrorMessage (ErrorMessage)
-import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero, scalarToInteger)
+import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
+import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero, one, scalarToInteger)
+import Safe (atMay)
 import Trace.Semantics (getGlobalEvaluationContext, getSubexpressionEvaluationContext)
-import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace)
-import Trace.Types.EvaluationContext (EvaluationContext, ContextType (Global))
+import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace))
+import Trace.Types.EvaluationContext (EvaluationContext, ContextType (Global, Local))
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -54,6 +59,7 @@ traceTypeToArithmeticAIR t =
     (columnTypes t)
     (gateConstraints t)
     (t ^. #rowCount)
+    -- TODO: include trace type fixed values
     (additionalFixedValues t (m ^. #fixed))
   where
     m = mappings t
@@ -109,7 +115,8 @@ newtype Mapping a = Mapping {unMapping :: ColumnIndex}
 
 data CaseNumber
 
-data CaseUsed
+data CaseUsed = CaseIsUsed | CaseIsNotUsed
+  deriving (Eq)
 
 data Mappings = Mappings
   { fixed :: FixedMappings,
@@ -135,6 +142,44 @@ data AdviceMappings = AdviceMappings
     caseUsed :: Mapping CaseUsed
   }
   deriving (Generic)
+
+newtype AIRFixedValues =
+  AIRFixedValues
+    { unAIRFixedValues ::
+        Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
+    }
+  deriving (Generic)
+
+getAIRFixedValues ::
+  TraceType ->
+  Mappings ->
+  AIRFixedValues
+getAIRFixedValues tt m =
+  fixedValuesToAIRFixedValues tt
+    (additionalFixedValues tt (m ^. #fixed))
+
+fixedValuesToAIRFixedValues ::
+  TraceType ->
+  FixedValues ->
+  AIRFixedValues
+fixedValuesToAIRFixedValues tt fvs =
+  AIRFixedValues $
+    Map.unionsWith (<>)
+      [ Map.singleton ri (Map.singleton ci y)
+        | (ci, col) <-
+            Map.toList (fvs ^. #getFixedValues),
+          (ri, y) <-
+            zip [0..n] (padInfinitely (col ^. #unFixedColumn))
+      ]
+  where
+    n = maxRowIndex tt
+
+maxRowIndex :: TraceType -> RowIndex 'Absolute
+maxRowIndex tt =
+  RowIndex (c * n - 1)
+  where
+    c = scalarToInt $ tt ^. #numCases . #unNumberOfCases
+    n = Set.size (tt ^. #subexpressions)
 
 mappings :: TraceType -> Mappings
 mappings t =
@@ -169,7 +214,8 @@ additionalFixedValues ::
   FixedMappings ->
   FixedValues
 additionalFixedValues t m =
-  linksTableFixedColumns (linksTable t) m <> caseAndResultFixedColumns t m
+  linksTableFixedColumns (linksTable t) m
+    <> caseAndResultFixedColumns t m
 
 newtype LinksTable = LinksTable
   {unLinksTable :: [SubexpressionLink]}
@@ -241,7 +287,7 @@ traceToArgument ::
 traceToArgument ann tt t = do
   gc <- getGlobalEvaluationContext ann tt t
   mconcat <$> sequence
-    [ caseArgument ann tt t m fvs gc
+    [ caseArgument ann tt t m fvs airFvs gc
         $ maybe
           (die "traceToArgument: case number is out of range of scalar field")
           Case
@@ -252,6 +298,7 @@ traceToArgument ann tt t = do
     m = mappings tt
     air = traceTypeToArithmeticAIR tt
     fvs = air ^. #fixedValues
+    airFvs = getAIRFixedValues tt m
 
 caseArgument ::
   ann ->
@@ -259,25 +306,256 @@ caseArgument ::
   Trace ->
   Mappings ->
   FixedValues ->
+  AIRFixedValues ->
   EvaluationContext 'Global ->
   Case ->
   Either (ErrorMessage ann) Argument
-caseArgument = todo subexpressionArgument
+caseArgument ann tt t m fvs airFvs gc c =
+  case Map.lookup c (t ^. #subexpressions) of
+    Nothing -> unusedCaseArgument ann tt t m fvs airFvs gc c
+    Just es ->
+      if Map.null es
+        then unusedCaseArgument ann tt t m fvs airFvs gc c
+        else usedCaseArgument ann tt t m fvs airFvs gc c es
+
+caseRowIndices ::
+  TraceType ->
+  Case ->
+  [RowIndex 'Absolute]
+caseRowIndices tt (Case (scalarToInteger -> c)) =
+  [start .. end]
+  where
+    c' = fromMaybe (die "caseRowIndices: case number out of range of Int")
+           (integerToInt c)
+    start = RowIndex (n * c')
+    end = start + RowIndex n
+    -- TODO: n can sometimes be less if we can show that every evaluation will only
+    -- require a subset of the subexpressions due to short circuiting, and this would
+    -- in turn allow us to decrease the row count
+    n = Set.size (tt ^. #subexpressions)
+
+usedCaseArgument ::
+  ann ->
+  TraceType ->
+  Trace ->
+  Mappings ->
+  FixedValues ->
+  AIRFixedValues ->
+  EvaluationContext 'Global ->
+  Case ->
+  Map SubexpressionId SubexpressionTrace ->
+  Either (ErrorMessage ann) Argument
+usedCaseArgument ann tt t m fvs airFvs gc c es = do
+  arg0 <- emptyCaseArgument ann tt t m fvs airFvs gc c CaseIsUsed
+  args <- mapM
+          (\(ri, (sId, sT)) -> subexpressionArgument ann tt t m fvs airFvs gc c CaseIsUsed sId sT ri)
+          (zip (caseRowIndices tt c) (Map.toList es))
+  pure $ mconcat args <> arg0
+
+unusedCaseArgument ::
+  ann ->
+  TraceType ->
+  Trace ->
+  Mappings ->
+  FixedValues ->
+  AIRFixedValues ->
+  EvaluationContext 'Global ->
+  Case ->
+  Either (ErrorMessage ann) Argument
+unusedCaseArgument ann tt t m fvs airFvs gc c =
+  emptyCaseArgument ann tt t m fvs airFvs gc c CaseIsNotUsed
+
+emptyCaseArgument ::
+  ann ->
+  TraceType ->
+  Trace ->
+  Mappings ->
+  FixedValues ->
+  AIRFixedValues ->
+  EvaluationContext 'Global ->
+  Case ->
+  CaseUsed ->
+  Either (ErrorMessage ann) Argument
+emptyCaseArgument ann tt t m fvs airFvs gc c used =
+  mconcat <$> sequence
+    [ voidRow ann tt t m fvs airFvs gc c used i
+      | i <- caseRowIndices tt c
+    ]
+
+voidRow :: 
+  ann ->
+  TraceType ->
+  Trace ->
+  Mappings ->
+  FixedValues ->
+  AIRFixedValues ->
+  EvaluationContext 'Global ->
+  Case ->
+  CaseUsed ->
+  RowIndex 'Absolute ->
+  Either (ErrorMessage ann) Argument
+voidRow ann tt t m fvs airFvs gc c used ri =
+  subexpressionArgument ann tt t m fvs airFvs gc c used
+    voidEid
+    (SubexpressionTrace zero voidStepType mempty)
+    ri
+  where
+    voidEid = 0 -- TODO: is it better not to assume void has subexpression id 0 and step type 0?
+    voidStepType = 0
 
 subexpressionArgument ::
   ann ->
   TraceType ->
   Trace ->
   Mappings ->
+  FixedValues ->
+  AIRFixedValues ->
   EvaluationContext 'Global ->
   Case ->
+  CaseUsed ->
   SubexpressionId ->
   SubexpressionTrace ->
+  RowIndex 'Absolute ->
   Either (ErrorMessage ann) Argument
-subexpressionArgument ann tt t m gc c sId sT = do
+subexpressionArgument ann tt t m fvs airFvs gc c used sId sT ri = do
   lc <- getSubexpressionEvaluationContext ann tt t gc
           (c, sId, sT)
-  todo lc m
+  mconcat <$> sequence
+    [ traceTypeFixedValuesArgument ann tt fvs c ri,
+      airFixedValuesArgument ann airFvs ri,
+      traceStatementValuesArgument ann tt t c ri,
+      traceWitnessValuesArgument ann tt t c ri,
+      subexpressionTraceValuesArgument ann tt t m gc lc c used sId sT ri
+    ]
+
+traceTypeFixedValuesArgument ::
+  ann ->
+  TraceType ->
+  FixedValues ->
+  Case ->
+  RowIndex 'Absolute ->
+  Either (ErrorMessage ann) Argument
+traceTypeFixedValuesArgument ann tt fvs c ri =
+  mconcat <$> sequence
+    [ Argument mempty . Witness
+        . Map.singleton
+           (CellReference ci ri)
+             <$> maybe
+                 (Left (ErrorMessage ann "traceTypeFixedValues: fixed value lookup failed"))
+                 pure
+                 ((`atMay` scalarToInt (c ^. #unCase))
+                   =<< (Map.lookup ci (fvs ^. #getFixedValues)
+                         <&> (^. #unFixedColumn)))
+      | ci <-
+          Map.keys $
+            Map.filter
+              (== Fixed)
+              (tt ^. #columnTypes . #getColumnTypes)
+    ]
+
+airFixedValuesArgument ::
+  ann ->
+  AIRFixedValues ->
+  RowIndex 'Absolute ->
+  Either (ErrorMessage ann) Argument
+airFixedValuesArgument ann airFvs ri =
+  maybe
+    (Left (ErrorMessage ann "airFixedValuesArgument"))
+    (pure . Argument mempty . Witness
+      . Map.mapKeys (`CellReference` ri))
+    (Map.lookup ri (airFvs ^. #unAIRFixedValues))
+
+traceStatementValuesArgument ::
+  ann ->
+  TraceType ->
+  Trace ->
+  Case ->
+  RowIndex 'Absolute ->
+  Either (ErrorMessage ann) Argument
+traceStatementValuesArgument ann tt t c ri =
+  (`Argument` Witness mempty) . Statement
+    . Map.fromList <$> sequence
+      [ (CellReference ci ri,)
+          <$> maybe
+                (Left (ErrorMessage ann "traceStatementValuesArgument"))
+                pure
+                (Map.lookup (c, ci)
+                  (t ^. #statement . #unStatement))
+        | ci <- Map.keys
+            (Map.filter (== Instance)
+              (tt ^. #columnTypes . #getColumnTypes))
+      ]
+
+traceWitnessValuesArgument ::
+  ann ->
+  TraceType ->
+  Trace ->
+  Case ->
+  RowIndex 'Absolute ->
+  Either (ErrorMessage ann) Argument
+traceWitnessValuesArgument ann tt t c ri =
+  Argument mempty . Witness . Map.fromList <$> sequence
+    [ (CellReference ci ri,)
+        <$> maybe
+              (Left (ErrorMessage ann "traceWitnessValuesArgument"))
+              pure
+              (Map.lookup (c, ci)
+                (t ^. #witness . #unWitness))
+      | ci <- Map.keys
+          (Map.filter (== Advice)
+            (tt ^. #columnTypes . #getColumnTypes))
+    ]
+
+subexpressionTraceValuesArgument ::
+  ann ->
+  TraceType ->
+  Trace ->
+  Mappings ->
+  EvaluationContext 'Global ->
+  EvaluationContext 'Local ->
+  Case ->
+  CaseUsed ->
+  SubexpressionId ->
+  SubexpressionTrace ->
+  RowIndex 'Absolute ->
+  Either (ErrorMessage ann) Argument
+subexpressionTraceValuesArgument ann tt t m gc lc c used sId sT ri =
+  Argument mempty . Witness . mconcat <$> sequence
+    [ -- case used
+      pure $
+        Map.singleton
+          (CellReference (m ^. #advice . #caseUsed . #unMapping) ri)
+          (if used == CaseIsUsed then one else zero),
+      -- step type
+      pure $
+        Map.singleton
+          (CellReference (tt ^. #stepTypeColumnIndex . #unStepTypeColumnIndex) ri)
+          (sT ^. #stepType . #unStepTypeId),
+      -- step indicator
+      pure $
+        Map.singleton
+          (CellReference (tt ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex) ri)
+          zero,
+      -- output subexpression id
+      pure $
+        Map.singleton
+          (CellReference (m ^. #advice . #output . #unMapping) ri)
+          (sId ^. #unSubexpressionId),
+      -- output value
+      pure $
+        Map.singleton
+          (CellReference (tt ^. #outputColumnIndex . #unOutputColumnIndex) ri)
+          (sT ^. #value),
+      -- input subexpression ids (TODO)
+      -- input values (TODO)
+      -- additional advice (TODO)
+      todo ann tt t gc lc c sId sT
+    ]
+
+padInfinitely :: [a] -> [a]
+padInfinitely [] = []
+padInfinitely [a] = repeat a
+padInfinitely (x:xs) = x : padInfinitely xs
 
 todo :: a
 todo = todo

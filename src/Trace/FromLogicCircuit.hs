@@ -58,7 +58,7 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Relative))
 import Halo2.Types.Sign (Sign (Negative, Positive))
-import OSL.Map (uncurryMap)
+import OSL.Map (curryMap)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Safe (headMay)
@@ -174,21 +174,21 @@ argumentToTrace ann bitsPerByte lc arg = do
   Trace
     <$> logicCircuitStatementToTraceStatement ann (arg ^. #statement)
     <*> logicCircuitWitnessToTraceWitness ann (arg ^. #witness)
-    <*> pure usedCases
-    <*> ( (voidCase usedCases voidId <>) . uncurryMap
+    <*> ( Map.unionWith (<>) (voidCase usedCases voidId)
             <$> argumentSubexpressionTraces ann lc arg mapping usedCases
         )
   where
     voidCase usedCases voidId =
-      Map.fromList
-        [ ( (i, voidId),
-            SubexpressionTrace
-              zero
-              (mapping ^. #stepTypeIds . #voidT . #unOf)
-              (getDefaultAdvice mapping)
-          )
-          | i <- Set.toList usedCases
-        ]
+      curryMap $
+        Map.fromList
+          [ ( (i, voidId),
+              SubexpressionTrace
+                zero
+                (mapping ^. #stepTypeIds . #voidT . #unOf)
+                (getDefaultAdvice mapping)
+            )
+            | i <- Set.toList usedCases
+          ]
 
     mapping = getMapping bitsPerByte lc
 
@@ -1014,7 +1014,8 @@ newtype BareLookupArgument = BareLookupArgument
   deriving (Eq, Ord, Generic, Show)
 
 data StepTypeIdMapping = StepTypeIdMapping
-  { loads :: Map PolynomialVariable StepTypeId,
+  { voidT :: StepTypeIdOf VoidT,
+    loads :: Map PolynomialVariable StepTypeId,
     loadFromDifferentCase :: StepTypeIdOf LoadFromDifferentCase,
     lookupTables :: Map LookupTable StepTypeId,
     constants :: Map Scalar StepTypeId,
@@ -1028,7 +1029,6 @@ data StepTypeIdMapping = StepTypeIdMapping
     equals :: StepTypeIdOf Equals,
     lessThan :: StepTypeIdOf LessThan,
     maxT :: StepTypeIdOf Max,
-    voidT :: StepTypeIdOf VoidT,
     assertT :: StepTypeIdOf AssertT
   }
   deriving (Generic, Show)
@@ -1188,6 +1188,7 @@ getMapping bitsPerByte c =
           (getStepArity c ^. #unArity)
           (InputColumnIndex <$> nextCol)
       out <- OutputColumnIndex <$> nextCol
+      voidStepTypeMapping <- nextSid'
       polyVarsZeroOffsetMapping <-
         Map.fromList . zip polyVarsZeroOffset
           <$> replicateM (length polyVarsZeroOffset) nextSid
@@ -1205,7 +1206,7 @@ getMapping bitsPerByte c =
                 <$> (ByteRangeColumnIndex <$> nextCol)
                 <*> (ZeroIndicatorColumnIndex <$> nextCol)
             )
-        <*> ( StepTypeIdMapping polyVarsZeroOffsetMapping
+        <*> ( StepTypeIdMapping voidStepTypeMapping polyVarsZeroOffsetMapping
                 <$> (nextSid' :: State S (StepTypeIdOf LoadFromDifferentCase))
                 <*> ( Map.fromList . zip lookupTables'
                         <$> replicateM (length lookupTables') nextSid
@@ -1223,7 +1224,6 @@ getMapping bitsPerByte c =
                 <*> (nextSid' :: State S (StepTypeIdOf Equals))
                 <*> (nextSid' :: State S (StepTypeIdOf LessThan))
                 <*> (nextSid' :: State S (StepTypeIdOf Max))
-                <*> (nextSid' :: State S (StepTypeIdOf VoidT))
                 <*> (nextSid' :: State S (StepTypeIdOf AssertT))
             )
         <*> ( do
