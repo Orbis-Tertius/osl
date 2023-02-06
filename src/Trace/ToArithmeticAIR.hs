@@ -23,11 +23,10 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Die (die)
-import Halo2.Circuit (fixedValuesToCellMap)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
 import Halo2.Types.AIR (AIR (AIR), ArithmeticAIR)
-import Halo2.Types.Argument (Argument (Argument), Witness (Witness))
+import Halo2.Types.Argument (Argument)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
 import Halo2.Types.ColumnType (ColumnType (Advice, Fixed))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
@@ -36,9 +35,9 @@ import Halo2.Types.FixedValues (FixedValues (FixedValues))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
 import OSL.Types.ErrorMessage (ErrorMessage)
-import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero)
+import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero, scalarToInteger)
 import Trace.Semantics (getGlobalEvaluationContext, getSubexpressionEvaluationContext)
-import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case, SubexpressionTrace)
+import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace)
 import Trace.Types.EvaluationContext (EvaluationContext, ContextType (Global))
 
 -- Trace type arithmetic AIRs have the columnar structure
@@ -130,6 +129,9 @@ data FixedMappings = FixedMappings
 data AdviceMappings = AdviceMappings
   { inputs :: [Mapping InputSubexpressionId],
     output :: Mapping OutputSubexpressionId,
+    -- The actual number of cases may be less than the maximum
+    -- number of cases, so we need to track whether each case
+    -- is used or not.
     caseUsed :: Mapping CaseUsed
   }
   deriving (Generic)
@@ -238,20 +240,29 @@ traceToArgument ::
   Either (ErrorMessage ann) Argument
 traceToArgument ann tt t = do
   gc <- getGlobalEvaluationContext ann tt t
-  (fixedValuesArgument fvs <>) . mconcat <$> sequence
-    [ subexpressionArgument ann tt t m gc s
-      | s <- Map.toList (t ^. #subexpressions)
+  mconcat <$> sequence
+    [ caseArgument ann tt t m fvs gc
+        $ maybe
+          (die "traceToArgument: case number is out of range of scalar field")
+          Case
+          (integerToScalar c)
+      | c <- [0 .. scalarToInteger $ tt ^. #numCases . #unNumberOfCases]
     ]
   where
     m = mappings tt
     air = traceTypeToArithmeticAIR tt
     fvs = air ^. #fixedValues
 
-fixedValuesArgument ::
+caseArgument ::
+  ann ->
+  TraceType ->
+  Trace ->
+  Mappings ->
   FixedValues ->
-  Argument
-fixedValuesArgument =
-  Argument mempty . Witness . fixedValuesToCellMap
+  EvaluationContext 'Global ->
+  Case ->
+  Either (ErrorMessage ann) Argument
+caseArgument = todo subexpressionArgument
 
 subexpressionArgument ::
   ann ->
@@ -259,9 +270,11 @@ subexpressionArgument ::
   Trace ->
   Mappings ->
   EvaluationContext 'Global ->
-  ((Case, SubexpressionId), SubexpressionTrace) ->
+  Case ->
+  SubexpressionId ->
+  SubexpressionTrace ->
   Either (ErrorMessage ann) Argument
-subexpressionArgument ann tt t m gc ((c, sId), sT) = do
+subexpressionArgument ann tt t m gc c sId sT = do
   lc <- getSubexpressionEvaluationContext ann tt t gc
           (c, sId, sT)
   todo lc m
