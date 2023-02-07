@@ -70,7 +70,7 @@ import Semicircuit.Sigma11 (existentialQuantifierInputBounds, existentialQuantif
 import Semicircuit.Types.PNFFormula (ExistentialQuantifier, ExistentialQuantifierF (Some, SomeP), InstanceQuantifier, InstanceQuantifierF (Instance), UniversalQuantifier (All))
 import qualified Semicircuit.Types.QFFormula as QF
 import Semicircuit.Types.Semicircuit (Semicircuit)
-import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OneVectorIndex (..), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..), ZeroVectorIndex (..))
+import Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout (ArgMapping (..), DummyRowAdviceColumn (..), FixedColumns (..), LastRowIndicatorColumnIndex (..), NameMapping (NameMapping), OutputMapping (..), SemicircuitToLogicCircuitColumnLayout (..))
 import Semicircuit.Types.Sigma11 (Bound, BoundF (FieldMaxBound, TermBound), InputBound, Name, OutputBound, OutputBoundF (OutputBound), Term, TermF (Add, App, AppInverse, Const, IndLess, Max, Mul))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, order, scalarToInt, scalarToInteger, zero)
 
@@ -277,30 +277,14 @@ getFixedValuesArgument ann (RowCount n) layout = do
       pure
       (integerToInt (scalarToInteger n))
   pure . Halo2.Argument mempty . Halo2.Witness . Map.fromList $
-    mconcat
-      [ [ ( CellReference
-              (layout ^. #fixedColumns . #zeroVector . #unZeroVectorIndex)
-              (RowIndex ri),
-            zero
-          )
-          | ri <- [0 .. n' - 1]
-        ],
-        [ ( CellReference
-              (layout ^. #fixedColumns . #oneVector . #unOneVectorIndex)
-              (RowIndex ri),
-            one
-          )
-          | ri <- [0 .. n' - 1]
-        ],
-        [ ( CellReference
-              (layout ^. #fixedColumns . #lastRowIndicator . #unLastRowIndicatorColumnIndex)
-              (RowIndex ri),
-            v
-          )
-          | ri <- [0 .. n' - 1],
-            let v = if ri == n' - 1 then one else zero
-        ]
-      ]
+    [ ( CellReference
+          (layout ^. #fixedColumns . #lastRowIndicator . #unLastRowIndicatorColumnIndex)
+          (RowIndex ri),
+        v
+      )
+      | ri <- [0 .. n' - 1],
+        let v = if ri == n' - 1 then one else zero
+    ]
 
 newtype S = S (ColumnIndex, ColumnTypes)
 
@@ -429,25 +413,13 @@ freeVariableMapping x =
 
 fixedColumns :: State S FixedColumns
 fixedColumns =
-  FixedColumns
-    <$> (ZeroVectorIndex <$> nextCol ColType.Fixed)
-    <*> (OneVectorIndex <$> nextCol ColType.Fixed)
-    <*> (LastRowIndicatorColumnIndex <$> nextCol ColType.Fixed)
+  FixedColumns . LastRowIndicatorColumnIndex
+    <$> nextCol ColType.Fixed
 
 fixedValues :: RowCount -> Layout -> FixedValues
 fixedValues (RowCount n) layout =
   FixedValues . Map.fromList $
     [ ( layout
-          ^. #fixedColumns . #zeroVector
-            . #unZeroVectorIndex,
-        FixedColumn $ replicate (scalarToInt n) zero
-      ),
-      ( layout
-          ^. #fixedColumns . #oneVector
-            . #unOneVectorIndex,
-        FixedColumn $ replicate (scalarToInt n) one
-      ),
-      ( layout
           ^. #fixedColumns . #lastRowIndicator
             . #unLastRowIndicatorColumnIndex,
         FixedColumn $ replicate (scalarToInt n - 1) zero <> [one]
@@ -463,8 +435,8 @@ equalityConstraints x layout =
     [ EqualityConstraint $
         [ CellReference
             ( layout
-                ^. #fixedColumns . #zeroVector
-                  . #unZeroVectorIndex
+                ^. #fixedColumns . #lastRowIndicator
+                  . #unLastRowIndicatorColumnIndex -- => 0
             )
             0
         ]
@@ -491,8 +463,8 @@ equalityConstrainableColumns ::
 equalityConstrainableColumns x layout =
   EqualityConstrainableColumns . Set.fromList $
     [ layout
-        ^. #fixedColumns . #zeroVector
-          . #unZeroVectorIndex
+        ^. #fixedColumns . #lastRowIndicator
+          . #unLastRowIndicatorColumnIndex
     ]
       <> ( universalToColumnIndex layout
              <$> (x ^. #formula . #quantifiers . #universalQuantifiers)
@@ -720,9 +692,7 @@ fixedColumnBounds layout constraints =
     <> LogicConstraints
       mempty
       ( Map.fromList
-          [ (layout ^. #fixedColumns . #lastRowIndicator . #unLastRowIndicatorColumnIndex, boolBound),
-            (layout ^. #fixedColumns . #oneVector . #unOneVectorIndex, boolBound),
-            (layout ^. #fixedColumns . #zeroVector . #unZeroVectorIndex, boolBound)
+          [ (layout ^. #fixedColumns . #lastRowIndicator . #unLastRowIndicatorColumnIndex, boolBound)
           ]
       )
 
