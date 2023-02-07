@@ -372,10 +372,15 @@ getLookupResults ::
 getLookupResults ann rc mRowSet cellMap table = do
   let rowSet = getRowSet rc mRowSet
       allRows = getRowSet rc Nothing
+      cellMapAllRows :: Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
       cellMapAllRows = getCellMapRows allRows cellMap
+      tableCols :: Map ColumnIndex ()
       tableCols = Map.fromList ((,()) . (^. #unLookupTableColumn) . snd <$> table)
+      cellMapTableRows :: Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
       cellMapTableRows = (`Map.intersection` tableCols) <$> cellMapAllRows
+      cellMapTableInverse :: Map (Map ColumnIndex Scalar) (RowIndex 'Absolute)
       cellMapTableInverse = inverseMap cellMapTableRows
+      tableRows :: Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
       tableRows = getColumnListRows rowSet table
   rowsToCellMap . Map.fromList
     <$> sequence

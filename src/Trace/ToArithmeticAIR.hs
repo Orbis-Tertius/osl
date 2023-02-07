@@ -41,9 +41,7 @@ import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero, one, scalarToInteger)
 import Safe (atMay)
-import Trace.Semantics (getGlobalEvaluationContext, getSubexpressionEvaluationContext)
-import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId, ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace))
-import Trace.Types.EvaluationContext (EvaluationContext, ContextType (Global, Local))
+import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId (OutputSubexpressionId), ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace), InputColumnIndex (InputColumnIndex))
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -285,9 +283,8 @@ traceToArgument ::
   Trace ->
   Either (ErrorMessage ann) Argument
 traceToArgument ann tt t = do
-  gc <- getGlobalEvaluationContext ann tt t
   mconcat <$> sequence
-    [ caseArgument ann tt t m fvs airFvs gc
+    [ caseArgument ann tt t m fvs airFvs
         $ maybe
           (die "traceToArgument: case number is out of range of scalar field")
           Case
@@ -307,16 +304,15 @@ caseArgument ::
   Mappings ->
   FixedValues ->
   AIRFixedValues ->
-  EvaluationContext 'Global ->
   Case ->
   Either (ErrorMessage ann) Argument
-caseArgument ann tt t m fvs airFvs gc c =
+caseArgument ann tt t m fvs airFvs c =
   case Map.lookup c (t ^. #subexpressions) of
-    Nothing -> unusedCaseArgument ann tt t m fvs airFvs gc c
+    Nothing -> unusedCaseArgument ann tt t m fvs airFvs c
     Just es ->
       if Map.null es
-        then unusedCaseArgument ann tt t m fvs airFvs gc c
-        else usedCaseArgument ann tt t m fvs airFvs gc c es
+        then unusedCaseArgument ann tt t m fvs airFvs c
+        else usedCaseArgument ann tt t m fvs airFvs c es
 
 caseRowIndices ::
   TraceType ->
@@ -341,14 +337,13 @@ usedCaseArgument ::
   Mappings ->
   FixedValues ->
   AIRFixedValues ->
-  EvaluationContext 'Global ->
   Case ->
   Map SubexpressionId SubexpressionTrace ->
   Either (ErrorMessage ann) Argument
-usedCaseArgument ann tt t m fvs airFvs gc c es = do
-  arg0 <- emptyCaseArgument ann tt t m fvs airFvs gc c CaseIsUsed
+usedCaseArgument ann tt t m fvs airFvs c es = do
+  arg0 <- emptyCaseArgument ann tt t m fvs airFvs c CaseIsUsed
   args <- mapM
-          (\(ri, (sId, sT)) -> subexpressionArgument ann tt t m fvs airFvs gc c CaseIsUsed sId sT ri)
+          (\(ri, (sId, sT)) -> subexpressionArgument ann tt t m fvs airFvs c CaseIsUsed sId sT ri)
           (zip (caseRowIndices tt c) (Map.toList es))
   pure $ mconcat args <> arg0
 
@@ -359,11 +354,10 @@ unusedCaseArgument ::
   Mappings ->
   FixedValues ->
   AIRFixedValues ->
-  EvaluationContext 'Global ->
   Case ->
   Either (ErrorMessage ann) Argument
-unusedCaseArgument ann tt t m fvs airFvs gc c =
-  emptyCaseArgument ann tt t m fvs airFvs gc c CaseIsNotUsed
+unusedCaseArgument ann tt t m fvs airFvs c =
+  emptyCaseArgument ann tt t m fvs airFvs c CaseIsNotUsed
 
 emptyCaseArgument ::
   ann ->
@@ -372,13 +366,12 @@ emptyCaseArgument ::
   Mappings ->
   FixedValues ->
   AIRFixedValues ->
-  EvaluationContext 'Global ->
   Case ->
   CaseUsed ->
   Either (ErrorMessage ann) Argument
-emptyCaseArgument ann tt t m fvs airFvs gc c used =
+emptyCaseArgument ann tt t m fvs airFvs c used =
   mconcat <$> sequence
-    [ voidRow ann tt t m fvs airFvs gc c used i
+    [ voidRow ann tt t m fvs airFvs c used i
       | i <- caseRowIndices tt c
     ]
 
@@ -389,13 +382,12 @@ voidRow ::
   Mappings ->
   FixedValues ->
   AIRFixedValues ->
-  EvaluationContext 'Global ->
   Case ->
   CaseUsed ->
   RowIndex 'Absolute ->
   Either (ErrorMessage ann) Argument
-voidRow ann tt t m fvs airFvs gc c used ri =
-  subexpressionArgument ann tt t m fvs airFvs gc c used
+voidRow ann tt t m fvs airFvs c used ri =
+  subexpressionArgument ann tt t m fvs airFvs c used
     voidEid
     (SubexpressionTrace zero voidStepType mempty)
     ri
@@ -410,22 +402,19 @@ subexpressionArgument ::
   Mappings ->
   FixedValues ->
   AIRFixedValues ->
-  EvaluationContext 'Global ->
   Case ->
   CaseUsed ->
   SubexpressionId ->
   SubexpressionTrace ->
   RowIndex 'Absolute ->
   Either (ErrorMessage ann) Argument
-subexpressionArgument ann tt t m fvs airFvs gc c used sId sT ri = do
-  lc <- getSubexpressionEvaluationContext ann tt t gc
-          (c, sId, sT)
+subexpressionArgument ann tt t m fvs airFvs c used sId sT ri = do
   mconcat <$> sequence
     [ traceTypeFixedValuesArgument ann tt fvs c ri,
       airFixedValuesArgument ann airFvs ri,
       traceStatementValuesArgument ann tt t c ri,
       traceWitnessValuesArgument ann tt t c ri,
-      subexpressionTraceValuesArgument ann tt t m gc lc c used sId sT ri
+      subexpressionTraceValuesArgument ann tt t m c used sId sT ri
     ]
 
 traceTypeFixedValuesArgument ::
@@ -511,15 +500,13 @@ subexpressionTraceValuesArgument ::
   TraceType ->
   Trace ->
   Mappings ->
-  EvaluationContext 'Global ->
-  EvaluationContext 'Local ->
   Case ->
   CaseUsed ->
   SubexpressionId ->
   SubexpressionTrace ->
   RowIndex 'Absolute ->
   Either (ErrorMessage ann) Argument
-subexpressionTraceValuesArgument ann tt t m gc lc c used sId sT ri =
+subexpressionTraceValuesArgument ann tt t m c used sId sT ri =
   Argument mempty . Witness . mconcat <$> sequence
     [ -- case used
       pure $
@@ -546,16 +533,31 @@ subexpressionTraceValuesArgument ann tt t m gc lc c used sId sT ri =
         Map.singleton
           (CellReference (tt ^. #outputColumnIndex . #unOutputColumnIndex) ri)
           (sT ^. #value),
-      -- input subexpression ids (TODO)
-      -- input values (TODO)
-      -- additional advice (TODO)
-      todo ann tt t gc lc c sId sT
+      -- input subexpression ids and values, and advice from subexpression trace
+      do
+        inIds <-
+          maybe
+            (Left (ErrorMessage ann "subexpressionTraceValuesArgument: link"))
+            pure
+            (Map.lookup
+              (sT ^. #stepType, OutputSubexpressionId sId)
+              (tt ^. #links))
+        mconcat <$> sequence
+          [ do x0 <- (CellReference inCol ri,)
+                       <$> maybe
+                           (Left (ErrorMessage ann "subexpressionTraceValuesArgument: input subexpression id"))
+                           (pure . (^. #value))
+                           (Map.lookup c (t ^. #subexpressions)
+                             >>= Map.lookup inId)
+               let x1 = (CellReference sIdCol ri, inId ^. #unSubexpressionId)
+                   xs = (\(ci, y) -> (CellReference ci ri, y)) <$> Map.toList (sT ^. #adviceValues)
+               pure (Map.fromList (x0 : x1 : xs))
+            | (InputSubexpressionId inId, InputColumnIndex inCol, Mapping sIdCol) <-
+                zip3 inIds (tt ^. #inputColumnIndices) (m ^. #advice . #inputs)
+          ]
     ]
 
 padInfinitely :: [a] -> [a]
 padInfinitely [] = []
 padInfinitely [a] = repeat a
 padInfinitely (x:xs) = x : padInfinitely xs
-
-todo :: a
-todo = todo
