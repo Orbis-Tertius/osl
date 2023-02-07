@@ -114,6 +114,7 @@ data TraceType = TraceType
   { columnTypes :: ColumnTypes,
     equalityConstrainableColumns :: EqualityConstrainableColumns,
     equalityConstraints :: EqualityConstraints,
+    fixedValues :: FixedValues,
     stepTypes :: Map StepTypeId StepType,
     subexpressions :: Set SubexpressionId,
     links :: Map (StepTypeId, OutputSubexpressionId) [InputSubexpressionId],

@@ -917,6 +917,7 @@ logicCircuitToTraceType bitsPerByte c =
     colTypes'
     (c ^. #equalityConstrainableColumns)
     (c ^. #equalityConstraints)
+    (c ^. #fixedValues)
     stepTypes
     subexprs
     (getSubexpressionLinksMap mapping)

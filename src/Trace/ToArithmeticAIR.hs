@@ -58,7 +58,6 @@ traceTypeToArithmeticAIR t =
     (columnTypes t)
     (gateConstraints t)
     (t ^. #rowCount)
-    -- TODO: include trace type fixed values
     (traceTypeFixedValues t <> additionalFixedValues t (m ^. #fixed))
   where
     m = mappings t
@@ -69,7 +68,8 @@ traceTypeFixedValues ::
   TraceType ->
   FixedValues
 traceTypeFixedValues tt =
-  FixedValues
+  ((tt ^. #fixedValues) <>)
+    . FixedValues
     . fmap f
     . (^. #getFixedValues)
     . mconcat
@@ -309,7 +309,7 @@ traceToArgument ann tt t = do
           (die "traceToArgument: case number is out of range of scalar field")
           Case
           (integerToScalar c)
-      | c <- [0 .. scalarToInteger $ tt ^. #numCases . #unNumberOfCases]
+      | c <- [0 .. (scalarToInteger (tt ^. #numCases . #unNumberOfCases)) - 1]
     ]
   where
     m = mappings tt
@@ -344,7 +344,7 @@ caseRowIndices tt (Case (scalarToInteger -> c)) =
     c' = fromMaybe (die "caseRowIndices: case number out of range of Int")
            (integerToInt c)
     start = RowIndex (n * c')
-    end = start + RowIndex n
+    end = start + RowIndex n - 1
     -- TODO: n can sometimes be less if we can show that every evaluation will only
     -- require a subset of the subexpressions due to short circuiting, and this would
     -- in turn allow us to decrease the row count
@@ -472,7 +472,8 @@ airFixedValuesArgument ::
   Either (ErrorMessage ann) Argument
 airFixedValuesArgument ann airFvs ri =
   maybe
-    (Left (ErrorMessage ann "airFixedValuesArgument"))
+    (Left (ErrorMessage ann
+      ("airFixedValuesArgument: failed row lookup: " <> pack (show ri))))
     (pure . Argument mempty . Witness
       . Map.mapKeys (`CellReference` ri))
     (Map.lookup ri (airFvs ^. #unAIRFixedValues))
@@ -509,13 +510,17 @@ traceWitnessValuesArgument ann tt t c ri =
   Argument mempty . Witness . Map.fromList <$> sequence
     [ (CellReference ci ri,)
         <$> maybe
-              (Left (ErrorMessage ann "traceWitnessValuesArgument"))
+              (Left (ErrorMessage ann
+                ("traceWitnessValuesArgument: value lookup failed: " <> pack (show (c, ci)))))
               pure
               (Map.lookup (c, ci)
                 (t ^. #witness . #unWitness))
       | ci <- Map.keys
           (Map.filter (== Advice)
-            (tt ^. #columnTypes . #getColumnTypes))
+            (tt ^. #columnTypes . #getColumnTypes)),
+        -- TODO: make this less brittle; we need to select only the advice columns
+        -- which came from the logic circuit, and this is a way to do it
+        ci < tt ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
     ]
 
 subexpressionTraceValuesArgument ::
