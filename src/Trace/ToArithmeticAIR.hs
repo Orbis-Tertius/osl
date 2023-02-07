@@ -24,6 +24,7 @@ import Data.List.Extra (mconcatMap, (!?))
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
+import Data.Text (pack)
 import Die (die)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
@@ -58,9 +59,28 @@ traceTypeToArithmeticAIR t =
     (gateConstraints t)
     (t ^. #rowCount)
     -- TODO: include trace type fixed values
-    (additionalFixedValues t (m ^. #fixed))
+    (traceTypeFixedValues t <> additionalFixedValues t (m ^. #fixed))
   where
     m = mappings t
+
+-- Converts the fixed values in the trace type from one per case to
+-- one per row.
+traceTypeFixedValues ::
+  TraceType ->
+  FixedValues
+traceTypeFixedValues tt =
+  FixedValues
+    . fmap f
+    . (^. #getFixedValues)
+    . mconcat
+    . fmap (^. #fixedValues)
+    . Map.elems
+    $ tt ^. #stepTypes
+  where
+    f :: FixedColumn -> FixedColumn
+    f = FixedColumn . concatMap (replicate n) . (^. #unFixedColumn)
+
+    n = Set.size (tt ^. #subexpressions)
 
 columnTypes :: TraceType -> ColumnTypes
 columnTypes t =
@@ -430,7 +450,10 @@ traceTypeFixedValuesArgument ann tt fvs c ri =
         . Map.singleton
            (CellReference ci ri)
              <$> maybe
-                 (Left (ErrorMessage ann "traceTypeFixedValues: fixed value lookup failed"))
+                 (Left
+                   (ErrorMessage ann
+                     ("traceTypeFixedValues: fixed value lookup failed: "
+                       <> pack (show (ci, c)))))
                  pure
                  ((`atMay` scalarToInt (c ^. #unCase))
                    =<< (Map.lookup ci (fvs ^. #getFixedValues)

@@ -9,6 +9,7 @@ module OSL.TranslatedEvaluation
     evalTranslatedFormula5,
     evalTranslatedFormula6,
     evalTranslatedFormula7,
+    evalTranslatedFormula8,
   )
 where
 
@@ -34,6 +35,8 @@ import Semicircuit.PrenexNormalForm (statementToSuperStrongPrenexNormalForm, toP
 import Semicircuit.ToLogicCircuit (semicircuitArgumentToLogicCircuitArgument, semicircuitToLogicCircuit)
 import Trace.FromLogicCircuit (argumentToTrace, logicCircuitToTraceType)
 import Trace.Semantics (evalTrace)
+import Trace.ToArithmeticAIR (traceToArgument)
+import Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit)
 
 -- First codegen pass: OSL -> OSL.Sigma11
 evalTranslatedFormula1 ::
@@ -308,3 +311,32 @@ evalTranslatedFormula7 bitsPerByte c name argumentForm argument = do
   mapLeft
     (\(ErrorMessage ann msg) -> ErrorMessage ann ("evalTrace: " <> msg))
     (evalTrace Nothing tt t)
+
+-- Eighth codegen pass: TraceType -> ArithmeticCircuit
+evalTranslatedFormula8 ::
+  Show ann =>
+  BitsPerByte ->
+  ValidContext t ann ->
+  Name ->
+  ArgumentForm ->
+  Argument ->
+  Either (ErrorMessage (Maybe ann)) Bool
+evalTranslatedFormula8 bitsPerByte c name argumentForm argument = do
+  (logic, lcArg) <- toLogicCircuit c name argumentForm argument
+  let tt = logicCircuitToTraceType bitsPerByte logic
+      ac = traceTypeToArithmeticCircuit tt
+  t <-
+    mapLeft
+      (\(ErrorMessage ann msg) ->
+        ErrorMessage ann ("argumentToTrace: " <> msg))
+      (argumentToTrace Nothing bitsPerByte logic lcArg)
+  arg <-
+    mapLeft
+      (\(ErrorMessage ann msg) ->
+        ErrorMessage ann ("traceToArgument: " <> msg))
+      (traceToArgument Nothing tt t)
+  mapLeft
+    ( \(ErrorMessage () msg) ->
+         ErrorMessage Nothing ("evaluate: " <> msg)
+    )
+    (Halo2.Circuit.evaluate () arg ac)

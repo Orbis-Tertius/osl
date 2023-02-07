@@ -17,7 +17,7 @@ import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
 import OSL.Spec.Sudoku.Types (Cell (Cell), Col (Col), Digit (Digit), Problem (Problem, unProblem), Row (Row), Solution (Solution, unSolution), Square (Square), SquareCell (SquareCell), SudokuWitness (SudokuWitness), X (X), Y (Y))
-import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6, evalTranslatedFormula7)
+import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6, evalTranslatedFormula7, evalTranslatedFormula8)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
@@ -136,6 +136,13 @@ exampleSpec c = do
 
     evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
       `shouldBe` Left (ErrorMessage Nothing "evalTrace: polynomial constraint not satisfied: (\"assert\",1 + 18446744069414584320x17,0^1,Case {unCase = 77},SubexpressionTrace {value = 0, stepType = 45, adviceValues = fromList [(22,0),(23,0),(24,0)]},133,fromList [(14,77),(15,45),(16,0),(17,0),(18,0),(19,0),(20,0),(21,0),(22,0),(23,0),(24,0)])")
+
+  it "Sudoku spec's semantics are preserved in codegen stage 8" $ do
+    evalTranslatedFormula8 8 c "problemIsSolvable" argumentForm (exampleArgument c)
+      `shouldBe` Right True
+
+    evalTranslatedFormula8 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
+      `shouldBe` Right False
 
 exampleArgument :: ValidContext 'Global ann -> Argument
 exampleArgument c =

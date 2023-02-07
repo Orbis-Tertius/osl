@@ -67,7 +67,6 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (PowerProduct, getPowerProduct))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
-import OSL.Debug (showTrace)
 import OSL.Map (inverseMap)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInteger, toWord64, zero)
@@ -280,8 +279,7 @@ class HasEvaluate a b | a -> b where
 
 instance HasEvaluate (RowCount, PolynomialVariable) (Map (RowIndex 'Absolute) Scalar) where
   evaluate _ arg (RowCount n, v) =
-    pure . showTrace (show v <> " = ")
-      . Map.mapKeys ((`mod` n') . subtract (RowIndex $ v ^. #rowIndex . #getRowIndex) . (^. #rowIndex))
+    pure . Map.mapKeys ((`mod` n') . subtract (RowIndex $ v ^. #rowIndex . #getRowIndex) . (^. #rowIndex))
       $ Map.filterWithKey
         (\k _ -> (k ^. #colIndex) == v ^. #colIndex)
         (getCellMap arg)
@@ -307,9 +305,9 @@ instance
               | (v, e) <- Map.toList m
             ]
 
-instance HasEvaluate (RowCount, Polynomial) (Map (RowIndex 'Absolute) Scalar) where
+instance HasEvaluate (RowCount, Polynomial) (Map (RowIndex 'Absolute) (Maybe Scalar)) where
   evaluate ann arg (rc, Polynomial monos) =
-    foldr (Map.unionWith (Group.+)) mempty
+    fmap Just . foldr (Map.unionWith (Group.+)) mempty
       <$> mapM (evaluate ann arg . (rc,)) (Map.toList monos)
 
 instance HasEvaluate (RowCount, Term) (Map (RowIndex 'Absolute) (Maybe Scalar)) where
@@ -560,7 +558,7 @@ instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
           ( degree poly <= degreeBound ^. #getPolynomialDegreeBound
               &&
           )
-            . all (== 0)
+            . all (== Just zero)
             <$> evaluate ann arg (rc, poly)
       )
       polys
