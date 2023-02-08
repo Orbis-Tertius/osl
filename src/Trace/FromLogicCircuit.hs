@@ -63,7 +63,7 @@ import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Safe (headMay)
 import Stark.Types.Scalar (Scalar, integerToScalar, inverseScalar, normalize, one, scalarToInteger, two, zero)
-import Trace.Types (Case (Case), CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), Statement (Statement), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeColumnIndex (..), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), SubexpressionTrace (SubexpressionTrace), Trace (Trace), TraceType (TraceType), Witness (Witness))
+import Trace.Types (Case (Case), CaseNumberColumnIndex (..), InputColumnIndex (..), InputSubexpressionId (..), NumberOfCases (NumberOfCases), OutputColumnIndex (..), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), Statement (Statement), StepIndicatorColumnIndex (..), StepType (StepType), StepTypeId (StepTypeId), SubexpressionId (SubexpressionId), SubexpressionLink (..), SubexpressionTrace (SubexpressionTrace), Trace (Trace), TraceType (TraceType), Witness (Witness), StepTypeIdSelectionVector (StepTypeIdSelectionVector))
 
 newtype LookupCaches = LookupCaches
   { lookupTermCaches ::
@@ -733,7 +733,13 @@ polyVarDifferentCaseSubexpressionTraces ::
 polyVarDifferentCaseSubexpressionTraces ann numCases arg mapping c x = do
   (m0, _, _) <- constant c (rowIndexToScalar (x ^. #rowIndex))
   (m1, _, _) <- constant c (polyVarStepTypeId (PolynomialVariable (x ^. #colIndex) 0) ^. #unStepTypeId)
-  let st = mapping ^. #stepTypeIds . #loadFromDifferentCase . #unOf
+  st <-
+    maybe
+      (Left (ErrorMessage ann "step type id lookup failed"))
+      pure
+      (Map.lookup
+        (x ^. #colIndex)
+        (mapping ^. #stepTypeIds . #loadFromDifferentCase))
   sId <-
     maybe
       (Left (ErrorMessage ann "variable subexpression id lookup failed"))
@@ -943,7 +949,7 @@ logicCircuitToTraceType bitsPerByte c =
 -- TODO: let the columns be reused where possible
 data Mapping = Mapping
   { caseNumber :: CaseNumberColumnIndex,
-    stepType :: StepTypeColumnIndex,
+    stepType :: StepTypeIdSelectionVector Advice,
     stepIndicator :: StepIndicatorColumnIndex,
     inputs :: [InputColumnIndex],
     output :: OutputColumnIndex,
@@ -1017,7 +1023,7 @@ newtype BareLookupArgument = BareLookupArgument
 data StepTypeIdMapping = StepTypeIdMapping
   { voidT :: StepTypeIdOf VoidT,
     loads :: Map PolynomialVariable StepTypeId,
-    loadFromDifferentCase :: StepTypeIdOf LoadFromDifferentCase,
+    loadFromDifferentCase :: Map ColumnIndex StepTypeId,
     lookupTables :: Map LookupTable StepTypeId,
     constants :: Map Scalar StepTypeId,
     plus :: StepTypeIdOf Plus,
@@ -1182,7 +1188,16 @@ getMapping bitsPerByte c =
     go :: State S Mapping
     go = do
       cnc <- CaseNumberColumnIndex <$> nextCol
-      stc <- StepTypeColumnIndex <$> nextCol
+      stc <-
+        StepTypeIdSelectionVector . Map.fromList <$> sequence
+          [ (stId',) <$> nextCol
+            | stId <- [0 .. countStepTypes bitsPerByte c - 1],
+              let stId' =
+                    maybe
+                      (die "Trace.FromLogicCircuit.getMapping: step type id out of range of scalar")
+                      StepTypeId
+                      (integerToScalar (intToInteger stId))
+          ]
       sic <- StepIndicatorColumnIndex <$> nextCol
       ins <-
         replicateM
@@ -1445,9 +1460,9 @@ getColumnTypes c mapping =
 getMappingIndices :: Mapping -> [ColumnIndex]
 getMappingIndices m =
   [ m ^. #caseNumber . #unCaseNumberColumnIndex,
-    m ^. #stepType . #unStepTypeColumnIndex,
     m ^. #stepIndicator . #unStepIndicatorColumnIndex
   ]
+    <> Map.elems (m ^. #stepType . #unStepTypeIdSelectionVector)
     <> ((m ^. #inputs) <&> (^. #unInputColumnIndex))
     <> [ m ^. #output . #unOutputColumnIndex,
          m ^. #byteDecomposition . #sign . #unSignColumnIndex
@@ -1485,9 +1500,11 @@ loadStepTypes ::
   Map StepTypeId StepType
 loadStepTypes numCases m =
   Map.fromList $
-    [ ( m ^. #stepTypeIds . #loadFromDifferentCase . #unOf,
-        loadFromDifferentCaseStepType numCases m
+    [ ( stId,
+        loadFromDifferentCaseStepType numCases m ci
       )
+      | (stId, ci) <-
+          Map.toList (m ^. #stepType . #unStepTypeIdSelectionVector)
     ]
       <> catMaybes
         [ (sId,) <$> loadStepType m x
@@ -1527,15 +1544,16 @@ loadFromSameCaseStepType m i =
 loadFromDifferentCaseStepType ::
   NumberOfCases ->
   Mapping ->
+  ColumnIndex ->
   StepType
-loadFromDifferentCaseStepType numCases m =
+loadFromDifferentCaseStepType numCases m vi =
   StepType
     "loadFromDifferentCase"
     ( PolynomialConstraints
-        [ ( "loadFromDifferentCase1",
+        [ ( "loadFromDifferentCase1(" <> show vi <> ")",
             d `P.times` ((d `P.plus` P.one) `P.times` (d `P.minus` P.one))
           ),
-          ( "loadFromDifferentCase2",
+          ( "loadFromDifferentCase2(" <> show vi <> ")",
             a `P.minus` (b `P.plus` (d `P.times` P.constant n))
           )
         ]
@@ -1543,7 +1561,7 @@ loadFromDifferentCaseStepType numCases m =
     )
     ( LookupArguments . Set.singleton $
         LookupArgument
-          "loadFromDifferentCase"
+          ("loadFromDifferentCase(" <> show vi <> ")")
           P.zero
           [(o, os), (c, cs), (t, ts)]
     )
@@ -1565,7 +1583,7 @@ loadFromDifferentCaseStepType numCases m =
     os, cs, ts :: LookupTableColumn
     os = LookupTableColumn (m ^. #output . #unOutputColumnIndex)
     cs = LookupTableColumn (m ^. #caseNumber . #unCaseNumberColumnIndex)
-    ts = LookupTableColumn (m ^. #stepType . #unStepTypeColumnIndex)
+    ts = LookupTableColumn vi
 
 bareLookupStepTypes ::
   Mapping ->
@@ -2104,14 +2122,15 @@ getSubexpressionLinks m =
     toVarDifferentCase =
       Set.fromList $
         [ SubexpressionLink
-            (m ^. #stepTypeIds . #loadFromDifferentCase . #unOf)
+            stepTypeId
             (padInputs (InputSubexpressionId <$> [rowIndexEid, stepTypeEid]))
             (OutputSubexpressionId (outEid ^. #unOf))
           | (v, outEid) <- Map.toList $ m ^. #subexpressionIds . #variables,
             let rowIndex = v ^. #rowIndex,
             rowIndex /= 0,
+            let stepTypeId = polyVarStepTypeId (PolynomialVariable (v ^. #colIndex) 0),
             let rowIndexEid = scalarMapping (rowIndexToScalar rowIndex) ^. #unOf,
-            let stepTypeEid = scalarMapping (polyVarStepTypeId (PolynomialVariable (v ^. #colIndex) 0) ^. #unStepTypeId) ^. #unOf
+            let stepTypeEid = scalarMapping (stepTypeId ^. #unStepTypeId) ^. #unOf
         ]
 
     rowIndexToScalar :: RowIndex a -> Scalar
@@ -2257,3 +2276,12 @@ maxStepsPerCase =
     . integerToScalar
     . intToInteger
     . Set.size
+
+countStepTypes ::
+  BitsPerByte ->
+  LogicCircuit ->
+  Int
+countStepTypes = todo
+
+todo :: a
+todo = todo

@@ -15,13 +15,11 @@ module Trace.Types
     OutputSubexpressionId (OutputSubexpressionId),
     SubexpressionLink (SubexpressionLink),
     ResultExpressionId (ResultExpressionId),
-    StepTypeColumnIndex (StepTypeColumnIndex),
     StepIndicatorColumnIndex (StepIndicatorColumnIndex),
     CaseNumberColumnIndex (CaseNumberColumnIndex),
     NumberOfCases (NumberOfCases),
     Case (Case),
-    Mapping (Mapping),
-    StepTypeIdMapping (StepTypeIdMapping),
+    StepTypeIdSelectionVector (StepTypeIdSelectionVector),
     TraceType (TraceType),
     Trace (Trace),
     SubexpressionTrace (SubexpressionTrace),
@@ -103,10 +101,6 @@ newtype CaseNumberColumnIndex = CaseNumberColumnIndex {unCaseNumberColumnIndex :
   deriving stock (Generic)
   deriving newtype (Show)
 
-newtype StepTypeColumnIndex = StepTypeColumnIndex {unStepTypeColumnIndex :: ColumnIndex}
-  deriving stock (Generic)
-  deriving newtype (Show)
-
 newtype StepIndicatorColumnIndex = StepIndicatorColumnIndex {unStepIndicatorColumnIndex :: ColumnIndex}
   deriving stock (Generic)
   deriving newtype (Show)
@@ -115,14 +109,11 @@ newtype NumberOfCases = NumberOfCases {unNumberOfCases :: Scalar}
   deriving stock (Generic)
   deriving newtype (Show)
 
-newtype Mapping a = Mapping {unMapping :: ColumnIndex}
-  deriving (Generic, Show)
-
 -- We represent step type ids as selection vectors, i.e. vectors
 -- of bits containing exactly one 1 bit.
-newtype StepTypeIdMapping (a :: ColumnType) =
-  StepTypeIdMapping
-    { unStepTypeIdMapping :: Map StepTypeId (Mapping Bool) }
+newtype StepTypeIdSelectionVector (a :: ColumnType) =
+  StepTypeIdSelectionVector
+    { unStepTypeIdSelectionVector :: Map StepTypeId ColumnIndex }
   deriving (Generic, Show)
 
 data TraceType = TraceType
@@ -135,7 +126,7 @@ data TraceType = TraceType
     links :: Map (StepTypeId, OutputSubexpressionId) [InputSubexpressionId],
     results :: Set ResultExpressionId,
     caseNumberColumnIndex :: CaseNumberColumnIndex,
-    stepTypeColumnIndex :: StepTypeIdMapping Advice,
+    stepTypeIdColumnIndices :: StepTypeIdSelectionVector Advice,
     stepIndicatorColumnIndex :: StepIndicatorColumnIndex,
     inputColumnIndices :: [InputColumnIndex],
     outputColumnIndex :: OutputColumnIndex,

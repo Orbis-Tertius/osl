@@ -42,7 +42,7 @@ import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero, one, scalarToInteger)
 import Safe (atMay)
-import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId (OutputSubexpressionId), ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace), InputColumnIndex (InputColumnIndex), StepTypeIdMapping)
+import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId (OutputSubexpressionId), ResultExpressionId, StepType, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace), InputColumnIndex (InputColumnIndex), StepTypeIdSelectionVector (StepTypeIdSelectionVector))
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -111,28 +111,31 @@ columnTypes t =
 gateConstraints :: TraceType -> PolynomialConstraints
 gateConstraints t =
   mconcatMap
-    (stepTypeGateConstraints (t ^. #stepTypeColumnIndex))
+    (stepTypeGateConstraints (t ^. #stepTypeIdMapping))
     (Map.toList (t ^. #stepTypes))
 
-stepTypeGateConstraints :: StepTypeColumnIndex -> (StepTypeId, StepType) -> PolynomialConstraints
+stepTypeGateConstraints :: StepTypeIdSelectionVector Advice -> (StepTypeId, StepType) -> PolynomialConstraints
 stepTypeGateConstraints i (tId, t) =
   PolynomialConstraints
     (second (gateOnStepType i tId) <$> (t ^. #gateConstraints . #constraints))
     -- TODO: degree bound goes up
     (t ^. #gateConstraints . #degreeBound)
 
-gateOnStepType :: StepTypeColumnIndex -> StepTypeId -> Polynomial -> Polynomial
-gateOnStepType i tId =
-  P.times
-    ( P.minus
-        (P.var' (i ^. #unStepTypeColumnIndex))
-        (P.constant (tId ^. #unStepTypeId))
-    )
+gateOnStepType :: StepTypeIdSelectionVector Advice -> StepTypeId -> Polynomial -> Polynomial
+gateOnStepType m stId =
+  P.times . P.var'
+    $ maybe
+        (die "gateOnStepType: step type id column mapping lookup failed")
+        (^. #unMapping)
+        (Map.lookup stId (m ^. #unStepTypeIdSelectionVector))
 
 data CaseNumber
 
 data CaseUsed = CaseIsUsed | CaseIsNotUsed
   deriving (Eq)
+
+newtype Mapping a = Mapping {unMapping :: ColumnIndex}
+  deriving (Generic, Show)
 
 data Mappings = Mappings
   { fixed :: FixedMappings,
@@ -201,26 +204,32 @@ mappings :: TraceType -> Mappings
 mappings t =
   Mappings
     ( FixedMappings
-        (Mapping i :: Mapping StepTypeId)
-        (Mapping <$> [i + 1 .. j] :: [Mapping InputSubexpressionId])
-        (Mapping (j + 1) :: Mapping OutputSubexpressionId)
-        (Mapping (j + 2) :: Mapping CaseNumber)
-        (Mapping (j + 3) :: Mapping ResultExpressionId)
+        (StepTypeIdMapping
+          (Map.fromList
+            (zip (Map.keys (t ^. #stepTypes))
+                 (Mapping <$> [i .. j-1] :: [Mapping Bool]))))
+        (Mapping <$> [j .. k] :: [Mapping InputSubexpressionId])
+        (Mapping (k + 1) :: Mapping OutputSubexpressionId)
+        (Mapping (k + 2) :: Mapping CaseNumber)
+        (Mapping (k + 3) :: Mapping ResultExpressionId)
     )
     ( AdviceMappings
-        (Mapping <$> [j + 5 .. k] :: [Mapping InputSubexpressionId])
-        (Mapping (k + 1) :: Mapping OutputSubexpressionId)
-        (Mapping (k + 2) :: Mapping CaseUsed)
+        (Mapping <$> [k + 5 .. l] :: [Mapping InputSubexpressionId])
+        (Mapping (l + 1) :: Mapping OutputSubexpressionId)
+        (Mapping (l + 2) :: Mapping CaseUsed)
     )
   where
     i :: ColumnIndex
-    i = ColumnIndex (length (Map.keys (t ^. #columnTypes . #getColumnTypes)))
+    i = ColumnIndex (Map.size (t ^. #columnTypes . #getColumnTypes))
 
     j :: ColumnIndex
-    j = i + ColumnIndex n
+    j = i + ColumnIndex (Map.size (t ^. #stepTypes))
 
     k :: ColumnIndex
-    k = j + 5 + ColumnIndex n
+    k = i + ColumnIndex (n-1)
+
+    l :: ColumnIndex
+    l = k + 5 + ColumnIndex n
 
     n :: Int
     n = length (t ^. #inputColumnIndices)
@@ -249,22 +258,28 @@ linksTableFixedColumns ::
   FixedValues
 linksTableFixedColumns (LinksTable ls) m =
   FixedValues . Map.fromList $
-    [ ( m ^. #stepType . #unMapping,
-        FixedColumn $ ls <&> (^. #stepType . #unStepTypeId)
-      ),
-      ( m ^. #output . #unMapping,
-        FixedColumn $ ls <&> (^. #output . #unOutputSubexpressionId . #unSubexpressionId)
+    [ ( ci,
+        FixedColumn
+          [ if stId == stId' then one else zero
+            | stId <- ls <&> (^. #stepType)
+          ]
       )
-    ]
+      | (stId', Mapping ci) <-
+          Map.toList $ m ^. #stepType . #unStepTypeIdMapping
+    ] <> [
+           ( m ^. #output . #unMapping,
+             FixedColumn $ ls <&> (^. #output . #unOutputSubexpressionId . #unSubexpressionId)
+           )
+         ]
       <> zip
-        ((m ^. #inputs) <&> (^. #unMapping))
-        [ FixedColumn $
-            fromMaybe
-              (replicate (length ls) (InputSubexpressionId (SubexpressionId zero)))
-              ((ls <&> (^. #inputs)) !? i)
-              <&> (^. #unInputSubexpressionId . #unSubexpressionId)
-          | i <- [0 .. length (m ^. #inputs) - 1]
-        ]
+         ((m ^. #inputs) <&> (^. #unMapping))
+         [ FixedColumn $
+             fromMaybe
+               (replicate (length ls) (InputSubexpressionId (SubexpressionId zero)))
+               ((ls <&> (^. #inputs)) !? i)
+               <&> (^. #unInputSubexpressionId . #unSubexpressionId)
+           | i <- [0 .. length (m ^. #inputs) - 1]
+         ]
 
 caseAndResultFixedColumns ::
   TraceType ->
@@ -541,9 +556,12 @@ subexpressionTraceValuesArgument ann tt t m c used sId sT ri =
           (if used == CaseIsUsed then one else zero),
       -- step type
       pure $
-        Map.singleton
-          (CellReference (tt ^. #stepTypeColumnIndex . #unStepTypeColumnIndex) ri)
-          (sT ^. #stepType . #unStepTypeId),
+        Map.fromList
+          [ (CellReference ci ri,
+             if sT ^. #stepType == stId then one else zero)
+            | (stId, Mapping ci) <-
+                Map.toList (tt ^. #stepTypeIdMapping . #unStepTypeIdMapping)
+          ],
       -- step indicator
       pure $
         Map.singleton
