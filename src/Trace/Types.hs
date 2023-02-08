@@ -1,7 +1,9 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Trace.Types
   ( InputColumnIndex (InputColumnIndex),
@@ -18,6 +20,8 @@ module Trace.Types
     CaseNumberColumnIndex (CaseNumberColumnIndex),
     NumberOfCases (NumberOfCases),
     Case (Case),
+    Mapping (Mapping),
+    StepTypeIdMapping (StepTypeIdMapping),
     TraceType (TraceType),
     Trace (Trace),
     SubexpressionTrace (SubexpressionTrace),
@@ -29,6 +33,7 @@ where
 import qualified Algebra.Additive as Group
 import Halo2.Prelude
 import Halo2.Types.ColumnIndex (ColumnIndex)
+import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes)
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
 import Halo2.Types.EqualityConstraints (EqualityConstraints)
@@ -110,6 +115,16 @@ newtype NumberOfCases = NumberOfCases {unNumberOfCases :: Scalar}
   deriving stock (Generic)
   deriving newtype (Show)
 
+newtype Mapping a = Mapping {unMapping :: ColumnIndex}
+  deriving (Generic, Show)
+
+-- We represent step type ids as selection vectors, i.e. vectors
+-- of bits containing exactly one 1 bit.
+newtype StepTypeIdMapping (a :: ColumnType) =
+  StepTypeIdMapping
+    { unStepTypeIdMapping :: Map StepTypeId (Mapping Bool) }
+  deriving (Generic, Show)
+
 data TraceType = TraceType
   { columnTypes :: ColumnTypes,
     equalityConstrainableColumns :: EqualityConstrainableColumns,
@@ -120,7 +135,7 @@ data TraceType = TraceType
     links :: Map (StepTypeId, OutputSubexpressionId) [InputSubexpressionId],
     results :: Set ResultExpressionId,
     caseNumberColumnIndex :: CaseNumberColumnIndex,
-    stepTypeColumnIndex :: StepTypeColumnIndex,
+    stepTypeColumnIndex :: StepTypeIdMapping Advice,
     stepIndicatorColumnIndex :: StepIndicatorColumnIndex,
     inputColumnIndices :: [InputColumnIndex],
     outputColumnIndex :: OutputColumnIndex,

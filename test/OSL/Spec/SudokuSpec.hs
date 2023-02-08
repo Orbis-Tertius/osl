@@ -135,7 +135,7 @@ exampleSpec c = do
       `shouldBe` Right ()
 
     evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
-      `shouldBe` Left (ErrorMessage Nothing "evalTrace: polynomial constraint not satisfied: (\"assert\",1 + 18446744069414584320x17,0^1,Case {unCase = 77},SubexpressionTrace {value = 0, stepType = 45, adviceValues = fromList [(22,0),(23,0),(24,0)]},133,fromList [(14,77),(15,45),(16,0),(17,0),(18,0),(19,0),(20,0),(21,0),(22,0),(23,0),(24,0)])")
+      `shouldBe` Left (ErrorMessage Nothing "evalTrace: polynomial constraint not satisfied: (\"assert\",1 + 18446744069414584320x15,0^1,Case {unCase = 77},SubexpressionTrace {value = 0, stepType = 45, adviceValues = fromList [(20,0),(21,0),(22,0)]},133,fromList [(12,77),(13,45),(14,0),(15,0),(16,0),(17,0),(18,0),(19,0),(20,0),(21,0),(22,0)])")
 
   it "Sudoku spec's semantics are preserved in codegen stage 8" $ do
     evalTranslatedFormula8 8 c "problemIsSolvable" argumentForm (exampleArgument c)

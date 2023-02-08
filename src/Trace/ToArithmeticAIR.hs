@@ -42,7 +42,7 @@ import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero, one, scalarToInteger)
 import Safe (atMay)
-import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId (OutputSubexpressionId), ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace), InputColumnIndex (InputColumnIndex))
+import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId (OutputSubexpressionId), ResultExpressionId, StepType, StepTypeColumnIndex, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace), InputColumnIndex (InputColumnIndex), StepTypeIdMapping)
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -118,6 +118,7 @@ stepTypeGateConstraints :: StepTypeColumnIndex -> (StepTypeId, StepType) -> Poly
 stepTypeGateConstraints i (tId, t) =
   PolynomialConstraints
     (second (gateOnStepType i tId) <$> (t ^. #gateConstraints . #constraints))
+    -- TODO: degree bound goes up
     (t ^. #gateConstraints . #degreeBound)
 
 gateOnStepType :: StepTypeColumnIndex -> StepTypeId -> Polynomial -> Polynomial
@@ -127,9 +128,6 @@ gateOnStepType i tId =
         (P.var' (i ^. #unStepTypeColumnIndex))
         (P.constant (tId ^. #unStepTypeId))
     )
-
-newtype Mapping a = Mapping {unMapping :: ColumnIndex}
-  deriving (Generic)
 
 data CaseNumber
 
@@ -143,7 +141,7 @@ data Mappings = Mappings
   deriving (Generic)
 
 data FixedMappings = FixedMappings
-  { stepType :: Mapping StepTypeId,
+  { stepType :: StepTypeIdMapping 'Fixed,
     inputs :: [Mapping InputSubexpressionId],
     output :: Mapping OutputSubexpressionId,
     caseNumber :: Mapping CaseNumber,

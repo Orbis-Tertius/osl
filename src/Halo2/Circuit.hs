@@ -67,6 +67,7 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (PowerProduct, getPowerProduct))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
+import OSL.Debug (showTrace)
 import OSL.Map (inverseMap)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInteger, toWord64, zero)
@@ -554,10 +555,11 @@ instance HasEvaluate (RowCount, LogicConstraints) Bool where
 instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
   evaluate ann arg (rc, PolynomialConstraints polys degreeBound) = do
     allM
-      ( \(_lbl, poly) ->
+      ( \(lbl, poly) ->
           ( degree poly <= degreeBound ^. #getPolynomialDegreeBound
               &&
           )
+            . showTrace (show lbl)
             . all (== Just zero)
             <$> evaluate ann arg (rc, poly)
       )
