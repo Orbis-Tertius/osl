@@ -41,7 +41,8 @@ import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConst
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero, one, scalarToInteger)
-import Safe (atMay)
+import Trace.FromLogicCircuit (getDefaultAdvice)
+import qualified Trace.FromLogicCircuit as LC
 import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId (OutputSubexpressionId), ResultExpressionId, StepType, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace), InputColumnIndex (InputColumnIndex), StepTypeIdSelectionVector)
 
 -- Trace type arithmetic AIRs have the columnar structure
@@ -52,23 +53,28 @@ import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpres
 -- Trace type arithmetic AIR gate constraints entail that
 -- for each step of each case, the gate constraints of
 -- its step type are satisfied.
-traceTypeToArithmeticAIR :: TraceType -> ArithmeticAIR
-traceTypeToArithmeticAIR t =
+traceTypeToArithmeticAIR :: TraceType -> LC.Mapping -> ArithmeticAIR
+traceTypeToArithmeticAIR t lcM =
   AIR
     (columnTypes t)
     (gateConstraints t)
     (t ^. #rowCount)
     (traceTypeFixedValues t <> additionalFixedValues t (m ^. #fixed))
   where
-    m = mappings t
+    m = mappings t lcM
 
 -- Converts the fixed values in the trace type from one per case to
 -- one per row.
 traceTypeFixedValues ::
   TraceType ->
-  FixedValues
+  FixedValues (RowIndex 'Absolute)
 traceTypeFixedValues tt =
-  ((tt ^. #fixedValues) <>)
+  (FixedValues
+    (FixedColumn . Map.fromList . zip [0..]
+      . concatMap (replicate (Set.size (tt ^. #subexpressions)))
+      . Map.elems . (^. #unFixedColumn)
+      <$> (tt ^. #fixedValues . #getFixedValues))
+     <>)
     . FixedValues
     . fmap f
     . (^. #getFixedValues)
@@ -77,8 +83,13 @@ traceTypeFixedValues tt =
     . Map.elems
     $ tt ^. #stepTypes
   where
-    f :: FixedColumn -> FixedColumn
-    f = FixedColumn . concatMap (replicate n) . (^. #unFixedColumn)
+    f :: FixedColumn Case -> FixedColumn (RowIndex 'Absolute)
+    f = FixedColumn
+      . Map.fromList
+      . zip [0..maxRowIndex tt]
+      . concatMap (replicate n)
+      . Map.elems
+      . (^. #unFixedColumn)
 
     n = Set.size (tt ^. #subexpressions)
 
@@ -139,7 +150,8 @@ newtype Mapping a = Mapping {unMapping :: ColumnIndex}
 
 data Mappings = Mappings
   { fixed :: FixedMappings,
-    advice :: AdviceMappings
+    advice :: AdviceMappings,
+    logicCircuit :: LC.Mapping
   }
   deriving (Generic)
 
@@ -179,7 +191,7 @@ getAIRFixedValues tt m =
 
 fixedValuesToAIRFixedValues ::
   TraceType ->
-  FixedValues ->
+  FixedValues (RowIndex 'Absolute) ->
   AIRFixedValues
 fixedValuesToAIRFixedValues tt fvs =
   AIRFixedValues $
@@ -188,7 +200,7 @@ fixedValuesToAIRFixedValues tt fvs =
         | (ci, col) <-
             Map.toList (fvs ^. #getFixedValues),
           (ri, y) <-
-            zip [0..n] (padInfinitely (col ^. #unFixedColumn))
+            zip [0..n] (padInfinitely (Map.elems (col ^. #unFixedColumn)))
       ]
   where
     n = maxRowIndex tt
@@ -200,7 +212,7 @@ maxRowIndex tt =
     c = scalarToInt $ tt ^. #numCases . #unNumberOfCases
     n = Set.size (tt ^. #subexpressions)
 
-mappings :: TraceType -> Mappings
+mappings :: TraceType -> LC.Mapping -> Mappings
 mappings t =
   Mappings
     ( FixedMappings
@@ -234,7 +246,7 @@ mappings t =
 additionalFixedValues ::
   TraceType ->
   FixedMappings ->
-  FixedValues
+  FixedValues (RowIndex 'Absolute)
 additionalFixedValues t m =
   linksTableFixedColumns (linksTable t) m
     <> caseAndResultFixedColumns t m
@@ -252,19 +264,21 @@ linksTable =
 linksTableFixedColumns ::
   LinksTable ->
   FixedMappings ->
-  FixedValues
+  FixedValues (RowIndex 'Absolute)
 linksTableFixedColumns (LinksTable ls) m =
   FixedValues . Map.fromList $
     [
       ( m ^. #stepType . #unMapping,
-        FixedColumn $ ls <&> (^. #stepType . #unStepTypeId)
+        FixedColumn . Map.fromList . zip [0..]
+          $ ls <&> (^. #stepType . #unStepTypeId)
       ),
       ( m ^. #output . #unMapping,
-        FixedColumn $ ls <&> (^. #output . #unOutputSubexpressionId . #unSubexpressionId)
+        FixedColumn . Map.fromList . zip [0..]
+          $ ls <&> (^. #output . #unOutputSubexpressionId . #unSubexpressionId)
       )
     ] <> zip
          ((m ^. #inputs) <&> (^. #unMapping))
-         [ FixedColumn $
+         [ FixedColumn . Map.fromList . zip [0..] $
              fromMaybe
                (replicate (length ls) (InputSubexpressionId (SubexpressionId zero)))
                ((ls <&> (^. #inputs)) !? i)
@@ -275,18 +289,18 @@ linksTableFixedColumns (LinksTable ls) m =
 caseAndResultFixedColumns ::
   TraceType ->
   FixedMappings ->
-  FixedValues
+  FixedValues (RowIndex 'Absolute)
 caseAndResultFixedColumns t m =
   FixedValues $
     Map.fromList
       [ ( m ^. #caseNumber . #unMapping,
-          FixedColumn $
+          FixedColumn . Map.fromList . zip [0..] $
             concatMap
               (replicate nResults . f)
               [0 .. nCases - 1]
         ),
         ( m ^. #result . #unMapping,
-          FixedColumn . concat . replicate nCases $
+          FixedColumn . Map.fromList . zip [0..] . concat . replicate nCases $
             f
               <$> [0 .. nResults - 1]
         )
@@ -304,9 +318,10 @@ caseAndResultFixedColumns t m =
 traceToArgument ::
   ann ->
   TraceType ->
+  LC.Mapping ->
   Trace ->
   Either (ErrorMessage ann) Argument
-traceToArgument ann tt t = do
+traceToArgument ann tt lcM t = do
   mconcat <$> sequence
     [ caseArgument ann tt t m fvs airFvs
         $ maybe
@@ -316,8 +331,8 @@ traceToArgument ann tt t = do
       | c <- [0 .. (scalarToInteger (tt ^. #numCases . #unNumberOfCases)) - 1]
     ]
   where
-    m = mappings tt
-    air = traceTypeToArithmeticAIR tt
+    m = mappings tt lcM
+    air = traceTypeToArithmeticAIR tt lcM
     fvs = air ^. #fixedValues
     airFvs = getAIRFixedValues tt m
 
@@ -326,7 +341,7 @@ caseArgument ::
   TraceType ->
   Trace ->
   Mappings ->
-  FixedValues ->
+  FixedValues (RowIndex 'Absolute) ->
   AIRFixedValues ->
   Case ->
   Either (ErrorMessage ann) Argument
@@ -359,7 +374,7 @@ usedCaseArgument ::
   TraceType ->
   Trace ->
   Mappings ->
-  FixedValues ->
+  FixedValues (RowIndex 'Absolute) ->
   AIRFixedValues ->
   Case ->
   Map SubexpressionId SubexpressionTrace ->
@@ -376,7 +391,7 @@ unusedCaseArgument ::
   TraceType ->
   Trace ->
   Mappings ->
-  FixedValues ->
+  FixedValues (RowIndex 'Absolute) ->
   AIRFixedValues ->
   Case ->
   Either (ErrorMessage ann) Argument
@@ -388,7 +403,7 @@ emptyCaseArgument ::
   TraceType ->
   Trace ->
   Mappings ->
-  FixedValues ->
+  FixedValues (RowIndex 'Absolute) ->
   AIRFixedValues ->
   Case ->
   CaseUsed ->
@@ -404,7 +419,7 @@ voidRow ::
   TraceType ->
   Trace ->
   Mappings ->
-  FixedValues ->
+  FixedValues (RowIndex 'Absolute) ->
   AIRFixedValues ->
   Case ->
   CaseUsed ->
@@ -413,18 +428,19 @@ voidRow ::
 voidRow ann tt t m fvs airFvs c used ri =
   subexpressionArgument ann tt t m fvs airFvs c used
     voidEid
-    (SubexpressionTrace zero voidStepType mempty)
+    (SubexpressionTrace zero voidStepType defaultAdvice)
     ri
   where
     voidEid = 0 -- TODO: is it better not to assume void has subexpression id 0 and step type 0?
     voidStepType = 0
+    defaultAdvice = getDefaultAdvice (m ^. #logicCircuit)
 
 subexpressionArgument ::
   ann ->
   TraceType ->
   Trace ->
   Mappings ->
-  FixedValues ->
+  FixedValues (RowIndex 'Absolute) ->
   AIRFixedValues ->
   Case ->
   CaseUsed ->
@@ -434,7 +450,7 @@ subexpressionArgument ::
   Either (ErrorMessage ann) Argument
 subexpressionArgument ann tt t m fvs airFvs c used sId sT ri = do
   mconcat <$> sequence
-    [ traceTypeFixedValuesArgument ann tt fvs c ri,
+    [ traceTypeFixedValuesArgument ann tt fvs ri,
       airFixedValuesArgument ann airFvs ri,
       traceStatementValuesArgument ann tt t c ri,
       traceWitnessValuesArgument ann tt t c ri,
@@ -444,24 +460,23 @@ subexpressionArgument ann tt t m fvs airFvs c used sId sT ri = do
 traceTypeFixedValuesArgument ::
   ann ->
   TraceType ->
-  FixedValues ->
-  Case ->
+  FixedValues (RowIndex 'Absolute) ->
   RowIndex 'Absolute ->
   Either (ErrorMessage ann) Argument
-traceTypeFixedValuesArgument ann tt fvs c ri =
+traceTypeFixedValuesArgument ann tt fvs ri =
   mconcat <$> sequence
     [ Argument mempty . Witness
         . Map.singleton
-           (CellReference ci ri)
-             <$> maybe
-                 (Left
-                   (ErrorMessage ann
-                     ("traceTypeFixedValues: fixed value lookup failed: "
-                       <> pack (show (ci, c)))))
-                 pure
-                 ((`atMay` scalarToInt (c ^. #unCase))
-                   =<< (Map.lookup ci (fvs ^. #getFixedValues)
-                         <&> (^. #unFixedColumn)))
+          (CellReference ci ri)
+            <$> maybe
+                (Left
+                  (ErrorMessage ann
+                    ("traceTypeFixedValues: fixed value lookup failed: "
+                      <> pack (show (ci, ri)))))
+                pure
+                (Map.lookup ri
+                  =<< (Map.lookup ci (fvs ^. #getFixedValues)
+                        <&> (^. #unFixedColumn)))
       | ci <-
           Map.keys $
             Map.filter

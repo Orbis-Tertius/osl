@@ -33,7 +33,7 @@ import Semicircuit.Gensyms (deBruijnToGensyms, deBruijnToGensymsEvalContext)
 import Semicircuit.PNFFormula (toPNFFormula, toSemicircuit)
 import Semicircuit.PrenexNormalForm (statementToSuperStrongPrenexNormalForm, toPrenexNormalForm, toStrongPrenexNormalForm, toSuperStrongPrenexNormalForm, witnessToPrenexNormalForm, witnessToStrongPrenexNormalForm, witnessToSuperStrongPrenexNormalForm)
 import Semicircuit.ToLogicCircuit (semicircuitArgumentToLogicCircuitArgument, semicircuitToLogicCircuit)
-import Trace.FromLogicCircuit (argumentToTrace, logicCircuitToTraceType)
+import Trace.FromLogicCircuit (argumentToTrace, logicCircuitToTraceType, getMapping)
 import Trace.Semantics (evalTrace)
 import Trace.ToArithmeticAIR (traceToArgument)
 import Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit)
@@ -324,7 +324,8 @@ evalTranslatedFormula8 ::
 evalTranslatedFormula8 bitsPerByte c name argumentForm argument = do
   (logic, lcArg) <- toLogicCircuit c name argumentForm argument
   let tt = logicCircuitToTraceType bitsPerByte logic
-      ac = traceTypeToArithmeticCircuit tt
+      lcM = getMapping bitsPerByte logic
+      ac = traceTypeToArithmeticCircuit tt lcM
   t <-
     mapLeft
       (\(ErrorMessage ann msg) ->
@@ -334,7 +335,7 @@ evalTranslatedFormula8 bitsPerByte c name argumentForm argument = do
     mapLeft
       (\(ErrorMessage ann msg) ->
         ErrorMessage ann ("traceToArgument: " <> msg))
-      (traceToArgument Nothing tt t)
+      (traceToArgument Nothing tt lcM t)
   mapLeft
     ( \(ErrorMessage () msg) ->
          ErrorMessage Nothing ("evaluate: " <> msg)

@@ -58,7 +58,7 @@ data StepType = StepType
   { label :: Label,
     gateConstraints :: PolynomialConstraints,
     lookupArguments :: LookupArguments Polynomial,
-    fixedValues :: FixedValues
+    fixedValues :: FixedValues Case
   }
   deriving (Generic, Show)
 
@@ -119,7 +119,7 @@ data TraceType = TraceType
   { columnTypes :: ColumnTypes,
     equalityConstrainableColumns :: EqualityConstrainableColumns,
     equalityConstraints :: EqualityConstraints,
-    fixedValues :: FixedValues,
+    fixedValues :: FixedValues Case,
     stepTypes :: Map StepTypeId StepType,
     subexpressions :: Set SubexpressionId,
     links :: Map (StepTypeId, OutputSubexpressionId) [InputSubexpressionId],
@@ -135,7 +135,8 @@ data TraceType = TraceType
   deriving (Generic, Show)
 
 newtype Case = Case {unCase :: Scalar}
-  deriving (Eq, Ord, Generic, Show, Group.C)
+  deriving stock (Eq, Ord, Generic)
+  deriving newtype (Show, Group.C)
 
 newtype Statement = Statement {unStatement :: Map (Case, ColumnIndex) Scalar}
   deriving (Generic, Show)

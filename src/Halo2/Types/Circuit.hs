@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -19,6 +20,7 @@ import Halo2.Types.LookupArguments (LookupArguments)
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints)
 import Halo2.Types.RowCount (RowCount)
+import Halo2.Types.RowIndex (RowIndex, RowIndexType (Absolute))
 
 data Circuit a b = Circuit
   { columnTypes :: ColumnTypes,
@@ -27,7 +29,7 @@ data Circuit a b = Circuit
     lookupArguments :: LookupArguments b,
     rowCount :: RowCount,
     equalityConstraints :: EqualityConstraints,
-    fixedValues :: FixedValues
+    fixedValues :: FixedValues (RowIndex Absolute)
   }
   deriving (Eq, Ord, Show, Generic)
 

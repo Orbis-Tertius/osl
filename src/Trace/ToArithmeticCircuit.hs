@@ -27,20 +27,22 @@ import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.RowIndex (RowIndex (..))
 import Stark.Types.Scalar (one, scalarToInt, zero)
+import Trace.FromLogicCircuit (Mapping)
 import Trace.ToArithmeticAIR (Mappings, mappings, traceTypeToArithmeticAIR)
 import Trace.Types (StepTypeId, TraceType)
 
 traceTypeToArithmeticCircuit ::
   TraceType ->
+  Mapping ->
   ArithmeticCircuit
-traceTypeToArithmeticCircuit traceType =
+traceTypeToArithmeticCircuit traceType lcM =
   toCircuit
-    (traceTypeToArithmeticAIR traceType)
+    (traceTypeToArithmeticAIR traceType lcM)
     (EqualityConstrainableColumns (Set.singleton (m ^. #advice . #caseUsed . #unMapping)))
     (traceTypeLookupArguments traceType m)
     (traceTypeEqualityConstraints traceType m)
   where
-    m = mappings traceType
+    m = mappings traceType lcM
 
 -- Trace type lookup arguments entail that:
 --  * For each step of each case, for each input to the step,

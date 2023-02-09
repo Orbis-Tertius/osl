@@ -135,7 +135,7 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
               (logic, layout) = semicircuitToLogicCircuit rowCount semi
               traceLayout = getMapping 8 logic
               traceType = logicCircuitToTraceType bitsPerByte logic
-              circuit = traceTypeToArithmeticCircuit traceType
+              circuit = traceTypeToArithmeticCircuit traceType traceLayout
               circuitMetrics = getCircuitMetrics circuit
               traceTypeMetrics = getTraceTypeMetrics traceType
           pure . SuccessfulOutput $

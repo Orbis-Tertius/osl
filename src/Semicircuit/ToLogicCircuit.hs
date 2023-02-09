@@ -416,15 +416,19 @@ fixedColumns =
   FixedColumns . LastRowIndicatorColumnIndex
     <$> nextCol ColType.Fixed
 
-fixedValues :: RowCount -> Layout -> FixedValues
+fixedValues :: RowCount -> Layout -> FixedValues (RowIndex 'Absolute)
 fixedValues (RowCount n) layout =
   FixedValues . Map.fromList $
     [ ( layout
           ^. #fixedColumns . #lastRowIndicator
             . #unLastRowIndicatorColumnIndex,
-        FixedColumn $ replicate (scalarToInt n - 1) zero <> [one]
+        FixedColumn . Map.fromList
+          . zip (RowIndex <$> [0 .. n' - 1])
+          $ replicate (n' - 1) zero <> [one]
       )
     ]
+  where
+    n' = scalarToInt n
 
 equalityConstraints ::
   Semicircuit ->

@@ -344,7 +344,7 @@ performLookups ::
   Either (ErrorMessage ann) (Map (RowIndex 'Absolute) (Maybe Scalar))
 performLookups ann rc arg is outCol = do
   inputTable <-
-    fmap (Map.mapMaybe id)
+    fmap (fmap (fromMaybe (die "Halo2.Circuit.performLookups: input expression undefined")))
       <$> mapM (evaluate ann arg . (rc,) . (^. #getInputExpression) . fst) is
   results <-
     getLookupResults
@@ -368,32 +368,34 @@ getLookupResults ::
   Map CellReference Scalar ->
   [(Map (RowIndex 'Absolute) Scalar, LookupTableColumn)] ->
   Either (ErrorMessage ann) (Map CellReference Scalar)
-getLookupResults ann rc mRowSet cellMap table = do
+getLookupResults ann rc mRowSet cellMap inputTable = do
   let rowSet = getRowSet rc mRowSet
       allRows = getRowSet rc Nothing
       cellMapAllRows :: Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
       cellMapAllRows = getCellMapRows allRows cellMap
       tableCols :: Map ColumnIndex ()
-      tableCols = Map.fromList ((,()) . (^. #unLookupTableColumn) . snd <$> table)
+      tableCols = Map.fromList ((,()) . (^. #unLookupTableColumn) . snd <$> inputTable)
       cellMapTableRows :: Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
       cellMapTableRows = (`Map.intersection` tableCols) <$> cellMapAllRows
       cellMapTableInverse :: Map (Map ColumnIndex Scalar) (RowIndex 'Absolute)
       cellMapTableInverse = inverseMap cellMapTableRows
       tableRows :: Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
-      tableRows = getColumnListRows rowSet table
+      tableRows = getColumnListRows rowSet inputTable
   rowsToCellMap . Map.fromList
     <$> sequence
       [ do
-          tableRow <-
+          inputTableRow <-
             maybe
-              (Left (ErrorMessage ann "input table row index missing"))
+              (Left
+                (ErrorMessage ann
+                  ("input table row index missing: " <> pack (show (ri, snd <$> inputTable, Map.lookup ri cellMapAllRows)))))
               pure
               (Map.lookup ri tableRows)
-          when (Map.size tableRow /= length table) $
+          when (Map.size inputTableRow /= length inputTable) $
             trace
-              ("table: " <> show table)
-              (Left (ErrorMessage ann ("table row is wrong size; duplicate column index in lookup table, or missing value in input column vectors? " <> pack (show (snd <$> table, tableRow)))))
-          case Map.lookup tableRow cellMapTableInverse of
+              ("input table: " <> show inputTable)
+              (Left (ErrorMessage ann ("input table row is wrong size; duplicate column index in lookup table, or missing value in input column vectors? " <> pack (show (snd <$> inputTable, inputTableRow)))))
+          case Map.lookup inputTableRow cellMapTableInverse of
             Just ri' ->
               case Map.lookup ri' cellMapAllRows of
                 Just r -> pure (ri, r)
@@ -575,7 +577,7 @@ instance
     gateVals <- columnVectorToBools gate <$> evaluate ann arg (rc, gate)
     let rowSet = Map.keysSet (Map.filter id gateVals)
     inputTable <-
-      fmap (Map.mapMaybe id)
+      fmap (fmap (fromMaybe (die "Halo2.Circuit.evaluate @LookupArgument: input expression undefined")))
         <$> mapM (evaluate ann arg . (rc,) . (^. #getInputExpression) . fst) tableMap
     rowSet' <-
       Set.fromList . fmap (^. #rowIndex) . Map.keys
@@ -624,17 +626,17 @@ instance HasEvaluate ColumnTypes Bool where
                `Set.union` Map.keysSet (Map.filter (== Fixed) m)
            )
 
-instance HasEvaluate FixedValues Bool where
+instance HasEvaluate (FixedValues (RowIndex Absolute)) Bool where
   evaluate _ arg fvs =
     pure $
       fixedValuesToCellMap fvs `Map.isSubmapOf` (arg ^. #witness . #unWitness)
 
-fixedValuesToCellMap :: FixedValues -> Map CellReference Scalar
+fixedValuesToCellMap :: FixedValues (RowIndex 'Absolute) -> Map CellReference Scalar
 fixedValuesToCellMap (FixedValues m) =
   Map.fromList
     [ (CellReference colIdx rowIdx, v)
       | (colIdx, col) <- Map.toList m,
-        (rowIdx, v) <- zip (RowIndex <$> [0 ..]) (col ^. #unFixedColumn)
+        (rowIdx, v) <- Map.toList (col ^. #unFixedColumn)
     ]
 
 instance HasEvaluate (EqualityConstrainableColumns, EqualityConstraints) Bool where

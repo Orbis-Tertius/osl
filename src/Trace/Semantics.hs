@@ -37,8 +37,8 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable)
 import Halo2.Types.PowerProduct (PowerProduct)
 import Halo2.Types.RowIndex (RowIndex (RowIndex))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
-import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInteger, zero)
-import Trace.Types (Case (Case), OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepType, SubexpressionId, SubexpressionTrace, Trace, TraceType)
+import Stark.Types.Scalar (Scalar, one, scalarToInteger, zero)
+import Trace.Types (Case, OutputSubexpressionId (..), ResultExpressionId (ResultExpressionId), StepType, SubexpressionId, SubexpressionTrace, Trace, TraceType)
 import Trace.Types.EvaluationContext (ContextType (Global, Local), EvaluationContext (EvaluationContext))
 
 evalTrace ::
@@ -200,7 +200,7 @@ checkLookupArgument ann c ec arg = do
               ( ErrorMessage
                   ann
                   ( "lookup argument is not satisfied: "
-                      <> pack (show (arg, is, ec ^. #localMappings, t))
+                      <> pack (show (arg, is, ec ^. #localMappings))
                   )
               )
           )
@@ -256,7 +256,7 @@ getGlobalCellMap ec =
 
 addFixedValuesToEvaluationContext ::
   EvaluationContext 'Global ->
-  FixedValues ->
+  FixedValues Case ->
   EvaluationContext 'Global
 addFixedValuesToEvaluationContext ec vs =
   ec' <> ec
@@ -264,10 +264,9 @@ addFixedValuesToEvaluationContext ec vs =
     ec' =
       EvaluationContext
         ( Map.fromList
-            [ ((Case i', col), x)
+            [ ((i, col), x)
               | (col, vs') <- Map.toList (vs ^. #getFixedValues),
-                (i, x) <- zip [0 ..] (vs' ^. #unFixedColumn),
-                i' <- maybeToList (integerToScalar i)
+                (i, x) <- Map.toList $ vs' ^. #unFixedColumn
             ]
         )
         mempty
