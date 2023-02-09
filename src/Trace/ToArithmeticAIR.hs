@@ -42,7 +42,7 @@ import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero, one, scalarToInteger)
 import Safe (atMay)
-import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId (OutputSubexpressionId), ResultExpressionId, StepType, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace), InputColumnIndex (InputColumnIndex), StepTypeIdSelectionVector (StepTypeIdSelectionVector))
+import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId (OutputSubexpressionId), ResultExpressionId, StepType, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace), InputColumnIndex (InputColumnIndex), StepTypeIdSelectionVector)
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -111,22 +111,22 @@ columnTypes t =
 gateConstraints :: TraceType -> PolynomialConstraints
 gateConstraints t =
   mconcatMap
-    (stepTypeGateConstraints (t ^. #stepTypeIdMapping))
+    (stepTypeGateConstraints (t ^. #stepTypeIdColumnIndices))
     (Map.toList (t ^. #stepTypes))
 
-stepTypeGateConstraints :: StepTypeIdSelectionVector Advice -> (StepTypeId, StepType) -> PolynomialConstraints
+stepTypeGateConstraints :: StepTypeIdSelectionVector -> (StepTypeId, StepType) -> PolynomialConstraints
 stepTypeGateConstraints i (tId, t) =
   PolynomialConstraints
     (second (gateOnStepType i tId) <$> (t ^. #gateConstraints . #constraints))
     -- TODO: degree bound goes up
     (t ^. #gateConstraints . #degreeBound)
 
-gateOnStepType :: StepTypeIdSelectionVector Advice -> StepTypeId -> Polynomial -> Polynomial
+gateOnStepType :: StepTypeIdSelectionVector -> StepTypeId -> Polynomial -> Polynomial
 gateOnStepType m stId =
-  P.times . P.var'
+  P.times
     $ maybe
         (die "gateOnStepType: step type id column mapping lookup failed")
-        (^. #unMapping)
+        P.var'
         (Map.lookup stId (m ^. #unStepTypeIdSelectionVector))
 
 data CaseNumber
@@ -144,7 +144,7 @@ data Mappings = Mappings
   deriving (Generic)
 
 data FixedMappings = FixedMappings
-  { stepType :: StepTypeIdMapping 'Fixed,
+  { stepType :: Mapping StepTypeId,
     inputs :: [Mapping InputSubexpressionId],
     output :: Mapping OutputSubexpressionId,
     caseNumber :: Mapping CaseNumber,
@@ -204,10 +204,7 @@ mappings :: TraceType -> Mappings
 mappings t =
   Mappings
     ( FixedMappings
-        (StepTypeIdMapping
-          (Map.fromList
-            (zip (Map.keys (t ^. #stepTypes))
-                 (Mapping <$> [i .. j-1] :: [Mapping Bool]))))
+        (Mapping i :: Mapping StepTypeId)
         (Mapping <$> [j .. k] :: [Mapping InputSubexpressionId])
         (Mapping (k + 1) :: Mapping OutputSubexpressionId)
         (Mapping (k + 2) :: Mapping CaseNumber)
@@ -223,7 +220,7 @@ mappings t =
     i = ColumnIndex (Map.size (t ^. #columnTypes . #getColumnTypes))
 
     j :: ColumnIndex
-    j = i + ColumnIndex (Map.size (t ^. #stepTypes))
+    j = i + 1
 
     k :: ColumnIndex
     k = i + ColumnIndex (n-1)
@@ -258,20 +255,14 @@ linksTableFixedColumns ::
   FixedValues
 linksTableFixedColumns (LinksTable ls) m =
   FixedValues . Map.fromList $
-    [ ( ci,
-        FixedColumn
-          [ if stId == stId' then one else zero
-            | stId <- ls <&> (^. #stepType)
-          ]
+    [
+      ( m ^. #stepType . #unMapping,
+        FixedColumn $ ls <&> (^. #stepType . #unStepTypeId)
+      ),
+      ( m ^. #output . #unMapping,
+        FixedColumn $ ls <&> (^. #output . #unOutputSubexpressionId . #unSubexpressionId)
       )
-      | (stId', Mapping ci) <-
-          Map.toList $ m ^. #stepType . #unStepTypeIdMapping
-    ] <> [
-           ( m ^. #output . #unMapping,
-             FixedColumn $ ls <&> (^. #output . #unOutputSubexpressionId . #unSubexpressionId)
-           )
-         ]
-      <> zip
+    ] <> zip
          ((m ^. #inputs) <&> (^. #unMapping))
          [ FixedColumn $
              fromMaybe
@@ -559,8 +550,8 @@ subexpressionTraceValuesArgument ann tt t m c used sId sT ri =
         Map.fromList
           [ (CellReference ci ri,
              if sT ^. #stepType == stId then one else zero)
-            | (stId, Mapping ci) <-
-                Map.toList (tt ^. #stepTypeIdMapping . #unStepTypeIdMapping)
+            | (stId, ci) <-
+                Map.toList (tt ^. #stepTypeIdColumnIndices . #unStepTypeIdSelectionVector)
           ],
       -- step indicator
       pure $
@@ -581,7 +572,9 @@ subexpressionTraceValuesArgument ann tt t m c used sId sT ri =
       do
         inIds <-
           maybe
-            (Left (ErrorMessage ann "subexpressionTraceValuesArgument: link"))
+            (Left . ErrorMessage ann
+              $ "subexpressionTraceValuesArgument: link not found: "
+                  <> pack (show (sT ^. #stepType, OutputSubexpressionId sId)))
             pure
             (Map.lookup
               (sT ^. #stepType, OutputSubexpressionId sId)

@@ -397,7 +397,13 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
       pure (Map.singleton (tt ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex) (c ^. #unCase))
 
     stepTypeMapping =
-      pure (Map.singleton (tt ^. #stepTypeColumnIndex . #unStepTypeColumnIndex) (sT ^. #stepType . #unStepTypeId))
+      pure $ Map.fromList
+        [ (ci, if stId == sT ^. #stepType then one else zero)
+          | (stId, ci) <-
+              Map.toList
+                (tt ^. #stepTypeIdColumnIndices
+                  . #unStepTypeIdSelectionVector)
+        ]
 
     stepIndicatorMapping =
       pure (Map.singleton (tt ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex) zero)
