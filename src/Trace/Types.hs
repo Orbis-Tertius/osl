@@ -31,7 +31,6 @@ where
 import qualified Algebra.Additive as Group
 import Halo2.Prelude
 import Halo2.Types.ColumnIndex (ColumnIndex)
-import Halo2.Types.ColumnType (ColumnType (Advice))
 import Halo2.Types.ColumnTypes (ColumnTypes)
 import Halo2.Types.EqualityConstrainableColumns (EqualityConstrainableColumns)
 import Halo2.Types.EqualityConstraints (EqualityConstraints)
@@ -111,7 +110,7 @@ newtype NumberOfCases = NumberOfCases {unNumberOfCases :: Scalar}
 
 -- We represent step type ids as selection vectors, i.e. vectors
 -- of bits containing exactly one 1 bit.
-newtype StepTypeIdSelectionVector (a :: ColumnType) =
+newtype StepTypeIdSelectionVector =
   StepTypeIdSelectionVector
     { unStepTypeIdSelectionVector :: Map StepTypeId ColumnIndex }
   deriving (Generic, Show)
@@ -126,7 +125,7 @@ data TraceType = TraceType
     links :: Map (StepTypeId, OutputSubexpressionId) [InputSubexpressionId],
     results :: Set ResultExpressionId,
     caseNumberColumnIndex :: CaseNumberColumnIndex,
-    stepTypeIdColumnIndices :: StepTypeIdSelectionVector Advice,
+    stepTypeIdColumnIndices :: StepTypeIdSelectionVector,
     stepIndicatorColumnIndex :: StepIndicatorColumnIndex,
     inputColumnIndices :: [InputColumnIndex],
     outputColumnIndex :: OutputColumnIndex,
