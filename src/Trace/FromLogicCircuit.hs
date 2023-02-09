@@ -1541,7 +1541,7 @@ loadFromDifferentCaseStepType ::
   StepType
 loadFromDifferentCaseStepType numCases m vi =
   StepType
-    "loadFromDifferentCase"
+    (Label $ "loadFromDifferentCase(" <> show vi <> ")")
     ( PolynomialConstraints
         [ ( Label $ "loadFromDifferentCase1(" <> show vi <> ")",
             d `P.times` ((d `P.plus` P.one) `P.times` (d `P.minus` P.one))

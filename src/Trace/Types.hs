@@ -63,8 +63,8 @@ data StepType = StepType
   deriving (Generic, Show)
 
 instance Semigroup StepType where
-  (StepType l a b c) <> (StepType m d e f) =
-    StepType (l <> m) (a <> d) (b <> e) (c <> f)
+  (StepType l a b c) <> (StepType _ d e f) =
+    StepType l (a <> d) (b <> e) (c <> f)
 
 instance Monoid StepType where
   mempty = StepType mempty mempty mempty mempty
