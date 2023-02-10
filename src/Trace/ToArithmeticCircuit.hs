@@ -65,6 +65,9 @@ traceTypeLookupArguments t m =
       traceStepTypeLookupArguments t
     ]
 
+-- Checks that each step's input advice columns contain
+-- the outputs of the steps which should be its inputs
+-- according to the links table.
 inputChecks ::
   TraceType ->
   Mappings ->
@@ -74,9 +77,17 @@ inputChecks t m =
     Set.fromList
       [ LookupArgument
           (Label ("input-" <> show i))
+          -- Only apply the check to rows which represent
+          -- a step in the trace.
           (stepIndicatorGate t)
+            -- alpha is the input subexpression id of the current row
+            -- beta is the output subexpression id column
           [ (InputExpression alpha, LookupTableColumn beta),
+            -- sigma' is the current case number
+            -- sigma is the case number column
             (InputExpression sigma', LookupTableColumn sigma),
+            -- x is the output value of the current row
+            -- y is the output value column
             (InputExpression x, LookupTableColumn y)
           ]
         | (i, iIdCol, iCol) <-
@@ -101,8 +112,12 @@ linkChecks t m =
     Set.fromList
       [ LookupArgument
           "linkCheck"
+          -- applies only at rows that represent steps in the trace
           (stepIndicatorGate t)
           ( zip
+              -- tau is the step type id
+              -- alphas are the input subexpression ids
+              -- beta is the output subexpression id
               (InputExpression <$> ([currentCase, tau] <> alphas <> [beta]))
               (LookupTableColumn <$> links)
           )

@@ -116,9 +116,12 @@ newtype StepTypeIdSelectionVector =
   deriving (Generic, Show)
 
 data TraceType = TraceType
-  { columnTypes :: ColumnTypes,
+  { -- All column types, both those inherited from the logic circuit and those
+    -- newly added in the trace type
+    columnTypes :: ColumnTypes,
     equalityConstrainableColumns :: EqualityConstrainableColumns,
     equalityConstraints :: EqualityConstraints,
+    -- Fixed values inherited from the logic circuit
     fixedValues :: FixedValues Case,
     stepTypes :: Map StepTypeId StepType,
     subexpressions :: Set SubexpressionId,
