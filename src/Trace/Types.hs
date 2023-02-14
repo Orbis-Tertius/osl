@@ -129,6 +129,7 @@ data TraceType = TraceType
     results :: Set ResultExpressionId,
     caseNumberColumnIndex :: CaseNumberColumnIndex,
     stepTypeIdColumnIndices :: StepTypeIdSelectionVector,
+    -- this column contains 1 if this row contains a step, and 0 otherwise
     stepIndicatorColumnIndex :: StepIndicatorColumnIndex,
     inputColumnIndices :: [InputColumnIndex],
     outputColumnIndex :: OutputColumnIndex,
@@ -155,7 +156,7 @@ data Trace = Trace
   deriving (Generic, Show)
 
 data SubexpressionTrace = SubexpressionTrace
-  { value :: Scalar,
+  { value :: Scalar, -- output value
     stepType :: StepTypeId,
     adviceValues :: Map ColumnIndex Scalar
   }
