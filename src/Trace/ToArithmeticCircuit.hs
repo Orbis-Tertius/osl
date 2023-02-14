@@ -159,13 +159,13 @@ resultChecks t m =
           ],
         LookupArgument
           "resultCheck2"
-          (P.var' used `P.minus` P.one)
+          (P.one `P.minus` P.var' used)
           [ (InputExpression (P.var' fixedCase), LookupTableColumn traceCase),
             (InputExpression (P.var' fixedResultId), LookupTableColumn outputExpressionId)
           ]
       ]
   where
-    fixedCase = m ^. #fixed . #caseNumber . #unMapping
+    fixedCase = traceCase
     fixedResultId = m ^. #fixed . #result . #unMapping
     traceCase = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
     outputExpressionId = m ^. #advice . #output . #unMapping

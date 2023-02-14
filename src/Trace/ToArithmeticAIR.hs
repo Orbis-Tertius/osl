@@ -9,7 +9,6 @@
 module Trace.ToArithmeticAIR
   ( traceTypeToArithmeticAIR,
     Mapping (Mapping),
-    CaseNumber,
     Mappings (Mappings),
     FixedMappings (FixedMappings),
     mappings,
@@ -17,7 +16,7 @@ module Trace.ToArithmeticAIR
   )
 where
 
-import Cast (intToInteger, integerToInt)
+import Cast (integerToInt, intToInteger)
 import Control.Arrow (second)
 import Control.Lens ((<&>))
 import Data.List.Extra (mconcatMap, (!?))
@@ -40,6 +39,7 @@ import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConstraints))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+import Safe (atMay)
 import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero, one, scalarToInteger)
 import Trace.FromLogicCircuit (getDefaultAdvice)
 import qualified Trace.FromLogicCircuit as LC
@@ -100,12 +100,12 @@ columnTypes t =
       ( Map.fromList
           ( zip
               [i ..]
-              (replicate (4 + n) Fixed)
+              (replicate (3 + n) Fixed)
           )
       )
     <> ColumnTypes
       ( Map.fromList
-          (zip [j ..] (replicate (n + 1) Advice))
+          (zip [j ..] (replicate (n + 2) Advice))
       )
   where
     i :: ColumnIndex
@@ -114,7 +114,7 @@ columnTypes t =
         t ^. #columnTypes . #getColumnTypes
 
     j :: ColumnIndex
-    j = ColumnIndex $ (i ^. #getColumnIndex) + 4 + n
+    j = ColumnIndex $ (i ^. #getColumnIndex) + 3 + n
 
     n :: Int
     n = length (t ^. #inputColumnIndices)
@@ -129,8 +129,7 @@ stepTypeGateConstraints :: StepTypeIdSelectionVector -> (StepTypeId, StepType) -
 stepTypeGateConstraints i (tId, t) =
   PolynomialConstraints
     (second (gateOnStepType i tId) <$> (t ^. #gateConstraints . #constraints))
-    -- TODO: degree bound goes up
-    (t ^. #gateConstraints . #degreeBound)
+    (t ^. #gateConstraints . #degreeBound + 1)
 
 gateOnStepType :: StepTypeIdSelectionVector -> StepTypeId -> Polynomial -> Polynomial
 gateOnStepType m stId =
@@ -139,8 +138,6 @@ gateOnStepType m stId =
         (die "gateOnStepType: step type id column mapping lookup failed")
         P.var'
         (Map.lookup stId (m ^. #unStepTypeIdSelectionVector))
-
-data CaseNumber
 
 data CaseUsed = CaseIsUsed | CaseIsNotUsed
   deriving (Eq)
@@ -153,16 +150,15 @@ data Mappings = Mappings
     advice :: AdviceMappings,
     logicCircuit :: LC.Mapping
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 data FixedMappings = FixedMappings
   { stepType :: Mapping StepTypeId,
     inputs :: [Mapping InputSubexpressionId],
     output :: Mapping OutputSubexpressionId,
-    caseNumber :: Mapping CaseNumber,
     result :: Mapping ResultExpressionId
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 data AdviceMappings = AdviceMappings
   { inputs :: [Mapping InputSubexpressionId],
@@ -172,7 +168,7 @@ data AdviceMappings = AdviceMappings
     -- is used or not.
     caseUsed :: Mapping CaseUsed
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 newtype AIRFixedValues =
   AIRFixedValues
@@ -219,11 +215,10 @@ mappings t =
         (Mapping i :: Mapping StepTypeId)
         (Mapping <$> [j .. k] :: [Mapping InputSubexpressionId])
         (Mapping (k + 1) :: Mapping OutputSubexpressionId)
-        (Mapping (k + 2) :: Mapping CaseNumber)
-        (Mapping (k + 3) :: Mapping ResultExpressionId)
+        (Mapping (k + 2) :: Mapping ResultExpressionId)
     )
     ( AdviceMappings
-        (Mapping <$> [k + 5 .. l] :: [Mapping InputSubexpressionId])
+        (Mapping <$> [k + 3 .. l] :: [Mapping InputSubexpressionId])
         (Mapping (l + 1) :: Mapping OutputSubexpressionId)
         (Mapping (l + 2) :: Mapping CaseUsed)
     )
@@ -235,10 +230,10 @@ mappings t =
     j = i + 1
 
     k :: ColumnIndex
-    k = i + ColumnIndex (n-1)
+    k = j + ColumnIndex (n-1)
 
     l :: ColumnIndex
-    l = k + 5 + ColumnIndex n
+    l = k + 3 + ColumnIndex (n-1)
 
     n :: Int
     n = length (t ^. #inputColumnIndices)
@@ -293,27 +288,36 @@ caseAndResultFixedColumns ::
 caseAndResultFixedColumns t m =
   FixedValues $
     Map.fromList
-      [ ( m ^. #caseNumber . #unMapping,
-          FixedColumn . Map.fromList . zip [0..] $
+      [ ( t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex,
+          FixedColumn . Map.fromList . zip [0..nRows-1] $
             concatMap
-              (replicate nResults . f)
+              (replicate nSubs . g)
               [0 .. nCases - 1]
         ),
         ( m ^. #result . #unMapping,
-          FixedColumn . Map.fromList . zip [0..] . concat . replicate nCases $
-            f
-              <$> [0 .. nResults - 1]
+          FixedColumn . Map.fromList . zip [0..nRows-1] . fmap f
+            . concat . replicate nCases
+            . take nSubs . padInfinitely $ [0 .. nResults - 1]
         )
       ]
   where
     nResults = Set.size (t ^. #results)
     nCases = scalarToInt (t ^. #numCases . #unNumberOfCases)
+    nRows = RowIndex . scalarToInt $ t ^. #rowCount . #getRowCount
+    nSubs = Set.size (t ^. #subexpressions)
+
+    g :: Int -> Scalar
+    g =
+      fromMaybe
+        (die "caseAndResultFixedColumns: case number out of range of scalar (this is a compiler bug)")
+        . integerToScalar . intToInteger
 
     f :: Int -> Scalar
-    f x =
-      case integerToScalar (intToInteger x) of
-        Just y -> y
-        Nothing -> die "caseFixedCoumn: case number out of range of scalar (this is a compiler bug)"
+    f =
+      maybe
+        (die "caseAndResultFixedColumns: result index out of range (this is a compiler bug)")
+        (^. #unResultExpressionId . #unSubexpressionId)
+        . (Set.toList (t ^. #results) `atMay`)
 
 traceToArgument ::
   ann ->

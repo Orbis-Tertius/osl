@@ -41,7 +41,7 @@ import Halo2.Types.Byte (Byte (Byte))
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (LogicCircuit)
 import Halo2.Types.ColumnIndex (ColumnIndex (ColumnIndex))
-import Halo2.Types.ColumnType (ColumnType (Advice))
+import Halo2.Types.ColumnType (ColumnType (Advice, Fixed))
 import Halo2.Types.ColumnTypes (ColumnTypes (ColumnTypes))
 import Halo2.Types.FixedColumn (FixedColumn (FixedColumn))
 import Halo2.Types.FixedValues (FixedValues (FixedValues))
@@ -1473,11 +1473,19 @@ getColumnTypes :: LogicCircuit -> Mapping -> ColumnTypes
 getColumnTypes c mapping =
   (c ^. #columnTypes)
     <> ( ColumnTypes . Map.fromList $
-           (,Advice) <$> getMappingIndices mapping
+           ((,Advice) <$> getAdviceMappingIndices mapping) <>
+           ((,Fixed) <$> getFixedMappingIndices mapping)
        )
 
-getMappingIndices :: Mapping -> [ColumnIndex]
-getMappingIndices m =
+getFixedMappingIndices :: Mapping -> [ColumnIndex]
+getFixedMappingIndices m =
+  [ m ^. #caseNumber . #unCaseNumberColumnIndex,
+    m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex,
+    m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex
+  ]
+
+getAdviceMappingIndices :: Mapping -> [ColumnIndex]
+getAdviceMappingIndices m =
   [ m ^. #caseNumber . #unCaseNumberColumnIndex,
     m ^. #stepIndicator . #unStepIndicatorColumnIndex
   ]
@@ -1493,9 +1501,6 @@ getMappingIndices m =
           ]
       )
       (m ^. #byteDecomposition . #bytes)
-    <> [ m ^. #truthTable . #byteRangeColumnIndex . #unByteRangeColumnIndex,
-         m ^. #truthTable . #zeroIndicatorColumnIndex . #unZeroIndicatorColumnIndex
-       ]
 
 getStepTypes ::
   BitsPerByte ->
@@ -2103,7 +2108,8 @@ getSubexpressionIdSet m =
       Set.fromList (Map.elems (m ^. #variables) <&> (^. #unOf)),
       Set.fromList (Map.elems (m ^. #bareLookups) <&> (^. #unBareLookupSubexpressionId)),
       Set.fromList (Map.elems (m ^. #constants) <&> (^. #unOf)),
-      Set.fromList (Map.elems (m ^. #operations) <&> (^. #unOf))
+      Set.fromList (Map.elems (m ^. #operations) <&> (^. #unOf)),
+      Set.fromList (Map.elems (m ^. #assertions) <&> (^. #unOutputSubexpressionId))
     ]
 
 getSubexpressionLinksMap ::

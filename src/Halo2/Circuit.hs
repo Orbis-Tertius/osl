@@ -7,6 +7,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -27,6 +28,8 @@ module Halo2.Circuit
   )
 where
 
+import Safe (headMay)
+import Control.Arrow (first)
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
@@ -558,6 +561,7 @@ instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
   evaluate ann arg (rc, PolynomialConstraints polys degreeBound) = do
     allM
       ( \(lbl, poly) ->
+          showTrace ("gate " <> show lbl <> " degree bound: ") .
           ( degree poly <= degreeBound ^. #getPolynomialDegreeBound
               &&
           )
@@ -579,16 +583,19 @@ instance
     inputTable <-
       fmap (fmap (fromMaybe (die "Halo2.Circuit.evaluate @LookupArgument: input expression undefined")))
         <$> mapM (evaluate ann arg . (rc,) . (^. #getInputExpression) . fst) tableMap
-    rowSet' <-
-      Set.fromList . fmap (^. #rowIndex) . Map.keys
-        <$> getLookupResults
-          ann
-          rc
-          (Just rowSet)
-          (getCellMap arg)
-          (zip inputTable (snd <$> tableMap))
-    pure . showTrace ("lookup " <> show lbl <> ": ")
-      $ trace (show (rowSet `Set.difference` rowSet')) $ rowSet' == rowSet
+    results <-
+      getLookupResults
+        ann
+        rc
+        (Just rowSet)
+        (getCellMap arg)
+        (zip inputTable (snd <$> tableMap))
+    let rowSet' =
+          Set.fromList . fmap (^. #rowIndex) . Map.keys
+            $ results
+    -- pure $ rowSet' == rowSet
+    pure . trace (show (lbl, rowSet' == rowSet)) $ rowSet' == rowSet
+    -- pure . trace (show (lbl, headMay (Set.toList rowSet), headMay (Set.toList (rowSet `Set.difference` rowSet')), headMay (Set.toList (rowSet' `Set.difference` rowSet)), rowSet == rowSet', headMay (Map.toList results), headMay . Map.toList <$> inputTable, take 100 (Map.toList (getCellMapRows rowSet (getCellMap arg))))) $ rowSet' == rowSet
 
 instance
   HasEvaluate (RowCount, LookupArgument a) Bool =>
@@ -604,28 +611,29 @@ instance
   evaluate ann arg c =
     and
       <$> sequence
-        [ evaluate ann arg (c ^. #columnTypes),
-          evaluate ann arg (c ^. #rowCount),
-          evaluate ann arg (c ^. #rowCount, c ^. #gateConstraints),
-          evaluate ann arg (c ^. #rowCount, c ^. #lookupArguments),
-          evaluate
+        [ showTrace "column types: " <$> evaluate ann arg (c ^. #columnTypes),
+          showTrace "row count: " <$> evaluate ann arg (c ^. #rowCount),
+          showTrace "gate constraints: " <$> evaluate ann arg (c ^. #rowCount, c ^. #gateConstraints),
+          showTrace "lookup arguments: " <$> evaluate ann arg (c ^. #rowCount, c ^. #lookupArguments),
+          showTrace "equality constraints: " <$> evaluate
             ann
             arg
             ( c ^. #equalityConstrainableColumns,
               c ^. #equalityConstraints
             ),
-          evaluate ann arg (c ^. #fixedValues)
+          showTrace "fixed values: " <$> evaluate ann arg (c ^. #fixedValues)
         ]
 
 instance HasEvaluate ColumnTypes Bool where
   evaluate _ arg (ColumnTypes m) =
     pure $
-      getColumns (arg ^. #statement . #unStatement)
-        == Map.keysSet (Map.filter (== Instance) m)
-        && getColumns (arg ^. #witness . #unWitness)
-        == ( Map.keysSet (Map.filter (== Advice) m)
-               `Set.union` Map.keysSet (Map.filter (== Fixed) m)
-           )
+      (showTrace "stmt cols: " (getColumns (arg ^. #statement . #unStatement))
+        == showTrace "instance cols: " (Map.keysSet (Map.filter (== Instance) m)))
+        && (showTrace "witness cols:          " (getColumns (arg ^. #witness . #unWitness))
+         == showTrace "advice and fixed cols: "
+            ( Map.keysSet (Map.filter (== Advice) m)
+                `Set.union` Map.keysSet (Map.filter (== Fixed) m)
+            ))
 
 instance HasEvaluate (FixedValues (RowIndex Absolute)) Bool where
   evaluate _ arg fvs =
