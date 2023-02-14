@@ -561,7 +561,7 @@ instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
           ( degree poly <= degreeBound ^. #getPolynomialDegreeBound
               &&
           )
-            . showTrace (show lbl)
+            . showTrace ("gate " <> show lbl <> ": ")
             . all (== Just zero)
             <$> evaluate ann arg (rc, poly)
       )
@@ -573,7 +573,7 @@ instance
   ) =>
   HasEvaluate (RowCount, LookupArgument a) Bool
   where
-  evaluate ann arg (rc, LookupArgument _ gate tableMap) = do
+  evaluate ann arg (rc, LookupArgument lbl gate tableMap) = do
     gateVals <- columnVectorToBools gate <$> evaluate ann arg (rc, gate)
     let rowSet = Map.keysSet (Map.filter id gateVals)
     inputTable <-
@@ -587,7 +587,8 @@ instance
           (Just rowSet)
           (getCellMap arg)
           (zip inputTable (snd <$> tableMap))
-    pure (rowSet' == rowSet)
+    pure . showTrace ("lookup " <> show lbl <> ": ")
+      $ trace (show (rowSet `Set.difference` rowSet')) $ rowSet' == rowSet
 
 instance
   HasEvaluate (RowCount, LookupArgument a) Bool =>

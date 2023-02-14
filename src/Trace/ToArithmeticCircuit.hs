@@ -221,7 +221,7 @@ stepIndicatorGate ::
   TraceType ->
   Polynomial
 stepIndicatorGate t =
-  P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex)
+  P.one `P.minus` P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex)
 
 stepTypeGate ::
   TraceType ->
@@ -239,7 +239,8 @@ stepTypesGate ::
   Set StepTypeId ->
   Polynomial
 stepTypesGate t sIds =
-  foldl' P.times P.one [stepTypeGate t sId | sId <- Set.toList sIds]
+  P.one `P.minus`
+    foldl' P.plus P.zero [stepTypeGate t sId | sId <- Set.toList sIds]
 
 traceTypeEqualityConstraints ::
   TraceType ->
