@@ -39,6 +39,7 @@ import qualified Data.Set as Set
 import Data.Text (Text, pack)
 import Die (die)
 import Halo2.Circuit (rowsToCellMap)
+import Halo2.LogicConstraint (constantFoldConstraints)
 import qualified Halo2.Types.Argument as Halo2
 import Halo2.Types.CellReference (CellReference (CellReference))
 import Halo2.Types.Circuit (Circuit (..), LogicCircuit)
@@ -85,7 +86,7 @@ semicircuitToLogicCircuit rowCount x =
    in ( Circuit
           (layout ^. #columnTypes)
           (equalityConstrainableColumns x layout)
-          (columnBounds x layout (gateConstraints x layout))
+          (constantFoldConstraints (columnBounds x layout (gateConstraints x layout)))
           mempty
           rowCount
           (equalityConstraints x layout)
@@ -946,7 +947,7 @@ existentialOutputsInBoundsConstraints ::
   LogicConstraints
 existentialOutputsInBoundsConstraints x layout =
   LogicConstraints
-    [ ( Label ("existentialOutputsInBounds(" <> show q <> ")"),
+    [ ( Label ("existentialOutputsInBounds(" <> show y <> ")"),
         Atom (LessThan y bp)
       )
       | q <-
@@ -972,7 +973,7 @@ existentialInputsInBoundsConstraints ::
   LogicConstraints
 existentialInputsInBoundsConstraints x layout =
   LogicConstraints
-    [ ( Label ("existentialInputsInBounds(" <> show q <> ")"),
+    [ ( Label ("existentialInputsInBounds(" <> show y <> ")"),
         Atom (LessThan y bp)
       )
       | q <-

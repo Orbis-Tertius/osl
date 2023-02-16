@@ -73,6 +73,7 @@ data LogicConstraint
   | Iff LogicConstraint LogicConstraint
   | Top
   | Bottom
+  deriving (Eq)
 
 instance Show LogicConstraint where
   show (Atom x) = show x
