@@ -60,7 +60,6 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Relative))
 import Halo2.Types.Sign (Sign (Negative, Positive))
-import OSL.Debug (showTrace)
 import OSL.Map (curryMap)
 import OSL.Types.Arity (Arity (Arity))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
@@ -1208,7 +1207,7 @@ getMapping bitsPerByte c =
       cnc <- CaseNumberColumnIndex <$> nextCol
       stc <-
         StepTypeIdSelectionVector . Map.fromList <$>
-          replicateM (showTrace "stepTypeCount = " (countStepTypes c))
+          replicateM (countStepTypes c)
             ((,) <$> nextSid <*> nextCol)
       resetSid
       sic <- StepIndicatorColumnIndex <$> nextCol

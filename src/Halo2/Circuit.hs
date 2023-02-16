@@ -42,7 +42,6 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Data.Text (pack)
 import Data.Tuple.Extra (second, swap, uncurry3)
-import Debug.Trace (trace)
 import Die (die)
 import Halo2.Polynomial (degree)
 import Halo2.Prelude
@@ -70,7 +69,6 @@ import Halo2.Types.PolynomialVariable (PolynomialVariable (..))
 import Halo2.Types.PowerProduct (PowerProduct (PowerProduct, getPowerProduct))
 import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
-import OSL.Debug (showTrace)
 import OSL.Map (inverseMap)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInteger, toWord64, zero)
@@ -395,9 +393,7 @@ getLookupResults ann rc mRowSet cellMap inputTable = do
               pure
               (Map.lookup ri tableRows)
           when (Map.size inputTableRow /= length inputTable) $
-            trace
-              ("input table: " <> show inputTable)
-              (Left (ErrorMessage ann ("input table row is wrong size; duplicate column index in lookup table, or missing value in input column vectors? " <> pack (show (snd <$> inputTable, inputTableRow)))))
+            Left (ErrorMessage ann ("input table row is wrong size; duplicate column index in lookup table, or missing value in input column vectors? " <> pack (show (snd <$> inputTable, inputTableRow))))
           case Map.lookup inputTableRow cellMapTableInverse of
             Just ri' ->
               case Map.lookup ri' cellMapAllRows of
@@ -523,10 +519,6 @@ instance HasEvaluate (RowCount, LogicConstraint) (Map (RowIndex 'Absolute) (Mayb
     where
       rec = evaluate ann arg
 
--- rec x = do
---   r <- evaluate ann arg x
---   pure (trace (show (foldr (liftA2 (&&)) (Just True) r, x)) r)
-
 instance HasEvaluate (Map ColumnIndex FixedBound) Bool where
   evaluate _ arg bs =
     pure $
@@ -561,11 +553,9 @@ instance HasEvaluate (RowCount, PolynomialConstraints) Bool where
   evaluate ann arg (rc, PolynomialConstraints polys degreeBound) = do
     allM
       ( \(lbl, poly) ->
-          showTrace ("gate " <> show lbl <> " degree bound: ") .
           ( degree poly <= degreeBound ^. #getPolynomialDegreeBound
               &&
           )
-            . showTrace ("gate " <> show lbl <> ": ")
             . all (== Just zero)
             <$> evaluate ann arg (rc, poly)
       )
@@ -593,9 +583,7 @@ instance
     let rowSet' =
           Set.fromList . fmap (^. #rowIndex) . Map.keys
             $ results
-    -- pure $ rowSet' == rowSet
-    pure . trace (show (lbl, rowSet' == rowSet)) $ rowSet' == rowSet
-    -- pure . trace (show (lbl, headMay (Set.toList rowSet), headMay (Set.toList (rowSet `Set.difference` rowSet')), headMay (Set.toList (rowSet' `Set.difference` rowSet)), rowSet == rowSet', headMay (Map.toList results), headMay . Map.toList <$> inputTable, take 100 (Map.toList (getCellMapRows rowSet (getCellMap arg))))) $ rowSet' == rowSet
+    pure $ rowSet' == rowSet
 
 instance
   HasEvaluate (RowCount, LookupArgument a) Bool =>
@@ -611,29 +599,27 @@ instance
   evaluate ann arg c =
     and
       <$> sequence
-        [ showTrace "column types: " <$> evaluate ann arg (c ^. #columnTypes),
-          showTrace "row count: " <$> evaluate ann arg (c ^. #rowCount),
-          showTrace "gate constraints: " <$> evaluate ann arg (c ^. #rowCount, c ^. #gateConstraints),
-          showTrace "lookup arguments: " <$> evaluate ann arg (c ^. #rowCount, c ^. #lookupArguments),
-          showTrace "equality constraints: " <$> evaluate
+        [ evaluate ann arg (c ^. #columnTypes),
+          evaluate ann arg (c ^. #rowCount),
+          evaluate ann arg (c ^. #rowCount, c ^. #gateConstraints),
+          evaluate ann arg (c ^. #rowCount, c ^. #lookupArguments),
+          evaluate
             ann
             arg
             ( c ^. #equalityConstrainableColumns,
               c ^. #equalityConstraints
             ),
-          showTrace "fixed values: " <$> evaluate ann arg (c ^. #fixedValues)
+          evaluate ann arg (c ^. #fixedValues)
         ]
 
 instance HasEvaluate ColumnTypes Bool where
   evaluate _ arg (ColumnTypes m) =
     pure $
-      (showTrace "stmt cols: " (getColumns (arg ^. #statement . #unStatement))
-        == showTrace "instance cols: " (Map.keysSet (Map.filter (== Instance) m)))
-        && (showTrace "witness cols:          " (getColumns (arg ^. #witness . #unWitness))
-         == showTrace "advice and fixed cols: "
-            ( Map.keysSet (Map.filter (== Advice) m)
+      getColumns (arg ^. #statement . #unStatement)
+        == Map.keysSet (Map.filter (== Instance) m)
+        && getColumns (arg ^. #witness . #unWitness)
+         == Map.keysSet (Map.filter (== Advice) m)
                 `Set.union` Map.keysSet (Map.filter (== Fixed) m)
-            ))
 
 instance HasEvaluate (FixedValues (RowIndex Absolute)) Bool where
   evaluate _ arg fvs =
