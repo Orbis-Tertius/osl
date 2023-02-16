@@ -1,8 +1,8 @@
 {-# LANGUAGE TupleSections #-}
 
-module OSL.Map (mapKeysMaybe, inverseMap, uncurryMap) where
+module OSL.Map (mapKeysMaybe, inverseMap, curryMap, uncurryMap) where
 
-import Data.Map (Map, fromList, toList)
+import Data.Map (Map, fromList, singleton, toList, unionsWith)
 import Data.Maybe (catMaybes)
 import Data.Tuple (swap)
 
@@ -20,4 +20,11 @@ uncurryMap m =
     [ ((a, b), c)
       | (a, m') <- toList m,
         (b, c) <- toList m'
+    ]
+
+curryMap :: (Ord a, Ord b) => Map (a, b) c -> Map a (Map b c)
+curryMap m =
+  unionsWith (<>) $
+    [ singleton a (singleton b c)
+      | ((a, b), c) <- toList m
     ]

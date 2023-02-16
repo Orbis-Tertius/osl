@@ -8,6 +8,8 @@ import Control.Lens ((<&>))
 import Data.List.Extra (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Text (pack)
+import Die (die)
 import Halo2.AIR (toCircuit)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
@@ -25,20 +27,22 @@ import Halo2.Types.LookupTableColumn (LookupTableColumn (LookupTableColumn))
 import Halo2.Types.Polynomial (Polynomial)
 import Halo2.Types.RowIndex (RowIndex (..))
 import Stark.Types.Scalar (one, scalarToInt, zero)
+import Trace.FromLogicCircuit (Mapping)
 import Trace.ToArithmeticAIR (Mappings, mappings, traceTypeToArithmeticAIR)
 import Trace.Types (StepTypeId, TraceType)
 
 traceTypeToArithmeticCircuit ::
   TraceType ->
+  Mapping ->
   ArithmeticCircuit
-traceTypeToArithmeticCircuit traceType =
+traceTypeToArithmeticCircuit traceType lcM =
   toCircuit
-    (traceTypeToArithmeticAIR traceType)
+    (traceTypeToArithmeticAIR traceType lcM)
     (EqualityConstrainableColumns (Set.singleton (m ^. #advice . #caseUsed . #unMapping)))
     (traceTypeLookupArguments traceType m)
     (traceTypeEqualityConstraints traceType m)
   where
-    m = mappings traceType
+    m = mappings traceType lcM
 
 -- Trace type lookup arguments entail that:
 --  * For each step of each case, for each input to the step,
@@ -61,6 +65,9 @@ traceTypeLookupArguments t m =
       traceStepTypeLookupArguments t
     ]
 
+-- Checks that each step's input advice columns contain
+-- the outputs of the steps which should be its inputs
+-- according to the links table.
 inputChecks ::
   TraceType ->
   Mappings ->
@@ -70,9 +77,17 @@ inputChecks t m =
     Set.fromList
       [ LookupArgument
           (Label ("input-" <> show i))
+          -- Only apply the check to rows which represent
+          -- a step in the trace.
           (stepIndicatorGate t)
+          -- alpha is the input subexpression id of the current row
+          -- beta is the output subexpression id column
           [ (InputExpression alpha, LookupTableColumn beta),
+            -- sigma' is the current case number
+            -- sigma is the case number column
             (InputExpression sigma', LookupTableColumn sigma),
+            -- x is the output value of the current row
+            -- y is the output value column
             (InputExpression x, LookupTableColumn y)
           ]
         | (i, iIdCol, iCol) <-
@@ -97,8 +112,12 @@ linkChecks t m =
     Set.fromList
       [ LookupArgument
           "linkCheck"
+          -- applies only at rows that represent steps in the trace
           (stepIndicatorGate t)
           ( zip
+              -- tau is the step type id
+              -- alphas are the input subexpression ids
+              -- beta is the output subexpression id
               (InputExpression <$> ([currentCase, tau] <> alphas <> [beta]))
               (LookupTableColumn <$> links)
           )
@@ -111,7 +130,14 @@ linkChecks t m =
     caseNumber = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
     subexpressionId = m ^. #advice . #output . #unMapping
     currentCase = P.var' caseNumber
-    tau = P.var' $ t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex
+    -- TODO: check that the selection vector values are all in {0,1}
+    tau =
+      foldr
+        P.plus
+        P.zero
+        [ P.constant (stId ^. #unStepTypeId) `P.times` P.var' ci
+          | (stId, ci) <- Map.toList (t ^. #stepTypeIdColumnIndices . #unStepTypeIdSelectionVector)
+        ]
     alphas = P.var' <$> ((m ^. #advice . #inputs) <&> (^. #unMapping))
     beta = P.var' subexpressionId
     links =
@@ -136,13 +162,13 @@ resultChecks t m =
           ],
         LookupArgument
           "resultCheck2"
-          (P.var' used `P.minus` P.one)
+          (P.one `P.minus` P.var' used)
           [ (InputExpression (P.var' fixedCase), LookupTableColumn traceCase),
             (InputExpression (P.var' fixedResultId), LookupTableColumn outputExpressionId)
           ]
       ]
   where
-    fixedCase = m ^. #fixed . #caseNumber . #unMapping
+    fixedCase = traceCase
     fixedResultId = m ^. #fixed . #result . #unMapping
     traceCase = t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
     outputExpressionId = m ^. #advice . #output . #unMapping
@@ -198,22 +224,29 @@ stepIndicatorGate ::
   TraceType ->
   Polynomial
 stepIndicatorGate t =
-  P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex)
+  P.one `P.minus` P.var' (t ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex)
 
 stepTypeGate ::
   TraceType ->
   StepTypeId ->
   Polynomial
 stepTypeGate t sId =
-  P.constant (sId ^. #unStepTypeId)
-    `P.minus` P.var' (t ^. #stepTypeColumnIndex . #unStepTypeColumnIndex)
+  maybe
+    ( die
+        ( "Trace.ToArithmeticCircuit.stepTypeGate: column index lookup failed: "
+            <> pack (show (sId, t))
+        )
+    )
+    P.var'
+    (Map.lookup sId (t ^. #stepTypeIdColumnIndices . #unStepTypeIdSelectionVector))
 
 stepTypesGate ::
   TraceType ->
   Set StepTypeId ->
   Polynomial
 stepTypesGate t sIds =
-  foldl' P.times P.one [stepTypeGate t sId | sId <- Set.toList sIds]
+  P.one
+    `P.minus` foldl' P.plus P.zero [stepTypeGate t sId | sId <- Set.toList sIds]
 
 traceTypeEqualityConstraints ::
   TraceType ->

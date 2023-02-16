@@ -1,7 +1,9 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Trace.Types
   ( InputColumnIndex (InputColumnIndex),
@@ -13,11 +15,11 @@ module Trace.Types
     OutputSubexpressionId (OutputSubexpressionId),
     SubexpressionLink (SubexpressionLink),
     ResultExpressionId (ResultExpressionId),
-    StepTypeColumnIndex (StepTypeColumnIndex),
     StepIndicatorColumnIndex (StepIndicatorColumnIndex),
     CaseNumberColumnIndex (CaseNumberColumnIndex),
     NumberOfCases (NumberOfCases),
     Case (Case),
+    StepTypeIdSelectionVector (StepTypeIdSelectionVector),
     TraceType (TraceType),
     Trace (Trace),
     SubexpressionTrace (SubexpressionTrace),
@@ -56,13 +58,13 @@ data StepType = StepType
   { label :: Label,
     gateConstraints :: PolynomialConstraints,
     lookupArguments :: LookupArguments Polynomial,
-    fixedValues :: FixedValues
+    fixedValues :: FixedValues Case
   }
   deriving (Generic, Show)
 
 instance Semigroup StepType where
-  (StepType l a b c) <> (StepType m d e f) =
-    StepType (l <> m) (a <> d) (b <> e) (c <> f)
+  (StepType l a b c) <> (StepType _ d e f) =
+    StepType l (a <> d) (b <> e) (c <> f)
 
 instance Monoid StepType where
   mempty = StepType mempty mempty mempty mempty
@@ -98,10 +100,6 @@ newtype CaseNumberColumnIndex = CaseNumberColumnIndex {unCaseNumberColumnIndex :
   deriving stock (Generic)
   deriving newtype (Show)
 
-newtype StepTypeColumnIndex = StepTypeColumnIndex {unStepTypeColumnIndex :: ColumnIndex}
-  deriving stock (Generic)
-  deriving newtype (Show)
-
 newtype StepIndicatorColumnIndex = StepIndicatorColumnIndex {unStepIndicatorColumnIndex :: ColumnIndex}
   deriving stock (Generic)
   deriving newtype (Show)
@@ -110,16 +108,27 @@ newtype NumberOfCases = NumberOfCases {unNumberOfCases :: Scalar}
   deriving stock (Generic)
   deriving newtype (Show)
 
+-- We represent step type ids as selection vectors, i.e. vectors
+-- of bits containing exactly one 1 bit.
+newtype StepTypeIdSelectionVector = StepTypeIdSelectionVector
+  {unStepTypeIdSelectionVector :: Map StepTypeId ColumnIndex}
+  deriving (Generic, Show)
+
 data TraceType = TraceType
-  { columnTypes :: ColumnTypes,
+  { -- All column types, both those inherited from the logic circuit and those
+    -- newly added in the trace type
+    columnTypes :: ColumnTypes,
     equalityConstrainableColumns :: EqualityConstrainableColumns,
     equalityConstraints :: EqualityConstraints,
+    -- Fixed values inherited from the logic circuit
+    fixedValues :: FixedValues Case,
     stepTypes :: Map StepTypeId StepType,
     subexpressions :: Set SubexpressionId,
     links :: Map (StepTypeId, OutputSubexpressionId) [InputSubexpressionId],
     results :: Set ResultExpressionId,
     caseNumberColumnIndex :: CaseNumberColumnIndex,
-    stepTypeColumnIndex :: StepTypeColumnIndex,
+    stepTypeIdColumnIndices :: StepTypeIdSelectionVector,
+    -- this column contains 1 if this row contains a step, and 0 otherwise
     stepIndicatorColumnIndex :: StepIndicatorColumnIndex,
     inputColumnIndices :: [InputColumnIndex],
     outputColumnIndex :: OutputColumnIndex,
@@ -129,7 +138,8 @@ data TraceType = TraceType
   deriving (Generic, Show)
 
 newtype Case = Case {unCase :: Scalar}
-  deriving (Eq, Ord, Generic, Show, Group.C)
+  deriving stock (Eq, Ord, Generic)
+  deriving newtype (Show, Group.C)
 
 newtype Statement = Statement {unStatement :: Map (Case, ColumnIndex) Scalar}
   deriving (Generic, Show)
@@ -140,13 +150,12 @@ newtype Witness = Witness {unWitness :: Map (Case, ColumnIndex) Scalar}
 data Trace = Trace
   { statement :: Statement,
     witness :: Witness,
-    usedCases :: Set Case,
-    subexpressions :: Map (Case, SubexpressionId) SubexpressionTrace
+    subexpressions :: Map Case (Map SubexpressionId SubexpressionTrace)
   }
   deriving (Generic, Show)
 
 data SubexpressionTrace = SubexpressionTrace
-  { value :: Scalar,
+  { value :: Scalar, -- output value
     stepType :: StepTypeId,
     adviceValues :: Map ColumnIndex Scalar
   }

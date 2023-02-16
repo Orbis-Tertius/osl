@@ -8,6 +8,7 @@ module Halo2.TruthTable
 where
 
 import Cast (intToInteger)
+import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Die (die)
@@ -17,14 +18,16 @@ import Halo2.Types.FixedColumn (FixedColumn (..))
 import Halo2.Types.RowCount (RowCount (..))
 import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInt, zero)
 
-getByteRangeColumn :: BitsPerByte -> RowCount -> FixedColumn
+getByteRangeColumn :: BitsPerByte -> RowCount -> FixedColumn Int
 getByteRangeColumn (BitsPerByte b) (RowCount r) =
   let m' = (2 ^ b) - 1
       m =
         fromMaybe
           (die $ "getByteRangeColumn: " <> pack (show m') <> " out of range of scalar type")
           (integerToScalar (intToInteger m'))
-   in FixedColumn ((f <$> [0 .. m']) <> replicate (scalarToInt r - m') m)
+   in FixedColumn . Map.fromList
+        . zip [0 .. scalarToInt r]
+        $ ((f <$> [0 .. m']) <> replicate (scalarToInt r - m') m)
   where
     f :: Int -> Scalar
     f =
@@ -32,6 +35,8 @@ getByteRangeColumn (BitsPerByte b) (RowCount r) =
         . integerToScalar
         . intToInteger
 
-getZeroIndicatorColumn :: RowCount -> FixedColumn
+getZeroIndicatorColumn :: RowCount -> FixedColumn Int
 getZeroIndicatorColumn (RowCount n) =
-  FixedColumn (one : replicate (scalarToInt n - 1) zero)
+  FixedColumn . Map.fromList
+    . zip [0 .. scalarToInt n]
+    $ (one : replicate (scalarToInt n - 1) zero)

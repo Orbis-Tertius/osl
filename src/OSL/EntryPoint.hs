@@ -37,6 +37,7 @@ import Semicircuit.ToLogicCircuit (semicircuitToLogicCircuit)
 import System.Environment (getArgs)
 import Trace.FromLogicCircuit (getMapping, logicCircuitToTraceType)
 import Trace.Metrics (getTraceTypeMetrics)
+import Trace.ToArithmeticAIR (mappings)
 import Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit)
 import Prelude hiding (readFile)
 
@@ -135,7 +136,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
               (logic, layout) = semicircuitToLogicCircuit rowCount semi
               traceLayout = getMapping 8 logic
               traceType = logicCircuitToTraceType bitsPerByte logic
-              circuit = traceTypeToArithmeticCircuit traceType
+              circuitLayout = mappings traceType traceLayout
+              circuit = traceTypeToArithmeticCircuit traceType traceLayout
               circuitMetrics = getCircuitMetrics circuit
               traceTypeMetrics = getTraceTypeMetrics traceType
           pure . SuccessfulOutput $
@@ -162,6 +164,8 @@ calcMain (FileName fileName) (TargetName targetName) (Source source) bitsPerByte
               <> show traceLayout
               <> "\n\nTrace type: "
               <> show traceType
+              <> "\n\nArithmetic circuit layout:\n"
+              <> show circuitLayout
               <> "\n\nArithmetic circuit:\n"
               <> show circuit
     _ -> Left . ErrorMessage $ "please provide the name of a defined term"

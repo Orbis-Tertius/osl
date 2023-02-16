@@ -17,7 +17,7 @@ import OSL.LoadContext (loadContext)
 import OSL.Satisfaction (satisfiesSimple)
 import OSL.SimplifyType (complexifyValueUnsafe, simplifyType)
 import OSL.Spec.Sudoku.Types (Cell (Cell), Col (Col), Digit (Digit), Problem (Problem, unProblem), Row (Row), Solution (Solution, unSolution), Square (Square), SquareCell (SquareCell), SudokuWitness (SudokuWitness), X (X), Y (Y))
-import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6, evalTranslatedFormula7)
+import OSL.TranslatedEvaluation (evalTranslatedFormula1, evalTranslatedFormula2, evalTranslatedFormula3, evalTranslatedFormula4, evalTranslatedFormula5, evalTranslatedFormula6, evalTranslatedFormula7, evalTranslatedFormula8)
 import OSL.Types.Argument (Argument (Argument), Statement (Statement), Witness (Witness))
 import OSL.Types.ArgumentForm (ArgumentForm (ArgumentForm), StatementType (StatementType), WitnessType (WitnessType))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
@@ -135,7 +135,14 @@ exampleSpec c = do
       `shouldBe` Right ()
 
     evalTranslatedFormula7 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
-      `shouldBe` Left (ErrorMessage Nothing "evalTrace: polynomial constraint not satisfied: (\"assert\",1 + 18446744069414584320x17,0^1,Case {unCase = 77},SubexpressionTrace {value = 0, stepType = 44, adviceValues = fromList [(22,0),(23,0),(24,0)]},132,fromList [(14,77),(15,44),(16,0),(17,0),(18,0),(19,0),(20,0),(21,0),(22,0),(23,0),(24,0)])")
+      `shouldBe` Left (ErrorMessage Nothing "evalTrace: polynomial constraint not satisfied: (\"assert\",1 + 18446744069414584320x65,0^1,77,SubexpressionTrace {value = 0, stepType = 50, adviceValues = fromList [(70,0),(71,0),(72,0)]},129,fromList [(12,77),(13,0),(14,0),(15,0),(16,0),(17,0),(18,0),(19,0),(20,0),(21,0),(22,0),(23,0),(24,0),(25,0),(26,0),(27,0),(28,0),(29,0),(30,0),(31,0),(32,0),(33,0),(34,0),(35,0),(36,0),(37,0),(38,0),(39,0),(40,0),(41,0),(42,0),(43,0),(44,0),(45,0),(46,0),(47,0),(48,0),(49,0),(50,0),(51,0),(52,0),(53,0),(54,0),(55,0),(56,0),(57,0),(58,0),(59,0),(60,0),(61,0),(62,0),(63,1),(64,0),(65,0),(66,0),(67,0),(68,0),(69,0),(70,0),(71,0),(72,0)])")
+
+  it "Sudoku spec's semantics are preserved in codegen stage 8" $ do
+    evalTranslatedFormula8 8 c "problemIsSolvable" argumentForm (exampleArgument c)
+      `shouldBe` Right True
+
+    evalTranslatedFormula8 8 c "problemIsSolvable" argumentForm (exampleUnsoundArgument c)
+      `shouldBe` Right False
 
 exampleArgument :: ValidContext 'Global ann -> Argument
 exampleArgument c =

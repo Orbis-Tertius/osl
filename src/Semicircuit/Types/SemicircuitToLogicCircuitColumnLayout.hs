@@ -6,8 +6,6 @@ module Semicircuit.Types.SemicircuitToLogicCircuitColumnLayout
   ( OutputMapping (OutputMapping),
     ArgMapping (ArgMapping),
     NameMapping (NameMapping),
-    OneVectorIndex (OneVectorIndex),
-    ZeroVectorIndex (ZeroVectorIndex),
     LastRowIndicatorColumnIndex (LastRowIndicatorColumnIndex),
     FixedColumns (FixedColumns),
     DummyRowAdviceColumn (DummyRowAdviceColumn),
@@ -22,23 +20,13 @@ import Halo2.Types.ColumnTypes (ColumnTypes)
 import Semicircuit.Types.NameMapping (ArgMapping (ArgMapping), NameMapping (NameMapping), OutputMapping (OutputMapping))
 import Semicircuit.Types.Sigma11 (Name)
 
-newtype ZeroVectorIndex = ZeroVectorIndex {unZeroVectorIndex :: ColumnIndex}
-  deriving stock (Generic)
-  deriving newtype (Show)
-
-newtype OneVectorIndex = OneVectorIndex {unOneVectorIndex :: ColumnIndex}
-  deriving stock (Generic)
-  deriving newtype (Show)
-
 newtype LastRowIndicatorColumnIndex = LastRowIndicatorColumnIndex
   {unLastRowIndicatorColumnIndex :: ColumnIndex}
   deriving stock (Generic)
   deriving newtype (Show)
 
-data FixedColumns = FixedColumns
-  { zeroVector :: ZeroVectorIndex,
-    oneVector :: OneVectorIndex,
-    lastRowIndicator :: LastRowIndicatorColumnIndex
+newtype FixedColumns = FixedColumns
+  { lastRowIndicator :: LastRowIndicatorColumnIndex
   }
   deriving stock (Generic, Show)
 
