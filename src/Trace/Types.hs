@@ -110,9 +110,8 @@ newtype NumberOfCases = NumberOfCases {unNumberOfCases :: Scalar}
 
 -- We represent step type ids as selection vectors, i.e. vectors
 -- of bits containing exactly one 1 bit.
-newtype StepTypeIdSelectionVector =
-  StepTypeIdSelectionVector
-    { unStepTypeIdSelectionVector :: Map StepTypeId ColumnIndex }
+newtype StepTypeIdSelectionVector = StepTypeIdSelectionVector
+  {unStepTypeIdSelectionVector :: Map StepTypeId ColumnIndex}
   deriving (Generic, Show)
 
 data TraceType = TraceType

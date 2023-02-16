@@ -16,7 +16,7 @@ module Trace.ToArithmeticAIR
   )
 where
 
-import Cast (integerToInt, intToInteger)
+import Cast (intToInteger, integerToInt)
 import Control.Arrow (second)
 import Control.Lens ((<&>))
 import Data.List.Extra (mconcatMap, (!?))
@@ -40,10 +40,10 @@ import Halo2.Types.PolynomialConstraints (PolynomialConstraints (PolynomialConst
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
 import Safe (atMay)
-import Stark.Types.Scalar (Scalar, integerToScalar, scalarToInt, zero, one, scalarToInteger)
+import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInt, scalarToInteger, zero)
 import Trace.FromLogicCircuit (getDefaultAdvice)
 import qualified Trace.FromLogicCircuit as LC
-import Trace.Types (InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId (OutputSubexpressionId), ResultExpressionId, StepType, StepTypeId, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), TraceType, Trace, Case (Case), SubexpressionTrace (SubexpressionTrace), InputColumnIndex (InputColumnIndex), StepTypeIdSelectionVector)
+import Trace.Types (Case (Case), InputColumnIndex (InputColumnIndex), InputSubexpressionId (InputSubexpressionId), OutputSubexpressionId (OutputSubexpressionId), ResultExpressionId, StepType, StepTypeId, StepTypeIdSelectionVector, SubexpressionId (SubexpressionId), SubexpressionLink (SubexpressionLink), SubexpressionTrace (SubexpressionTrace), Trace, TraceType)
 
 -- Trace type arithmetic AIRs have the columnar structure
 -- of the trace type, with additional fixed columns for:
@@ -69,12 +69,15 @@ traceTypeFixedValues ::
   TraceType ->
   FixedValues (RowIndex 'Absolute)
 traceTypeFixedValues tt =
-  (FixedValues
-    (FixedColumn . Map.fromList . zip [0..]
-      . concatMap (replicate (Set.size (tt ^. #subexpressions)))
-      . Map.elems . (^. #unFixedColumn)
-      <$> (tt ^. #fixedValues . #getFixedValues))
-     <>)
+  ( FixedValues
+      ( FixedColumn . Map.fromList . zip [0 ..]
+          . concatMap (replicate (Set.size (tt ^. #subexpressions)))
+          . Map.elems
+          . (^. #unFixedColumn)
+          <$> (tt ^. #fixedValues . #getFixedValues)
+      )
+      <>
+  )
     . FixedValues
     . fmap f
     . (^. #getFixedValues)
@@ -84,12 +87,13 @@ traceTypeFixedValues tt =
     $ tt ^. #stepTypes
   where
     f :: FixedColumn Case -> FixedColumn (RowIndex 'Absolute)
-    f = FixedColumn
-      . Map.fromList
-      . zip [0..maxRowIndex tt]
-      . concatMap (replicate n)
-      . Map.elems
-      . (^. #unFixedColumn)
+    f =
+      FixedColumn
+        . Map.fromList
+        . zip [0 .. maxRowIndex tt]
+        . concatMap (replicate n)
+        . Map.elems
+        . (^. #unFixedColumn)
 
     n = Set.size (tt ^. #subexpressions)
 
@@ -133,11 +137,11 @@ stepTypeGateConstraints i (tId, t) =
 
 gateOnStepType :: StepTypeIdSelectionVector -> StepTypeId -> Polynomial -> Polynomial
 gateOnStepType m stId =
-  P.times
-    $ maybe
-        (die "gateOnStepType: step type id column mapping lookup failed")
-        P.var'
-        (Map.lookup stId (m ^. #unStepTypeIdSelectionVector))
+  P.times $
+    maybe
+      (die "gateOnStepType: step type id column mapping lookup failed")
+      P.var'
+      (Map.lookup stId (m ^. #unStepTypeIdSelectionVector))
 
 data CaseUsed = CaseIsUsed | CaseIsNotUsed
   deriving (Eq)
@@ -170,11 +174,10 @@ data AdviceMappings = AdviceMappings
   }
   deriving (Generic, Show)
 
-newtype AIRFixedValues =
-  AIRFixedValues
-    { unAIRFixedValues ::
-        Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
-    }
+newtype AIRFixedValues = AIRFixedValues
+  { unAIRFixedValues ::
+      Map (RowIndex 'Absolute) (Map ColumnIndex Scalar)
+  }
   deriving (Generic)
 
 getAIRFixedValues ::
@@ -182,7 +185,8 @@ getAIRFixedValues ::
   Mappings ->
   AIRFixedValues
 getAIRFixedValues tt m =
-  fixedValuesToAIRFixedValues tt
+  fixedValuesToAIRFixedValues
+    tt
     (additionalFixedValues tt (m ^. #fixed))
 
 fixedValuesToAIRFixedValues ::
@@ -191,12 +195,13 @@ fixedValuesToAIRFixedValues ::
   AIRFixedValues
 fixedValuesToAIRFixedValues tt fvs =
   AIRFixedValues $
-    Map.unionsWith (<>)
+    Map.unionsWith
+      (<>)
       [ Map.singleton ri (Map.singleton ci y)
         | (ci, col) <-
             Map.toList (fvs ^. #getFixedValues),
           (ri, y) <-
-            zip [0..n] (padInfinitely (Map.elems (col ^. #unFixedColumn)))
+            zip [0 .. n] (padInfinitely (Map.elems (col ^. #unFixedColumn)))
       ]
   where
     n = maxRowIndex tt
@@ -230,10 +235,10 @@ mappings t =
     j = i + 1
 
     k :: ColumnIndex
-    k = j + ColumnIndex (n-1)
+    k = j + ColumnIndex (n - 1)
 
     l :: ColumnIndex
-    l = k + 3 + ColumnIndex (n-1)
+    l = k + 3 + ColumnIndex (n - 1)
 
     n :: Int
     n = length (t ^. #inputColumnIndices)
@@ -262,24 +267,24 @@ linksTableFixedColumns ::
   FixedValues (RowIndex 'Absolute)
 linksTableFixedColumns (LinksTable ls) m =
   FixedValues . Map.fromList $
-    [
-      ( m ^. #stepType . #unMapping,
-        FixedColumn . Map.fromList . zip [0..]
-          $ ls <&> (^. #stepType . #unStepTypeId)
+    [ ( m ^. #stepType . #unMapping,
+        FixedColumn . Map.fromList . zip [0 ..] $
+          ls <&> (^. #stepType . #unStepTypeId)
       ),
       ( m ^. #output . #unMapping,
-        FixedColumn . Map.fromList . zip [0..]
-          $ ls <&> (^. #output . #unOutputSubexpressionId . #unSubexpressionId)
+        FixedColumn . Map.fromList . zip [0 ..] $
+          ls <&> (^. #output . #unOutputSubexpressionId . #unSubexpressionId)
       )
-    ] <> zip
-         ((m ^. #inputs) <&> (^. #unMapping))
-         [ FixedColumn . Map.fromList . zip [0..] $
-             fromMaybe
-               (replicate (length ls) (InputSubexpressionId (SubexpressionId zero)))
-               ((ls <&> (^. #inputs)) !? i)
-               <&> (^. #unInputSubexpressionId . #unSubexpressionId)
-           | i <- [0 .. length (m ^. #inputs) - 1]
-         ]
+    ]
+      <> zip
+        ((m ^. #inputs) <&> (^. #unMapping))
+        [ FixedColumn . Map.fromList . zip [0 ..] $
+            fromMaybe
+              (replicate (length ls) (InputSubexpressionId (SubexpressionId zero)))
+              ((ls <&> (^. #inputs)) !? i)
+              <&> (^. #unInputSubexpressionId . #unSubexpressionId)
+          | i <- [0 .. length (m ^. #inputs) - 1]
+        ]
 
 caseAndResultFixedColumns ::
   TraceType ->
@@ -289,15 +294,18 @@ caseAndResultFixedColumns t m =
   FixedValues $
     Map.fromList
       [ ( t ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex,
-          FixedColumn . Map.fromList . zip [0..nRows-1] $
+          FixedColumn . Map.fromList . zip [0 .. nRows - 1] $
             concatMap
               (replicate nSubs . g)
               [0 .. nCases - 1]
         ),
         ( m ^. #result . #unMapping,
-          FixedColumn . Map.fromList . zip [0..nRows-1] . fmap f
-            . concat . replicate nCases
-            . take nSubs . padInfinitely $ [0 .. nResults - 1]
+          FixedColumn . Map.fromList . zip [0 .. nRows - 1] . fmap f
+            . concat
+            . replicate nCases
+            . take nSubs
+            . padInfinitely
+            $ [0 .. nResults - 1]
         )
       ]
   where
@@ -310,7 +318,8 @@ caseAndResultFixedColumns t m =
     g =
       fromMaybe
         (die "caseAndResultFixedColumns: case number out of range of scalar (this is a compiler bug)")
-        . integerToScalar . intToInteger
+        . integerToScalar
+        . intToInteger
 
     f :: Int -> Scalar
     f =
@@ -326,14 +335,15 @@ traceToArgument ::
   Trace ->
   Either (ErrorMessage ann) Argument
 traceToArgument ann tt lcM t = do
-  mconcat <$> sequence
-    [ caseArgument ann tt t m fvs airFvs
-        $ maybe
-          (die "traceToArgument: case number is out of range of scalar field")
-          Case
-          (integerToScalar c)
-      | c <- [0 .. (scalarToInteger (tt ^. #numCases . #unNumberOfCases)) - 1]
-    ]
+  mconcat
+    <$> sequence
+      [ caseArgument ann tt t m fvs airFvs $
+          maybe
+            (die "traceToArgument: case number is out of range of scalar field")
+            Case
+            (integerToScalar c)
+        | c <- [0 .. scalarToInteger (tt ^. #numCases . #unNumberOfCases) - 1]
+      ]
   where
     m = mappings tt lcM
     air = traceTypeToArithmeticAIR tt lcM
@@ -364,8 +374,10 @@ caseRowIndices ::
 caseRowIndices tt (Case (scalarToInteger -> c)) =
   [start .. end]
   where
-    c' = fromMaybe (die "caseRowIndices: case number out of range of Int")
-           (integerToInt c)
+    c' =
+      fromMaybe
+        (die "caseRowIndices: case number out of range of Int")
+        (integerToInt c)
     start = RowIndex (n * c')
     end = start + RowIndex n - 1
     -- TODO: n can sometimes be less if we can show that every evaluation will only
@@ -385,9 +397,10 @@ usedCaseArgument ::
   Either (ErrorMessage ann) Argument
 usedCaseArgument ann tt t m fvs airFvs c es = do
   arg0 <- emptyCaseArgument ann tt t m fvs airFvs c CaseIsUsed
-  args <- mapM
-          (\(ri, (sId, sT)) -> subexpressionArgument ann tt t m fvs airFvs c CaseIsUsed sId sT ri)
-          (zip (caseRowIndices tt c) (Map.toList es))
+  args <-
+    mapM
+      (\(ri, (sId, sT)) -> subexpressionArgument ann tt t m fvs airFvs c CaseIsUsed sId sT ri)
+      (zip (caseRowIndices tt c) (Map.toList es))
   pure $ mconcat args <> arg0
 
 unusedCaseArgument ::
@@ -413,12 +426,13 @@ emptyCaseArgument ::
   CaseUsed ->
   Either (ErrorMessage ann) Argument
 emptyCaseArgument ann tt t m fvs airFvs c used =
-  mconcat <$> sequence
-    [ voidRow ann tt t m fvs airFvs c used i
-      | i <- caseRowIndices tt c
-    ]
+  mconcat
+    <$> sequence
+      [ voidRow ann tt t m fvs airFvs c used i
+        | i <- caseRowIndices tt c
+      ]
 
-voidRow :: 
+voidRow ::
   ann ->
   TraceType ->
   Trace ->
@@ -429,11 +443,18 @@ voidRow ::
   CaseUsed ->
   RowIndex 'Absolute ->
   Either (ErrorMessage ann) Argument
-voidRow ann tt t m fvs airFvs c used ri =
-  subexpressionArgument ann tt t m fvs airFvs c used
+voidRow ann tt t m fvs airFvs c used =
+  subexpressionArgument
+    ann
+    tt
+    t
+    m
+    fvs
+    airFvs
+    c
+    used
     voidEid
     (SubexpressionTrace zero voidStepType defaultAdvice)
-    ri
   where
     voidEid = 0 -- TODO: is it better not to assume void has subexpression id 0 and step type 0?
     voidStepType = 0
@@ -453,13 +474,14 @@ subexpressionArgument ::
   RowIndex 'Absolute ->
   Either (ErrorMessage ann) Argument
 subexpressionArgument ann tt t m fvs airFvs c used sId sT ri = do
-  mconcat <$> sequence
-    [ traceTypeFixedValuesArgument ann tt fvs ri,
-      airFixedValuesArgument ann airFvs ri,
-      traceStatementValuesArgument ann tt t c ri,
-      traceWitnessValuesArgument ann tt t c ri,
-      subexpressionTraceValuesArgument ann tt t m c used sId sT ri
-    ]
+  mconcat
+    <$> sequence
+      [ traceTypeFixedValuesArgument ann tt fvs ri,
+        airFixedValuesArgument ann airFvs ri,
+        traceStatementValuesArgument ann tt t c ri,
+        traceWitnessValuesArgument ann tt t c ri,
+        subexpressionTraceValuesArgument ann tt t m c used sId sT ri
+      ]
 
 traceTypeFixedValuesArgument ::
   ann ->
@@ -468,25 +490,32 @@ traceTypeFixedValuesArgument ::
   RowIndex 'Absolute ->
   Either (ErrorMessage ann) Argument
 traceTypeFixedValuesArgument ann tt fvs ri =
-  mconcat <$> sequence
-    [ Argument mempty . Witness
-        . Map.singleton
-          (CellReference ci ri)
-            <$> maybe
-                (Left
-                  (ErrorMessage ann
-                    ("traceTypeFixedValues: fixed value lookup failed: "
-                      <> pack (show (ci, ri)))))
-                pure
-                (Map.lookup ri
-                  =<< (Map.lookup ci (fvs ^. #getFixedValues)
-                        <&> (^. #unFixedColumn)))
-      | ci <-
-          Map.keys $
-            Map.filter
-              (== Fixed)
-              (tt ^. #columnTypes . #getColumnTypes)
-    ]
+  mconcat
+    <$> sequence
+      [ Argument mempty . Witness
+          . Map.singleton
+            (CellReference ci ri)
+          <$> maybe
+            ( Left
+                ( ErrorMessage
+                    ann
+                    ( "traceTypeFixedValues: fixed value lookup failed: "
+                        <> pack (show (ci, ri))
+                    )
+                )
+            )
+            pure
+            ( Map.lookup ri
+                =<< ( Map.lookup ci (fvs ^. #getFixedValues)
+                        <&> (^. #unFixedColumn)
+                    )
+            )
+        | ci <-
+            Map.keys $
+              Map.filter
+                (== Fixed)
+                (tt ^. #columnTypes . #getColumnTypes)
+      ]
 
 airFixedValuesArgument ::
   ann ->
@@ -495,10 +524,15 @@ airFixedValuesArgument ::
   Either (ErrorMessage ann) Argument
 airFixedValuesArgument ann airFvs ri =
   maybe
-    (Left (ErrorMessage ann
-      ("airFixedValuesArgument: failed row lookup: " <> pack (show ri))))
-    (pure . Argument mempty . Witness
-      . Map.mapKeys (`CellReference` ri))
+    ( Left
+        ( ErrorMessage
+            ann
+            ("airFixedValuesArgument: failed row lookup: " <> pack (show ri))
+        )
+    )
+    ( pure . Argument mempty . Witness
+        . Map.mapKeys (`CellReference` ri)
+    )
     (Map.lookup ri (airFvs ^. #unAIRFixedValues))
 
 traceStatementValuesArgument ::
@@ -510,16 +544,22 @@ traceStatementValuesArgument ::
   Either (ErrorMessage ann) Argument
 traceStatementValuesArgument ann tt t c ri =
   (`Argument` Witness mempty) . Statement
-    . Map.fromList <$> sequence
+    . Map.fromList
+    <$> sequence
       [ (CellReference ci ri,)
           <$> maybe
-                (Left (ErrorMessage ann "traceStatementValuesArgument"))
-                pure
-                (Map.lookup (c, ci)
-                  (t ^. #statement . #unStatement))
-        | ci <- Map.keys
-            (Map.filter (== Instance)
-              (tt ^. #columnTypes . #getColumnTypes))
+            (Left (ErrorMessage ann "traceStatementValuesArgument"))
+            pure
+            ( Map.lookup
+                (c, ci)
+                (t ^. #statement . #unStatement)
+            )
+        | ci <-
+            Map.keys
+              ( Map.filter
+                  (== Instance)
+                  (tt ^. #columnTypes . #getColumnTypes)
+              )
       ]
 
 traceWitnessValuesArgument ::
@@ -530,21 +570,31 @@ traceWitnessValuesArgument ::
   RowIndex 'Absolute ->
   Either (ErrorMessage ann) Argument
 traceWitnessValuesArgument ann tt t c ri =
-  Argument mempty . Witness . Map.fromList <$> sequence
-    [ (CellReference ci ri,)
-        <$> maybe
-              (Left (ErrorMessage ann
-                ("traceWitnessValuesArgument: value lookup failed: " <> pack (show (c, ci)))))
-              pure
-              (Map.lookup (c, ci)
-                (t ^. #witness . #unWitness))
-      | ci <- Map.keys
-          (Map.filter (== Advice)
-            (tt ^. #columnTypes . #getColumnTypes)),
-        -- TODO: make this less brittle; we need to select only the advice columns
-        -- which came from the logic circuit, and this is a way to do it
-        ci < tt ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
-    ]
+  Argument mempty . Witness . Map.fromList
+    <$> sequence
+      [ (CellReference ci ri,)
+          <$> maybe
+            ( Left
+                ( ErrorMessage
+                    ann
+                    ("traceWitnessValuesArgument: value lookup failed: " <> pack (show (c, ci)))
+                )
+            )
+            pure
+            ( Map.lookup
+                (c, ci)
+                (t ^. #witness . #unWitness)
+            )
+        | ci <-
+            Map.keys
+              ( Map.filter
+                  (== Advice)
+                  (tt ^. #columnTypes . #getColumnTypes)
+              ),
+          -- TODO: make this less brittle; we need to select only the advice columns
+          -- which came from the logic circuit, and this is a way to do it
+          ci < tt ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex
+      ]
 
 subexpressionTraceValuesArgument ::
   ann ->
@@ -558,62 +608,70 @@ subexpressionTraceValuesArgument ::
   RowIndex 'Absolute ->
   Either (ErrorMessage ann) Argument
 subexpressionTraceValuesArgument ann tt t m c used sId sT ri =
-  Argument mempty . Witness . mconcat <$> sequence
-    [ -- case used
-      pure $
-        Map.singleton
-          (CellReference (m ^. #advice . #caseUsed . #unMapping) ri)
-          (if used == CaseIsUsed then one else zero),
-      -- step type
-      pure $
-        Map.fromList
-          [ (CellReference ci ri,
-             if sT ^. #stepType == stId then one else zero)
-            | (stId, ci) <-
-                Map.toList (tt ^. #stepTypeIdColumnIndices . #unStepTypeIdSelectionVector)
-          ],
-      -- step indicator
-      pure $
-        Map.singleton
-          (CellReference (tt ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex) ri)
-          zero,
-      -- output subexpression id
-      pure $
-        Map.singleton
-          (CellReference (m ^. #advice . #output . #unMapping) ri)
-          (sId ^. #unSubexpressionId),
-      -- output value
-      pure $
-        Map.singleton
-          (CellReference (tt ^. #outputColumnIndex . #unOutputColumnIndex) ri)
-          (sT ^. #value),
-      -- input subexpression ids and values, and advice from subexpression trace
-      do
-        inIds <-
-          maybe
-            (Left . ErrorMessage ann
-              $ "subexpressionTraceValuesArgument: link not found: "
-                  <> pack (show (sT ^. #stepType, OutputSubexpressionId sId)))
-            pure
-            (Map.lookup
-              (sT ^. #stepType, OutputSubexpressionId sId)
-              (tt ^. #links))
-        mconcat <$> sequence
-          [ do x0 <- (CellReference inCol ri,)
-                       <$> maybe
-                           (Left (ErrorMessage ann "subexpressionTraceValuesArgument: input subexpression id"))
-                           (pure . (^. #value))
-                           (Map.lookup c (t ^. #subexpressions)
-                             >>= Map.lookup inId)
-               let x1 = (CellReference sIdCol ri, inId ^. #unSubexpressionId)
-                   xs = (\(ci, y) -> (CellReference ci ri, y)) <$> Map.toList (sT ^. #adviceValues)
-               pure (Map.fromList (x0 : x1 : xs))
-            | (InputSubexpressionId inId, InputColumnIndex inCol, Mapping sIdCol) <-
-                zip3 inIds (tt ^. #inputColumnIndices) (m ^. #advice . #inputs)
-          ]
-    ]
+  Argument mempty . Witness . mconcat
+    <$> sequence
+      [ -- case used
+        pure $
+          Map.singleton
+            (CellReference (m ^. #advice . #caseUsed . #unMapping) ri)
+            (if used == CaseIsUsed then one else zero),
+        -- step type
+        pure $
+          Map.fromList
+            [ ( CellReference ci ri,
+                if sT ^. #stepType == stId then one else zero
+              )
+              | (stId, ci) <-
+                  Map.toList (tt ^. #stepTypeIdColumnIndices . #unStepTypeIdSelectionVector)
+            ],
+        -- step indicator
+        pure $
+          Map.singleton
+            (CellReference (tt ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex) ri)
+            zero,
+        -- output subexpression id
+        pure $
+          Map.singleton
+            (CellReference (m ^. #advice . #output . #unMapping) ri)
+            (sId ^. #unSubexpressionId),
+        -- output value
+        pure $
+          Map.singleton
+            (CellReference (tt ^. #outputColumnIndex . #unOutputColumnIndex) ri)
+            (sT ^. #value),
+        -- input subexpression ids and values, and advice from subexpression trace
+        do
+          inIds <-
+            maybe
+              ( Left . ErrorMessage ann $
+                  "subexpressionTraceValuesArgument: link not found: "
+                    <> pack (show (sT ^. #stepType, OutputSubexpressionId sId))
+              )
+              pure
+              ( Map.lookup
+                  (sT ^. #stepType, OutputSubexpressionId sId)
+                  (tt ^. #links)
+              )
+          mconcat
+            <$> sequence
+              [ do
+                  x0 <-
+                    (CellReference inCol ri,)
+                      <$> maybe
+                        (Left (ErrorMessage ann "subexpressionTraceValuesArgument: input subexpression id"))
+                        (pure . (^. #value))
+                        ( Map.lookup c (t ^. #subexpressions)
+                            >>= Map.lookup inId
+                        )
+                  let x1 = (CellReference sIdCol ri, inId ^. #unSubexpressionId)
+                      xs = (\(ci, y) -> (CellReference ci ri, y)) <$> Map.toList (sT ^. #adviceValues)
+                  pure (Map.fromList (x0 : x1 : xs))
+                | (InputSubexpressionId inId, InputColumnIndex inCol, Mapping sIdCol) <-
+                    zip3 inIds (tt ^. #inputColumnIndices) (m ^. #advice . #inputs)
+              ]
+      ]
 
 padInfinitely :: [a] -> [a]
 padInfinitely [] = []
 padInfinitely [a] = repeat a
-padInfinitely (x:xs) = x : padInfinitely xs
+padInfinitely (x : xs) = x : padInfinitely xs

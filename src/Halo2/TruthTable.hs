@@ -26,8 +26,8 @@ getByteRangeColumn (BitsPerByte b) (RowCount r) =
           (die $ "getByteRangeColumn: " <> pack (show m') <> " out of range of scalar type")
           (integerToScalar (intToInteger m'))
    in FixedColumn . Map.fromList
-       . zip [0..scalarToInt r]
-       $ ((f <$> [0 .. m']) <> replicate (scalarToInt r - m') m)
+        . zip [0 .. scalarToInt r]
+        $ ((f <$> [0 .. m']) <> replicate (scalarToInt r - m') m)
   where
     f :: Int -> Scalar
     f =
@@ -38,5 +38,5 @@ getByteRangeColumn (BitsPerByte b) (RowCount r) =
 getZeroIndicatorColumn :: RowCount -> FixedColumn Int
 getZeroIndicatorColumn (RowCount n) =
   FixedColumn . Map.fromList
-    . zip [0..scalarToInt n]
+    . zip [0 .. scalarToInt n]
     $ (one : replicate (scalarToInt n - 1) zero)

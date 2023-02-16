@@ -5,7 +5,7 @@ where
 
 import Halo2.Types.BitsPerByte (BitsPerByte)
 import Halo2.Types.Circuit (ArithmeticCircuit, LogicCircuit)
-import Trace.FromLogicCircuit (logicCircuitToTraceType, getMapping)
+import Trace.FromLogicCircuit (getMapping, logicCircuitToTraceType)
 import Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit)
 
 logicCircuitToArithmeticCircuit ::

@@ -2,7 +2,7 @@
 
 module OSL.Map (mapKeysMaybe, inverseMap, curryMap, uncurryMap) where
 
-import Data.Map (Map, fromList, toList, unionsWith, singleton)
+import Data.Map (Map, fromList, singleton, toList, unionsWith)
 import Data.Maybe (catMaybes)
 import Data.Tuple (swap)
 

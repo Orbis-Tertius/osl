@@ -5,11 +5,11 @@ module Trace.ToArithmeticCircuit (traceTypeToArithmeticCircuit) where
 
 import qualified Algebra.Additive as Group
 import Control.Lens ((<&>))
-import Die (die)
 import Data.List.Extra (foldl')
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (pack)
+import Die (die)
 import Halo2.AIR (toCircuit)
 import qualified Halo2.Polynomial as P
 import Halo2.Prelude
@@ -80,8 +80,8 @@ inputChecks t m =
           -- Only apply the check to rows which represent
           -- a step in the trace.
           (stepIndicatorGate t)
-            -- alpha is the input subexpression id of the current row
-            -- beta is the output subexpression id column
+          -- alpha is the input subexpression id of the current row
+          -- beta is the output subexpression id column
           [ (InputExpression alpha, LookupTableColumn beta),
             -- sigma' is the current case number
             -- sigma is the case number column
@@ -131,10 +131,13 @@ linkChecks t m =
     subexpressionId = m ^. #advice . #output . #unMapping
     currentCase = P.var' caseNumber
     -- TODO: check that the selection vector values are all in {0,1}
-    tau = foldr P.plus P.zero
-            [ P.constant (stId ^. #unStepTypeId) `P.times` P.var' ci
-              | (stId, ci) <- Map.toList (t ^. #stepTypeIdColumnIndices . #unStepTypeIdSelectionVector)
-            ]
+    tau =
+      foldr
+        P.plus
+        P.zero
+        [ P.constant (stId ^. #unStepTypeId) `P.times` P.var' ci
+          | (stId, ci) <- Map.toList (t ^. #stepTypeIdColumnIndices . #unStepTypeIdSelectionVector)
+        ]
     alphas = P.var' <$> ((m ^. #advice . #inputs) <&> (^. #unMapping))
     beta = P.var' subexpressionId
     links =
@@ -229,8 +232,11 @@ stepTypeGate ::
   Polynomial
 stepTypeGate t sId =
   maybe
-    (die ("Trace.ToArithmeticCircuit.stepTypeGate: column index lookup failed: "
-           <> pack (show (sId, t))))
+    ( die
+        ( "Trace.ToArithmeticCircuit.stepTypeGate: column index lookup failed: "
+            <> pack (show (sId, t))
+        )
+    )
     P.var'
     (Map.lookup sId (t ^. #stepTypeIdColumnIndices . #unStepTypeIdSelectionVector))
 
@@ -239,8 +245,8 @@ stepTypesGate ::
   Set StepTypeId ->
   Polynomial
 stepTypesGate t sIds =
-  P.one `P.minus`
-    foldl' P.plus P.zero [stepTypeGate t sId | sId <- Set.toList sIds]
+  P.one
+    `P.minus` foldl' P.plus P.zero [stepTypeGate t sId | sId <- Set.toList sIds]
 
 traceTypeEqualityConstraints ::
   TraceType ->

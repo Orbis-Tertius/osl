@@ -81,10 +81,10 @@ checkAllStepConstraintsAreSatisfied ::
   Either (ErrorMessage ann) ()
 checkAllStepConstraintsAreSatisfied ann tt t = do
   gc <- getGlobalEvaluationContext ann tt t
-  forM_ (Map.toList (t ^. #subexpressions))
-    $ \(c, ss) ->
-      forM_ (Map.toList ss)
-        $ \(sId, sT) -> do
+  forM_ (Map.toList (t ^. #subexpressions)) $
+    \(c, ss) ->
+      forM_ (Map.toList ss) $
+        \(sId, sT) -> do
           lc <- getSubexpressionEvaluationContext ann tt t gc (c, sId, sT)
           checkStepConstraintsAreSatisfied ann tt c sT sId lc
 
@@ -396,13 +396,16 @@ getSubexpressionEvaluationContext ann tt t gc (c, sId, sT) =
       pure (Map.singleton (tt ^. #caseNumberColumnIndex . #unCaseNumberColumnIndex) (c ^. #unCase))
 
     stepTypeMapping =
-      pure $ Map.fromList
-        [ (ci, if stId == sT ^. #stepType then one else zero)
-          | (stId, ci) <-
-              Map.toList
-                (tt ^. #stepTypeIdColumnIndices
-                  . #unStepTypeIdSelectionVector)
-        ]
+      pure $
+        Map.fromList
+          [ (ci, if stId == sT ^. #stepType then one else zero)
+            | (stId, ci) <-
+                Map.toList
+                  ( tt
+                      ^. #stepTypeIdColumnIndices
+                        . #unStepTypeIdSelectionVector
+                  )
+          ]
 
     stepIndicatorMapping =
       pure (Map.singleton (tt ^. #stepIndicatorColumnIndex . #unStepIndicatorColumnIndex) zero)

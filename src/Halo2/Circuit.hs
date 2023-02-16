@@ -28,12 +28,11 @@ module Halo2.Circuit
   )
 where
 
-import Safe (headMay)
-import Control.Arrow (first)
 import qualified Algebra.Additive as Group
 import qualified Algebra.Ring as Ring
 import Cast (intToInteger, integerToInt)
 import Control.Applicative (liftA2)
+import Control.Arrow (first)
 import Control.Lens ((<&>))
 import Control.Monad.Extra (allM, andM, when, (&&^), (||^))
 import Data.Either.Extra (mapLeft)
@@ -71,6 +70,7 @@ import Halo2.Types.RowCount (RowCount (RowCount))
 import Halo2.Types.RowIndex (RowIndex (RowIndex), RowIndexType (Absolute))
 import OSL.Map (inverseMap)
 import OSL.Types.ErrorMessage (ErrorMessage (ErrorMessage))
+import Safe (headMay)
 import Stark.Types.Scalar (Scalar, integerToScalar, one, scalarToInteger, toWord64, zero)
 
 class HasPolynomialVariables a where
@@ -281,8 +281,8 @@ class HasEvaluate a b | a -> b where
 
 instance HasEvaluate (RowCount, PolynomialVariable) (Map (RowIndex 'Absolute) Scalar) where
   evaluate _ arg (RowCount n, v) =
-    pure . Map.mapKeys ((`mod` n') . subtract (RowIndex $ v ^. #rowIndex . #getRowIndex) . (^. #rowIndex))
-      $ Map.filterWithKey
+    pure . Map.mapKeys ((`mod` n') . subtract (RowIndex $ v ^. #rowIndex . #getRowIndex) . (^. #rowIndex)) $
+      Map.filterWithKey
         (\k _ -> (k ^. #colIndex) == v ^. #colIndex)
         (getCellMap arg)
     where
@@ -387,9 +387,12 @@ getLookupResults ann rc mRowSet cellMap inputTable = do
       [ do
           inputTableRow <-
             maybe
-              (Left
-                (ErrorMessage ann
-                  ("input table row index missing: " <> pack (show (ri, snd <$> inputTable, Map.lookup ri cellMapAllRows)))))
+              ( Left
+                  ( ErrorMessage
+                      ann
+                      ("input table row index missing: " <> pack (show (ri, snd <$> inputTable, Map.lookup ri cellMapAllRows)))
+                  )
+              )
               pure
               (Map.lookup ri tableRows)
           when (Map.size inputTableRow /= length inputTable) $
@@ -581,8 +584,8 @@ instance
         (getCellMap arg)
         (zip inputTable (snd <$> tableMap))
     let rowSet' =
-          Set.fromList . fmap (^. #rowIndex) . Map.keys
-            $ results
+          Set.fromList . fmap (^. #rowIndex) . Map.keys $
+            results
     pure $ rowSet' == rowSet
 
 instance
@@ -618,8 +621,8 @@ instance HasEvaluate ColumnTypes Bool where
       getColumns (arg ^. #statement . #unStatement)
         == Map.keysSet (Map.filter (== Instance) m)
         && getColumns (arg ^. #witness . #unWitness)
-         == Map.keysSet (Map.filter (== Advice) m)
-                `Set.union` Map.keysSet (Map.filter (== Fixed) m)
+          == Map.keysSet (Map.filter (== Advice) m)
+            `Set.union` Map.keysSet (Map.filter (== Fixed) m)
 
 instance HasEvaluate (FixedValues (RowIndex Absolute)) Bool where
   evaluate _ arg fvs =

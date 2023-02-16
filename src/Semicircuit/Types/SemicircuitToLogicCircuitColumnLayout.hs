@@ -25,7 +25,7 @@ newtype LastRowIndicatorColumnIndex = LastRowIndicatorColumnIndex
   deriving stock (Generic)
   deriving newtype (Show)
 
-data FixedColumns = FixedColumns
+newtype FixedColumns = FixedColumns
   { lastRowIndicator :: LastRowIndicatorColumnIndex
   }
   deriving stock (Generic, Show)
